@@ -107,99 +107,21 @@ class FirebaseManager {
         }
     }
 
-    // Compress Base64 image to ~35KB so it easily fits inside Firestore 1MB document limit if Storage CORS fails
-    async compressBase64Image(dataUrl, maxDimension = 850, quality = 0.5) {
-        if (!dataUrl || typeof dataUrl !== "string" || !dataUrl.startsWith("data:image")) {
-            return dataUrl;
-        }
-        return new Promise((resolve) => {
-            const img = new Image();
-            img.onload = () => {
-                let w = img.naturalWidth || 1000;
-                let h = img.naturalHeight || 1400;
-                if (w > maxDimension || h > maxDimension) {
-                    if (w > h) {
-                        h = Math.round((h * maxDimension) / w);
-                        w = maxDimension;
-                    } else {
-                        w = Math.round((w * maxDimension) / h);
-                        h = maxDimension;
-                    }
-                }
-                const canvas = document.createElement("canvas");
-                canvas.width = w;
-                canvas.height = h;
-                const ctx = canvas.getContext("2d");
-                ctx.drawImage(img, 0, 0, w, h);
-                resolve(canvas.toDataURL("image/jpeg", quality));
-            };
-            img.onerror = () => resolve(dataUrl);
-            img.src = dataUrl;
-        });
-    }
-
-    // Firebase Storage: Upload Data URL / Blob and get permanent HTTPS Download URL with 1.5s CORS timeout
-    async uploadImageToStorage(path, dataUrl) {
-        if (!this.isConnected || !this.storage || !dataUrl) return null;
-        try {
-            const uploadPromise = (async () => {
-                const storageRef = this.storage.ref().child(path);
-                const snapshot = await storageRef.putString(dataUrl, 'data_url');
-                return await snapshot.ref.getDownloadURL();
-            })();
-
-            const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(null), 1500));
-            return await Promise.race([uploadPromise, timeoutPromise]);
-        } catch (err) {
-            console.warn("Firebase Storage upload CORS/skipped:", err.message || err);
-            return null;
-        }
-    }
-
-    // Firestore + Firebase Storage: Upload Heavy Assets & Save Paper Document
+    // Firestore: Save Evaluation Paper (Sanitized to avoid 1MB document size limit)
     async saveEvaluation(evaluation) {
         if (!this.isConnected || !this.firestore || !evaluation || !evaluation.id) return false;
         try {
-            const evalId = String(evaluation.id);
-            const sanitized = JSON.parse(JSON.stringify(evaluation));
-
-            // Process page images
-            if (Array.isArray(sanitized.pages)) {
-                for (let i = 0; i < sanitized.pages.length; i++) {
-                    const pageStr = sanitized.pages[i];
-                    if (typeof pageStr === "string" && pageStr.startsWith("data:")) {
-                        const path = `evaluations/${evalId}/page_${i + 1}.jpg`;
-                        const url = await this.uploadImageToStorage(path, pageStr);
-                        if (url) {
-                            sanitized.pages[i] = url;
-                            evaluation.pages[i] = url;
-                        } else {
-                            // Fallback: Compress Base64 image to ~35KB so document fits inside 1MB Firestore limit
-                            sanitized.pages[i] = await this.compressBase64Image(pageStr, 850, 0.5);
-                        }
-                    }
-                }
-            }
-
-            // Process raw PDF Data URL if present
-            if (sanitized.pdfDataUrl && typeof sanitized.pdfDataUrl === "string" && sanitized.pdfDataUrl.startsWith("data:")) {
-                const pdfPath = `evaluations/${evalId}/paper.pdf`;
-                const url = await this.uploadImageToStorage(pdfPath, sanitized.pdfDataUrl);
-                if (url) {
-                    sanitized.pdfDataUrl = url;
-                    evaluation.pdfDataUrl = url;
-                } else {
-                    delete sanitized.pdfDataUrl; // Omit heavy PDF string from Firestore document
-                }
-            } else if (sanitized.pdfDataUrl && sanitized.pdfDataUrl.length > 500000) {
+            const sanitized = { ...evaluation };
+            if (sanitized.pdfDataUrl && sanitized.pdfDataUrl.length > 500000) {
                 delete sanitized.pdfDataUrl;
             }
-
-            await this.firestore.collection("evaluations").doc(evalId).set(sanitized, { merge: true });
-            console.log(`🔥 Evaluation ${evalId} saved to Firestore successfully!`);
+            if (Array.isArray(sanitized.pages)) {
+                sanitized.pages = sanitized.pages.map(p => (typeof p === "string" && p.length > 500000) ? "[Local Base64 Data]" : p);
+            }
+            await this.firestore.collection("evaluations").doc(String(evaluation.id)).set(sanitized, { merge: true });
             return true;
         } catch (err) {
-            console.warn("Firestore save error/skipped:", err.message || err);
+            console.warn("Firestore sync skipped for heavy paper:", err.message || err);
             return false;
         }
     }
