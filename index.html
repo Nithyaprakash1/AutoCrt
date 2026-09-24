@@ -1,0 +1,785 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OneSpace OSM – Smart On-Screen Marking Platform</title>
+    
+    <!-- Favicon & Apple Touch Icon -->
+    <link rel="icon" type="image/png" href="assets/logo.png">
+    <link rel="apple-touch-icon" href="assets/logo.png">
+    
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    
+    <!-- PDF.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        // Configure PDF.js worker
+        if (window.pdfjsLib) {
+            window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+        }
+    </script>
+    
+    <!-- jsPDF CDN & AutoTable Plugin CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
+    <!-- Chart.js CDN for Analytics Graphs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+    <!-- Apple SF SVG Icons Library -->
+    <script src="js/icons.js"></script>
+
+    <!-- App Stylesheets -->
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/workspace.css">
+</head>
+<body>
+
+    <!-- Central Animated Preloader / Splash Screen -->
+    <div class="app-preloader" id="app-preloader">
+        <div class="preloader-content">
+            <div class="preloader-logo-wrap">
+                <div class="preloader-ring"></div>
+                <img src="assets/logo.png" alt="OneSpace OSM" class="preloader-logo" />
+            </div>
+            <div class="preloader-text-group">
+                <span class="preloader-title">OneSpace <span class="text-osm">OSM</span></span>
+                <span class="preloader-sub">Smart On-Screen Marking Platform</span>
+            </div>
+            <div class="preloader-progress-track">
+                <div class="preloader-progress-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Clean Portal Login Gateway (Apple Cupertino Style) -->
+    <div class="portal-login-overlay" id="portal-login-screen" style="display: none;">
+        <div class="portal-login-container" style="max-width: 540px;">
+            <div class="portal-login-brand">
+                <div class="portal-brand-logos-row">
+                    <img src="assets/fulllogo.png" alt="OneSpace OSM" class="portal-app-logo" />
+                    <span class="portal-logo-divider"></span>
+                    <img src="assets/school_fulllogo.jpg" alt="Adwaith Thought Academy" class="portal-school-logo" />
+                </div>
+                <h1 class="portal-brand-title">OneSpace <span class="brand-badge-large">OSM</span></h1>
+                <p class="portal-brand-sub">Physics Digital Examination Platform</p>
+            </div>
+
+            <!-- Single Unified Portal Authentication Card -->
+            <div class="portal-role-card" style="padding: 28px; border-radius: 24px; box-shadow: var(--shadow-md);">
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 0.8rem; color: var(--text-muted); margin-bottom: 6px;">Select Portal Destination</label>
+                    <div style="display: flex; gap: 6px; background: var(--bg-subtle); padding: 4px; border-radius: 12px; border: 1px solid var(--border-color);">
+                        <button type="button" id="tab-login-admin" class="login-tab-btn active" style="flex: 1; height: 36px; border: none; border-radius: 9px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: var(--bg-card); color: var(--text-main); box-shadow: var(--shadow-xs);">Admin Panel</button>
+                        <button type="button" id="tab-login-uploader" class="login-tab-btn" style="flex: 1; height: 36px; border: none; border-radius: 9px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: transparent; color: var(--text-muted);">Upload Desk</button>
+                        <button type="button" id="tab-login-evaluator" class="login-tab-btn" style="flex: 1; height: 36px; border: none; border-radius: 9px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: transparent; color: var(--text-muted);">Teacher Desk</button>
+                    </div>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">User Email</label>
+                    <input type="email" id="demo-login-email" value="admin@adwaith.edu" style="width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 0.9rem; background: var(--bg-subtle); color: var(--text-main);" />
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Password</label>
+                    <input type="password" id="demo-login-password" value="admin2026" style="width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 0.9rem; background: var(--bg-subtle); color: var(--text-main);" />
+                </div>
+
+                <a href="admin.html" class="btn-portal-enter btn-enter-purple" id="btn-login-as-uploader" style="height: 48px; border-radius: 14px; font-size: 0.95rem; background: linear-gradient(135deg, #AF52DE, #5856D6); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; text-decoration: none; transition: transform 0.15s ease, box-shadow 0.15s ease;">
+                    Access Admin Panel
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                </a>
+            </div>
+
+            <div class="portal-login-footer" style="margin-top: 24px;">
+                <span>OneSpace OSM Platform • Co-Branded with Adwaith Thought Academy</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Mobile Top Bar with Drawer Toggle (Visible only on mobile) -->
+    <div class="mobile-top-bar" id="app-mobile-top-bar">
+        <button type="button" class="btn-mobile-menu-toggle" id="btn-mobile-sidebar-toggle" title="Toggle Navigation Menu">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <div class="mobile-brand-title">
+            <img src="assets/logo.png" alt="OSM" class="mobile-brand-logo" />
+            <span class="brand-text-main">OneSpace <span class="text-osm">OSM</span></span>
+        </div>
+        <div class="mobile-top-right">
+            <img src="assets/school_logo.jpg" alt="School" class="mobile-school-logo" id="mobile-school-logo-img" />
+            <button type="button" class="btn-mobile-logout" id="btn-mobile-logout" title="Change Desk / Logout">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Backdrop for mobile drawer -->
+    <div class="sidebar-drawer-backdrop" id="sidebar-drawer-backdrop"></div>
+
+    <!-- App Shell: Side Menu Bar + Main Viewport -->
+    <div class="app-shell" id="main-app-shell">
+        <!-- Side Menu Bar (Apple macOS / iPadOS Style) -->
+        <aside class="app-sidebar" id="app-side-menu-bar">
+            <!-- Sidebar Header / Brand -->
+            <div class="sidebar-header">
+                <div class="sidebar-brand-box" id="sidebar-brand-logo">
+                    <img src="assets/fulllogo.png" alt="OneSpace OSM" class="sidebar-brand-full" />
+                    <img src="assets/logo.png" alt="OneSpace OSM" class="sidebar-brand-mark" />
+                </div>
+                <button type="button" class="btn-sidebar-collapse" id="btn-sidebar-collapse" title="Collapse / Expand Side Menu">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+                </button>
+            </div>
+
+            <!-- Sidebar Navigation Menu Items -->
+            <nav class="sidebar-nav">
+                <!-- Uploader Desk Navigation (Shown when activePortal === 'uploader') -->
+                <div class="sidebar-nav-group" id="sidebar-uploader-nav" style="display: none;">
+                    <div class="sidebar-group-title">UPLOADER DESK</div>
+                    <ul class="sidebar-menu-list">
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item active" data-view="upload-portal" id="side-nav-uploader-portal" title="Upload Desk">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Upload Desk</span>
+                                <span class="sidebar-menu-badge" id="side-badge-upload">Active</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="classes" id="side-nav-uploader-classes" title="Classes & Rosters">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Classes & Rosters</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="uploaded-papers" id="side-nav-uploader-papers" title="Uploaded Papers">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Uploaded Papers</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="user-management" id="side-nav-uploader-users" title="User Management">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">User Management</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="settings" id="side-nav-uploader-settings" title="Settings">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Settings</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <!-- Teacher Evaluator Navigation (Shown when activePortal === 'evaluator') -->
+                <div class="sidebar-nav-group" id="sidebar-teacher-nav">
+                    <div class="sidebar-group-title">TEACHER WORKSPACE</div>
+                    <ul class="sidebar-menu-list">
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item active" data-view="dashboard" id="side-nav-dashboard" title="Dashboard">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Dashboard</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="new-eval" id="side-nav-new-eval" title="New Evaluation">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">New Evaluation</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="history" id="side-nav-history" title="Evaluation History">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 3"/><circle cx="12" cy="12" r="9"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Evaluation History</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="bulk-report" id="side-nav-bulk-report" title="Bulk Reports">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Bulk Reports</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="settings" id="side-nav-teacher-settings" title="Settings">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Settings</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            </nav>
+
+            <!-- Sidebar Footer Controls -->
+            <div class="sidebar-footer">
+                <!-- Portal Desk Mode Indicator & Switch -->
+                <div class="sidebar-portal-card" id="side-portal-card">
+                    <div class="portal-card-top">
+                        <span class="portal-indicator-dot"></span>
+                        <div class="portal-name-col">
+                            <span class="portal-sub-label">Active Desk</span>
+                            <span class="portal-active-label" id="side-portal-label">Teacher Desk</span>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-side-switch" id="btn-side-switch-portal" title="Switch Portal Role">
+                        Switch Desk
+                    </button>
+                </div>
+
+                <!-- Teacher User Profile & Logout -->
+                <div class="sidebar-user-row">
+                    <div class="user-avatar" id="side-user-avatar">NP</div>
+                    <div class="user-info-col">
+                        <span class="user-name" id="side-user-name">Mrs. Nithya Prakash</span>
+                        <span class="user-role-label">Evaluator</span>
+                    </div>
+                    <button type="button" class="btn-sidebar-icon" id="btn-side-logout" title="Change Portal / Logout">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+                    </button>
+                    <button type="button" class="btn-sidebar-icon" id="btn-side-settings" title="Settings">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Content Viewport -->
+        <div class="app-main-viewport" id="app-main-viewport">
+            <!-- Co-Branded Top Navigation Bar (Apple Frosted Glass) -->
+            <header class="app-navbar" id="main-app-header">
+                <div class="navbar-left">
+                    <button type="button" class="btn-navbar-menu-toggle" id="btn-navbar-menu-toggle" title="Expand / Collapse Side Navigation Menu">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+                    </button>
+                    <div class="navbar-brand-wrap" title="OneSpace OSM">
+                        <img src="assets/fulllogo.png" alt="OneSpace OSM" class="navbar-brand-full" id="navbar-brand-full-img" />
+                        <img src="assets/logo.png" alt="OneSpace OSM" class="navbar-brand-mark" id="navbar-brand-mark-img" />
+                    </div>
+                    <span class="navbar-osm-badge">OSM Platform</span>
+                </div>
+
+                <div class="navbar-center">
+                    <div class="header-portal-pill portal-pill-upload" id="header-portal-pill" title="Current Desk Mode (Click to Switch)">
+                        <span class="portal-pill-dot"></span>
+                        <span class="portal-pill-name" id="portal-pill-label">Upload Desk</span>
+                    </div>
+                </div>
+
+                <div class="navbar-right">
+                    <!-- Dynamic Client School Co-Branding Container -->
+                    <div class="navbar-client-container">
+                        <div class="navbar-client-divider"></div>
+                        <div class="navbar-client-badge" id="navbar-client-badge" title="Client Institution">
+                            <div class="client-logo-wrapper">
+                                <img src="assets/school_logo.jpg" alt="Adwaith Thought Academy" class="client-school-logo-mark" id="navbar-school-mark-img" />
+                            </div>
+                            <span class="navbar-school-text" id="navbar-school-name">Adwaith Thought Academy</span>
+                        </div>
+                    </div>
+
+                    <div class="navbar-user-actions">
+                        <button type="button" class="btn-navbar-icon" id="btn-open-settings" title="System & Account Settings">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                        </button>
+                    </div>
+                </div>
+            </header>
+
+            <main class="main-content" id="main-content-area">
+                <!-- View 0: Upload Portal (Subject -> Template -> Class -> PDF Ingestion) -->
+                <section class="view-section" id="view-upload-portal">
+                    <div id="upload-portal-container-root"></div>
+                </section>
+
+                <!-- View 1: Teacher Dashboard -->
+                <section class="view-section active-view" id="view-dashboard">
+                    <div id="dashboard-container-root"></div>
+                </section>
+
+                <!-- View 2: Create Evaluation & Dropzone -->
+                <section class="view-section" id="view-new-eval">
+                    <div id="eval-form-container-root"></div>
+                </section>
+
+                <!-- View 3: Student History -->
+                <section class="view-section" id="view-history">
+                    <div id="history-container-root"></div>
+                </section>
+
+                <!-- View 4: Bulk Mark Report -->
+                <section class="view-section" id="view-bulk-report">
+                    <div id="bulk-report-container-root"></div>
+                </section>
+
+                <!-- View 5: Classes & Rosters Page -->
+                <section class="view-section" id="view-classes">
+                    <div id="classes-container-root"></div>
+                </section>
+
+                <!-- View 6: Uploaded Papers & Pages Repository -->
+                <section class="view-section" id="view-uploaded-papers">
+                    <div id="uploaded-papers-container-root"></div>
+                </section>
+
+                <!-- View 7: Full-Page Settings -->
+                <section class="view-section" id="view-settings">
+                    <div id="settings-container-root"></div>
+                </section>
+
+                <!-- View 8: User Management Desk -->
+                <section class="view-section" id="view-user-management">
+                    <div id="user-management-container-root"></div>
+                </section>
+            </main>
+        </div>
+    </div>
+
+    <!-- View 5: Digital Correction Workspace (Full Height Overlay) -->
+    <div class="workspace-container" id="view-workspace" style="display: none;">
+        <!-- Top Workspace Bar -->
+        <div class="ws-top-toolbar">
+            <div class="ws-student-meta">
+                <button type="button" class="btn-back-dash" id="ws-btn-back">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                    <span>Dashboard</span>
+                </button>
+                <div class="ws-branding-badge" title="OneSpace OSM">
+                    <img src="assets/logo.png" alt="OSM" class="ws-brand-mark" />
+                </div>
+                <div class="student-info-pill">
+                    <div class="ws-student-name">
+                        <span id="ws-student-name-text">Student Name</span>
+                        <span class="ws-roll-tag" id="ws-roll-tag-text">Roll: 101</span>
+                    </div>
+                    <div class="ws-exam-subtitle" id="ws-exam-subtitle-text">Physics • Board Paper 2026</div>
+                </div>
+            </div>
+
+            <!-- Prominent Score Status Counter -->
+            <div class="ws-center-status">
+                <div class="ws-score-display">
+                    <span class="ws-score-label">Score:</span>
+                    <span class="ws-score-val" id="ws-live-score-val">0 / 20</span>
+                </div>
+                <div class="autosave-pill" id="ws-autosave-status">
+                    <span class="autosave-dot"></span>
+                    <span id="ws-autosave-text">Autosaved</span>
+                </div>
+            </div>
+
+            <!-- Top Action Controls -->
+            <div class="ws-controls-group">
+                <div class="ws-client-badge" id="ws-client-badge" title="Client Institution">
+                    <img src="assets/school_logo.jpg" alt="School" class="ws-school-logo" id="ws-school-logo-img" />
+                    <span class="ws-school-name-text" id="ws-school-name-text">Adwaith</span>
+                </div>
+                <div class="toolbar-divider" style="width: 1px; height: 20px;"></div>
+                <button type="button" class="btn-ws-tool" id="ws-btn-undo" title="Undo (Ctrl+Z)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7v6h6"/><path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"/></svg>
+                </button>
+                <button type="button" class="btn-ws-tool" id="ws-btn-redo" title="Redo (Ctrl+Y)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 7v6h-6"/><path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7"/></svg>
+                </button>
+                <div class="toolbar-divider" style="width: 1px; height: 20px;"></div>
+                <button type="button" class="btn-ws-tool" id="ws-btn-zoom-out" title="Zoom Out (-)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                </button>
+                <button type="button" class="btn-ws-tool" id="ws-btn-zoom-in" title="Zoom In (+)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/></svg>
+                </button>
+                <button type="button" class="btn-ws-tool" id="ws-btn-fit-width" title="Fit to Width">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>
+                </button>
+                <button type="button" class="btn-ws-tool" id="ws-btn-fit-page" title="Fit to Page">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/></svg>
+                </button>
+                <button type="button" class="btn-ws-tool" id="ws-btn-fullscreen" title="Toggle Fullscreen">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+                </button>
+                <div class="toolbar-divider" style="width: 1px; height: 20px;"></div>
+                <button type="button" class="btn-ws-save" id="ws-btn-save-progress">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                    <span>Save</span>
+                </button>
+                <button type="button" class="btn-ws-save-next" id="ws-btn-save-next" title="Save and move to next student (Ctrl+Enter)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    <span>Save & Next</span>
+                </button>
+                <button type="button" class="btn-ws-export-excel" id="ws-btn-export-excel" title="Export class results as Excel CSV">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                    <span>Excel</span>
+                </button>
+                <button type="button" class="btn-ws-export-pdf" id="ws-btn-export-pdf">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10 12v6"/><path d="M10 15h3a1.5 1.5 0 0 0 0-3h-3"/></svg>
+                    <span>Export PDF</span>
+                </button>
+                <button type="button" class="btn-mobile-drawer-toggle" id="ws-btn-mobile-drawer" title="Toggle Question Sheet">
+                    <span>Questions</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Top Quick-Marking HUD (Apple Glassmorphism Bar) -->
+        <div class="ws-top-quick-hud" id="ws-quick-hud-bar">
+            <div class="ws-hud-left-group">
+                <span class="hud-sec-tag-pill" id="hud-section-badge">Section A</span>
+                <div class="hud-q-stepper">
+                    <button type="button" class="hud-q-nav-btn" id="hud-btn-prev-q" title="Previous Question">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <span class="hud-active-q-badge" id="hud-active-q-label">Q1</span>
+                    <span class="hud-q-max-pill" id="hud-active-q-max">/ 2 Marks</span>
+                    <button type="button" class="hud-q-nav-btn" id="hud-btn-next-q" title="Next Question">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                </div>
+                <span class="hud-choice-pill" id="hud-choice-badge" style="display: none;">OR Choice</span>
+                <span class="hud-q-total-pill" id="hud-q-total-badge">Q Total: 0/2M</span>
+                <span class="hud-sec-total-pill" id="hud-sec-total-badge">Sec Total: 0/10M</span>
+            </div>
+
+            <!-- Direct Quick Mark Buttons with Step Marks (+0.5, +1.0) and Half Marks -->
+            <div class="ws-hud-marks-strip" id="hud-marks-buttons-row">
+                <div class="hud-step-btns-group">
+                    <button type="button" class="hud-step-btn" id="hud-btn-step-half" data-step="0.5" title="Add +0.5 Step Mark">+0.5 Step</button>
+                    <button type="button" class="hud-step-btn" id="hud-btn-step-one" data-step="1.0" title="Add +1.0 Step Mark">+1.0 Step</button>
+                </div>
+                <div class="hud-number-marks-row">
+                    <button type="button" class="hud-mark-btn" data-mark="0">0</button>
+                    <button type="button" class="hud-mark-btn hud-half-btn" data-mark="0.5">0.5</button>
+                    <button type="button" class="hud-mark-btn" data-mark="1">1</button>
+                    <button type="button" class="hud-mark-btn hud-half-btn" data-mark="1.5">1.5</button>
+                    <button type="button" class="hud-mark-btn" data-mark="2">2</button>
+                    <button type="button" class="hud-mark-btn hud-half-btn" data-mark="2.5">2.5</button>
+                    <button type="button" class="hud-mark-btn" data-mark="3">3</button>
+                    <button type="button" class="hud-mark-btn hud-half-btn" data-mark="3.5">3.5</button>
+                    <button type="button" class="hud-mark-btn" data-mark="4">4</button>
+                    <button type="button" class="hud-mark-btn" data-mark="5">5</button>
+                    <button type="button" class="hud-mark-btn" data-mark="6">6</button>
+                    <button type="button" class="hud-mark-btn" data-mark="8">8</button>
+                    <button type="button" class="hud-mark-btn" data-mark="10">10</button>
+                </div>
+            </div>
+
+            <div class="ws-hud-right-group">
+                <div class="hud-custom-input-wrap">
+                    <input type="number" step="0.5" min="0" max="100" id="hud-custom-score-inp" class="hud-custom-inp" placeholder="Score" />
+                    <button type="button" id="hud-btn-apply-custom" class="hud-btn-apply">Set</button>
+                </div>
+                <button type="button" class="hud-btn-stamp-mode" id="hud-btn-stamp-toggle" title="Stamp current marks badge on paper">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    <span>Stamp Mark</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Split Workspace Body -->
+        <div class="ws-body">
+            <!-- Left Toolbar: Correction & Vector Tools -->
+            <aside class="ws-left-toolbar">
+                <span class="tool-category-title">Select</span>
+                <button type="button" class="tool-button tool-select" data-tool="select" id="tool-select" title="Select & Move / Resize Annotations [V]">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3l7 18 3-7 7-3L3 3z"/></svg>
+                    </span>
+                    <span class="tool-name">Select</span>
+                </button>
+
+                <div class="toolbar-divider"></div>
+                <span class="tool-category-title">Marking</span>
+                
+                <button type="button" class="tool-button tool-tick active" data-tool="tick" id="tool-tick" title="Tick - Correct Answer [T]">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                    </span>
+                    <span class="tool-name">Tick</span>
+                </button>
+
+                <button type="button" class="tool-button tool-wrong" data-tool="wrong" id="tool-wrong" title="Wrong - Incorrect Answer [W]">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </span>
+                    <span class="tool-name">Wrong</span>
+                </button>
+
+                <button type="button" class="tool-button tool-circle" data-tool="circle" id="tool-circle" title="Circle - Highlight mistake [C]">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/></svg>
+                    </span>
+                    <span class="tool-name">Circle</span>
+                </button>
+
+                <button type="button" class="tool-button tool-underline" data-tool="underline" id="tool-underline" title="Underline text">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v7a6 6 0 0 0 12 0V3"/><line x1="4" y1="21" x2="20" y2="21"/></svg>
+                    </span>
+                    <span class="tool-name">Underline</span>
+                </button>
+
+                <button type="button" class="tool-button tool-highlight" data-tool="highlight" id="tool-highlight" title="Highlight area">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FFCC00" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 11-6 6v3h3l6-6"/><path d="m22 12-4.6 4.6a2 2 0 0 1-2.8 0l-5.2-5.2a2 2 0 0 1 0-2.8L14 4"/></svg>
+                    </span>
+                    <span class="tool-name">Highlight</span>
+                </button>
+
+                <button type="button" class="tool-button tool-comment" data-tool="comment" id="tool-comment" title="Add text comment">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    </span>
+                    <span class="tool-name">Comment</span>
+                </button>
+
+                <button type="button" class="tool-button tool-eraser" data-tool="eraser" id="tool-eraser" title="Eraser [E]">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#8E8E93" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7 21-4.3-4.3c-1-1-1-2.5 0-3.4l9.6-9.6c1-1 2.5-1 3.4 0l5.6 5.6c1 1 1 2.5 0 3.4L13 21"/><path d="M22 21H7"/><path d="m5 11 9 9"/></svg>
+                    </span>
+                    <span class="tool-name">Eraser</span>
+                </button>
+
+                <div class="toolbar-divider"></div>
+                <span class="tool-category-title">Draw</span>
+
+                <button type="button" class="tool-button tool-pen" data-tool="pen" id="tool-pen" title="Freehand Pen [P]">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>
+                    </span>
+                    <span class="tool-name">Pen</span>
+                </button>
+
+                <button type="button" class="tool-button tool-arrow" data-tool="arrow" id="tool-arrow" title="Pointer Arrow">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>
+                    </span>
+                    <span class="tool-name">Arrow</span>
+                </button>
+
+                <button type="button" class="tool-button tool-marks" data-tool="marks" id="tool-marks" title="Marks Stamp Badge">
+                    <span class="tool-icon">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"/><line x1="7" y1="7" x2="7.01" y2="7"/></svg>
+                    </span>
+                    <span class="tool-name">Marks</span>
+                </button>
+            </aside>
+
+            <!-- Center Answer Sheet Canvas Viewport -->
+            <section class="ws-viewport-stage" id="ws-viewport-container">
+                <!-- Workspace PDF Loading / Processing Overlay -->
+                <div class="ws-loading-overlay" id="ws-loading-overlay" style="display: none;">
+                    <div class="ws-loader-box">
+                        <div class="ws-loader-spinner-wrap">
+                            <div class="ws-loader-ring"></div>
+                            <img src="assets/logo.png" alt="OSM Loading" class="ws-loader-logo" />
+                        </div>
+                        <div class="ws-loader-text-group">
+                            <span class="ws-loader-msg" id="ws-loader-msg">Loading Student Answer Sheet...</span>
+                            <span class="ws-loader-subtext">Rendering high-resolution vector pages</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="canvas-container-root"></div>
+
+                <!-- Floating Page Navigator -->
+                <div class="ws-floating-pager">
+                    <button type="button" class="btn-pager" id="ws-pager-prev" title="Previous Page">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                    </button>
+                    <span class="pager-text" id="ws-pager-text">Page 1 of 1</span>
+                    <button type="button" class="btn-pager" id="ws-pager-next" title="Next Page">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                    <div class="ws-page-total-pill" id="ws-page-total-pill" title="Total Marks Awarded on This Page">
+                        <span class="page-total-label">Page Total:</span>
+                        <span class="page-total-val" id="ws-page-total-val">0</span>
+                        <span class="page-total-unit">M</span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Marking & Feedback Panel -->
+            <aside class="ws-right-marking-panel" id="marking-panel-container">
+                <!-- Injected by MarkingPanel -->
+            </aside>
+        </div>
+
+        <!-- Absent Student Overlay (shown when no paper exists for a student) -->
+        <div class="ws-absent-overlay" id="ws-absent-overlay" style="display: none;">
+            <div class="absent-card">
+                <div class="absent-icon-ring">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                </div>
+                <h3 class="absent-title">Student Absent</h3>
+                <p class="absent-student-name" id="absent-student-name">—</p>
+                <p class="absent-desc">No answer sheet was uploaded for this student. Mark as absent and continue.</p>
+                <div class="absent-actions">
+                    <button type="button" class="btn-absent-mark" id="btn-absent-mark-confirm">Mark Absent &amp; Continue</button>
+                    <button type="button" class="btn-absent-skip" id="btn-absent-skip">Skip to Next</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal-backdrop" id="modal-settings">
+        <div class="modal-dialog modal-dialog-wide">
+            <div class="modal-header">
+                <div>
+                    <h3 class="modal-title">Account & System Settings</h3>
+                    <p class="modal-subtitle">Manage profile display name, reset account password, and configure database preferences.</p>
+                </div>
+                <button type="button" class="btn-modal-close" id="btn-close-settings">×</button>
+            </div>
+
+            <!-- Settings Tab Headers -->
+            <div class="modal-tab-nav">
+                <button type="button" class="modal-tab-btn active" data-tab="tab-settings-profile">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                    Profile & Name
+                </button>
+                <button type="button" class="modal-tab-btn" data-tab="tab-settings-password">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                    Reset Password
+                </button>
+                <button type="button" class="modal-tab-btn" data-tab="tab-settings-storage">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+                    Cloud & Database
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Tab 1: Profile & Name -->
+                <div class="settings-tab-pane active" id="tab-settings-profile">
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label>User Display Name / Full Name</label>
+                        <input type="text" id="settings-teacher-name" class="form-input" placeholder="e.g. Mrs. Nithya Prakash" value="Mrs. Nithya Prakash" />
+                        <span class="form-help-text">This name appears on the sidebar, header profile, and digital evaluation feedback certificates.</span>
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label>School / Institution Name</label>
+                        <input type="text" id="settings-inst-name" class="form-input" value="Adwaith Thought Academy" />
+                    </div>
+
+                    <div class="profile-preview-card">
+                        <div class="user-avatar-preview" id="settings-avatar-preview">NP</div>
+                        <div class="profile-preview-info">
+                            <span class="preview-name" id="settings-preview-name">Mrs. Nithya Prakash</span>
+                            <span class="preview-role">Digital Evaluation Specialist</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Tab 2: Reset Password -->
+                <div class="settings-tab-pane" id="tab-settings-password" style="display: none;">
+                    <div id="password-reset-status" class="settings-status-box" style="display: none;"></div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label>Current Password</label>
+                        <input type="password" id="settings-curr-password" class="form-input" placeholder="Enter existing password" autocomplete="current-password" />
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 14px;">
+                        <label>New Password</label>
+                        <input type="password" id="settings-new-password" class="form-input" placeholder="Minimum 6 characters" autocomplete="new-password" />
+                    </div>
+
+                    <div class="form-group" style="margin-bottom: 18px;">
+                        <label>Confirm New Password</label>
+                        <input type="password" id="settings-confirm-password" class="form-input" placeholder="Re-type new password" autocomplete="new-password" />
+                    </div>
+
+                    <button type="button" class="btn-primary" id="btn-submit-password-reset" style="height: 40px; padding: 0 20px;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        Update Password
+                    </button>
+                </div>
+
+                <!-- Tab 3: Cloud & Database -->
+                <div class="settings-tab-pane" id="tab-settings-storage" style="display: none;">
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label>Storage & Database Mode</label>
+                        <select id="settings-storage-mode" class="form-select">
+                            <option value="local">Local Mock & Offline Mode (IndexedDB)</option>
+                            <option value="firebase">Cloud Firebase (Firestore + Storage + Auth)</option>
+                        </select>
+                    </div>
+
+                    <div id="firebase-config-fields" style="display: none; border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 16px;">
+                        <h4 style="font-size: 0.95rem; margin-bottom: 10px; color: var(--text-main); font-weight: 400 !important;">Firebase Project Credentials</h4>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label>API Key</label>
+                            <input type="text" id="fb-cfg-api-key" class="form-input" placeholder="AIzaSy..." />
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label>Project ID</label>
+                            <input type="text" id="fb-cfg-project-id" class="form-input" placeholder="onespace-evaluation" />
+                        </div>
+                        <div class="form-group" style="margin-bottom: 10px;">
+                            <label>Storage Bucket</label>
+                            <input type="text" id="fb-cfg-storage-bucket" class="form-input" placeholder="onespace-evaluation.appspot.com" />
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="modal-footer">
+                <button type="button" class="btn-secondary" id="btn-cancel-settings">Close</button>
+                <button type="button" class="btn-primary" id="btn-save-settings">Save Changes</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications Root -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
+    <script src="js/firebase-config.js"></script>
+
+    <!-- Application Script Modules -->
+    <script src="js/mock-data.js"></script>
+    <script src="js/storage.js"></script>
+    <script src="js/canvas-engine.js"></script>
+    <script src="js/marking-panel.js"></script>
+    <script src="js/pdf-generator.js"></script>
+    <script src="js/bulk-report.js"></script>
+    <script src="js/dashboard.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/eval-form.js"></script>
+    <script src="js/upload-portal.js"></script>
+    <script src="js/classes-page.js"></script>
+    <script src="js/uploaded-papers-page.js"></script>
+    <script src="js/settings-page.js"></script>
+    <script src="js/user-management-page.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

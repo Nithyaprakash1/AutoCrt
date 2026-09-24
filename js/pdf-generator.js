@@ -1,0 +1,398 @@
+/**
+ * OneSpace Digital Correction - PDF Generator
+ * Renders original paper pages overlaid with crisp annotations,
+ * followed by a professional final Student Mark Summary Page.
+ */
+
+class PDFGenerator {
+    /**
+     * Generate and download the evaluated student PDF
+     */
+    static async generateCorrectedPaperPDF(evaluation) {
+        if (!window.jspdf || !window.jspdf.jsPDF) {
+            throw new Error("jsPDF library is not loaded");
+        }
+
+        const { jsPDF } = window.jspdf;
+        // Default A4 portrait (210 x 297 mm)
+        const doc = new jsPDF({
+            orientation: "portrait",
+            unit: "mm",
+            format: "a4",
+            compress: true
+        });
+
+        const pages = evaluation.pages || [];
+        const annotations = evaluation.annotations || [];
+
+        // 1. Render each answer sheet page with overlaid annotations
+        for (let i = 0; i < pages.length; i++) {
+            if (i > 0) {
+                doc.addPage("a4", "portrait");
+            }
+
+            const pageAnnotations = annotations.filter(a => (a.pageIndex || 0) === i);
+            const compositeDataUrl = await this.renderCompositePage(pages[i], pageAnnotations);
+
+            // A4 is 210 x 297 mm
+            doc.addImage(compositeDataUrl, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+        }
+
+        // Preload co-branding logos for institutional co-branding header
+        const [schoolLogoData, appLogoData] = await Promise.all([
+            this.loadLogoDataUrl("assets/school_fulllogo.jpg"),
+            this.loadLogoDataUrl("assets/fulllogo.png")
+        ]);
+
+        // 2. Add Final Student Mark Summary Page
+        doc.addPage("a4", "portrait");
+        this.renderSummaryPage(doc, evaluation, {
+            schoolLogo: schoolLogoData,
+            appLogo: appLogoData
+        });
+
+        // 3. Save or Download
+        const sanitizedName = (evaluation.studentName || "Student").replace(/[^a-zA-Z0-9_-]/g, "_");
+        const sanitizedExam = (evaluation.examName || "Exam").replace(/[^a-zA-Z0-9_-]/g, "_");
+        const filename = `${sanitizedName}_${sanitizedExam}_Corrected.pdf`;
+
+        doc.save(filename);
+        return filename;
+    }
+
+    /**
+     * Cache and convert image asset into Base64 data URL via canvas
+     */
+    static async loadLogoDataUrl(src) {
+        if (!this._logoCache) this._logoCache = {};
+        if (this._logoCache[src]) return this._logoCache[src];
+
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                canvas.width = img.naturalWidth;
+                canvas.height = img.naturalHeight;
+                const ctx = canvas.getContext("2d");
+                ctx.drawImage(img, 0, 0);
+                const dataUrl = canvas.toDataURL(src.endsWith(".png") ? "image/png" : "image/jpeg");
+                this._logoCache[src] = dataUrl;
+                resolve(dataUrl);
+            };
+            img.onerror = () => {
+                console.warn("Failed to load logo asset:", src);
+                resolve(null);
+            };
+            img.src = src;
+        });
+    }
+
+    /**
+     * Renders base image + annotations onto a high-res offscreen canvas
+     */
+    static async renderCompositePage(imageSrc, annotations) {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                const canvas = document.createElement("canvas");
+                const w = img.naturalWidth || 1200;
+                const h = img.naturalHeight || 1650;
+                canvas.width = w;
+                canvas.height = h;
+                const ctx = canvas.getContext("2d");
+
+                // Draw base page
+                ctx.drawImage(img, 0, 0, w, h);
+
+                // Overlay annotations using static CanvasEngine drawing method
+                annotations.forEach(ann => {
+                    CanvasEngine.drawAnnotation(ctx, ann, w, h, 1.0);
+                });
+
+                // Render Compact Smart Page Total Footer on composite page
+                let pageTotal = 0;
+                annotations.forEach(a => {
+                    if (a.type === "marks") {
+                        const raw = String(a.text || "").replace(/^\+/, "").trim();
+                        const val = parseFloat(raw);
+                        if (!isNaN(val)) pageTotal += val;
+                    } else if (a.type === "margin_mark") {
+                        const raw = String(a.marks !== undefined ? a.marks : (a.text || "")).replace(/^\+/, "").trim();
+                        const val = parseFloat(raw);
+                        if (!isNaN(val)) pageTotal += val;
+                    } else if (a.type === "tick" && a.marks !== undefined && a.marks !== null && a.marks !== "") {
+                        if (a.isStep || !a.hasMarginMark) {
+                            const raw = String(a.marks).replace(/^\+/, "").trim();
+                            const val = parseFloat(raw);
+                            if (!isNaN(val)) pageTotal += val;
+                        }
+                    }
+                });
+                pageTotal = Math.round(pageTotal * 10) / 10;
+
+                const scale = 1.0;
+                const numText = String(pageTotal);
+                ctx.font = `400 ${Math.round(14 * scale)}px system-ui, -apple-system, sans-serif`;
+                const textW = ctx.measureText(numText).width;
+
+                const boxW = Math.max(34 * scale, textW + 16 * scale);
+                const boxH = 24 * scale;
+                const padRight = 16 * scale;
+                const padBottom = 14 * scale;
+                const x = w - boxW - padRight;
+                const y = h - boxH - padBottom;
+
+                ctx.save();
+                ctx.shadowColor = "rgba(15, 23, 42, 0.08)";
+                ctx.shadowBlur = 4 * scale;
+                ctx.shadowOffsetY = 1 * scale;
+                ctx.fillStyle = "#FFFFFF";
+                ctx.beginPath();
+                ctx.roundRect(x, y, boxW, boxH, [12 * scale]);
+                ctx.fill();
+
+                ctx.shadowColor = "transparent";
+                ctx.lineWidth = 1.5 * scale;
+                ctx.strokeStyle = "#DC2626"; // Teacher red ink
+                ctx.stroke();
+
+                ctx.fillStyle = "#DC2626";
+                ctx.font = `400 ${Math.round(13 * scale)}px system-ui, -apple-system, sans-serif`;
+                ctx.textAlign = "center";
+                ctx.textBaseline = "middle";
+                ctx.fillText(numText, x + boxW / 2, y + boxH / 2);
+                ctx.restore();
+
+                resolve(canvas.toDataURL("image/jpeg", 0.88));
+            };
+            img.onerror = () => {
+                // Fallback white canvas
+                const canvas = document.createElement("canvas");
+                canvas.width = 1200;
+                canvas.height = 1650;
+                resolve(canvas.toDataURL("image/jpeg", 0.8));
+            };
+            img.src = imageSrc;
+        });
+    }
+
+    /**
+     * Renders the comprehensive Final Summary Page with Co-Branded Institutional Header
+     * Strict Regular Typography: 0 Bold Fonts (font-weight: 400 !important;)
+     */
+    static renderSummaryPage(doc, evaluation, logos = {}) {
+        const pageWidth = 210;
+        const margin = 14;
+        let currentY = 12;
+
+        // 1. Co-Branding Header Banner Container
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(226, 232, 240);
+        doc.setLineWidth(0.4);
+        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 22, 2, 2, "FD");
+
+        // Top-Left: Client School Branding (school_fulllogo.jpg)
+        if (logos.schoolLogo) {
+            try {
+                doc.addImage(logos.schoolLogo, "JPEG", margin + 3, currentY + 2.5, 46, 15.6);
+            } catch (err) {
+                console.warn("Could not draw school logo:", err);
+            }
+        }
+
+        // Top-Right: OneSpace OSM Branding (fulllogo.png)
+        if (logos.appLogo) {
+            try {
+                doc.addImage(logos.appLogo, "PNG", pageWidth - margin - 49, currentY + 3.8, 46, 13.8);
+            } catch (err) {
+                console.warn("Could not draw OSM logo:", err);
+            }
+        }
+
+        // Center: Institutional Co-Branding Title
+        const instName = evaluation.institutionName || "ADWAITH THOUGHT ACADEMY";
+        doc.setTextColor(15, 23, 42);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        doc.text(instName.toUpperCase(), pageWidth / 2, currentY + 9, { align: "center" });
+
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.setFont("helvetica", "normal");
+        doc.text("SMART ON-SCREEN MARKING (OSM) • EVALUATION SUMMARY", pageWidth / 2, currentY + 16, { align: "center" });
+
+        currentY += 27;
+
+        // Student Info Card
+        doc.setDrawColor(226, 232, 240);
+        doc.setFillColor(248, 250, 252);
+        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 38, 3, 3, "FD");
+
+        doc.setTextColor(30, 41, 59);
+        doc.setFontSize(10);
+
+        // Column 1
+        doc.setFont("helvetica", "normal");
+        doc.text("Student Name:", margin + 6, currentY + 10);
+        doc.setFont("helvetica", "normal");
+        doc.text(String(evaluation.studentName || "-"), margin + 35, currentY + 10);
+
+        doc.setFont("helvetica", "normal");
+        doc.text("Register No:", margin + 6, currentY + 18);
+        doc.setFont("helvetica", "normal");
+        doc.text(String(evaluation.rollNo || "-"), margin + 35, currentY + 18);
+
+        doc.setFont("helvetica", "normal");
+        doc.text("Class / Sec:", margin + 6, currentY + 26);
+        doc.setFont("helvetica", "normal");
+        doc.text(`${evaluation.class || "-"} (${evaluation.section || "-"})`, margin + 35, currentY + 26);
+
+        // Column 2
+        const col2X = margin + 100;
+        doc.setFont("helvetica", "normal");
+        doc.text("Examination:", col2X, currentY + 10);
+        doc.setFont("helvetica", "normal");
+        doc.text(String(evaluation.examName || "-"), col2X + 26, currentY + 10);
+
+        doc.setFont("helvetica", "normal");
+        doc.text("Subject:", col2X, currentY + 18);
+        doc.setFont("helvetica", "normal");
+        doc.text(String(evaluation.subject || "-"), col2X + 26, currentY + 18);
+
+        doc.setFont("helvetica", "normal");
+        doc.text("Exam Date:", col2X, currentY + 26);
+        doc.setFont("helvetica", "normal");
+        doc.text(String(evaluation.examDate || "-"), col2X + 26, currentY + 26);
+
+        doc.setFont("helvetica", "normal");
+        doc.text("Teacher:", col2X, currentY + 34);
+        doc.setFont("helvetica", "normal");
+        doc.text(String(evaluation.teacherName || "-"), col2X + 26, currentY + 34);
+
+        currentY += 44;
+
+        // Question Marks Table
+        const questions = evaluation.questions || [];
+        const tableBody = questions.map((q, idx) => {
+            const max = Number(q.maxMarks) || 0;
+            const awarded = Number(q.awardedMarks) || 0;
+            const pct = max > 0 ? Math.round((awarded / max) * 100) : 0;
+            let status = "Full Marks";
+            if (awarded === 0) status = "Incorrect (0)";
+            else if (awarded < max) status = "Partial";
+
+            return [
+                `Question ${q.qNo !== undefined ? q.qNo : idx + 1}`,
+                `${max}`,
+                `${awarded}`,
+                `${pct}%`,
+                status
+            ];
+        });
+
+        // Use autoTable
+        if (doc.autoTable) {
+            doc.autoTable({
+                startY: currentY,
+                margin: { left: margin, right: margin },
+                head: [["Question", "Max Marks", "Marks Obtained", "Percentage", "Remarks"]],
+                body: tableBody,
+                theme: "striped",
+                headStyles: {
+                    fillColor: [15, 23, 42],
+                    textColor: [255, 255, 255],
+                    fontSize: 9.5,
+                    fontStyle: "normal",
+                    halign: "center"
+                },
+                columnStyles: {
+                    0: { halign: "left" },
+                    1: { halign: "center" },
+                    2: { halign: "center", fontStyle: "normal" },
+                    3: { halign: "center" },
+                    4: { halign: "center" }
+                },
+                styles: {
+                    fontSize: 9,
+                    cellPadding: 3.5
+                }
+            });
+
+            currentY = doc.lastAutoTable.finalY + 10;
+        }
+
+        // Total Score Banner Card
+        doc.setFillColor(240, 253, 244); // #F0FDF4 emerald-50
+        doc.setDrawColor(16, 185, 129);
+        doc.setLineWidth(0.6);
+        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 28, 3, 3, "FD");
+
+        doc.setTextColor(6, 78, 59);
+        doc.setFontSize(11);
+        doc.setFont("helvetica", "normal");
+        doc.text("TOTAL MARKS OBTAINED:", margin + 8, currentY + 11);
+
+        doc.setFontSize(16);
+        doc.text(`${evaluation.obtainedMarks || 0} / ${evaluation.maxMarks || 0}`, margin + 8, currentY + 22);
+
+        doc.setFontSize(11);
+        doc.text(`PERCENTAGE: ${evaluation.percentage || 0}%`, margin + 80, currentY + 14);
+        doc.text(`FINAL GRADE: ${evaluation.grade || "--"}`, margin + 80, currentY + 22);
+
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.text(`Correct: ${evaluation.correctCount || 0}`, margin + 140, currentY + 14);
+        doc.text(`Wrong: ${evaluation.wrongCount || 0}`, margin + 140, currentY + 22);
+
+        currentY += 36;
+
+        // Feedback / Remarks Box
+        doc.setFontSize(10);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30, 41, 59);
+        doc.text("Teacher's Overall Feedback & Observations:", margin, currentY);
+        currentY += 4;
+
+        doc.setFillColor(255, 255, 255);
+        doc.setDrawColor(203, 213, 225);
+        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 24, 2, 2, "FD");
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9.5);
+        doc.setTextColor(51, 65, 85);
+        const feedbackText = evaluation.feedback && evaluation.feedback.trim().length > 0 
+            ? `"${evaluation.feedback}"`
+            : "No specific feedback recorded. Good effort.";
+        doc.text(feedbackText, margin + 5, currentY + 9, { maxWidth: pageWidth - margin * 2 - 10 });
+
+        currentY += 34;
+
+        // Signature & Date Section
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+
+        // Date
+        doc.text(`Evaluation Date: ${evaluation.correctionDate || new Date().toISOString().split("T")[0]}`, margin, currentY + 8);
+        doc.text("System: OneSpace Digital Evaluation Engine v1.0", margin, currentY + 14);
+
+        // Signature line
+        const sigX = pageWidth - margin - 60;
+        doc.setDrawColor(148, 163, 184);
+        doc.line(sigX, currentY + 8, pageWidth - margin, currentY + 8);
+        doc.setFont("helvetica", "normal");
+        doc.setTextColor(30, 41, 59);
+        doc.text("Evaluator Signature", sigX + 10, currentY + 14);
+        doc.setFont("helvetica", "normal");
+        doc.text(evaluation.teacherName || "Authorized Evaluator", sigX + 10, currentY + 19);
+
+        // Footer watermarking
+        doc.setFontSize(8);
+        doc.setTextColor(148, 163, 184);
+        doc.text("Generated by OneSpace Digital Correction - Confirmed & Verified", pageWidth / 2, 288, { align: "center" });
+    }
+}
+
+window.PDFGenerator = PDFGenerator;
