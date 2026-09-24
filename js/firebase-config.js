@@ -107,21 +107,63 @@ class FirebaseManager {
         }
     }
 
-    // Firestore: Save Evaluation Paper (Sanitized to avoid 1MB document size limit)
+    // Firebase Storage: Upload Data URL / Blob and get permanent HTTPS Download URL
+    async uploadImageToStorage(path, dataUrl) {
+        if (!this.isConnected || !this.storage || !dataUrl) return null;
+        try {
+            const storageRef = this.storage.ref().child(path);
+            const snapshot = await storageRef.putString(dataUrl, 'data_url');
+            const downloadUrl = await snapshot.ref.getDownloadURL();
+            return downloadUrl;
+        } catch (err) {
+            console.warn("Firebase Storage upload skipped/warning:", err.message || err);
+            return null;
+        }
+    }
+
+    // Firestore + Firebase Storage: Upload Heavy Assets & Save Paper Document
     async saveEvaluation(evaluation) {
         if (!this.isConnected || !this.firestore || !evaluation || !evaluation.id) return false;
         try {
-            const sanitized = { ...evaluation };
-            if (sanitized.pdfDataUrl && sanitized.pdfDataUrl.length > 500000) {
+            const evalId = String(evaluation.id);
+            const sanitized = JSON.parse(JSON.stringify(evaluation));
+
+            // Upload page images to Firebase Storage if they contain raw Base64 Data URLs
+            if (this.storage && Array.isArray(sanitized.pages)) {
+                for (let i = 0; i < sanitized.pages.length; i++) {
+                    const pageStr = sanitized.pages[i];
+                    if (typeof pageStr === "string" && pageStr.startsWith("data:")) {
+                        const path = `evaluations/${evalId}/page_${i + 1}.jpg`;
+                        const url = await this.uploadImageToStorage(path, pageStr);
+                        if (url) {
+                            sanitized.pages[i] = url;
+                            evaluation.pages[i] = url;
+                        } else if (pageStr.length > 500000) {
+                            sanitized.pages[i] = "[Local Image Data]";
+                        }
+                    }
+                }
+            }
+
+            // Upload raw PDF Data URL if present
+            if (this.storage && sanitized.pdfDataUrl && typeof sanitized.pdfDataUrl === "string" && sanitized.pdfDataUrl.startsWith("data:")) {
+                const pdfPath = `evaluations/${evalId}/paper.pdf`;
+                const url = await this.uploadImageToStorage(pdfPath, sanitized.pdfDataUrl);
+                if (url) {
+                    sanitized.pdfDataUrl = url;
+                    evaluation.pdfDataUrl = url;
+                } else {
+                    delete sanitized.pdfDataUrl;
+                }
+            } else if (sanitized.pdfDataUrl && sanitized.pdfDataUrl.length > 500000) {
                 delete sanitized.pdfDataUrl;
             }
-            if (Array.isArray(sanitized.pages)) {
-                sanitized.pages = sanitized.pages.map(p => (typeof p === "string" && p.length > 500000) ? "[Local Base64 Data]" : p);
-            }
-            await this.firestore.collection("evaluations").doc(String(evaluation.id)).set(sanitized, { merge: true });
+
+            await this.firestore.collection("evaluations").doc(evalId).set(sanitized, { merge: true });
+            console.log(`🔥 Paper ${evalId} successfully saved to Firebase Storage + Firestore!`);
             return true;
         } catch (err) {
-            console.warn("Firestore sync skipped for heavy paper:", err.message || err);
+            console.warn("Firestore save skipped/warning:", err.message || err);
             return false;
         }
     }
