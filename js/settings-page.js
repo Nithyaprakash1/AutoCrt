@@ -57,6 +57,11 @@ class SettingsPageManager {
                 autosaveInterval: 10
             };
         }
+        if (window.appStorage && typeof window.appStorage.getStorageUsage === "function") {
+            this.storageUsage = await window.appStorage.getStorageUsage();
+        } else {
+            this.storageUsage = { usedGB: 0, totalGB: 50, remainingGB: 50, percentUsed: 0 };
+        }
     }
 
     render() {
@@ -228,6 +233,25 @@ class SettingsPageManager {
                                 </div>
 
                                 <div class="card-group-body">
+                                    <!-- 50.0 GB Institution Storage Quota Meter -->
+                                    <div class="quota-meter-container" style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: 16px; padding: 20px; margin-bottom: 24px;">
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                            <div>
+                                                <h4 style="font-size: 0.95rem; font-weight: 600; color: var(--text-main); margin-bottom: 2px;">Institution Quota Limit</h4>
+                                                <p style="font-size: 0.78rem; color: var(--text-muted);">Allocated capacity for PDF answer papers and evaluations.</p>
+                                            </div>
+                                            <span style="font-size: 0.95rem; font-weight: 700; color: #0071E3;">${this.storageUsage?.percentUsed || 0}% Used</span>
+                                        </div>
+                                        <div style="height: 10px; background: rgba(0,0,0,0.06); border-radius: 99px; overflow: hidden; margin-bottom: 12px;">
+                                            <div style="height: 100%; width: ${Math.min(100, Math.max(1, this.storageUsage?.percentUsed || 0))}%; background: linear-gradient(90deg, #34C759, #0071E3); border-radius: 99px; transition: width 0.4s ease;"></div>
+                                        </div>
+                                        <div style="display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-muted);">
+                                            <span>Used: <strong style="color: var(--text-main);">${this.storageUsage?.usedGB || 0} GB</strong></span>
+                                            <span>Remaining: <strong style="color: var(--text-main);">${this.storageUsage?.remainingGB || 50} GB</strong></span>
+                                            <span>Quota Limit: <strong style="color: var(--text-main);">50.0 GB Limit</strong></span>
+                                        </div>
+                                    </div>
+
                                     <div class="form-group" style="margin-bottom: 18px;">
                                         <label>Data Storage Mode</label>
                                         <select id="select-full-storage-mode" class="form-select">
@@ -244,11 +268,11 @@ class SettingsPageManager {
                                         </div>
                                         <div class="form-group" style="margin-bottom: 12px;">
                                             <label>Project ID</label>
-                                            <input type="text" id="input-fb-project-id" class="form-input" placeholder="onespace-evaluation" value="${fbConfig.projectId || 'onespace-evaluation'}" />
+                                            <input type="text" id="input-fb-project-id" class="form-input" placeholder="niprak-osm-evaluation" value="${fbConfig.projectId || 'niprak-osm-evaluation'}" />
                                         </div>
                                         <div class="form-group" style="margin-bottom: 12px;">
                                             <label>Storage Bucket</label>
-                                            <input type="text" id="input-fb-storage-bucket" class="form-input" placeholder="onespace-evaluation.appspot.com" value="${fbConfig.storageBucket || 'onespace-evaluation.appspot.com'}" />
+                                            <input type="text" id="input-fb-storage-bucket" class="form-input" placeholder="niprak-osm-evaluation.appspot.com" value="${fbConfig.storageBucket || 'niprak-osm-evaluation.appspot.com'}" />
                                         </div>
                                     </div>
                                 </div>

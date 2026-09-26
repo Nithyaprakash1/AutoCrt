@@ -3562,6 +3562,15 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             return;
         }
 
+        // Check 50.0 GB Institution Storage Quota Limit
+        if (window.appStorage && typeof window.appStorage.getStorageUsage === "function") {
+            const storageInfo = await window.appStorage.getStorageUsage();
+            if (storageInfo.isExceeded) {
+                alert(`⚠️ 50.0 GB Institution Storage Quota Reached!\n\nCurrently used: ${storageInfo.usedGB} GB of 50.0 GB limit (${storageInfo.percentUsed}%).\n\nPlease delete older evaluated batches or completed examination papers from the Dashboard or Uploaded Papers Repository to free up storage space before uploading new answer scripts.`);
+                return;
+            }
+        }
+
         // Show the loading dialog with real-time feedback
         this.showPublishLoadingDialog(readyItems.length);
 
@@ -3667,7 +3676,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         // Remove published items from active queue
         this.fileQueue = this.fileQueue.filter(item => !readyItems.includes(item));
         await this.loadExistingClassPapers();
-        this.updateStepView();
+        if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
+            window.app.updateStorageQuotaDisplay();
+        }
 
         if (window.app && window.app.showToast) {
             window.app.showToast(`Published ${publishedCount} paper(s) to Teacher Evaluator Desk!`);

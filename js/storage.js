@@ -493,10 +493,13 @@ class StorageService {
         await this.readyPromise;
         const targetId = String(id);
 
-        // Remove from memoryStore
+        // 1. Remove from in-memory cache and map
         this.memoryStore = (this.memoryStore || []).filter(e => String(e.id) !== targetId);
+        if (this.pdfCacheMap) {
+            this.pdfCacheMap.delete(targetId);
+        }
 
-        // Remove from localStorage
+        // 2. Remove from localStorage
         try {
             const legacy = localStorage.getItem("onespace_evaluations");
             if (legacy) {
@@ -512,13 +515,13 @@ class StorageService {
             console.warn("localStorage delete evaluation error:", e);
         }
 
-        // Remove from sessionStorage
+        // 3. Remove from sessionStorage
         try {
             sessionStorage.removeItem(`onespace_draft_${targetId}`);
             sessionStorage.removeItem(`onespace_pdf_${targetId}`);
         } catch (e) {}
 
-        // Remove from CacheStorage
+        // 4. Remove from CacheStorage (PDF binary cache)
         try {
             if ('caches' in window) {
                 const cache = await caches.open("onespace-pdf-cache-v1");
@@ -528,16 +531,16 @@ class StorageService {
             console.warn("CacheStorage delete error:", e);
         }
 
-        // Remove from Firebase Firestore
+        // 5. Remove from Firebase Firestore AND Firebase Storage
         if (window.firebaseManager && window.firebaseManager.isConnected) {
             try {
                 await window.firebaseManager.deleteEvaluation(targetId);
             } catch (e) {
-                console.warn("Firestore delete evaluation failed:", e);
+                console.warn("Firestore/Storage delete evaluation failed:", e);
             }
         }
 
-        // Delete from IndexedDB
+        // 6. Delete from IndexedDB
         if (this.db) {
             await new Promise((resolve) => {
                 const tx = this.db.transaction(["evaluations"], "readwrite");
@@ -551,7 +554,64 @@ class StorageService {
                 };
             });
         }
+
+        // Notify app to refresh 50 GB storage quota display if available
+        if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
+            window.app.updateStorageQuotaDisplay();
+        }
+
         return true;
+    }
+
+    // --- 50 GB Storage Quota Tracking & Estimation ---
+    async getStorageUsage() {
+        let usedBytes = 0;
+
+        // 1. Browser Storage Manager Estimate (IndexedDB + Cache Storage)
+        if (navigator.storage && navigator.storage.estimate) {
+            try {
+                const est = await navigator.storage.estimate();
+                if (est && est.usage) {
+                    usedBytes = est.usage;
+                }
+            } catch (e) {}
+        }
+
+        // 2. Sum data from memoryStore / evaluated papers (calculate approximate size)
+        let docBytes = 0;
+        const list = this.memoryStore || [];
+        for (const ev of list) {
+            if (ev.pdfDataUrl && typeof ev.pdfDataUrl === 'string') {
+                docBytes += Math.round(ev.pdfDataUrl.length * 0.75); // base64 payload to bytes
+            } else if (ev.pages && Array.isArray(ev.pages)) {
+                for (const p of ev.pages) {
+                    if (typeof p === 'string' && p.startsWith('data:')) {
+                        docBytes += Math.round(p.length * 0.75);
+                    }
+                }
+            }
+            if (!ev.pdfDataUrl && (!ev.pages || ev.pages.length === 0)) {
+                docBytes += (ev.pageCount || 4) * 350 * 1024; // ~350KB per student answer sheet
+            }
+        }
+        usedBytes = Math.max(usedBytes, docBytes);
+
+        const limitBytes = 50 * 1024 * 1024 * 1024; // 50 GB quota
+        const usedGB = (usedBytes / (1024 * 1024 * 1024)).toFixed(2);
+        const totalGB = 50;
+        const remainingGB = Math.max(0, 50 - parseFloat(usedGB)).toFixed(2);
+        const percentUsed = Math.min(100, parseFloat(((usedBytes / limitBytes) * 100).toFixed(1)));
+
+        return {
+            usedBytes,
+            limitBytes,
+            usedGB: parseFloat(usedGB),
+            totalGB,
+            remainingGB: parseFloat(remainingGB),
+            percentUsed,
+            isNearLimit: percentUsed >= 90,
+            isExceeded: usedBytes >= limitBytes
+        };
     }
 
     saveDraft(id, evaluation) {

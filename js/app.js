@@ -40,6 +40,7 @@ class AppController {
         this.bindWorkspaceControls();
         this.bindKeyboardShortcuts();
         this.bindSettingsModal();
+        this.updateStorageQuotaDisplay();
 
         // Respect page data-default-portal attribute if set (uploader.html vs teacher.html)
         const pageDefaultPortal = document.body.getAttribute("data-default-portal");
@@ -592,6 +593,7 @@ class AppController {
         if (mainHeader) mainHeader.style.display = "flex";
         if (mainContent) mainContent.style.display = "block";
         if (workspaceView) workspaceView.style.display = "none";
+        this.updateStorageQuotaDisplay();
 
         // Update nav active states (Sidebar + Desktop Header)
         document.querySelectorAll(".sidebar-menu-item").forEach(btn => {
@@ -2177,6 +2179,8 @@ class AppController {
         if (btnSideSettings) btnSideSettings.addEventListener("click", openModal);
         const btnUploaderSettings = document.getElementById("side-nav-uploader-settings");
         if (btnUploaderSettings) btnUploaderSettings.addEventListener("click", openModal);
+        const btnStorageBadge = document.getElementById("navbar-storage-quota");
+        if (btnStorageBadge) btnStorageBadge.addEventListener("click", () => this.switchView("settings"));
         if (btnClose) btnClose.addEventListener("click", closeModal);
         if (btnCancel) btnCancel.addEventListener("click", closeModal);
 
@@ -2292,6 +2296,43 @@ class AppController {
             toast.style.transition = "opacity 0.3s ease";
             setTimeout(() => toast.remove(), 300);
         }, 3200);
+    }
+
+    async updateStorageQuotaDisplay() {
+        if (!window.appStorage || typeof window.appStorage.getStorageUsage !== "function") return;
+        try {
+            const usage = await window.appStorage.getStorageUsage();
+
+            // 1. Top Navbar 50 GB Quota Badge
+            const valEl = document.getElementById("nav-storage-val");
+            const barEl = document.getElementById("nav-storage-bar");
+            const badgeEl = document.getElementById("navbar-storage-quota");
+
+            if (valEl) {
+                valEl.textContent = `${usage.usedGB} / ${usage.totalGB} GB`;
+            }
+            if (barEl) {
+                barEl.style.width = `${Math.min(100, Math.max(1, usage.percentUsed))}%`;
+            }
+            if (badgeEl) {
+                badgeEl.classList.toggle("near-limit", usage.isNearLimit && !usage.isExceeded);
+                badgeEl.classList.toggle("exceeded", usage.isExceeded);
+                badgeEl.title = `Institution Storage: ${usage.usedGB} GB of ${usage.totalGB} GB Used (${usage.percentUsed}%). Remaining: ${usage.remainingGB} GB. Click to manage.`;
+            }
+
+            // 2. Settings Modal Quota Fields (if visible)
+            const modalPercent = document.getElementById("modal-storage-percent");
+            const modalBar = document.getElementById("modal-storage-bar");
+            const modalUsed = document.getElementById("modal-storage-used");
+            const modalRemaining = document.getElementById("modal-storage-remaining");
+
+            if (modalPercent) modalPercent.textContent = `${usage.percentUsed}%`;
+            if (modalBar) modalBar.style.width = `${Math.min(100, Math.max(1, usage.percentUsed))}%`;
+            if (modalUsed) modalUsed.textContent = `${usage.usedGB} GB`;
+            if (modalRemaining) modalRemaining.textContent = `${usage.remainingGB} GB`;
+        } catch (e) {
+            console.warn("Storage quota display update error:", e);
+        }
     }
 
     async loadEvaluations() {

@@ -338,11 +338,11 @@ class FirebaseManager {
             if (this.storage) {
                 let uploadedPdfUrl = evalData.pdfStorageUrl || null;
 
-                // 1. Upload original PDF document
+                // 1. Upload & strictly overwrite original single PDF document in Firebase Storage
                 if (!uploadedPdfUrl) {
+                    const storagePath = `evaluations_pdf/${evalData.id}.pdf`;
                     if (rawFile instanceof File || rawFile instanceof Blob) {
                         try {
-                            const storagePath = `evaluations_pdf/${evalData.id}/${rawFile.name || 'student_paper.pdf'}`;
                             uploadedPdfUrl = await this.uploadStorageBlob(storagePath, rawFile, { contentType: 'application/pdf' });
                         } catch (fErr) {
                             console.warn("Direct file upload to Storage failed:", fErr);
@@ -353,7 +353,6 @@ class FirebaseManager {
                         try {
                             const blob = this.dataURLtoBlob(evalData.pdfDataUrl);
                             if (blob) {
-                                const storagePath = `evaluations_pdf/${evalData.id}/student_paper.pdf`;
                                 uploadedPdfUrl = await this.uploadStorageBlob(storagePath, blob, { contentType: 'application/pdf' });
                             }
                         } catch (pdfErr) {
@@ -365,56 +364,23 @@ class FirebaseManager {
                 if (uploadedPdfUrl) {
                     evalData.pdfStorageUrl = uploadedPdfUrl;
                 }
-
-                // 2. Parallel upload of extracted page images to Firebase Storage
-                if (Array.isArray(evalData.pages) && evalData.pages.length > 0) {
-                    const pageUploadPromises = evalData.pages.map(async (pg, i) => {
-                        if (typeof pg === 'string' && pg.startsWith("data:")) {
-                            try {
-                                const pageBlob = this.dataURLtoBlob(pg);
-                                if (pageBlob) {
-                                    const pagePath = `evaluations_pages/${evalData.id}/page_${i + 1}.jpeg`;
-                                    const pageUrl = await this.uploadStorageBlob(pagePath, pageBlob, { contentType: 'image/jpeg' });
-                                    return pageUrl || null;
-                                }
-                            } catch (pgErr) {
-                                console.warn(`Page ${i + 1} upload warning:`, pgErr);
-                            }
-                            return null;
-                        }
-                        return pg; // already a Firebase Storage URL
-                    });
-
-                    const uploadedPages = await Promise.all(pageUploadPromises);
-                    evalData.storagePages = uploadedPages.filter(Boolean);
-                    if (evalData.storagePages.length === evalData.pages.length) {
-                        evalData.pages = evalData.storagePages;
-                    }
-                }
             }
 
-            // 3. Firestore Document Size Optimization:
+            // 2. Firestore Document Size Optimization:
             // Cloud Firestore has a strict 1MB document size limit.
-            // Create a sanitized lightweight document that never exceeds the limit:
+            // Save sanitized document: omit redundant base64 strings and duplicate page arrays
             const firestoreRecord = Object.assign({}, evalData);
             if (firestoreRecord.pdfDataUrl && firestoreRecord.pdfDataUrl.startsWith("data:")) {
                 delete firestoreRecord.pdfDataUrl; // Omit large base64 from Firestore
             }
-            if (Array.isArray(firestoreRecord.pages)) {
-                firestoreRecord.pages = firestoreRecord.pages.map(p => {
-                    if (typeof p === "string" && p.startsWith("data:")) {
-                        return null; // Omit heavy base64 images from Firestore document
-                    }
-                    return p;
-                }).filter(Boolean);
-            }
+            delete firestoreRecord.pages; // Store only the single PDF reference, not duplicate page arrays!
             firestoreRecord.hasPdfStorage = !!evalData.pdfStorageUrl;
-            firestoreRecord.pageCount = Array.isArray(evaluation.pages) ? evaluation.pages.length : 1;
+            firestoreRecord.pageCount = evalData.pageCount || 1;
             firestoreRecord.updatedAt = new Date().toISOString();
 
             if (this.firestore) {
                 await this.firestore.collection("evaluations").doc(String(evalData.id)).set(firestoreRecord, { merge: true });
-                console.log(`🔥 Successfully saved evaluation ${evalData.id} to Firestore! Storage PDF: ${evalData.pdfStorageUrl ? 'Uploaded' : 'Pending'}`);
+                console.log(`🔥 Successfully saved evaluation ${evalData.id} to Firestore! Single Storage PDF: ${evalData.pdfStorageUrl ? 'Uploaded' : 'Pending'}`);
             }
 
             return true;
@@ -457,17 +423,57 @@ class FirebaseManager {
         }
     }
 
-    // Firestore: Save Single Evaluation Document Directly
+    // Firestore & Storage: Delete Evaluation Record and Storage Assets
     async deleteEvaluation(id) {
-        if (!this.isConnected || !this.firestore || !id) return false;
-        try {
-            await this.firestore.collection("evaluations").doc(String(id)).delete();
-            console.log(`Deleted evaluation ${id} from Firestore.`);
-            return true;
-        } catch (err) {
-            console.warn("Error deleting evaluation from Firestore:", err);
-            return false;
+        if (!id) return false;
+        const targetId = String(id);
+
+        // 1. Delete document from Firestore
+        if (this.firestore) {
+            try {
+                await this.firestore.collection("evaluations").doc(targetId).delete();
+                console.log(`Deleted evaluation ${targetId} from Firestore.`);
+            } catch (err) {
+                console.warn("Error deleting evaluation from Firestore:", err);
+            }
         }
+
+        // 2. Delete single PDF & any associated files from Firebase Cloud Storage
+        if (this.storage) {
+            try {
+                // Delete direct single PDF
+                const pdfRef = this.storage.ref().child(`evaluations_pdf/${targetId}.pdf`);
+                await pdfRef.delete().catch(() => {});
+            } catch (sErr) {}
+
+            try {
+                // Delete legacy path if existed
+                const legacyRef = this.storage.ref().child(`evaluations_pdf/${targetId}/student_paper.pdf`);
+                await legacyRef.delete().catch(() => {});
+            } catch (sErr) {}
+
+            try {
+                // Delete folder contents if any legacy files in evaluations_pdf/{id}
+                const folderRef = this.storage.ref().child(`evaluations_pdf/${targetId}`);
+                const list = await folderRef.listAll().catch(() => null);
+                if (list && list.items) {
+                    await Promise.all(list.items.map(item => item.delete().catch(() => {})));
+                }
+            } catch (fErr) {}
+
+            try {
+                // Delete legacy page images if any existed
+                const pagesRef = this.storage.ref().child(`evaluations_pages/${targetId}`);
+                const list = await pagesRef.listAll().catch(() => null);
+                if (list && list.items) {
+                    await Promise.all(list.items.map(item => item.delete().catch(() => {})));
+                }
+            } catch (pErr) {}
+
+            console.log(`Deleted evaluation ${targetId} assets from Firebase Storage.`);
+        }
+
+        return true;
     }
 
     // Firestore: Save Generic Exam Template
