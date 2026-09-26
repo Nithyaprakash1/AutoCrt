@@ -26,11 +26,7 @@ class ClassesPageManager {
             if (savedClasses && savedClasses.length > 0) {
                 this.classes = savedClasses;
             } else {
-                this.classes = [
-                    { id: "cls_12a", name: "Class 12-A", label: "Class 12-A", section: "A", grade: "12", studentCount: 0 },
-                    { id: "cls_12b", name: "Class 12-B", label: "Class 12-B", section: "B", grade: "12", studentCount: 0 }
-                ];
-                await window.appStorage.saveClassesList(this.classes);
+                this.classes = [];
             }
 
             if (!this.activeClassId && this.classes.length > 0) {
@@ -97,7 +93,7 @@ class ClassesPageManager {
                     <div class="classes-cards-grid">
                         ${this.classes.map(cls => {
                             const isSelected = cls.id === this.activeClassId;
-                            const count = cls.studentCount || (cls.id === this.activeClassId ? this.currentRoster.length : 25);
+                            const count = isSelected ? this.currentRoster.length : (cls.studentCount !== undefined ? cls.studentCount : 0);
                             return `
                                 <div class="class-card ${isSelected ? 'selected' : ''}" data-class-id="${cls.id}">
                                     <div class="class-card-top">
@@ -108,7 +104,7 @@ class ClassesPageManager {
                                     <div class="class-card-meta">
                                         <div class="meta-item">
                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-                                            <span>${count} Students</span>
+                                            <span>${count} Students Enrolled</span>
                                         </div>
                                         <div class="meta-item">
                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -179,18 +175,6 @@ class ClassesPageManager {
                                     <label>Full Student Name *</label>
                                     <input type="text" id="new-stu-name" class="form-input" placeholder="e.g. Priya Sundaram" />
                                 </div>
-                                <div class="form-field">
-                                    <label>Gender</label>
-                                    <select id="new-stu-gender" class="form-select">
-                                        <option value="Female">Female</option>
-                                        <option value="Male">Male</option>
-                                        <option value="Other">Other</option>
-                                    </select>
-                                </div>
-                                <div class="form-field">
-                                    <label>Parent Contact Phone</label>
-                                    <input type="text" id="new-stu-phone" class="form-input" placeholder="e.g. +91 9876543210" />
-                                </div>
                             </div>
                             <div class="form-actions-row">
                                 <button type="button" class="btn-pane-cancel" id="btn-cancel-add-student">Cancel</button>
@@ -204,10 +188,8 @@ class ClassesPageManager {
                         <table class="roster-data-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 100px;">Roll No</th>
+                                    <th style="width: 120px;">Roll No</th>
                                     <th>Student Name</th>
-                                    <th style="width: 120px;">Gender</th>
-                                    <th>Parent Contact</th>
                                     <th style="width: 150px;">Enrollment Status</th>
                                     <th style="width: 110px; text-align: right;">Action</th>
                                 </tr>
@@ -215,7 +197,7 @@ class ClassesPageManager {
                             <tbody>
                                 ${filteredRoster.length === 0 ? `
                                     <tr>
-                                        <td colspan="6" class="roster-empty-cell">
+                                        <td colspan="4" class="roster-empty-cell">
                                             <div class="empty-roster-state">
                                                 <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
                                                 <span>${this.searchQuery ? 'No students matched your search query.' : 'No students found in this class roster.'}</span>
@@ -231,8 +213,6 @@ class ClassesPageManager {
                                                 <span class="name-text">${s.studentName}</span>
                                             </div>
                                         </td>
-                                        <td class="cell-gender">${s.gender || '—'}</td>
-                                        <td class="cell-phone">${s.parentContact || '—'}</td>
                                         <td class="cell-status">
                                             <span class="badge-enrolled">
                                                 <span class="dot"></span> Enrolled
@@ -366,8 +346,6 @@ class ClassesPageManager {
             btnSaveStudent.addEventListener("click", async () => {
                 const roll = this.container.querySelector("#new-stu-roll")?.value.trim();
                 const name = this.container.querySelector("#new-stu-name")?.value.trim();
-                const gender = this.container.querySelector("#new-stu-gender")?.value || "Female";
-                const phone = this.container.querySelector("#new-stu-phone")?.value.trim() || "+91 9876543210";
 
                 if (!roll || !name) {
                     alert("Please provide both Roll Number and Student Full Name.");
@@ -379,7 +357,7 @@ class ClassesPageManager {
                     return;
                 }
 
-                const newStudent = { rollNo: roll, studentName: name, gender, parentContact: phone };
+                const newStudent = { rollNo: roll, studentName: name };
                 this.currentRoster.push(newStudent);
                 this.currentRoster.sort((a, b) => Number(a.rollNo) - Number(b.rollNo));
 
@@ -496,7 +474,7 @@ class ClassesPageManager {
                     label: lbl,
                     section: s,
                     grade: g,
-                    studentCount: 25
+                    studentCount: 0
                 };
 
                 this.classes.push(newCls);
@@ -510,15 +488,16 @@ class ClassesPageManager {
                 this.activeClassId = newId;
                 if (window.appStorage) {
                     this.currentRoster = await window.appStorage.getClassRoster(newId);
+                    newCls.studentCount = this.currentRoster.length;
                 }
-                if (window.app) window.app.showToast(`Class ${lbl} created with 25 enrolled students!`);
+                if (window.app) window.app.showToast(`Class ${lbl} created successfully! (${this.currentRoster.length} Enrolled Students)`);
                 this.render();
             });
         }
     }
 
     downloadSampleTemplate() {
-        const headers = ["Roll Number", "Student Name", "Gender", "Parent Contact"];
+        const headers = ["Roll Number", "Student Name"];
         const csvContent = "data:text/csv;charset=utf-8," + headers.join(",") + "\n";
 
         const encodedUri = encodeURI(csvContent);
@@ -551,9 +530,7 @@ class ClassesPageManager {
                 if (parts.length >= 2 && parts[0] && parts[1]) {
                     importedStudents.push({
                         rollNo: parts[0],
-                        studentName: parts[1],
-                        gender: parts[2] || "Female",
-                        parentContact: parts[3] || "+91 9876543210"
+                        studentName: parts[1]
                     });
                 }
             }

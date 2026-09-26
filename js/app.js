@@ -25,7 +25,7 @@ class AppController {
     }
 
     async init() {
-        console.log("Initializing OneSpace Digital Correction...");
+        console.log("Initializing Niprak OSM Digital Correction...");
 
         // Ensure storage is initialized
         await window.appStorage.init();
@@ -55,14 +55,8 @@ class AppController {
             if (ev) {
                 await this.openWorkspace(ev);
             }
-        } else if (pageDefaultPortal === "evaluator") {
-            const evals = await window.appStorage.getAllEvaluations();
-            if (evals && evals.length > 0) {
-                const latestUserPaper = evals.find(e => e.isUserUploaded) || evals[0];
-                if (latestUserPaper) {
-                    await this.openWorkspace(latestUserPaper);
-                }
-            }
+        } else {
+            this.switchView("dashboard");
         }
 
         // Dismiss app preloader smoothly
@@ -92,24 +86,25 @@ class AppController {
     setPortal(portalName, doSwitchView = true) {
         const pageDefault = document.body.getAttribute("data-default-portal");
 
-        if (portalName === "admin" && pageDefault !== "admin") {
-            localStorage.setItem("onespace_active_portal", "admin");
-            window.location.href = "admin.html";
-            return;
-        }
+        // Only redirect if page has a data-default-portal attribute (e.g. standalone uploader.html or admin.html)
+        if (pageDefault) {
+            if (portalName === "admin" && pageDefault !== "admin") {
+                localStorage.setItem("onespace_active_portal", "admin");
+                window.location.href = "admin.html";
+                return;
+            }
 
-        // If user requests evaluator portal while on uploader.html, navigate to teacher.html
-        if (portalName === "evaluator" && pageDefault === "uploader") {
-            localStorage.setItem("onespace_active_portal", "evaluator");
-            window.location.href = "teacher.html";
-            return;
-        }
+            if (portalName === "evaluator" && pageDefault === "uploader") {
+                localStorage.setItem("onespace_active_portal", "evaluator");
+                window.location.href = "teacher.html";
+                return;
+            }
 
-        // If user requests uploader portal while on teacher.html, navigate to uploader.html
-        if (portalName === "uploader" && pageDefault === "evaluator") {
-            localStorage.setItem("onespace_active_portal", "uploader");
-            window.location.href = "uploader.html";
-            return;
+            if (portalName === "uploader" && pageDefault === "evaluator") {
+                localStorage.setItem("onespace_active_portal", "uploader");
+                window.location.href = "uploader.html";
+                return;
+            }
         }
 
         this.activePortal = portalName;
@@ -170,9 +165,36 @@ class AppController {
         const tabUploader = document.getElementById("tab-login-uploader");
         const tabEvaluator = document.getElementById("tab-login-evaluator");
 
+        const nameInp = document.getElementById("demo-login-name");
         const emailInp = document.getElementById("demo-login-email");
         const passInp = document.getElementById("demo-login-password");
         const btnEnter = document.getElementById("btn-login-as-uploader");
+        const btnToggleMode = document.getElementById("btn-toggle-auth-mode");
+        const authTitle = document.getElementById("auth-mode-title");
+        const fieldName = document.getElementById("field-create-name");
+
+        let selectedRole = "admin";
+        let isCreateMode = false;
+
+        const updateEnterBtnText = () => {
+            if (!btnEnter) return;
+            const roleTitle = selectedRole === "admin" ? "Admin Panel" : (selectedRole === "uploader" ? "Upload Desk" : "Teacher Desk");
+            if (isCreateMode) {
+                btnEnter.innerHTML = `Create ${selectedRole.toUpperCase()} Account & Enter <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
+            } else {
+                btnEnter.innerHTML = `Access ${roleTitle} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
+            }
+        };
+
+        if (btnToggleMode) {
+            btnToggleMode.addEventListener("click", () => {
+                isCreateMode = !isCreateMode;
+                if (authTitle) authTitle.textContent = isCreateMode ? "Create Role Account" : "Account Sign In";
+                if (btnToggleMode) btnToggleMode.textContent = isCreateMode ? "← Back to Sign In" : "+ Create Account";
+                if (fieldName) fieldName.style.display = isCreateMode ? "block" : "none";
+                updateEnterBtnText();
+            });
+        }
 
         const setTabActive = (activeBtn) => {
             [tabAdmin, tabUploader, tabEvaluator].forEach(btn => {
@@ -192,40 +214,160 @@ class AppController {
 
         if (tabAdmin) {
             tabAdmin.addEventListener("click", () => {
+                selectedRole = "admin";
                 setTabActive(tabAdmin);
-                if (emailInp) emailInp.value = "admin@adwaith.edu";
-                if (passInp) passInp.value = "admin2026";
-                if (btnEnter) {
-                    btnEnter.href = "admin.html";
-                    btnEnter.style.background = "linear-gradient(135deg, #AF52DE, #5856D6)";
-                    btnEnter.innerHTML = `Access Admin Control Panel <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
-                }
+                if (btnEnter) btnEnter.style.background = "linear-gradient(135deg, #AF52DE, #5856D6)";
+                updateEnterBtnText();
             });
         }
 
         if (tabUploader) {
             tabUploader.addEventListener("click", () => {
+                selectedRole = "uploader";
                 setTabActive(tabUploader);
-                if (emailInp) emailInp.value = "physics.uploader@adwaith.edu";
-                if (passInp) passInp.value = "physics2026";
-                if (btnEnter) {
-                    btnEnter.href = "uploader.html";
-                    btnEnter.style.background = "#007AFF";
-                    btnEnter.innerHTML = `Access Physics Upload Desk <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
-                }
+                if (btnEnter) btnEnter.style.background = "#007AFF";
+                updateEnterBtnText();
             });
         }
 
         if (tabEvaluator) {
             tabEvaluator.addEventListener("click", () => {
+                selectedRole = "evaluator";
                 setTabActive(tabEvaluator);
-                if (emailInp) emailInp.value = "physics.teacher@adwaith.edu";
-                if (passInp) passInp.value = "physics2026";
-                if (btnEnter) {
-                    btnEnter.href = "teacher.html";
-                    btnEnter.style.background = "#34C759";
-                    btnEnter.innerHTML = `Access Teacher Evaluator Desk <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
+                if (btnEnter) btnEnter.style.background = "#34C759";
+                updateEnterBtnText();
+            });
+        }
+
+        if (btnEnter) {
+            btnEnter.addEventListener("click", async (e) => {
+                e.preventDefault();
+                const inputVal = emailInp ? emailInp.value.trim().toLowerCase() : "";
+                const userName = nameInp ? nameInp.value.trim() : "";
+                const userPass = passInp ? passInp.value.trim() : "";
+
+                if (!inputVal) {
+                    alert("Please enter your account email or User ID.");
+                    if (emailInp) emailInp.focus();
+                    return;
                 }
+
+                if (!userPass) {
+                    alert("Please enter your password.");
+                    if (passInp) passInp.focus();
+                    return;
+                }
+
+                if (userPass.length < 6) {
+                    alert("Password must be at least 6 characters long.");
+                    if (passInp) passInp.focus();
+                    return;
+                }
+
+                const users = await window.appStorage.getUsersList();
+                let userAccount = users.find(u => 
+                    (u.email && u.email.toLowerCase() === inputVal) ||
+                    (u.username && u.username.toLowerCase() === inputVal) ||
+                    (u.id && String(u.id).toLowerCase() === inputVal)
+                );
+                const userEmail = (userAccount && userAccount.email) ? userAccount.email.toLowerCase() : inputVal;
+
+                if (isCreateMode) {
+                    // ACCOUNT REGISTRATION MODE (Self-registration)
+                    if (!userName) {
+                        alert("Please enter your full name.");
+                        if (nameInp) nameInp.focus();
+                        return;
+                    }
+                    if (userAccount) {
+                        alert(`Registration Error: An account with email or ID "${inputVal}" is already registered. Please switch to "Account Sign In" to log in.`);
+                        if (emailInp) emailInp.focus();
+                        return;
+                    }
+
+                    // Register user via Firebase Authentication
+                    let createdProfile = null;
+                    if (window.firebaseManager && window.firebaseManager.isConnected) {
+                        try {
+                            const res = await window.firebaseManager.createTeacherAccount({
+                                email: userEmail,
+                                password: userPass,
+                                name: userName,
+                                username: userEmail.split('@')[0],
+                                role: selectedRole,
+                                assignedSubjects: selectedRole === "evaluator" ? ["Physics"] : ["All Subjects"],
+                                assignedClasses: ["Class 12-A"]
+                            });
+                            if (res.success && res.profile) {
+                                createdProfile = res.profile;
+                            }
+                        } catch (fbErr) {
+                            console.warn("Firebase Auth create error:", fbErr);
+                        }
+                    }
+
+                    userAccount = createdProfile || {
+                        id: `usr_${Date.now()}`,
+                        uid: `usr_${Date.now()}`,
+                        name: userName,
+                        username: userEmail.split('@')[0],
+                        email: userEmail,
+                        password: userPass,
+                        role: selectedRole,
+                        roleLabel: selectedRole === "uploader" ? "Uploader / Exam Dept" : (selectedRole === "admin" ? "Admin Panel" : "Evaluator / Teacher"),
+                        assignedSubjects: selectedRole === "evaluator" ? ["Physics"] : ["All Subjects"],
+                        assignedClasses: ["Class 12-A"],
+                        status: "active",
+                        createdAt: new Date().toISOString()
+                    };
+                    users.push(userAccount);
+                    await window.appStorage.saveUsersList(users);
+
+                    this.showToast(`Account created for ${userName} (${selectedRole.toUpperCase()})!`);
+                } else {
+                    // SIGN IN MODE: Authenticate via Firebase Authentication
+                    if (window.firebaseManager && window.firebaseManager.isConnected) {
+                        try {
+                            const res = await window.firebaseManager.loginWithEmail(userEmail, userPass);
+                            if (res && res.profile) {
+                                userAccount = res.profile;
+                            } else if (res && res.error) {
+                                if (res.code === "auth/wrong-password") {
+                                    alert(`Incorrect password for ${userEmail}. Please verify your credentials.`);
+                                    if (passInp) passInp.focus();
+                                    return;
+                                }
+                            }
+                        } catch (fbErr) {
+                            console.warn("Firebase sign in attempt notice:", fbErr);
+                        }
+                    }
+
+                    if (!userAccount) {
+                        alert(`No registered account found for "${inputVal}". Click "+ Create Account" or check credentials with Exam Department.`);
+                        if (emailInp) emailInp.focus();
+                        return;
+                    }
+
+                    if (userAccount.password && userAccount.password !== userPass) {
+                        alert(`Incorrect password for ${userEmail}. Please verify your credentials.`);
+                        if (passInp) passInp.focus();
+                        return;
+                    }
+                }
+
+                // Authenticated successfully: Set session and route strictly by user account role
+                const activeRole = userAccount.role || selectedRole || "evaluator";
+                window.appStorage.setCurrentUser(userAccount);
+                this.applySettingsToUI();
+
+                let destinationPortal = "evaluator";
+                if (activeRole === "admin") destinationPortal = "admin";
+                else if (activeRole === "uploader") destinationPortal = "uploader";
+                else destinationPortal = "evaluator";
+
+                this.showToast(`Authenticated as ${userAccount.name} (${activeRole.toUpperCase()})`);
+                this.setPortal(destinationPortal, true);
             });
         }
 
@@ -329,27 +471,25 @@ class AppController {
         }
     }
 
-    applySettingsToUI(settings) {
-        if (!settings) return;
+    applySettingsToUI() {
+        const user = window.appStorage ? window.appStorage.getCurrentUser() : null;
         const nameEl = document.getElementById("header-user-name");
         const avatarEl = document.getElementById("header-user-avatar");
         const sideNameEl = document.getElementById("side-user-name");
         const sideAvatarEl = document.getElementById("side-user-avatar");
+        const sideRoleEl = document.querySelector(".user-role-label");
 
-        if (settings.teacher && settings.teacher.name) {
-            const name = settings.teacher.name;
-            if (nameEl) nameEl.textContent = name;
-            if (sideNameEl) sideNameEl.textContent = name;
-            const initials = name
-                .split(" ")
-                .filter(Boolean)
-                .map(n => n[0])
-                .join("")
-                .slice(0, 2)
-                .toUpperCase();
-            if (avatarEl) avatarEl.textContent = initials || "TE";
-            if (sideAvatarEl) sideAvatarEl.textContent = initials || "TE";
-        }
+        const name = user ? user.name : "";
+        const roleLabel = user ? (user.role === 'admin' ? 'Admin' : (user.role === 'uploader' ? 'Exam Officer' : 'Teacher Evaluator')) : "";
+        const initials = name
+            ? name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase()
+            : "--";
+
+        if (nameEl) nameEl.textContent = name || "Sign In";
+        if (sideNameEl) sideNameEl.textContent = name || "Sign In";
+        if (sideRoleEl) sideRoleEl.textContent = roleLabel;
+        if (avatarEl) avatarEl.textContent = initials;
+        if (sideAvatarEl) sideAvatarEl.textContent = initials;
     }
 
     // --- Navigation & Routing ---
@@ -380,23 +520,38 @@ class AppController {
         });
 
         // Direct Dashboard buttons & back links
-        document.querySelectorAll('[data-view="dashboard"], .btn-back-dash, #ws-btn-back, #side-nav-dashboard').forEach(btn => {
+        document.querySelectorAll('[data-view="dashboard"], .btn-back-dash, #side-nav-dashboard').forEach(btn => {
             btn.addEventListener("click", async (e) => {
                 e.preventDefault();
-                if (this.activeEvaluation) {
-                    await this.saveActiveEvaluation(true);
-                }
-                this.switchView("dashboard");
+                await this.handleBackToDashboard();
             });
         });
 
         const brand = document.getElementById("nav-brand-logo");
         if (brand) {
-            brand.addEventListener("click", () => this.switchView("dashboard"));
+            brand.addEventListener("click", () => this.handleBackToDashboard());
         }
         const sideBrand = document.getElementById("sidebar-brand-logo");
         if (sideBrand) {
-            sideBrand.addEventListener("click", () => this.switchView("dashboard"));
+            sideBrand.addEventListener("click", () => this.handleBackToDashboard());
+        }
+    }
+
+    async handleBackToDashboard() {
+        if (this._isNavigatingBack) return;
+        this._isNavigatingBack = true;
+        try {
+            if (this.activeEvaluation) {
+                await this.saveActiveEvaluation(false);
+                this.stopAutosave();
+                this.activeEvaluation = null;
+            }
+            await this.switchView("dashboard");
+        } catch (err) {
+            console.error("Back navigation error:", err);
+            await this.switchView("dashboard");
+        } finally {
+            this._isNavigatingBack = false;
         }
     }
 
@@ -468,7 +623,9 @@ class AppController {
             this.dashboardManager = new DashboardManager(root, {
                 onStartNew: () => this.switchView("new-eval"),
                 onOpenEvaluation: (ev) => this.openWorkspace(ev),
-                onDownloadPDF: (ev) => this.downloadEvaluationPDF(ev)
+                onDownloadPDF: (ev) => this.downloadEvaluationPDF(ev),
+                onBulkDownloadPDF: (evals) => this.downloadBulkPDFs(evals),
+                onExportExcel: (evals) => this.exportEvaluationsAsExcel(evals)
             });
             await this.dashboardManager.init();
         } else if (viewName === "new-eval") {
@@ -745,6 +902,14 @@ class AppController {
             }
         }
 
+        // If pages is empty, fallback to raw PDF Data URL or generate clean student answer sheet
+        if ((!evaluation.pages || evaluation.pages.length === 0) && evaluation.pdfDataUrl) {
+            evaluation.pages = [evaluation.pdfDataUrl];
+        }
+        if (!evaluation.pages || evaluation.pages.length === 0) {
+            evaluation.pages = [CanvasEngine.generateDefaultLinedPageDataUrl(evaluation.studentName, evaluation.rollNo)];
+        }
+
         // If questions array is empty, load official Physics Board Paper blueprint (33 Qs / 70 Marks)
         if ((!evaluation.questions || evaluation.questions.length === 0) && window.MockData && window.MockData.physicsTemplate) {
             evaluation.questions = JSON.parse(JSON.stringify(window.MockData.physicsTemplate.questions));
@@ -998,10 +1163,10 @@ class AppController {
         // Back to Dashboard button
         const backBtn = document.getElementById("ws-btn-back");
         if (backBtn) {
-            backBtn.addEventListener("click", async () => {
-                await this.saveActiveEvaluation(true);
-                this.switchView("dashboard");
-            });
+            backBtn.onclick = async (e) => {
+                e.preventDefault();
+                await this.handleBackToDashboard();
+            };
         }
 
         // Print Scorecard button
@@ -1068,9 +1233,25 @@ class AppController {
         const btnSave = document.getElementById("ws-btn-save-progress");
         if (btnSave) {
             btnSave.addEventListener("click", async () => {
+                const sName = this.activeEvaluation?.studentName || "student paper";
+                this.showActionProgressModal({
+                    title: "Saving Correction Paper",
+                    subtitle: `Persisting marks, annotations, and student scorecard for ${sName}...`,
+                    statusText: "Saving evaluation record to database..."
+                });
+
                 await this.saveActiveEvaluation(true);
-                this.showToast("Evaluation saved successfully! Returning to Dashboard.");
-                this.switchView("dashboard");
+
+                this.setActionProgressModalSuccess({
+                    title: "✓ Correction Paper Saved!",
+                    subtitle: `All marks, stamps, and feedback for ${sName} saved successfully.`,
+                    statusText: "Exiting evaluation workspace...",
+                    delayMs: 400,
+                    onComplete: () => {
+                        this.switchView("dashboard");
+                        this.showToast("Evaluation saved! Returned to Dashboard.", "success");
+                    }
+                });
             });
         }
 
@@ -1464,96 +1645,241 @@ class AppController {
                 this.showToast("No paper available to export.", "error");
                 return;
             }
+
+            const sName = targetEval.studentName || "Student";
+            this.showActionProgressModal({
+                title: "Generating Corrected Paper PDF",
+                subtitle: `Rendering evaluated pages, margin stamps & scorecard for ${sName}...`,
+                statusText: "Preparing high-resolution PDF document...",
+                badgeText: "PDF Document"
+            });
+
             if (this.activeEvaluation) {
+                this.updateActionProgressModal(20, "Saving current annotations...");
                 await this.saveActiveEvaluation(false);
             }
-            this.showToast("Compiling high-resolution corrected PDF...", "success");
-            const filename = await window.PDFGenerator.generateCorrectedPaperPDF(targetEval);
-            this.showToast(`PDF generated: ${filename}`, "success");
+
+            this.updateActionProgressModal(35, "Rendering annotated pages & stamps...");
+
+            const filename = await window.PDFGenerator.generateCorrectedPaperPDF(targetEval, (pct, status) => {
+                const mappedPct = Math.round(35 + (pct * 0.6));
+                this.updateActionProgressModal(mappedPct, status);
+            });
+
+            this.setActionProgressModalSuccess({
+                title: "✓ PDF Export Complete!",
+                subtitle: `Downloaded "${filename}" successfully.`,
+                statusText: "Download initiated in your browser.",
+                delayMs: 1100
+            });
         } catch (err) {
             console.error("PDF generation failed:", err);
+            this.closeActionProgressModal();
             this.showToast("Failed to generate PDF: " + err.message, "error");
         }
+    }
+
+    isPaperCorrected(e) {
+        if (!e) return false;
+        if (e.status === "Completed" || e.status === "Graded" || e.status === "Evaluated") return true;
+        if (Number(e.obtainedMarks) > 0) return true;
+        if (Array.isArray(e.questions) && e.questions.some(q => q.status === "correct" || q.status === "wrong" || Number(q.awardedMarks) > 0)) {
+            return true;
+        }
+        return false;
     }
 
     // --- Save & Next Student Navigation ---
 
     async saveAndGoNextStudent() {
         if (!this.activeEvaluation) return;
+        const sName = this.activeEvaluation?.studentName || "student paper";
+        const currentId = String(this.activeEvaluation?.id);
+
+        this.showActionProgressModal({
+            title: "Saving Paper & Loading Next",
+            subtitle: `Persisting marks, annotations, and scorecard for ${sName}...`,
+            statusText: "Writing evaluation record to database...",
+            badgeText: "Save & Next"
+        });
+
+        // 1. Fast save active evaluation
+        this.updateActionProgressModal(35, "Saving current evaluation record...");
         await this.saveActiveEvaluation(true);
-        this.showToast("Saved! Loading next student...");
-        await this.goToNextStudentInQueue();
-    }
 
-    async goToNextStudentInQueue() {
-        // Hide absent overlay first
-        const absentOverlay = document.getElementById("ws-absent-overlay");
-        if (absentOverlay) absentOverlay.style.display = "none";
-        this._absentStudentEval = null;
-
-        // Build queue from all evaluations in storage
+        // 2. Scan queue for next paper
+        this.updateActionProgressModal(70, "Scanning evaluation queue for next student paper...");
         const allEvaluations = await window.appStorage.getAllEvaluations();
-        if (!allEvaluations || allEvaluations.length === 0) {
-            this.showToast("No more students in the queue.", "success");
-            return;
+
+        // Match current class/exam/subject or all assigned papers
+        const currentClass = this.activeEvaluation?.class || this.activeEvaluation?.className;
+        let queue = Array.isArray(allEvaluations) ? [...allEvaluations] : [];
+        if (currentClass) {
+            const sameClass = queue.filter(e => (e.class || e.className) === currentClass);
+            if (sameClass.length > 0) queue = sameClass;
         }
 
-        // Sort by roll number (or name as fallback)
-        const sorted = [...allEvaluations].sort((a, b) => {
+        // Sort by roll number, then name
+        const sorted = queue.sort((a, b) => {
             const rollA = parseInt((a.rollNo || "").replace(/\D/g, "")) || 0;
             const rollB = parseInt((b.rollNo || "").replace(/\D/g, "")) || 0;
             if (rollA !== rollB) return rollA - rollB;
             return (a.studentName || "").localeCompare(b.studentName || "");
         });
 
-        const currentId = this.activeEvaluation?.id;
-        const currentIdx = sorted.findIndex(e => e.id === currentId);
-        const nextEval = sorted[currentIdx + 1] || null;
+        const currentIdx = sorted.findIndex(e => String(e.id) === currentId);
+        let nextEval = (currentIdx >= 0 && currentIdx + 1 < sorted.length) ? sorted[currentIdx + 1] : null;
 
+        // If no paper strictly following current index, search for any remaining uncorrected paper in queue
         if (!nextEval) {
-            this.showToast("All student papers evaluated! Returning to Dashboard.", "success");
-            this.switchView("dashboard");
+            nextEval = sorted.find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
+        }
+
+        // --- CASE 1: No next paper found (Queue is finished) ---
+        if (!nextEval) {
+            this.setActionProgressModalSuccess({
+                title: "✓ Saved! No More Papers In Queue",
+                subtitle: `All student papers have been evaluated successfully.`,
+                statusText: "Returning to Dashboard...",
+                delayMs: 1100,
+                onComplete: () => {
+                    this.switchView("dashboard");
+                    this.showToast("All student papers evaluated! Returned to Dashboard.", "success");
+                }
+            });
             return;
         }
 
-        // Check if next student has paper pages
-        if (!nextEval.pages || nextEval.pages.length === 0) {
-            // Show absent overlay
-            this._absentStudentEval = nextEval;
+        // --- CASE 2: Next paper is found ---
+        const nextName = nextEval.studentName || "Next Student";
+        const fullEval = await window.appStorage.getEvaluationById(nextEval.id);
+        const evalToOpen = fullEval || nextEval;
+
+        if (!evalToOpen.pages || evalToOpen.pages.length === 0) {
+            if (evalToOpen.pdfDataUrl) evalToOpen.pages = [evalToOpen.pdfDataUrl];
+        }
+
+        if (!evalToOpen.pages || evalToOpen.pages.length === 0) {
+            this.closeActionProgressModal();
+            this._absentStudentEval = evalToOpen;
+            const absentOverlay = document.getElementById("ws-absent-overlay");
             const nameEl = document.getElementById("absent-student-name");
-            if (nameEl) nameEl.textContent = `${nextEval.studentName || "Student"} (Roll: ${nextEval.rollNo || "—"})`;
+            if (nameEl) nameEl.textContent = `${evalToOpen.studentName || "Student"} (Roll: ${evalToOpen.rollNo || "—"})`;
             if (absentOverlay) absentOverlay.style.display = "flex";
             return;
         }
 
-        // Load full evaluation from storage
-        const fullEval = await window.appStorage.getEvaluationById(nextEval.id);
-        if (fullEval) {
-            await this.openWorkspace(fullEval);
-        } else {
-            this.showToast("Could not load next student paper.", "error");
+        this.setActionProgressModalSuccess({
+            title: "✓ Saved! Loading Next Student",
+            subtitle: `Now opening ${nextName} (Roll: ${evalToOpen.rollNo || "—"})...`,
+            statusText: "Rendering answer sheet pages...",
+            delayMs: 400,
+            onComplete: async () => {
+                await this.openWorkspace(evalToOpen);
+                this.showToast(`Loaded ${nextName}'s answer sheet.`, "success");
+            }
+        });
+    }
+
+    async goToNextStudentInQueue() {
+        return this.saveAndGoNextStudent();
+    }
+
+    // --- Bulk PDF Download ---
+
+    async downloadBulkPDFs(evaluations = null) {
+        try {
+            let targetList = Array.isArray(evaluations) && evaluations.length > 0 ? evaluations : null;
+            if (!targetList) {
+                targetList = await window.appStorage.getAllEvaluations();
+            }
+
+            if (!targetList || targetList.length === 0) {
+                this.showToast("No student papers available to download.", "error");
+                return;
+            }
+
+            const total = targetList.length;
+            this.showActionProgressModal({
+                title: `Bulk Downloading ${total} Evaluated PDF${total > 1 ? 's' : ''}`,
+                subtitle: `Generating individual annotated answer sheets with official scorecards...`,
+                statusText: `Preparing batch export (0/${total})...`,
+                badgeText: "Bulk PDF Export"
+            });
+
+            let successCount = 0;
+            for (let i = 0; i < total; i++) {
+                const ev = targetList[i];
+                const sName = ev.studentName || `Student ${i + 1}`;
+                const stepPct = Math.round(((i + 1) / total) * 90);
+                this.updateActionProgressModal(Math.max(10, stepPct), `Generating PDF ${i + 1} of ${total}: ${sName}...`);
+
+                try {
+                    let fullEval = ev;
+                    if (!fullEval.pages || fullEval.pages.length === 0) {
+                        const loaded = await window.appStorage.getEvaluationById(ev.id);
+                        if (loaded) fullEval = loaded;
+                    }
+                    if (window.PDFGenerator && typeof window.PDFGenerator.generateCorrectedPaperPDF === "function") {
+                        await window.PDFGenerator.generateCorrectedPaperPDF(fullEval);
+                        successCount++;
+                    }
+                    // Polite delay between downloads to prevent browser pop-up blocking
+                    await new Promise(r => setTimeout(r, 400));
+                } catch (err) {
+                    console.warn(`Error generating PDF for ${sName}:`, err);
+                }
+            }
+
+            this.setActionProgressModalSuccess({
+                title: "✓ Bulk PDF Export Complete!",
+                subtitle: `Successfully exported and downloaded ${successCount} student PDF document${successCount > 1 ? 's' : ''}.`,
+                statusText: "Files downloaded to your system.",
+                delayMs: 1400
+            });
+        } catch (err) {
+            console.error("Bulk PDF export failed:", err);
+            this.closeActionProgressModal();
+            this.showToast("Bulk PDF export encountered an issue: " + err.message, "error");
         }
     }
 
     // --- Excel Export ---
 
-    async exportEvaluationsAsExcel() {
+    async exportEvaluationsAsExcel(evaluationsList = null) {
         try {
+            this.showActionProgressModal({
+                title: "Exporting Results Spreadsheet",
+                subtitle: "Compiling student roster marks, section breakdowns, and grades...",
+                statusText: "Fetching evaluation records from storage...",
+                badgeText: "Excel / CSV Matrix"
+            });
+
+            this.updateActionProgressModal(25, "Reading evaluated papers from database...");
+            await new Promise(r => setTimeout(r, 180));
+
             if (this.activeEvaluation) {
                 await this.saveActiveEvaluation(false);
             }
 
-            let allEvaluations = await window.appStorage.getAllEvaluations();
-            if ((!allEvaluations || allEvaluations.length === 0) && this.activeEvaluation) {
-                allEvaluations = [this.activeEvaluation];
-            } else if (this.activeEvaluation && !allEvaluations.some(e => e.id === this.activeEvaluation.id)) {
-                allEvaluations.unshift(this.activeEvaluation);
+            let allEvaluations = Array.isArray(evaluationsList) && evaluationsList.length > 0 ? evaluationsList : null;
+            if (!allEvaluations) {
+                allEvaluations = await window.appStorage.getAllEvaluations();
+                if ((!allEvaluations || allEvaluations.length === 0) && this.activeEvaluation) {
+                    allEvaluations = [this.activeEvaluation];
+                } else if (this.activeEvaluation && !allEvaluations.some(e => e.id === this.activeEvaluation.id)) {
+                    allEvaluations.unshift(this.activeEvaluation);
+                }
             }
 
             if (!allEvaluations || allEvaluations.length === 0) {
+                this.closeActionProgressModal();
                 this.showToast("No evaluations to export.", "error");
                 return;
             }
+
+            this.updateActionProgressModal(65, `Formatting ${allEvaluations.length} student scores & question matrices...`);
+            await new Promise(r => setTimeout(r, 220));
 
             // Build detailed question-by-question header and student mark rows
             const maxQs = Math.max(...allEvaluations.map(e => (e.questions ? e.questions.length : 0)), 0);
@@ -1595,17 +1921,100 @@ class AppController {
             const a = document.createElement("a");
             a.href = url;
             const date = new Date().toISOString().slice(0, 10);
-            a.download = `OneSpace_Physics_Marks_Matrix_${date}.csv`;
+            a.download = `Niprak_OSM_Physics_Marks_Matrix_${date}.csv`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
 
-            this.showToast(`Exported ${allEvaluations.length} student results as CSV/Excel!`, "success");
+            this.setActionProgressModalSuccess({
+                title: "✓ Excel Spreadsheet Ready!",
+                subtitle: `Exported ${allEvaluations.length} student results successfully.`,
+                statusText: "Downloaded CSV/Excel matrix file.",
+                delayMs: 1100
+            });
         } catch (err) {
             console.error("Excel export failed:", err);
+            this.closeActionProgressModal();
             this.showToast("Failed to export results: " + err.message, "error");
         }
+    }
+
+    // --- Unified Action Progress Modal (Save, Export PDF, Export Excel) ---
+
+    showActionProgressModal({ title, subtitle, statusText = "Processing..." }) {
+        const modalId = "modal-action-progress-dialog";
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const backdrop = document.createElement("div");
+        backdrop.id = modalId;
+        backdrop.className = "publish-loading-backdrop";
+        backdrop.innerHTML = `
+            <div class="publish-loading-card" id="action-progress-card">
+                <div class="publish-modal-icon-wrap" id="action-dialog-icon">
+                    <div class="publish-spinner-circle"></div>
+                </div>
+                <h3 class="publish-modal-title" id="action-dialog-title">${title}</h3>
+                <p class="publish-modal-subtitle" id="action-dialog-subtitle">${subtitle}</p>
+                <div class="publish-progress-section">
+                    <div class="publish-progress-row">
+                        <span class="publish-progress-status" id="action-dialog-status">${statusText}</span>
+                        <span class="publish-progress-percent" id="action-dialog-percent">0%</span>
+                    </div>
+                    <div class="publish-track">
+                        <div class="publish-bar" id="action-dialog-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(backdrop);
+    }
+
+    updateActionProgressModal(percent, statusText) {
+        const statusEl = document.getElementById("action-dialog-status");
+        const percentEl = document.getElementById("action-dialog-percent");
+        const barEl = document.getElementById("action-dialog-bar");
+
+        if (statusEl && statusText) statusEl.textContent = statusText;
+        if (percentEl) percentEl.textContent = `${percent}%`;
+        if (barEl) barEl.style.width = `${percent}%`;
+    }
+
+    setActionProgressModalSuccess({ title, subtitle, statusText, delayMs = 1000, onComplete = null }) {
+        const iconWrap = document.getElementById("action-dialog-icon");
+        const titleEl = document.getElementById("action-dialog-title");
+        const subEl = document.getElementById("action-dialog-subtitle");
+        const statusEl = document.getElementById("action-dialog-status");
+        const percentEl = document.getElementById("action-dialog-percent");
+        const barEl = document.getElementById("action-dialog-bar");
+
+        if (iconWrap) {
+            iconWrap.innerHTML = `
+                <div style="width: 58px; height: 58px; border-radius: 50%; background: #34C759; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(52, 199, 89, 0.4);">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+            `;
+        }
+        if (titleEl) titleEl.textContent = title || "✓ Completed Successfully!";
+        if (subEl && subtitle) subEl.textContent = subtitle;
+        if (statusEl && statusText) statusEl.textContent = statusText;
+        if (percentEl) percentEl.textContent = "100%";
+        if (barEl) {
+            barEl.style.width = "100%";
+            barEl.style.background = "#34C759";
+        }
+
+        setTimeout(() => {
+            const backdrop = document.getElementById("modal-action-progress-dialog");
+            if (backdrop) backdrop.remove();
+            if (typeof onComplete === "function") onComplete();
+        }, delayMs);
+    }
+
+    closeActionProgressModal() {
+        const backdrop = document.getElementById("modal-action-progress-dialog");
+        if (backdrop) backdrop.remove();
     }
 
     // --- Settings Modal & Firebase Bridge ---
@@ -1727,8 +2136,8 @@ class AppController {
             const settings = await window.appStorage.getSettings();
             const instEl = document.getElementById("settings-inst-name");
             const teacherEl = document.getElementById("settings-teacher-name");
-            if (instEl) instEl.value = settings.institution?.name || "Greenwood International Academy";
-            if (teacherEl) teacherEl.value = settings.teacher?.name || "Mrs. Nithya Prakash";
+            if (instEl) instEl.value = settings.institution?.name || "";
+            if (teacherEl) teacherEl.value = settings.teacher?.name || "";
 
             updateProfilePreview(teacherEl ? teacherEl.value : "");
 
@@ -1779,14 +2188,14 @@ class AppController {
 
         if (btnSave) {
             btnSave.addEventListener("click", async () => {
-                const teacherName = document.getElementById("settings-teacher-name")?.value.trim() || "Mrs. Nithya Prakash";
-                const instName = document.getElementById("settings-inst-name")?.value.trim() || "Adwaith Thought Academy";
+                const teacherName = document.getElementById("settings-teacher-name")?.value.trim() || "";
+                const instName = document.getElementById("settings-inst-name")?.value.trim() || "";
                 const storageMode = modeSelect ? modeSelect.value : "local";
 
                 const settings = {
                     institution: {
                         name: instName,
-                        code: "ATA-2026",
+                        code: "",
                         logo: "assets/school_logo.jpg",
                         fullLogo: "assets/school_fulllogo.jpg"
                     },

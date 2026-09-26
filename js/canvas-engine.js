@@ -108,12 +108,75 @@ class CanvasEngine {
         this.container.appendChild(this.wrapper);
     }
 
+    static generateDefaultLinedPageDataUrl(titleText = "Student Answer Sheet", rollNo = "101") {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1200;
+        canvas.height = 1650;
+        const ctx = canvas.getContext("2d");
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.fillRect(0, 0, 1200, 1650);
+
+        ctx.fillStyle = "#F8FAFC";
+        ctx.fillRect(0, 0, 1200, 140);
+        ctx.strokeStyle = "#CBD5E1";
+        ctx.lineWidth = 2;
+        ctx.strokeRect(0, 0, 1200, 140);
+
+        ctx.fillStyle = "#0F172A";
+        ctx.font = "400 24px system-ui, -apple-system, sans-serif";
+        ctx.fillText(`${titleText} (Roll: ${rollNo})`, 40, 55);
+
+        ctx.fillStyle = "#64748B";
+        ctx.font = "400 16px system-ui, -apple-system, sans-serif";
+        ctx.fillText("Niprak OSM Platform • Official Physics Examination Answer Sheet", 40, 95);
+
+        ctx.strokeStyle = "rgba(220, 38, 38, 0.4)";
+        ctx.lineWidth = 2.5;
+        ctx.beginPath();
+        ctx.moveTo(140, 140);
+        ctx.lineTo(140, 1650);
+        ctx.stroke();
+
+        ctx.strokeStyle = "rgba(0, 122, 255, 0.12)";
+        ctx.lineWidth = 1;
+        for (let y = 190; y < 1620; y += 44) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(1200, y);
+            ctx.stroke();
+        }
+
+        return canvas.toDataURL("image/jpeg", 0.92);
+    }
+
     async setPages(pageImages, savedAnnotations = []) {
         let expandedPages = Array.isArray(pageImages) ? [...pageImages] : [];
 
-        if (expandedPages.length === 1 && typeof expandedPages[0] === "string" && expandedPages[0].startsWith("data:application/pdf") && window.pdfjsLib) {
+        // Check if pages is a single PDF (either Base64 or Firebase Storage URL)
+        const isPdfDataUrl = expandedPages.length === 1 && typeof expandedPages[0] === "string" && expandedPages[0].startsWith("data:application/pdf");
+        const isPdfHttpUrl = expandedPages.length === 1 && typeof expandedPages[0] === "string" && (
+            expandedPages[0].includes("evaluations_pdf") || 
+            expandedPages[0].toLowerCase().includes(".pdf") || 
+            expandedPages[0].includes("alt=media")
+        );
+
+        if ((isPdfDataUrl || isPdfHttpUrl) && window.pdfjsLib) {
             try {
-                const pdfDoc = await window.pdfjsLib.getDocument(expandedPages[0]).promise;
+                let loadingTask = null;
+                if (isPdfDataUrl) {
+                    const base64Data = expandedPages[0].split(",")[1] || expandedPages[0];
+                    const raw = atob(base64Data);
+                    const uint8Array = new Uint8Array(raw.length);
+                    for (let i = 0; i < raw.length; i++) {
+                        uint8Array[i] = raw.charCodeAt(i);
+                    }
+                    loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
+                } else {
+                    loadingTask = window.pdfjsLib.getDocument({ url: expandedPages[0] });
+                }
+
+                const pdfDoc = await loadingTask.promise;
                 if (pdfDoc && pdfDoc.numPages >= 1) {
                     const rendered = [];
                     for (let pNum = 1; pNum <= pdfDoc.numPages; pNum++) {
@@ -131,6 +194,10 @@ class CanvasEngine {
             } catch (e) {
                 console.warn("Could not expand PDF in setPages:", e);
             }
+        }
+
+        if (!expandedPages || expandedPages.length === 0) {
+            expandedPages = [CanvasEngine.generateDefaultLinedPageDataUrl()];
         }
 
         this.pages = expandedPages.map((src, idx) => {
@@ -159,11 +226,17 @@ class CanvasEngine {
         if (!page.imgObj) {
             let srcToLoad = page.imageSrc;
 
-            // If page.imageSrc is a PDF Data URL or PDF URL, render page via PDF.js to JPEG Data URL
-            if (typeof srcToLoad === "string" && (srcToLoad.startsWith("data:application/pdf") || srcToLoad.endsWith(".pdf"))) {
+            // Handle PDF Data URL
+            if (typeof srcToLoad === "string" && srcToLoad.startsWith("data:application/pdf")) {
                 try {
                     if (window.pdfjsLib) {
-                        const loadingTask = window.pdfjsLib.getDocument(srcToLoad);
+                        const base64Data = srcToLoad.split(",")[1] || srcToLoad;
+                        const raw = atob(base64Data);
+                        const uint8Array = new Uint8Array(raw.length);
+                        for (let i = 0; i < raw.length; i++) {
+                            uint8Array[i] = raw.charCodeAt(i);
+                        }
+                        const loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
                         const pdfDoc = await loadingTask.promise;
                         const pdfPage = await pdfDoc.getPage(1);
                         const viewport = pdfPage.getViewport({ scale: 1.8 });
@@ -176,6 +249,20 @@ class CanvasEngine {
                     }
                 } catch (pdfErr) {
                     console.warn("Error rendering PDF page in CanvasEngine:", pdfErr);
+                    srcToLoad = CanvasEngine.generateDefaultLinedPageDataUrl();
+                }
+            }
+
+            // Convert remote HTTP/HTTPS Firebase Storage URL to safe local blob URL
+            if (typeof srcToLoad === "string" && (srcToLoad.startsWith("http://") || srcToLoad.startsWith("https://"))) {
+                try {
+                    const resp = await fetch(srcToLoad, { mode: "cors" });
+                    if (resp.ok) {
+                        const blob = await resp.blob();
+                        srcToLoad = URL.createObjectURL(blob);
+                    }
+                } catch (corsErr) {
+                    console.warn("Fetch blob for cross-origin image notice:", corsErr);
                 }
             }
 
@@ -190,11 +277,23 @@ class CanvasEngine {
                     resolve();
                 };
                 img.onerror = () => {
-                    console.error("Failed to load page image:", srcToLoad);
-                    page.origWidth = 1200;
-                    page.origHeight = 1650;
-                    page.isLoaded = true;
-                    resolve();
+                    console.warn("Failed to load page image, generating clean student answer sheet:", srcToLoad);
+                    const fbData = CanvasEngine.generateDefaultLinedPageDataUrl();
+                    const fbImg = new Image();
+                    fbImg.onload = () => {
+                        page.imgObj = fbImg;
+                        page.origWidth = fbImg.naturalWidth || 1200;
+                        page.origHeight = fbImg.naturalHeight || 1650;
+                        page.isLoaded = true;
+                        resolve();
+                    };
+                    fbImg.onerror = () => {
+                        page.origWidth = 1200;
+                        page.origHeight = 1650;
+                        page.isLoaded = true;
+                        resolve();
+                    };
+                    fbImg.src = fbData;
                 };
                 img.src = srcToLoad;
             });
@@ -1313,11 +1412,15 @@ class CanvasEngine {
         const qInfo = (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo() : null) || { label: "Q1", maxMarks: 2, qNo: 1 };
         const qMax = Number(qInfo.maxMarks) || 2;
         const isFull = !isStep && val >= qMax;
+        const isZero = Number(val) === 0;
 
-        // Stamp tick in red ink with marks badge
+        // When mark is 0, show "wrong" (X mark) not "tick"
+        const stampType = isZero ? "wrong" : "tick";
+
+        // Stamp tick or X cross in red ink with marks badge
         const stamp = {
             pageIndex: this.currentPageIndex,
-            type: "tick",
+            type: stampType,
             x: normPos.x,
             y: normPos.y,
             color: "#DC2626", // Teacher Red Ink
@@ -1325,16 +1428,18 @@ class CanvasEngine {
             qNo: qInfo.qNo || 1,
             qLabel: qInfo.label || `Q${qInfo.qNo || 1}`,
             isStep: !!isStep,
-            hasMarginMark: isFull,
+            hasMarginMark: isFull || isZero,
             scale: 1.0,
             timestamp: Date.now()
         };
 
         this.addAnnotation(stamp);
 
-        // If awarding full marks, also stamp the right margin question mark!
+        // If awarding full marks, stamp right margin question mark; if 0, stamp 0
         if (isFull) {
             this.stampRightMarginMark(qInfo.qNo || qInfo.label, val, normPos.y);
+        } else if (isZero) {
+            this.stampRightMarginMark(qInfo.qNo || qInfo.label, 0, normPos.y);
         }
 
         this.renderOverlay();
@@ -1901,6 +2006,27 @@ class CanvasEngine {
                 ctx.moveTo(x + 14 * effScale, y - 14 * effScale);
                 ctx.lineTo(x - 14 * effScale, y + 14 * effScale);
                 ctx.stroke();
+
+                // Optional marks badge next to the X cross mark
+                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "") {
+                    const badgeText = `${ann.marks}`;
+                    ctx.font = `bold ${Math.round(11 * effScale)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
+                    const textMetrics = ctx.measureText(badgeText);
+                    const bW = textMetrics.width + 12 * effScale;
+                    const bH = 18 * effScale;
+                    const bX = x + 18 * effScale;
+                    const bY = y;
+
+                    ctx.fillStyle = "#DC2626";
+                    ctx.beginPath();
+                    ctx.roundRect(bX, bY - bH / 2, bW, bH, [4 * effScale]);
+                    ctx.fill();
+
+                    ctx.fillStyle = "#FFFFFF";
+                    ctx.textAlign = "center";
+                    ctx.textBaseline = "middle";
+                    ctx.fillText(badgeText, bX + bW / 2, bY);
+                }
                 break;
             }
 

@@ -31,35 +31,43 @@ p, span, div, strong, b, th, td, label, a,
    ========================================================================== */
 
 .ws-top-toolbar {
-    height: 60px;
+    height: 56px;
     background-color: #FFFFFF;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 16px;
+    padding: 0 14px;
     z-index: 50;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    flex-wrap: nowrap;
+    gap: 8px;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .ws-student-meta {
     display: flex;
     align-items: center;
-    gap: 12px;
+    gap: 8px;
+    flex-shrink: 0;
+    min-width: 0;
 }
 
 .btn-back-dash {
     background: none;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding: 6px 10px;
+    padding: 5px 9px;
     color: var(--text-body);
-    font-size: 0.85rem;
-    font-weight: 400;
+    font-size: 0.82rem;
+    font-weight: 500;
     cursor: pointer;
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: all 0.15s ease;
 }
 
@@ -71,79 +79,108 @@ p, span, div, strong, b, th, td, label, a,
 .student-info-pill {
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    min-width: 0;
 }
 
 .ws-student-name {
-    font-size: 0.95rem;
-    font-weight: 400;
+    font-size: 0.88rem;
+    font-weight: 600;
     color: var(--text-main);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
+    white-space: nowrap;
+    line-height: 1.2;
 }
 
 .ws-roll-tag {
-    font-size: 0.72rem;
+    font-size: 0.7rem;
     font-family: var(--font-mono);
     background-color: var(--bg-subtle);
-    padding: 2px 6px;
+    padding: 1px 5px;
     border-radius: var(--radius-sm);
     color: var(--text-muted);
+    font-weight: 500;
+    white-space: nowrap;
 }
 
 .ws-exam-subtitle {
-    font-size: 0.76rem;
+    font-size: 0.72rem;
     color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 180px;
+    line-height: 1.2;
 }
 
 /* Center score badge & status */
 .ws-center-status {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 16px;
+    gap: 8px;
+    flex-shrink: 0;
+    margin: 0 4px;
+    white-space: nowrap;
 }
 
 .ws-score-display {
     background: linear-gradient(135deg, #ECFDF5 0%, #D1FAE5 100%);
-    border: 1.5px solid #34C759;
-    padding: 4px 16px;
+    border: 1.5px solid #10B981;
+    padding: 0 12px;
+    height: 32px;
     border-radius: 9999px;
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    box-shadow: 0 2px 8px rgba(52, 199, 89, 0.12);
+    justify-content: center;
+    gap: 6px;
+    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.15);
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 .ws-score-label {
-    font-size: 0.8rem;
-    font-weight: 400;
+    font-size: 0.76rem;
+    font-weight: 700;
     color: #047857;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.4px;
+    white-space: nowrap;
+    line-height: 1;
 }
 
 .ws-score-val {
-    font-size: 1.15rem;
-    font-weight: 400;
+    font-size: 1.02rem;
+    font-weight: 700;
     color: #064E3B;
+    white-space: nowrap;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
 }
 
 .autosave-pill {
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    font-size: 0.76rem;
+    gap: 5px;
+    font-size: 0.72rem;
     color: var(--text-muted);
     background-color: var(--bg-subtle);
-    padding: 4px 10px;
+    padding: 0 8px;
+    height: 26px;
     border-radius: var(--radius-pill);
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-sizing: border-box;
 }
 
 .autosave-dot {
-    width: 7px;
-    height: 7px;
+    width: 6px;
+    height: 6px;
     border-radius: 50%;
     background-color: var(--primary);
+    flex-shrink: 0;
 }
 
 .autosave-dot.saving {
@@ -158,24 +195,33 @@ p, span, div, strong, b, th, td, label, a,
 
 /* Top Action Controls */
 .ws-controls-group {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
+    gap: 5px;
+    flex-shrink: 0;
+    white-space: nowrap;
 }
 
 .btn-ws-tool {
-    width: 34px;
-    height: 34px;
+    width: 30px;
+    height: 30px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
     background-color: #FFFFFF;
     color: var(--text-body);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
-    font-size: 0.95rem;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+    padding: 0;
     transition: all 0.15s ease;
+}
+
+.btn-ws-tool svg {
+    width: 14px;
+    height: 14px;
 }
 
 .btn-ws-tool:hover {
@@ -193,14 +239,17 @@ p, span, div, strong, b, th, td, label, a,
     background-color: #FFFFFF;
     border: 1px solid var(--primary-border);
     color: var(--primary-hover);
-    padding: 7px 14px;
+    height: 30px;
+    padding: 0 10px;
     border-radius: var(--radius-md);
-    font-size: 0.86rem;
-    font-weight: 400;
+    font-size: 0.8rem;
+    font-weight: 500;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: all 0.15s ease;
 }
 
@@ -212,15 +261,18 @@ p, span, div, strong, b, th, td, label, a,
     background-color: var(--primary);
     color: #FFFFFF;
     border: none;
-    padding: 7px 16px;
+    height: 30px;
+    padding: 0 11px;
     border-radius: var(--radius-md);
-    font-size: 0.88rem;
-    font-weight: 400;
+    font-size: 0.8rem;
+    font-weight: 500;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    box-shadow: 0 2px 6px rgba(16, 185, 129, 0.3);
+    gap: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.25);
     transition: all 0.15s ease;
 }
 
@@ -233,15 +285,18 @@ p, span, div, strong, b, th, td, label, a,
     background-color: #1D4ED8;
     color: #FFFFFF;
     border: none;
-    padding: 7px 14px;
+    height: 30px;
+    padding: 0 10px;
     border-radius: var(--radius-md);
-    font-size: 0.86rem;
-    font-weight: 400;
+    font-size: 0.8rem;
+    font-weight: 500;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
-    box-shadow: 0 2px 6px rgba(29, 78, 216, 0.25);
+    gap: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    box-shadow: 0 1px 4px rgba(29, 78, 216, 0.22);
     transition: all 0.15s ease;
 }
 
@@ -254,14 +309,17 @@ p, span, div, strong, b, th, td, label, a,
     background-color: #FFFFFF;
     border: 1px solid var(--primary-border);
     color: #217346;
-    padding: 7px 14px;
+    height: 30px;
+    padding: 0 10px;
     border-radius: var(--radius-md);
-    font-size: 0.86rem;
-    font-weight: 400;
+    font-size: 0.8rem;
+    font-weight: 500;
     cursor: pointer;
     display: inline-flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
+    white-space: nowrap;
+    flex-shrink: 0;
     transition: all 0.15s ease;
 }
 
@@ -455,7 +513,7 @@ p, span, div, strong, b, th, td, label, a,
    ========================================================================== */
 
 .ws-right-marking-panel {
-    width: 340px;
+    width: 275px;
     background-color: #FFFFFF;
     border-left: 1px solid var(--border-color);
     overflow-y: auto;
@@ -463,22 +521,23 @@ p, span, div, strong, b, th, td, label, a,
     flex-direction: column;
     z-index: 40;
     box-shadow: -2px 0 6px rgba(0, 0, 0, 0.03);
+    flex-shrink: 0;
 }
 
 .marking-panel-content {
-    padding: 16px;
+    padding: 10px;
     display: flex;
     flex-direction: column;
-    gap: 16px;
+    gap: 10px;
 }
 
 /* Score Banner Card */
 .score-banner-card {
     background: linear-gradient(135deg, #10B981 0%, #059669 100%);
-    border-radius: var(--radius-lg);
-    padding: 16px;
+    border-radius: 10px;
+    padding: 10px 12px;
     color: #FFFFFF;
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.35);
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.3);
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -490,8 +549,8 @@ p, span, div, strong, b, th, td, label, a,
 }
 
 .score-label {
-    font-size: 0.7rem;
-    font-weight: 400;
+    font-size: 0.65rem;
+    font-weight: 600;
     letter-spacing: 0.05em;
     opacity: 0.9;
 }
@@ -499,38 +558,38 @@ p, span, div, strong, b, th, td, label, a,
 .score-numbers {
     display: flex;
     align-items: baseline;
-    gap: 4px;
+    gap: 3px;
 }
 
 .score-obtained {
-    font-size: 2.2rem;
-    font-weight: 400;
+    font-size: 1.65rem;
+    font-weight: 700;
     line-height: 1.1;
 }
 
 .score-separator {
-    font-size: 1.4rem;
+    font-size: 1.15rem;
     opacity: 0.7;
 }
 
 .score-max {
-    font-size: 1.3rem;
-    font-weight: 400;
+    font-size: 1.1rem;
+    font-weight: 600;
     opacity: 0.9;
 }
 
 .score-meta-pills {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 4px;
     align-items: flex-end;
 }
 
 .score-pill {
-    padding: 4px 10px;
+    padding: 2px 7px;
     border-radius: var(--radius-pill);
-    font-weight: 400;
-    font-size: 0.85rem;
+    font-weight: 600;
+    font-size: 0.75rem;
 }
 
 .pill-percent {
@@ -547,9 +606,9 @@ p, span, div, strong, b, th, td, label, a,
 .marking-stats-strip {
     display: flex;
     justify-content: space-between;
-    gap: 8px;
+    gap: 6px;
     background-color: var(--bg-subtle);
-    padding: 8px 12px;
+    padding: 6px 10px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border-color);
 }
@@ -557,9 +616,9 @@ p, span, div, strong, b, th, td, label, a,
 .stat-item {
     display: flex;
     align-items: center;
-    gap: 5px;
-    font-size: 0.78rem;
-    font-weight: 400;
+    gap: 4px;
+    font-size: 0.72rem;
+    font-weight: 500;
 }
 
 .correct-stat { color: #059669; }
@@ -570,46 +629,47 @@ p, span, div, strong, b, th, td, label, a,
 .quick-marking-card {
     background-color: #F8FAFC;
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    padding: 14px;
+    border-radius: 10px;
+    padding: 10px;
 }
 
 .section-label {
-    font-size: 0.74rem;
-    font-weight: 400;
+    font-size: 0.7rem;
+    font-weight: 600;
     color: var(--text-muted);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    margin-bottom: 8px;
 }
 
 .active-q-tag {
     background-color: var(--primary);
     color: #FFFFFF;
-    padding: 2px 8px;
+    padding: 1px 6px;
     border-radius: var(--radius-pill);
-    font-size: 0.72rem;
+    font-size: 0.68rem;
+    font-weight: 600;
 }
 
 .quick-mark-actions {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: 6px;
+    margin-bottom: 8px;
 }
 
 .quick-action-btn {
-    padding: 8px;
+    padding: 6px 8px;
     border-radius: var(--radius-md);
-    font-size: 0.84rem;
-    font-weight: 400;
+    font-size: 0.76rem;
+    font-weight: 500;
     cursor: pointer;
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 5px;
     border: none;
     transition: all 0.15s ease;
 }
@@ -637,17 +697,17 @@ p, span, div, strong, b, th, td, label, a,
 .quick-numbers-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
-    gap: 6px;
-    margin-bottom: 10px;
+    gap: 4px;
+    margin-bottom: 8px;
 }
 
 .quick-num-btn {
     background-color: #FFFFFF;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-sm);
-    padding: 8px 0;
-    font-size: 0.95rem;
-    font-weight: 400;
+    padding: 5px 0;
+    font-size: 0.84rem;
+    font-weight: 500;
     color: var(--text-main);
     cursor: pointer;
     transition: all 0.15s ease;
@@ -661,6 +721,7 @@ p, span, div, strong, b, th, td, label, a,
 
 .quick-next-row {
     display: flex;
+    gap: 6px;
 }
 
 .btn-next-question {
@@ -668,9 +729,9 @@ p, span, div, strong, b, th, td, label, a,
     background-color: #FFFFFF;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
-    padding: 8px;
-    font-size: 0.84rem;
-    font-weight: 400;
+    padding: 6px;
+    font-size: 0.76rem;
+    font-weight: 500;
     color: var(--text-body);
     cursor: pointer;
     transition: all 0.15s ease;
@@ -684,36 +745,36 @@ p, span, div, strong, b, th, td, label, a,
 /* Section x Question Breakdown Table (Below Total Marks) */
 .q-breakdown-table-card {
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
+    border-radius: 10px;
     background-color: #FFFFFF;
     overflow: hidden;
 }
 
 .q-breakdown-header {
     display: grid;
-    grid-template-columns: 48px 48px 1fr 64px;
+    grid-template-columns: 30px 32px 1fr 48px;
     align-items: center;
-    padding: 8px 12px;
+    padding: 5px 8px;
     background-color: #F8FAFC;
     border-bottom: 1px solid var(--border-color);
-    font-size: 0.72rem;
-    font-weight: 500;
+    font-size: 0.68rem;
+    font-weight: 600;
     color: var(--text-muted);
-    letter-spacing: 0.04em;
+    letter-spacing: 0.03em;
 }
 
 .q-breakdown-body {
-    max-height: 180px;
+    max-height: 155px;
     overflow-y: auto;
 }
 
 .q-breakdown-row {
     display: grid;
-    grid-template-columns: 48px 48px 1fr 64px;
+    grid-template-columns: 30px 32px 1fr 48px;
     align-items: center;
-    padding: 7px 12px;
+    padding: 4px 8px;
     border-bottom: 1px solid #F1F5F9;
-    font-size: 0.82rem;
+    font-size: 0.76rem;
     cursor: pointer;
     transition: background-color 0.15s ease;
 }
@@ -1422,26 +1483,29 @@ p, span, div, strong, b, th, td, label, a,
 }
 
 .ws-client-badge {
-    display: flex;
+    display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 3px 10px 3px 6px;
+    gap: 6px;
+    padding: 2px 8px 2px 4px;
     background: rgba(0, 0, 0, 0.035);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-pill);
+    flex-shrink: 0;
+    height: 28px;
+    box-sizing: border-box;
 }
 
 .ws-school-logo {
-    height: 20px;
+    height: 18px;
     width: auto;
-    max-width: 24px;
+    max-width: 22px;
     object-fit: contain;
-    border-radius: 3px;
+    border-radius: 2px;
 }
 
 .ws-school-name-text {
-    font-size: 0.8rem;
-    font-weight: 400 !important;
+    font-size: 0.76rem;
+    font-weight: 500 !important;
     color: var(--text-main);
     white-space: nowrap;
 }
@@ -1935,28 +1999,28 @@ p, span, div, strong, b, th, td, label, a,
 .step-marks-toolbar {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 10px;
+    gap: 6px;
+    padding: 4px 8px;
     background: rgba(0, 122, 255, 0.04);
     border: 1px dashed rgba(0, 122, 255, 0.25);
     border-radius: var(--radius-sm);
-    margin-bottom: 10px;
+    margin-bottom: 6px;
 }
 
 .step-label {
-    font-size: 0.75rem;
+    font-size: 0.7rem;
     color: #007AFF;
-    font-weight: 400 !important;
+    font-weight: 500 !important;
 }
 
 .btn-step-mark {
-    padding: 4px 12px;
+    padding: 2px 8px;
     border-radius: var(--radius-pill);
     background: #FFFFFF;
     border: 1px solid rgba(0, 122, 255, 0.35);
     color: #007AFF;
-    font-size: 0.78rem;
-    font-weight: 400 !important;
+    font-size: 0.72rem;
+    font-weight: 500 !important;
     cursor: pointer;
     transition: all 0.15s ease;
 }
@@ -1975,20 +2039,20 @@ p, span, div, strong, b, th, td, label, a,
 
 .quick-next-row {
     display: flex;
-    gap: 8px;
-    margin-top: 10px;
+    gap: 6px;
+    margin-top: 6px;
 }
 
 .btn-prev-question,
 .btn-next-question {
     flex: 1;
-    height: 34px;
+    height: 28px;
     background: #F1F5F9;
     border: 1px solid #CBD5E1;
     border-radius: var(--radius-sm);
     color: var(--text-main);
-    font-size: 0.8rem;
-    font-weight: 400 !important;
+    font-size: 0.74rem;
+    font-weight: 500 !important;
     cursor: pointer;
     transition: all 0.15s ease;
 }
@@ -2459,34 +2523,34 @@ p, span, div, strong, b, th, td, label, a,
 
 .q-breakdown-header {
     display: grid;
-    grid-template-columns: 32px 36px 1fr;
+    grid-template-columns: 30px 32px 1fr 48px;
     gap: 4px;
-    padding: 5px 10px;
-    background: rgba(220, 38, 38, 0.06);
-    border-bottom: 1px solid var(--panel-card-border);
+    padding: 5px 8px;
+    background: #F8FAFC;
+    border-bottom: 1px solid var(--border-color);
     font-size: 0.68rem;
-    color: var(--text-secondary);
+    color: var(--text-muted);
+    font-weight: 600 !important;
     text-transform: uppercase;
     letter-spacing: 0.4px;
-    font-weight: 400 !important;
+    align-items: center;
 }
 
 .q-breakdown-body {
-    max-height: 180px;
+    max-height: 155px;
     overflow-y: auto;
 }
 
 .q-breakdown-row {
     display: grid;
-    grid-template-columns: 32px 36px 1fr;
+    grid-template-columns: 30px 32px 1fr 48px;
     gap: 4px;
-    padding: 4px 10px;
-    border-bottom: 1px solid var(--panel-card-border);
-    font-size: 0.78rem;
-    color: var(--text-primary);
+    padding: 4px 8px;
+    border-bottom: 1px solid #F1F5F9;
+    font-size: 0.74rem;
+    color: var(--text-main);
     cursor: pointer;
     transition: background 0.1s ease;
-    font-weight: 400 !important;
     align-items: center;
 }
 

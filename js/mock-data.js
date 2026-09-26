@@ -1,38 +1,11 @@
 /**
- * OneSpace Digital Correction - Clean Data Layer & Physics Template
- * Contains only the Physics Board Examination Template (33 Qs / 70 Marks)
- * ready for Firestore deployment, with all dummy evaluation mock data removed.
+ * OneSpace Digital Correction - Exam Template Data
+ * Contains the Physics Board Examination Template (33 Qs / 70 Marks)
+ * All institution, teacher, and class mock data removed.
  */
 
 const MockData = {
-    institution: {
-        id: "inst_01",
-        name: "Adwaith Thought Academy",
-        code: "ATA-2026",
-        address: "742 Evergreen Terrace, Tech Park City",
-        phone: "+91 98765 43210",
-        email: "evaluation@adwaith.edu",
-        logoText: "OneSpace OSM",
-        logo: "assets/school_logo.jpg",
-        fullLogo: "assets/school_fulllogo.jpg"
-    },
-
-    teacher: {
-        id: "teacher_01",
-        name: "Mrs. Nithya Prakash",
-        designation: "Senior Physics & Mathematics Faculty",
-        department: "Physics & Science Department",
-        academicYear: "2026-2027"
-    },
-
-    classes: [
-        { id: "12-A", name: "Class 12", section: "A", label: "Class 12-A", stream: "Physics & Mathematics" },
-        { id: "12-B", name: "Class 12", section: "B", label: "Class 12-B", stream: "Physics & Biology" }
-    ],
-
-    subjects: ["Physics"],
-
-    // Official Physics Board Paper Template (33 Qs / 70 Marks) - Ready for Firestore
+    // Official Physics Board Paper Template (33 Qs / 70 Marks)
     physicsTemplate: {
         id: "phy-cbse-70",
         name: "Physics Board Paper (33 Qs / 70 Marks)",
@@ -88,14 +61,14 @@ const MockData = {
     ],
 
     /**
-     * Disabled: No mock sample paper generation. Returns empty array.
+     * Returns empty array — no mock sample pages generated.
      */
-    generateSamplePaperPages: function(studentName = "Physics Student", regNo = "101") {
+    generateSamplePaperPages: function(studentName = "Student", regNo = "001") {
         return [];
     },
 
     /**
-     * Returns empty evaluation list by default (no dummy mock evaluations)
+     * Returns empty evaluation list — no dummy mock evaluations.
      */
     getInitialEvaluations: function() {
         return [];

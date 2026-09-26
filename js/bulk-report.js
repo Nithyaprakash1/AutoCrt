@@ -39,7 +39,7 @@ class BulkReportManager {
                     </div>
                     <div class="bulk-badge-divider"></div>
                     <div class="bulk-app-badge">
-                        <img src="assets/fulllogo.png" alt="OneSpace OSM" class="bulk-app-logo-img" />
+                        <img src="assets/fulllogo.png" alt="Niprak OSM" class="bulk-app-logo-img" />
                         <span class="bulk-app-tag">Official Evaluation System</span>
                     </div>
                 </div>
@@ -522,7 +522,7 @@ class BulkReportManager {
                     const pageNo = doc.internal.getNumberOfPages();
                     doc.setFontSize(8);
                     doc.setTextColor(100, 116, 139);
-                    doc.text(`OneSpace Digital Correction - Bulk Mark Report | Generated: ${new Date().toLocaleDateString()}`, margin, pageHeight - 8);
+                    doc.text(`Niprak OSM - Bulk Mark Report | Generated: ${new Date().toLocaleDateString()}`, margin, pageHeight - 8);
                     doc.text(`Page ${pageNo}`, pageWidth - margin, pageHeight - 8, { align: "right" });
                 }
             });

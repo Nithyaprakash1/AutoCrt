@@ -63,6 +63,10 @@ class UserManagementPageManager {
                     </div>
 
                     <div class="header-actions">
+                        <button type="button" class="btn-mgmt-secondary" id="btn-sync-credentials" title="Ensure all teacher login credentials are synchronized">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                            <span>Sync Credentials</span>
+                        </button>
                         <button type="button" class="btn-mgmt-secondary" id="btn-export-users-csv" title="Export users list as CSV">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             <span>Export CSV</span>
@@ -166,9 +170,12 @@ class UserManagementPageManager {
                     <div class="empty-icon-circle">
                         <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
                     </div>
-                    <span class="empty-title">No Users Found</span>
-                    <span class="empty-sub">No matching evaluator or uploader accounts found for the current query or filter.</span>
-                    <button type="button" class="btn-mgmt-primary" id="btn-empty-add-user" style="margin-top: 14px;">+ Add New User</button>
+                    <h3 class="empty-title">No Users Found</h3>
+                    <p class="empty-sub">No matching evaluator or uploader accounts found for the current query or filter.</p>
+                    <button type="button" class="btn-mgmt-primary" id="btn-empty-add-user">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                        <span>+ Add New User</span>
+                    </button>
                 </div>
             `;
         }
@@ -202,7 +209,7 @@ class UserManagementPageManager {
                                         </div>
                                         <div class="user-info-text">
                                             <span class="user-display-name">${u.name}</span>
-                                            <span class="user-id-code">ID: ${u.username || u.id}</span>
+                                            <span class="user-id-code">ID: ${u.username || u.id} ${u.email ? `• ${u.email}` : ''}</span>
                                         </div>
                                     </div>
                                 </td>
@@ -320,6 +327,37 @@ class UserManagementPageManager {
             btnEmptyAdd.addEventListener("click", () => this.openUserModal());
         }
 
+        // Sync Credentials Button
+        const btnSync = this.container.querySelector("#btn-sync-credentials");
+        if (btnSync) {
+            btnSync.addEventListener("click", async () => {
+                if (!window.firebaseManager) {
+                    alert("Account synchronization service is not available.");
+                    return;
+                }
+                const originalHtml = btnSync.innerHTML;
+                btnSync.disabled = true;
+                btnSync.innerHTML = `<span>Syncing Credentials...</span>`;
+
+                try {
+                    const res = await window.firebaseManager.batchSyncTeachersToFirebaseAuth(this.users);
+                    if (res.success) {
+                        this.showToast(`Synced ${res.synced} of ${this.users.length} teacher accounts successfully!`);
+                    } else {
+                        this.showToast("Batch synchronization completed with notices.");
+                    }
+                    await this.loadData();
+                    this.render();
+                } catch (sErr) {
+                    console.error("Sync error:", sErr);
+                    this.showToast("Sync failed: " + sErr.message);
+                } finally {
+                    btnSync.disabled = false;
+                    btnSync.innerHTML = originalHtml;
+                }
+            });
+        }
+
         // Export CSV Button
         const btnExport = this.container.querySelector("#btn-export-users-csv");
         if (btnExport) {
@@ -330,6 +368,12 @@ class UserManagementPageManager {
         const tableContainer = this.container.querySelector("#user-table-container");
         if (tableContainer) {
             tableContainer.addEventListener("click", (e) => {
+                const btnEmptyAdd = e.target.closest("#btn-empty-add-user");
+                if (btnEmptyAdd) {
+                    this.openUserModal();
+                    return;
+                }
+
                 const btnPass = e.target.closest(".btn-toggle-pass");
                 if (btnPass) {
                     const uId = btnPass.getAttribute("data-user-id");
@@ -383,6 +427,11 @@ class UserManagementPageManager {
         if (!u) return;
         u.status = u.status === "active" ? "inactive" : "active";
         await window.appStorage.saveUsersList(this.users);
+        if (window.firebaseManager && window.firebaseManager.firestore) {
+            try {
+                await window.firebaseManager.firestore.collection("users").doc(u.uid || u.id).set({ status: u.status }, { merge: true });
+            } catch (e) {}
+        }
         this.render();
         this.showToast(`User ${u.name} marked ${u.status}`);
     }
@@ -394,6 +443,11 @@ class UserManagementPageManager {
 
         this.users = this.users.filter(item => item.id !== userId);
         await window.appStorage.saveUsersList(this.users);
+        if (window.firebaseManager && window.firebaseManager.firestore) {
+            try {
+                await window.firebaseManager.firestore.collection("users").doc(u.uid || u.id).delete();
+            } catch (e) {}
+        }
         this.render();
         this.showToast(`User ${u.name} removed`);
     }
@@ -407,9 +461,10 @@ class UserManagementPageManager {
         const uData = user || {
             name: "",
             username: "",
+            email: "",
             password: this.generateRandomPassword(),
             role: "evaluator",
-            assignedSubjects: ["Biology"],
+            assignedSubjects: ["Physics"],
             assignedClasses: ["Class 12-A"],
             status: "active"
         };
@@ -434,21 +489,28 @@ class UserManagementPageManager {
                         </div>
                         <div class="form-group">
                             <label class="form-label" for="inp-user-username">User ID / Username <span class="required-star">*</span></label>
-                            <input type="text" id="inp-user-username" class="form-input" placeholder="e.g. sarah.bio" value="${uData.username}" required />
+                            <input type="text" id="inp-user-username" class="form-input" placeholder="e.g. sarah.bio" value="${uData.username || ''}" required />
                         </div>
                     </div>
 
                     <div class="form-row-two-col">
+                        <div class="form-group">
+                            <label class="form-label" for="inp-user-email">User Email <span class="required-star">*</span></label>
+                            <input type="email" id="inp-user-email" class="form-input" placeholder="e.g. sarah@niprak.edu" value="${uData.email || ''}" required />
+                        </div>
                         <div class="form-group">
                             <div class="label-with-action-row">
                                 <label class="form-label" for="inp-user-pass">Password <span class="required-star">*</span></label>
                                 <button type="button" class="btn-label-link" id="btn-gen-pass">Generate</button>
                             </div>
                             <div class="input-with-inline-btn">
-                                <input type="text" id="inp-user-pass" class="form-input" placeholder="Enter secure password" value="${uData.password}" required />
+                                <input type="text" id="inp-user-pass" class="form-input" placeholder="Enter secure password (min 6 chars)" value="${uData.password}" required />
                             </div>
                         </div>
-                        <div class="form-group">
+                    </div>
+
+                    <div class="form-row-two-col">
+                        <div class="form-group" style="grid-column: span 2;">
                             <label class="form-label" for="select-user-role">Role <span class="required-star">*</span></label>
                             <select id="select-user-role" class="form-select">
                                 <option value="evaluator" ${uData.role === 'evaluator' ? 'selected' : ''}>Evaluator / Teacher (Marking Desk)</option>
@@ -533,8 +595,10 @@ class UserManagementPageManager {
         if (form) {
             form.addEventListener("submit", async (e) => {
                 e.preventDefault();
+                const btnSubmit = modalEl.querySelector("#btn-user-modal-save");
                 const name = modalEl.querySelector("#inp-user-fullname")?.value.trim();
                 const username = modalEl.querySelector("#inp-user-username")?.value.trim();
+                const email = modalEl.querySelector("#inp-user-email")?.value.trim();
                 const password = modalEl.querySelector("#inp-user-pass")?.value.trim();
                 const role = modalEl.querySelector("#select-user-role")?.value;
                 const status = modalEl.querySelector("#select-user-status")?.value;
@@ -542,8 +606,13 @@ class UserManagementPageManager {
                 const selectedSubjects = Array.from(modalEl.querySelectorAll("input[name='assigned_subject']:checked")).map(cb => cb.value);
                 const selectedClasses = Array.from(modalEl.querySelectorAll("input[name='assigned_class']:checked")).map(cb => cb.value);
 
-                if (!name || !username || !password) {
-                    alert("Please fill in all required fields (Name, User ID, Password).");
+                if (!name || !username || !email || !password) {
+                    alert("Please fill in all required fields (Name, User ID, Email, Password).");
+                    return;
+                }
+
+                if (password.length < 6) {
+                    alert("Password must be at least 6 characters long.");
                     return;
                 }
 
@@ -552,35 +621,110 @@ class UserManagementPageManager {
                     return;
                 }
 
-                if (isEdit && this.editingUser) {
-                    this.editingUser.name = name;
-                    this.editingUser.username = username;
-                    this.editingUser.password = password;
-                    this.editingUser.role = role;
-                    this.editingUser.roleLabel = role === 'uploader' ? 'Uploader / Exam Dept' : 'Evaluator / Teacher';
-                    this.editingUser.assignedSubjects = selectedSubjects;
-                    this.editingUser.assignedClasses = selectedClasses;
-                    this.editingUser.status = status;
-                } else {
-                    const newUser = {
-                        id: `usr_${Date.now()}`,
-                        name: name,
-                        username: username,
-                        password: password,
-                        role: role,
-                        roleLabel: role === 'uploader' ? 'Uploader / Exam Dept' : 'Evaluator / Teacher',
-                        assignedSubjects: selectedSubjects,
-                        assignedClasses: selectedClasses,
-                        status: status,
-                        createdAt: new Date().toISOString().split("T")[0]
-                    };
-                    this.users.unshift(newUser);
+                if (btnSubmit) {
+                    btnSubmit.disabled = true;
+                    btnSubmit.textContent = isEdit ? "Updating..." : "Securing Credentials...";
                 }
 
-                await window.appStorage.saveUsersList(this.users);
-                closeModal();
-                this.render();
-                this.showToast(isEdit ? `User ${name} updated successfully` : `User ${name} created successfully!`);
+                try {
+                    if (isEdit && this.editingUser) {
+                        this.editingUser.name = name;
+                        this.editingUser.username = username;
+                        this.editingUser.email = email;
+                        this.editingUser.password = password;
+                        this.editingUser.role = role;
+                        this.editingUser.roleLabel = role === 'uploader' ? 'Uploader / Exam Dept' : 'Evaluator / Teacher';
+                        this.editingUser.assignedSubjects = selectedSubjects;
+                        this.editingUser.assignedClasses = selectedClasses;
+                        this.editingUser.status = status;
+
+                        // Sync updated profile to Firestore
+                        if (window.firebaseManager && window.firebaseManager.firestore) {
+                            try {
+                                const uid = this.editingUser.uid || this.editingUser.id;
+                                await window.firebaseManager.firestore.collection("users").doc(uid).set({
+                                    name: name,
+                                    username: username,
+                                    email: email,
+                                    password: password,
+                                    role: role,
+                                    roleLabel: role === 'uploader' ? 'Uploader / Exam Dept' : 'Evaluator / Teacher',
+                                    assignedSubjects: selectedSubjects,
+                                    assignedClasses: selectedClasses,
+                                    status: status,
+                                    updatedAt: new Date().toISOString()
+                                }, { merge: true });
+                            } catch (fsErr) {
+                                console.warn("Firestore user update warning:", fsErr);
+                            }
+                        }
+                    } else {
+                        // Check for duplicate email locally
+                        const existingEmail = this.users.find(u => u.email && u.email.toLowerCase() === email.toLowerCase());
+                        if (existingEmail) {
+                            alert(`Account creation notice: A user with email "${email}" is already in the list. Please use a unique email or edit the existing user.`);
+                            if (btnSubmit) {
+                                btnSubmit.disabled = false;
+                                btnSubmit.textContent = "Create User Account";
+                            }
+                            return;
+                        }
+
+                        // Create account credentials
+                        let createdProfile = null;
+                        if (window.firebaseManager) {
+                            const res = await window.firebaseManager.createTeacherAccount({
+                                email: email,
+                                password: password,
+                                name: name,
+                                username: username,
+                                role: role,
+                                assignedSubjects: selectedSubjects,
+                                assignedClasses: selectedClasses,
+                                status: status
+                            });
+
+                            if (res.success && res.profile) {
+                                createdProfile = res.profile;
+                            } else if (!res.success && res.error) {
+                                alert("Credential Setup Notice: " + res.error);
+                                if (btnSubmit) {
+                                    btnSubmit.disabled = false;
+                                    btnSubmit.textContent = "Create User Account";
+                                }
+                                return;
+                            }
+                        }
+
+                        const newUser = createdProfile || {
+                            id: `usr_${Date.now()}`,
+                            uid: `usr_${Date.now()}`,
+                            name: name,
+                            username: username,
+                            email: email,
+                            password: password,
+                            role: role,
+                            roleLabel: role === 'uploader' ? 'Uploader / Exam Dept' : 'Evaluator / Teacher',
+                            assignedSubjects: selectedSubjects,
+                            assignedClasses: selectedClasses,
+                            status: status,
+                            createdAt: new Date().toISOString().split("T")[0]
+                        };
+                        this.users.unshift(newUser);
+                    }
+
+                    await window.appStorage.saveUsersList(this.users);
+                    closeModal();
+                    this.render();
+                    this.showToast(isEdit ? `User ${name} updated successfully` : `Teacher account created successfully for ${name}!`);
+                } catch (err) {
+                    console.error("Error creating/saving user:", err);
+                    alert("Failed to save user: " + err.message);
+                    if (btnSubmit) {
+                        btnSubmit.disabled = false;
+                        btnSubmit.textContent = isEdit ? "Save Changes" : "Create User Account";
+                    }
+                }
             });
         }
     }
@@ -610,7 +754,7 @@ class UserManagementPageManager {
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `onespace_users_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `niprak_users_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         link.remove();

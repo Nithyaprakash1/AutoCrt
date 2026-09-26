@@ -25,8 +25,8 @@ class EvaluationForm {
 
     render() {
         const today = new Date().toISOString().split("T")[0];
-        const initialInst = (window.MockData && window.MockData.institution.name) || "Greenwood International Academy";
-        const initialTeacher = (window.MockData && window.MockData.teacher.name) || "Mrs. Nithya Prakash";
+        const initialInst = (window.appStorage && window.appStorage._cachedSettings?.institution?.name) || "";
+        const initialTeacher = (window.appStorage && window.appStorage._cachedSettings?.teacher?.name) || "";
 
         const ic = window.Icons || {};
 

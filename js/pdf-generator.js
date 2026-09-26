@@ -8,10 +8,12 @@ class PDFGenerator {
     /**
      * Generate and download the evaluated student PDF
      */
-    static async generateCorrectedPaperPDF(evaluation) {
+    static async generateCorrectedPaperPDF(evaluation, onProgress = null) {
         if (!window.jspdf || !window.jspdf.jsPDF) {
             throw new Error("jsPDF library is not loaded");
         }
+
+        if (onProgress) onProgress(15, "Initializing high-resolution PDF document engine...");
 
         const { jsPDF } = window.jspdf;
         // Default A4 portrait (210 x 297 mm)
@@ -22,11 +24,60 @@ class PDFGenerator {
             compress: true
         });
 
-        const pages = evaluation.pages || [];
+        let pages = evaluation.pages || [];
         const annotations = evaluation.annotations || [];
+
+        // If paper was stored as optimized single PDF, expand pages on demand via pdfjsLib
+        const isPdf = (pages.length === 1 && typeof pages[0] === "string" && (pages[0].startsWith("data:application/pdf") || pages[0].includes(".pdf") || pages[0].includes("alt=media"))) ||
+                      (evaluation.pdfDataUrl && (!pages || pages.length <= 1));
+        const pdfSrc = (pages.length === 1 && typeof pages[0] === "string" && pages[0].startsWith("data:application/pdf")) 
+                       ? pages[0] 
+                       : (evaluation.pdfDataUrl || pages[0]);
+
+        if (isPdf && pdfSrc && window.pdfjsLib) {
+            try {
+                if (onProgress) onProgress(25, "Extracting PDF answer sheet pages...");
+                let loadingTask = null;
+                if (typeof pdfSrc === "string" && pdfSrc.startsWith("data:application/pdf")) {
+                    const base64Data = pdfSrc.split(",")[1] || pdfSrc;
+                    const raw = atob(base64Data);
+                    const uint8Array = new Uint8Array(raw.length);
+                    for (let i = 0; i < raw.length; i++) {
+                        uint8Array[i] = raw.charCodeAt(i);
+                    }
+                    loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
+                } else {
+                    loadingTask = window.pdfjsLib.getDocument({ url: pdfSrc });
+                }
+                const pdfDoc = await loadingTask.promise;
+                if (pdfDoc && pdfDoc.numPages >= 1) {
+                    const rendered = [];
+                    for (let pNum = 1; pNum <= pdfDoc.numPages; pNum++) {
+                        const pdfPage = await pdfDoc.getPage(pNum);
+                        const unscaled = pdfPage.getViewport({ scale: 1.0 });
+                        const targetW = 1300;
+                        let sc = Math.max(1.0, Math.min(1.5, targetW / unscaled.width));
+                        const viewport = pdfPage.getViewport({ scale: sc });
+                        const offCanvas = document.createElement("canvas");
+                        offCanvas.width = viewport.width;
+                        offCanvas.height = viewport.height;
+                        const offCtx = offCanvas.getContext("2d");
+                        await pdfPage.render({ canvasContext: offCtx, viewport }).promise;
+                        rendered.push(offCanvas.toDataURL("image/jpeg", 0.82));
+                    }
+                    if (rendered.length > 0) pages = rendered;
+                }
+            } catch (err) {
+                console.warn("Could not expand PDF in PDFGenerator:", err);
+            }
+        }
 
         // 1. Render each answer sheet page with overlaid annotations
         for (let i = 0; i < pages.length; i++) {
+            if (onProgress) {
+                const pct = Math.round(35 + ((i + 1) / (pages.length + 1)) * 50);
+                onProgress(pct, `Composing page ${i + 1} of ${pages.length} with markings...`);
+            }
             if (i > 0) {
                 doc.addPage("a4", "portrait");
             }
@@ -37,6 +88,8 @@ class PDFGenerator {
             // A4 is 210 x 297 mm
             doc.addImage(compositeDataUrl, "JPEG", 0, 0, 210, 297, undefined, "FAST");
         }
+
+        if (onProgress) onProgress(88, "Appending official Student Mark Summary scorecard...");
 
         // Preload co-branding logos for institutional co-branding header
         const [schoolLogoData, appLogoData] = await Promise.all([
@@ -50,6 +103,8 @@ class PDFGenerator {
             schoolLogo: schoolLogoData,
             appLogo: appLogoData
         });
+
+        if (onProgress) onProgress(98, "Finalizing and downloading PDF file...");
 
         // 3. Save or Download
         const sanitizedName = (evaluation.studentName || "Student").replace(/[^a-zA-Z0-9_-]/g, "_");
@@ -92,6 +147,43 @@ class PDFGenerator {
      * Renders base image + annotations onto a high-res offscreen canvas
      */
     static async renderCompositePage(imageSrc, annotations) {
+        let safeSrc = imageSrc;
+
+        // If remote HTTP/HTTPS Firebase Storage URL, load as local blob URL to avoid canvas taint
+        if (typeof safeSrc === "string" && (safeSrc.startsWith("http://") || safeSrc.startsWith("https://"))) {
+            try {
+                const resp = await fetch(safeSrc, { mode: "cors" });
+                if (resp.ok) {
+                    const blob = await resp.blob();
+                    safeSrc = URL.createObjectURL(blob);
+                }
+            } catch (fErr) {
+                console.warn("PDFGenerator fetch image blob warning:", fErr);
+            }
+        }
+
+        // If safeSrc is a PDF data URL, render it via PDF.js to image
+        if (typeof safeSrc === "string" && safeSrc.startsWith("data:application/pdf") && window.pdfjsLib) {
+            try {
+                const base64Data = safeSrc.split(",")[1] || safeSrc;
+                const raw = atob(base64Data);
+                const uint8Array = new Uint8Array(raw.length);
+                for (let i = 0; i < raw.length; i++) {
+                    uint8Array[i] = raw.charCodeAt(i);
+                }
+                const pdf = await window.pdfjsLib.getDocument({ data: uint8Array }).promise;
+                const p = await pdf.getPage(1);
+                const vp = p.getViewport({ scale: 1.8 });
+                const c = document.createElement("canvas");
+                c.width = vp.width;
+                c.height = vp.height;
+                await p.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
+                safeSrc = c.toDataURL("image/jpeg", 0.92);
+            } catch (pErr) {
+                console.warn("PDFGenerator pdf render warning:", pErr);
+            }
+        }
+
         return new Promise((resolve) => {
             const img = new Image();
             img.crossOrigin = "anonymous";
@@ -174,7 +266,7 @@ class PDFGenerator {
                 canvas.height = 1650;
                 resolve(canvas.toDataURL("image/jpeg", 0.8));
             };
-            img.src = imageSrc;
+            img.src = safeSrc;
         });
     }
 
@@ -376,7 +468,7 @@ class PDFGenerator {
 
         // Date
         doc.text(`Evaluation Date: ${evaluation.correctionDate || new Date().toISOString().split("T")[0]}`, margin, currentY + 8);
-        doc.text("System: OneSpace Digital Evaluation Engine v1.0", margin, currentY + 14);
+        doc.text("System: Niprak OSM Digital Evaluation Engine v1.0", margin, currentY + 14);
 
         // Signature line
         const sigX = pageWidth - margin - 60;
@@ -391,7 +483,7 @@ class PDFGenerator {
         // Footer watermarking
         doc.setFontSize(8);
         doc.setTextColor(148, 163, 184);
-        doc.text("Generated by OneSpace Digital Correction - Confirmed & Verified", pageWidth / 2, 288, { align: "center" });
+        doc.text("Generated by Niprak OSM Digital Correction - Confirmed & Verified", pageWidth / 2, 288, { align: "center" });
     }
 }
 

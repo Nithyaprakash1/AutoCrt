@@ -28,20 +28,20 @@ class SettingsPageManager {
         if (!this.settings) {
             this.settings = {
                 institution: {
-                    name: "Adwaith Thought Academy",
-                    code: "ATA-2026",
+                    name: "",
+                    code: "",
                     logo: "assets/school_logo.jpg",
                     fullLogo: "assets/school_fulllogo.jpg"
                 },
                 teacher: {
-                    name: "Mrs. Nithya Prakash",
-                    role: "Digital Evaluation Specialist"
+                    name: "",
+                    role: ""
                 },
                 storageMode: "local",
                 firebaseConfig: {
                     apiKey: "",
-                    projectId: "onespace-evaluation",
-                    storageBucket: "onespace-evaluation.appspot.com"
+                    projectId: "",
+                    storageBucket: ""
                 },
                 preferences: {
                     passingPercentage: 40,
@@ -62,10 +62,10 @@ class SettingsPageManager {
     render() {
         if (!this.container) return;
 
-        const teacherName = this.settings.teacher?.name || "Mrs. Nithya Prakash";
-        const instName = this.settings.institution?.name || "Adwaith Thought Academy";
-        const teacherRole = this.settings.teacher?.role || "Digital Evaluation Specialist";
-        const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || "NP";
+        const teacherName = this.settings.teacher?.name || "";
+        const instName = this.settings.institution?.name || "";
+        const teacherRole = this.settings.teacher?.role || "";
+        const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || "??";
         const storageMode = this.settings.storageMode || "local";
         const fbConfig = this.settings.firebaseConfig || {};
         const prefs = this.settings.preferences || { passingPercentage: 40, quickMarkRange: 10, autosaveInterval: 10 };
@@ -121,7 +121,7 @@ class SettingsPageManager {
                             </span>
                             <div class="pill-text-col">
                                 <span class="pill-title">Database & Cloud</span>
-                                <span class="pill-desc">Local IndexedDB & Firebase</span>
+                                <span class="pill-desc">Local & Cloud Sync</span>
                             </div>
                         </button>
 
@@ -232,12 +232,12 @@ class SettingsPageManager {
                                         <label>Data Storage Mode</label>
                                         <select id="select-full-storage-mode" class="form-select">
                                             <option value="local" ${storageMode === 'local' ? 'selected' : ''}>Local Offline Mode (IndexedDB + LocalStorage)</option>
-                                            <option value="firebase" ${storageMode === 'firebase' ? 'selected' : ''}>Cloud Firebase (Firestore + Storage + Live Sync)</option>
+                                            <option value="firebase" ${storageMode === 'firebase' ? 'selected' : ''}>Cloud Server & Realtime Sync</option>
                                         </select>
                                     </div>
 
                                     <div id="full-firebase-credentials-box" style="display: ${storageMode === 'firebase' ? 'block' : 'none'}; border-top: 1px solid var(--border-color); padding-top: 16px;">
-                                        <h4 class="sub-section-title">Firebase Project Configuration</h4>
+                                        <h4 class="sub-section-title">Cloud Server Configuration</h4>
                                         <div class="form-group" style="margin-bottom: 12px;">
                                             <label>API Key</label>
                                             <input type="text" id="input-fb-api-key" class="form-input" placeholder="AIzaSy..." value="${fbConfig.apiKey || ''}" />
@@ -332,14 +332,14 @@ class SettingsPageManager {
         const instPreview = this.container.querySelector("#full-settings-inst-preview");
 
         const updateLivePreview = () => {
-            const n = nameInput?.value.trim() || "Mrs. Nithya Prakash";
-            const inst = instInput?.value.trim() || "Adwaith Thought Academy";
-            const role = roleInput?.value.trim() || "Digital Evaluation Specialist";
-            const initials = n.split(" ").filter(Boolean).map(x => x[0]).slice(0, 2).join("").toUpperCase() || "NP";
+            const n = nameInput?.value.trim() || "";
+            const inst = instInput?.value.trim() || "";
+            const role = roleInput?.value.trim() || "";
+            const initials = n.split(" ").filter(Boolean).map(x => x[0]).slice(0, 2).join("").toUpperCase() || "??";
 
             if (avatarPreview) avatarPreview.textContent = initials;
-            if (namePreview) namePreview.textContent = n;
-            if (instPreview) instPreview.textContent = `${inst} • ${role}`;
+            if (namePreview) namePreview.textContent = n || "Your Name";
+            if (instPreview) instPreview.textContent = inst || role ? `${inst}${inst && role ? " • " : ""}${role}` : "Your Institution";
         };
 
         if (nameInput) nameInput.addEventListener("input", updateLivePreview);
@@ -357,9 +357,9 @@ class SettingsPageManager {
 
         // Save Settings (Top and Bottom buttons)
         const handleSave = async () => {
-            const tName = nameInput?.value.trim() || "Mrs. Nithya Prakash";
-            const iName = instInput?.value.trim() || "Adwaith Thought Academy";
-            const tRole = roleInput?.value.trim() || "Digital Evaluation Specialist";
+            const tName = nameInput?.value.trim() || "";
+            const iName = instInput?.value.trim() || "";
+            const tRole = roleInput?.value.trim() || "";
             const sMode = storageModeSelect?.value || "local";
 
             const passPct = Number(this.container.querySelector("#input-passing-percentage")?.value) || 40;
@@ -369,7 +369,7 @@ class SettingsPageManager {
             const newSettings = {
                 institution: {
                     name: iName,
-                    code: "ATA-2026",
+                    code: this.settings.institution?.code || "",
                     logo: "assets/school_logo.jpg",
                     fullLogo: "assets/school_fulllogo.jpg"
                 },
@@ -424,7 +424,7 @@ class SettingsPageManager {
                     `;
                 };
 
-                const savedPass = window.appStorage ? (await window.appStorage.getUserPassword()) : "admin123";
+                const savedPass = window.appStorage ? (await window.appStorage.getUserPassword()) : "";
 
                 if (!currPass) {
                     showStatus("Please enter your current password.");
@@ -468,10 +468,10 @@ class SettingsPageManager {
         const btnResetDefaults = this.container.querySelector("#btn-reset-settings-defaults");
         if (btnResetDefaults) {
             btnResetDefaults.addEventListener("click", () => {
-                if (confirm("Reset configuration to default values?")) {
-                    if (nameInput) nameInput.value = "Mrs. Nithya Prakash";
-                    if (instInput) instInput.value = "Adwaith Thought Academy";
-                    if (roleInput) roleInput.value = "Digital Evaluation Specialist";
+                if (confirm("Reset configuration to default values? This will clear your name, institution and role fields.")) {
+                    if (nameInput) nameInput.value = "";
+                    if (instInput) instInput.value = "";
+                    if (roleInput) roleInput.value = "";
                     updateLivePreview();
                     handleSave();
                 }

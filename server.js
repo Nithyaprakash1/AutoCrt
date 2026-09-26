@@ -48,5 +48,5 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-    console.log(`OneSpace Digital Correction Server running at http://127.0.0.1:${PORT}/`);
+    console.log(`Niprak OSM Digital Correction Server running at http://127.0.0.1:${PORT}/`);
 });

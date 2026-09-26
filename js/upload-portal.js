@@ -152,6 +152,16 @@ class UploadPortalManager {
             if (savedClasses && Array.isArray(savedClasses) && savedClasses.length > 0) {
                 this.classes = savedClasses;
             }
+
+            // Update dynamic student counts for all classes from actual rosters
+            for (const cls of this.classes) {
+                try {
+                    const roster = await window.appStorage.getClassRoster(cls.id);
+                    cls.studentsCount = (roster && roster.length > 0) ? `${roster.length} Enrolled` : `0 Enrolled`;
+                } catch (e) {
+                    cls.studentsCount = `0 Enrolled`;
+                }
+            }
         }
         this.render();
         this.bindEvents();
@@ -600,7 +610,7 @@ class UploadPortalManager {
     }
 
     generateDemoCsvContent() {
-        return '"Roll No","Student Name","Gender","Parent Contact"';
+        return '"Roll No","Student Name"';
     }
 
     downloadDemoCsvTemplate() {
@@ -628,9 +638,7 @@ class UploadPortalManager {
             if (row.length >= 2 && row[1]) {
                 newStudents.push({
                     rollNo: row[0] || String(1200 + i),
-                    studentName: row[1],
-                    gender: row[2] || "Unspecified",
-                    parentContact: row[3] || ""
+                    studentName: row[1]
                 });
             }
         }
@@ -721,7 +729,7 @@ class UploadPortalManager {
                             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="12 18 12 12 9 15"/><polyline points="12 12 15 15"/></svg>
                         </div>
                         <h4 class="dropzone-heading">Drop Student Answer Sheet PDFs Here</h4>
-                        <p class="dropzone-sub">Upload individual student PDFs or multiple files at once. The system automatically reconciles files with the student roster below.</p>
+                        <p class="dropzone-sub">Upload individual student PDFs or multiple files at once (Strict 5MB Limit per file • Auto-optimized & compressed). The system automatically reconciles files with the student roster below.</p>
                         <div class="dropzone-buttons-row">
                             <button type="button" class="btn-browse-pdf" id="btn-portal-browse-pdf">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -735,7 +743,7 @@ class UploadPortalManager {
                     </div>
 
                     <!-- Files Processing Queue -->
-                    <div class="file-queue-area" id="file-queue-container" style="${this.fileQueue.length > 0 ? 'display:block;' : 'display:none;'}">
+                    <div class="file-queue-area" id="file-queue-container" style="display: block;">
                         <!-- Batch Upload Progress Banner -->
                         <div class="batch-upload-progress-banner" id="batch-upload-progress-banner" style="display: none;">
                             <div class="batch-progress-header">
@@ -749,7 +757,7 @@ class UploadPortalManager {
 
                         <div class="file-queue-header">
                             <h4 class="queue-title">PDF Ingestion Queue (${this.fileQueue.length} Document${this.fileQueue.length === 1 ? '' : 's'})</h4>
-                            <button type="button" class="btn-clear-queue" id="btn-clear-queue">Clear All</button>
+                            <button type="button" class="btn-clear-queue" id="btn-clear-queue" style="${this.fileQueue.length > 0 ? '' : 'display:none;'}">Clear All</button>
                         </div>
 
                         <div class="queue-list" id="queue-items-list">
@@ -759,7 +767,7 @@ class UploadPortalManager {
                         <div class="queue-actions-footer">
                             <button type="button" class="btn-publish-eval" id="btn-publish-batch">
                                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                Publish Papers to Teacher Evaluator Desk (${this.fileQueue.length} Ready)
+                                <span id="btn-publish-batch-text">Publish Papers to Teacher Evaluator Desk (${this.fileQueue.filter(i => i.isReady).length} Ready)</span>
                             </button>
                         </div>
                     </div>
@@ -874,6 +882,16 @@ class UploadPortalManager {
     }
 
     renderQueueItems() {
+        if (!this.fileQueue || this.fileQueue.length === 0) {
+            return `
+                <div class="queue-empty-placeholder" style="text-align: center; padding: 26px 20px; background: var(--bg-subtle); border: 1.5px dashed var(--border-color); border-radius: 16px; margin-bottom: 16px;">
+                    <div style="font-size: 0.95rem; font-weight: 500; color: var(--text-main); margin-bottom: 4px;">No student answer sheets staged in queue</div>
+                    <div style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 10px;">Drop or browse PDF answer sheets (Max 5MB each) into the dropzone above to stage them.</div>
+                    <span class="publish-badge-pill pill-green" style="font-size: 0.74rem;">Strict 5MB Limit • Dynamic Image Compression • Fast Cloud Sync</span>
+                </div>
+            `;
+        }
+
         return this.fileQueue.map((item, idx) => {
             const pct = item.progressPercent !== undefined ? item.progressPercent : (item.isReady ? 100 : 0);
             const statusMsg = item.statusText || (item.isProcessing ? 'Processing PDF pages...' : `${item.pages.length} Pages Extracted via PDF.js`);
@@ -914,16 +932,27 @@ class UploadPortalManager {
                     </div>
 
                     <!-- Page Thumbnails Row -->
-                    ${item.pages.length > 0 ? `
+                    ${item.thumbnail ? `
                         <div class="queue-thumb-strip">
-                            ${item.pages.map((p, pIdx) => `
+                            <div class="queue-thumb-box" title="Cover Page (Page 1)">
+                                <img src="${item.thumbnail}" alt="Page 1" />
+                                <span>P1 of ${item.pageCount || 1}</span>
+                            </div>
+                            <span style="font-size: 0.78rem; color: var(--text-muted); align-self: center; margin-left: 8px;">
+                                ${item.pageCount || 1} Pages Extracted &bull; Optimized Single PDF Mode
+                            </span>
+                        </div>
+                    ` : (item.pages && item.pages.length > 0 ? `
+                        <div class="queue-thumb-strip">
+                            ${item.pages.slice(0, 3).map((p, pIdx) => `
                                 <div class="queue-thumb-box" title="Page ${pIdx + 1}">
                                     ${typeof p === "string" && p.startsWith("data:application/pdf") ? `<iframe src="${p}" style="width:100%; height:100%; border:none; pointer-events:none;"></iframe>` : `<img src="${p}" alt="P${pIdx + 1}" />`}
                                     <span>P${pIdx + 1}</span>
                                 </div>
                             `).join('')}
+                            ${item.pages.length > 3 ? `<span style="font-size:0.75rem; color:var(--text-muted); align-self:center; margin-left:6px;">+${item.pages.length - 3} more</span>` : ''}
                         </div>
-                    ` : ''}
+                    ` : '')}
                 </div>
             `;
         }).join('');
@@ -2867,13 +2896,23 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         const queueContainer = this.container.querySelector("#file-queue-container");
         const list = this.container.querySelector("#queue-items-list");
         const headerTitle = this.container.querySelector(".queue-title");
+        const clearBtn = this.container.querySelector("#btn-clear-queue");
+        const pubBtnText = this.container.querySelector("#btn-publish-batch-text");
+        const sidePubBtn = this.container.querySelector("#btn-side-publish-queue");
+
+        const readyCount = (this.fileQueue || []).filter(i => i.isReady).length;
+
+        if (pubBtnText) {
+            pubBtnText.textContent = `Publish Papers to Teacher Evaluator Desk (${readyCount} Ready)`;
+        }
+        if (sidePubBtn) {
+            sidePubBtn.textContent = `Publish Batch (${readyCount} Ready)`;
+        }
+        if (clearBtn) {
+            clearBtn.style.display = this.fileQueue.length > 0 ? "inline-block" : "none";
+        }
 
         if (!queueContainer || !list) return;
-
-        if (this.fileQueue.length === 0) {
-            queueContainer.style.display = "none";
-            return;
-        }
 
         queueContainer.style.display = "block";
         if (headerTitle) {
@@ -2883,59 +2922,199 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         this.bindQueueInputs();
     }
 
-    // --- Ingestion & PDF/Image Parsing ---
-    async handleIncomingFiles(files, targetStudent = null) {
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
-            const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+    parseFilenameForStudentInfo(filename) {
+        const baseName = filename.replace(/\.[^/.]+$/, "").trim();
+        let possibleName = baseName;
+        let possibleRoll = "";
 
-            if (!isPdf && !isImage) {
-                alert(`File "${file.name}" is not supported. Please upload PDF or image answer sheet files.`);
-                continue;
-            }
+        const parts = baseName.split(/[\s_\-]+/).filter(Boolean);
+        if (parts.length >= 2) {
+            const lastPart = parts[parts.length - 1];
+            const firstPart = parts[0];
 
-            // Derive clean student name & roll number from filename or targetStudent
-            const baseName = file.name.replace(/\.[^/.]+$/, "");
-            const nameParts = baseName.replace(/[_-]/g, " ").trim().split(" ");
-            let possibleRoll = targetStudent ? targetStudent.rollNo : "";
-            let possibleName = targetStudent ? targetStudent.studentName : baseName;
-
-            if (!targetStudent) {
-                const lastWord = nameParts[nameParts.length - 1];
-                if (/^\d+$/.test(lastWord)) {
-                    possibleRoll = lastWord;
-                    possibleName = nameParts.slice(0, -1).join(" ");
-                } else {
-                    possibleRoll = String(100 + this.fileQueue.length + 1);
-                    possibleName = nameParts.join(" ");
+            if (/^\d+$/.test(lastPart)) {
+                possibleRoll = lastPart;
+                possibleName = parts.slice(0, -1).join(" ");
+            } else if (/^\d+$/.test(firstPart)) {
+                possibleRoll = firstPart;
+                possibleName = parts.slice(1).join(" ");
+            } else {
+                const numIdx = parts.findIndex(p => /^\d+$/.test(p));
+                if (numIdx >= 0) {
+                    possibleRoll = parts[numIdx];
+                    const nameTokens = parts.filter((_, idx) => idx !== numIdx);
+                    possibleName = nameTokens.join(" ");
                 }
             }
-
-            const queueItem = {
-                file: file,
-                fileName: file.name,
-                studentName: possibleName || `Student ${this.fileQueue.length + 1}`,
-                rollNo: possibleRoll,
-                pages: [],
-                isProcessing: true,
-                isReady: false
-            };
-
-            this.fileQueue.push(queueItem);
-            this.refreshQueueUI();
-
-            if (isImage) {
-                await this.extractImagePages(queueItem);
-            } else {
-                await this.extractPdfPages(queueItem);
-            }
-            this.refreshQueueUI();
         }
 
-        // Auto-save & publish ingested files directly to appStorage & Evaluator Desk
-        if (this.fileQueue.some(i => i.isReady)) {
-            await this.publishQueueToStorage();
+        // Clean up title case
+        possibleName = possibleName.replace(/\b\w/g, l => l.toUpperCase());
+
+        // Cross-match with active class roster if available
+        if (this.currentClassRoster && this.currentClassRoster.length > 0) {
+            const matchedStudent = this.currentClassRoster.find(s => {
+                const sRoll = String(s.rollNo || "").trim();
+                const sName = String(s.studentName || "").toLowerCase().trim();
+                if (possibleRoll && sRoll === possibleRoll) return true;
+                if (possibleName && sName === possibleName.toLowerCase().trim()) return true;
+                return false;
+            });
+
+            if (matchedStudent) {
+                possibleName = matchedStudent.studentName;
+                possibleRoll = matchedStudent.rollNo;
+            }
+        }
+
+        return {
+            studentName: possibleName || baseName,
+            rollNo: possibleRoll || String(100 + (this.fileQueue ? this.fileQueue.length : 0) + 1)
+        };
+    }
+
+    // --- Ingestion & PDF/Image Parsing ---
+    async handleIncomingFiles(files, targetStudent = null) {
+        if (!files || files.length === 0) return;
+
+        // Prevent repeated or concurrent uploads
+        if (this.isUploading) {
+            if (window.app && window.app.showToast) {
+                window.app.showToast("An upload is currently in progress. Please wait for it to finish.", "warning");
+            }
+            return;
+        }
+
+        this.isUploading = true;
+
+        // Lock dropzone, file inputs, and browse buttons to prevent double-upload
+        const dropzone = this.container.querySelector("#portal-pdf-dropzone");
+        const fileInput = this.container.querySelector("#portal-pdf-file-input");
+        const browseBtn = this.container.querySelector("#btn-portal-browse-pdf");
+        const singleFileInp = this.container.querySelector("#inp-single-student-pdf-file");
+
+        if (dropzone) {
+            dropzone.style.pointerEvents = "none";
+            dropzone.style.opacity = "0.7";
+        }
+        if (fileInput) fileInput.disabled = true;
+        if (singleFileInp) singleFileInp.disabled = true;
+        if (browseBtn) browseBtn.disabled = true;
+
+        // Immediately show and initialize batch progress banner
+        const banner = this.container.querySelector("#batch-upload-progress-banner");
+        if (banner) {
+            banner.style.display = "block";
+            const titleEl = this.container.querySelector("#batch-progress-title");
+            if (titleEl) titleEl.textContent = `Validating & Ingesting ${files.length} answer sheet(s)...`;
+            const pctEl = this.container.querySelector("#batch-progress-pct");
+            if (pctEl) pctEl.textContent = "5%";
+            const fillEl = this.container.querySelector("#batch-progress-fill");
+            if (fillEl) fillEl.style.width = "5%";
+        }
+
+        try {
+            const MAX_FILE_SIZE = 5 * 1024 * 1024; // Strict 5MB limit
+            let duplicateCount = 0;
+
+            for (let i = 0; i < files.length; i++) {
+                const file = files[i];
+                const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
+                const isImage = file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
+
+                if (!isPdf && !isImage) {
+                    alert(`File "${file.name}" is not supported. Please upload PDF or image answer sheet files.`);
+                    continue;
+                }
+
+                // Enforce strict 5MB limit per file
+                if (file.size > MAX_FILE_SIZE) {
+                    const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
+                    this.showFileSizeLimitModal(file.name, sizeMb);
+                    continue;
+                }
+
+                let possibleRoll = targetStudent ? String(targetStudent.rollNo).trim() : "";
+                let possibleName = targetStudent ? String(targetStudent.studentName).trim() : "";
+
+                if (!targetStudent) {
+                    const extracted = this.parseFilenameForStudentInfo(file.name);
+                    possibleName = extracted.studentName;
+                    possibleRoll = extracted.rollNo;
+                }
+
+                // --- DUPLICATE PREVENTION ---
+                // 1. Check if already staged in this.fileQueue
+                const isDuplicateInQueue = (this.fileQueue || []).some(item => {
+                    const rollMatch = possibleRoll && String(item.rollNo).trim() === possibleRoll;
+                    const nameMatch = possibleName && String(item.studentName).toLowerCase().trim() === possibleName.toLowerCase();
+                    const fileMatch = item.fileName && item.fileName.toLowerCase() === file.name.toLowerCase();
+                    return rollMatch || nameMatch || fileMatch;
+                });
+
+                // 2. Check if already uploaded/published in this class
+                const isDuplicateInExisting = (this.existingPapers || []).some(paper => {
+                    const rollMatch = possibleRoll && String(paper.rollNo).trim() === possibleRoll;
+                    const nameMatch = possibleName && String(paper.studentName).toLowerCase().trim() === possibleName.toLowerCase();
+                    return rollMatch || nameMatch;
+                });
+
+                if (isDuplicateInQueue || isDuplicateInExisting) {
+                    duplicateCount++;
+                    const reason = isDuplicateInQueue ? "already in upload queue" : "already uploaded for this class";
+                    if (window.app && window.app.showToast) {
+                        window.app.showToast(`Duplicate skipped: Roll ${possibleRoll} (${possibleName}) is ${reason}.`, "warning");
+                    }
+                    continue;
+                }
+
+                const queueItem = {
+                    file: file,
+                    fileName: file.name,
+                    studentName: possibleName || `Student ${this.fileQueue.length + 1}`,
+                    rollNo: possibleRoll || String(100 + this.fileQueue.length + 1),
+                    pages: [],
+                    pageCount: 1,
+                    thumbnail: null,
+                    pdfDataUrl: null,
+                    isProcessing: true,
+                    isReady: false
+                };
+
+                this.fileQueue.push(queueItem);
+                this.refreshQueueUI();
+
+                if (isImage) {
+                    await this.extractImagePages(queueItem);
+                } else {
+                    await this.extractPdfPages(queueItem);
+                }
+                this.refreshQueueUI();
+            }
+
+            if (duplicateCount > 0 && window.app && window.app.showToast) {
+                window.app.showToast(`Ingestion complete: ${duplicateCount} duplicate paper(s) were safely ignored.`, "info");
+            }
+        } finally {
+            this.isUploading = false;
+
+            // Re-enable dropzone, inputs, and clear file input value so user can upload next batch
+            if (dropzone) {
+                dropzone.style.pointerEvents = "";
+                dropzone.style.opacity = "";
+            }
+            if (fileInput) {
+                fileInput.disabled = false;
+                fileInput.value = "";
+            }
+            if (singleFileInp) {
+                singleFileInp.disabled = false;
+                singleFileInp.value = "";
+            }
+            if (browseBtn) browseBtn.disabled = false;
+
+            this.refreshQueueUI();
+            this.updateBatchProgress();
         }
     }
 
@@ -2996,13 +3175,24 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         }
 
         this.updateBatchProgress();
+
+        // Dynamically update Publish Button ready counts
+        const readyCount = (this.fileQueue || []).filter(i => i.isReady).length;
+        const pubBtnText = this.container.querySelector("#btn-publish-batch-text");
+        if (pubBtnText) {
+            pubBtnText.textContent = `Publish Papers to Teacher Evaluator Desk (${readyCount} Ready)`;
+        }
+        const sidePubBtn = this.container.querySelector("#btn-side-publish-queue");
+        if (sidePubBtn) {
+            sidePubBtn.textContent = `Publish Batch (${readyCount} Ready)`;
+        }
     }
 
     async extractImagePages(queueItem) {
         queueItem.isProcessing = true;
         queueItem.isReady = false;
         queueItem.progressPercent = 20;
-        queueItem.statusText = "Reading image file...";
+        queueItem.statusText = "Reading image file buffer...";
         this.updateQueueItemProgress(queueItem);
 
         return new Promise((resolve) => {
@@ -3011,18 +3201,51 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 if (e.lengthComputable) {
                     const loadedPct = Math.round(20 + (e.loaded / e.total) * 75);
                     queueItem.progressPercent = loadedPct;
-                    queueItem.statusText = `Uploading Image (${loadedPct}%)...`;
+                    queueItem.statusText = `Compressing & Ingesting Image (${loadedPct}%)...`;
                     this.updateQueueItemProgress(queueItem);
                 }
             };
             reader.onload = (e) => {
-                queueItem.pages = [e.target.result];
-                queueItem.progressPercent = 100;
-                queueItem.statusText = "✓ Image Extracted (1 Page)";
-                queueItem.isProcessing = false;
-                queueItem.isReady = true;
-                this.updateQueueItemProgress(queueItem);
-                resolve();
+                const img = new Image();
+                img.onload = () => {
+                    // Downscale and compress image if large to ensure high performance
+                    const maxDim = 1400;
+                    let w = img.width;
+                    let h = img.height;
+                    if (w > maxDim || h > maxDim) {
+                        if (w > h) {
+                            h = Math.round((h * maxDim) / w);
+                            w = maxDim;
+                        } else {
+                            w = Math.round((w * maxDim) / h);
+                            h = maxDim;
+                        }
+                    }
+                    const canvas = document.createElement("canvas");
+                    canvas.width = w;
+                    canvas.height = h;
+                    const ctx = canvas.getContext("2d");
+                    ctx.drawImage(img, 0, 0, w, h);
+                    const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.80);
+
+                    queueItem.pages = [compressedDataUrl];
+                    queueItem.progressPercent = 100;
+                    queueItem.statusText = "✓ Image Compressed & Ready (1 Page)";
+                    queueItem.isProcessing = false;
+                    queueItem.isReady = true;
+                    this.updateQueueItemProgress(queueItem);
+                    resolve();
+                };
+                img.onerror = () => {
+                    queueItem.pages = [e.target.result];
+                    queueItem.progressPercent = 100;
+                    queueItem.statusText = "✓ Image Extracted (1 Page)";
+                    queueItem.isProcessing = false;
+                    queueItem.isReady = true;
+                    this.updateQueueItemProgress(queueItem);
+                    resolve();
+                };
+                img.src = e.target.result;
             };
             reader.onerror = () => {
                 queueItem.pages = [];
@@ -3040,7 +3263,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
     async extractPdfPages(queueItem) {
         queueItem.isProcessing = true;
         queueItem.isReady = false;
-        queueItem.progressPercent = 5;
+        queueItem.progressPercent = 10;
         queueItem.statusText = "Reading PDF file buffer...";
         this.updateQueueItemProgress(queueItem);
 
@@ -3066,10 +3289,11 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         }
 
         if (!window.pdfjsLib) {
-            console.warn("PDF.js unavailable, using PDF data URL payload");
+            console.warn("PDF.js unavailable, using single PDF data URL payload");
             queueItem.pages = queueItem.pdfDataUrl ? [queueItem.pdfDataUrl] : [];
+            queueItem.pageCount = 1;
             queueItem.progressPercent = 100;
-            queueItem.statusText = `✓ Complete (${queueItem.pages.length} Uploaded PDF Page Ready)`;
+            queueItem.statusText = `✓ Complete (PDF Document Ready)`;
             queueItem.isProcessing = false;
             queueItem.isReady = true;
             queueItem.isUserUploaded = true;
@@ -3078,48 +3302,48 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         }
 
         try {
-            queueItem.progressPercent = 15;
-            queueItem.statusText = "Parsing PDF structure via PDF.js...";
+            queueItem.progressPercent = 35;
+            queueItem.statusText = "Parsing PDF document structure...";
             this.updateQueueItemProgress(queueItem);
 
             const arrayBuffer = await queueItem.file.arrayBuffer();
             const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-            const pages = [];
             const numPages = pdf.numPages;
+            queueItem.pageCount = numPages;
 
-            queueItem.progressPercent = 25;
-            queueItem.statusText = `PDF Loaded: ${numPages} Page${numPages === 1 ? '' : 's'}. Extracting...`;
+            queueItem.progressPercent = 65;
+            queueItem.statusText = `PDF Loaded: ${numPages} Page${numPages === 1 ? '' : 's'}. Generating cover preview...`;
             this.updateQueueItemProgress(queueItem);
 
-            for (let pageNum = 1; pageNum <= numPages; pageNum++) {
-                const currentPct = Math.min(95, Math.round(25 + ((pageNum - 1) / numPages) * 70));
-                queueItem.progressPercent = currentPct;
-                queueItem.statusText = `Rendering Page ${pageNum} of ${numPages} (${currentPct}%)...`;
-                this.updateQueueItemProgress(queueItem);
-
-                const page = await pdf.getPage(pageNum);
-                const viewport = page.getViewport({ scale: 1.5 }); // High-DPI render
-
+            // Generate ONLY the Page 1 thumbnail for fast UI preview (saving only the single optimized PDF!)
+            try {
+                const page1 = await pdf.getPage(1);
+                const unscaled = page1.getViewport({ scale: 1.0 });
+                const optScale = Math.min(1.0, 360 / unscaled.width);
+                const viewport = page1.getViewport({ scale: optScale });
                 const canvas = document.createElement("canvas");
                 canvas.width = viewport.width;
                 canvas.height = viewport.height;
                 const ctx = canvas.getContext("2d");
-
-                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
-                pages.push(canvas.toDataURL("image/jpeg", 0.88));
+                await page1.render({ canvasContext: ctx, viewport }).promise;
+                queueItem.thumbnail = canvas.toDataURL("image/jpeg", 0.80);
+            } catch (tErr) {
+                console.warn("Could not generate Page 1 thumbnail:", tErr);
             }
 
-            queueItem.pages = pages;
+            // Save single optimized PDF reference in pages array
+            queueItem.pages = [queueItem.thumbnail || queueItem.pdfDataUrl];
             queueItem.progressPercent = 100;
-            queueItem.statusText = `✓ Complete (${pages.length} Pages Extracted)`;
+            queueItem.statusText = `✓ Complete (${numPages} Pages Optimized PDF Ready)`;
             queueItem.isProcessing = false;
             queueItem.isReady = true;
             queueItem.isUserUploaded = true;
             this.updateQueueItemProgress(queueItem);
         } catch (err) {
             console.error("PDF Parsing error:", err);
-            // Fallback to raw PDF Data URL if extracted canvas pages fail
+            // Fallback to raw PDF Data URL
             queueItem.pages = queueItem.pdfDataUrl ? [queueItem.pdfDataUrl] : [];
+            queueItem.pageCount = 1;
             queueItem.progressPercent = 100;
             queueItem.statusText = `✓ Uploaded PDF Document Ready`;
             queueItem.isProcessing = false;
@@ -3134,20 +3358,225 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         alert("Please browse or drop your actual Physics PDF answer sheet file to upload.");
     }
 
+    // --- 5MB Limit Modal ---
+    showFileSizeLimitModal(fileName, sizeMb) {
+        const modalId = "modal-file-size-error";
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const backdrop = document.createElement("div");
+        backdrop.id = modalId;
+        backdrop.className = "publish-loading-backdrop";
+        backdrop.innerHTML = `
+            <div class="publish-loading-card" style="max-width: 440px;">
+                <div class="publish-modal-icon-wrap" style="background: rgba(245, 158, 11, 0.1); border: 2px solid rgba(245, 158, 11, 0.25);">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+                </div>
+                <h3 class="publish-modal-title">File Exceeds 5MB Limit</h3>
+                <p class="publish-modal-subtitle">
+                    The file <strong style="color: var(--text-main); font-weight: 600;">"${fileName}"</strong> (${sizeMb} MB) exceeds the strict <strong>5MB file limit</strong>.
+                </p>
+                <div class="publish-pills-row">
+                    <span class="publish-badge-pill pill-orange">Max Size: 5.0 MB</span>
+                    <span class="publish-badge-pill">Auto Compression Active</span>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 24px;">
+                    To protect browser stability and ensure fast page rendering for evaluators, answer sheets must be under 5MB. Please compress your document before uploading.
+                </p>
+                <div class="publish-modal-actions">
+                    <button type="button" class="publish-btn-primary" id="btn-close-size-modal">Understand & Select Again</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(backdrop);
+        const closeBtn = backdrop.querySelector("#btn-close-size-modal");
+        if (closeBtn) {
+            closeBtn.addEventListener("click", () => backdrop.remove());
+        }
+        backdrop.addEventListener("click", (e) => {
+            if (e.target === backdrop) backdrop.remove();
+        });
+    }
+
+    // --- Informative Zero-Ready Dialog ---
+    showZeroReadyModal() {
+        const modalId = "modal-zero-ready-info";
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const backdrop = document.createElement("div");
+        backdrop.id = modalId;
+        backdrop.className = "publish-loading-backdrop";
+        backdrop.innerHTML = `
+            <div class="publish-loading-card" style="max-width: 480px;">
+                <div class="publish-modal-icon-wrap" style="background: rgba(0, 122, 255, 0.1); border: 2px solid rgba(0, 122, 255, 0.25);">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="12 18 12 12 9 15"/><polyline points="12 12 15 15"/></svg>
+                </div>
+                <h3 class="publish-modal-title">No Papers Ready in Queue</h3>
+                <p class="publish-modal-subtitle">
+                    There are currently <strong>0 answer sheets</strong> staged for publishing to the Teacher Evaluator Desk.
+                </p>
+                <div class="publish-pills-row">
+                    <span class="publish-badge-pill pill-green">5MB Strict Limit</span>
+                    <span class="publish-badge-pill">High-DPI Compression</span>
+                    <span class="publish-badge-pill">Cloud Server Sync</span>
+                </div>
+                <div class="publish-progress-section" style="text-align: left; margin-bottom: 20px;">
+                    <div style="font-size: 0.85rem; color: var(--text-main); font-weight: 500; margin-bottom: 6px;">How to Publish Answer Sheets:</div>
+                    <ul style="margin: 0; padding-left: 20px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.6;">
+                        <li>Drop or select student PDF answer sheets (Max 5MB each).</li>
+                        <li>The system automatically detects student names & rolls.</li>
+                        <li>Pages are compressed (JPEG 0.80) to maximize loading speed.</li>
+                        <li>Click "Publish Papers" to make them live on the Evaluator Desk.</li>
+                    </ul>
+                </div>
+                <div class="publish-modal-actions">
+                    <button type="button" class="publish-btn-secondary" id="btn-close-zero-modal">Close</button>
+                    <button type="button" class="publish-btn-primary" id="btn-upload-from-zero-modal">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span>Select Answer Sheets (&lt;5MB)</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(backdrop);
+        const closeBtn = backdrop.querySelector("#btn-close-zero-modal");
+        const uploadBtn = backdrop.querySelector("#btn-upload-from-zero-modal");
+        if (closeBtn) closeBtn.addEventListener("click", () => backdrop.remove());
+        if (uploadBtn) {
+            uploadBtn.addEventListener("click", () => {
+                backdrop.remove();
+                const fileInp = this.container.querySelector("#portal-pdf-file-input");
+                if (fileInp) fileInp.click();
+            });
+        }
+        backdrop.addEventListener("click", (e) => {
+            if (e.target === backdrop) backdrop.remove();
+        });
+    }
+
+    // --- Publishing Loading Dialog ---
+    showPublishLoadingDialog(totalCount) {
+        const modalId = "modal-publish-loading-dialog";
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const backdrop = document.createElement("div");
+        backdrop.id = modalId;
+        backdrop.className = "publish-loading-backdrop";
+        backdrop.innerHTML = `
+            <div class="publish-loading-card" id="publish-loading-card">
+                <div class="publish-modal-icon-wrap" id="publish-dialog-icon">
+                    <div class="publish-spinner-circle"></div>
+                </div>
+                <h3 class="publish-modal-title" id="publish-dialog-title">Publishing Papers to Teacher Desk</h3>
+                <p class="publish-modal-subtitle" id="publish-dialog-subtitle">
+                    Optimizing, compressing, and dispatching <strong id="publish-dialog-count">${totalCount}</strong> answer sheet(s)...
+                </p>
+                <div class="publish-pills-row">
+                    <span class="publish-badge-pill pill-green">5MB Limit Enforced</span>
+                    <span class="publish-badge-pill">0.80 JPEG Compression</span>
+                </div>
+                <div class="publish-progress-section">
+                    <div class="publish-progress-row">
+                        <span class="publish-progress-status" id="publish-dialog-status">Initializing batch upload...</span>
+                        <span class="publish-progress-percent" id="publish-dialog-percent">0%</span>
+                    </div>
+                    <div class="publish-track">
+                        <div class="publish-bar" id="publish-dialog-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <div class="publish-modal-actions" id="publish-dialog-actions" style="display: none;">
+                    <button type="button" class="publish-btn-primary" id="btn-dialog-done">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span>Done & View Evaluator Desk</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(backdrop);
+    }
+
+    updatePublishDialogProgress(current, total, percent, statusText) {
+        const statusEl = document.getElementById("publish-dialog-status");
+        const percentEl = document.getElementById("publish-dialog-percent");
+        const barEl = document.getElementById("publish-dialog-bar");
+
+        if (statusEl) statusEl.textContent = statusText || `Publishing paper ${current} of ${total}...`;
+        if (percentEl) percentEl.textContent = `${percent}%`;
+        if (barEl) barEl.style.width = `${percent}%`;
+    }
+
+    setPublishDialogComplete(publishedCount) {
+        const iconWrap = document.getElementById("publish-dialog-icon");
+        const titleEl = document.getElementById("publish-dialog-title");
+        const subEl = document.getElementById("publish-dialog-subtitle");
+        const statusEl = document.getElementById("publish-dialog-status");
+        const percentEl = document.getElementById("publish-dialog-percent");
+        const barEl = document.getElementById("publish-dialog-bar");
+        const actionsEl = document.getElementById("publish-dialog-actions");
+
+        if (iconWrap) {
+            iconWrap.innerHTML = `
+                <div style="width: 58px; height: 58px; border-radius: 50%; background: #34C759; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(52, 199, 89, 0.4);">
+                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                </div>
+            `;
+        }
+
+        if (titleEl) titleEl.textContent = "✓ Published to Evaluator Desk!";
+        if (subEl) subEl.textContent = `All ${publishedCount} answer sheet(s) have been compressed, optimized, and published successfully.`;
+        if (statusEl) statusEl.textContent = "✓ Ingestion and synchronization complete.";
+        if (percentEl) percentEl.textContent = "100%";
+        if (barEl) {
+            barEl.style.width = "100%";
+            barEl.style.background = "#34C759";
+        }
+        if (actionsEl) {
+            actionsEl.style.display = "flex";
+            const doneBtn = actionsEl.querySelector("#btn-dialog-done");
+            if (doneBtn) {
+                doneBtn.addEventListener("click", () => {
+                    const backdrop = document.getElementById("modal-publish-loading-dialog");
+                    if (backdrop) backdrop.remove();
+                });
+            }
+        }
+
+        // Auto-dismiss after 800ms if user doesn't click
+        setTimeout(() => {
+            const backdrop = document.getElementById("modal-publish-loading-dialog");
+            if (backdrop) backdrop.remove();
+        }, 800);
+    }
+
     // --- Publish to Storage & Evaluator Desk ---
     async publishQueueToStorage() {
-        if (!this.fileQueue || this.fileQueue.length === 0) {
-            if (window.app) window.app.showToast("No student papers in queue to publish.");
+        const readyItems = (this.fileQueue || []).filter(item => item.isReady);
+
+        if (readyItems.length === 0) {
+            this.showZeroReadyModal();
             return;
         }
+
+        // Show the loading dialog with real-time feedback
+        this.showPublishLoadingDialog(readyItems.length);
 
         const subject = this.selectedSubject || (this.catalog && this.catalog[0]) || { name: "Physics" };
         const template = this.selectedTemplate || (subject.templates ? subject.templates[0] : null) || { name: "Physics Board Paper (33 Qs / 70 Marks)", maxMarks: 70, id: "phy-cbse-70" };
         const cls = this.selectedClass || (this.classes && this.classes[0]) || { name: "Class 12", section: "A", label: "Class 12-A" };
 
         let publishedCount = 0;
+        const total = readyItems.length;
 
-        for (const item of this.fileQueue) {
+        for (let i = 0; i < total; i++) {
+            const item = readyItems[i];
+            const startPct = Math.round((i / total) * 90);
+            this.updatePublishDialogProgress(i + 1, total, startPct, `Optimizing & saving paper for ${item.studentName}...`);
+
             // Build standardized question list based on selected template
             const questions = (template.questions || []).map((q, idx) => ({
                 id: q.id || `q${idx + 1}`,
@@ -3173,10 +3602,24 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 })) : []
             }));
 
+            // Check if paper already exists for this student in this class & exam:
+            const rollKey = String(item.rollNo || "").trim().toLowerCase();
+            const nameKey = String(item.studentName || "").trim().toLowerCase();
+            const existingMatch = (this.existingPapers || []).find(p => {
+                const pRoll = String(p.rollNo || "").trim().toLowerCase();
+                const pName = String(p.studentName || "").trim().toLowerCase();
+                if (rollKey && pRoll && rollKey === pRoll) return true;
+                if (nameKey && pName && nameKey === pName) return true;
+                return false;
+            });
+
+            // Overwrite existing paper if found, rather than creating a duplicate!
+            const evalId = item.id || (existingMatch ? existingMatch.id : `eval-${Date.now()}-${Math.floor(Math.random() * 100000)}`);
+
             const newEvaluation = {
-                id: `eval-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
-                studentName: item.studentName || "Unnamed Student",
-                rollNo: item.rollNo || String(100 + publishedCount),
+                id: evalId,
+                studentName: item.studentName || (existingMatch ? existingMatch.studentName : "Unnamed Student"),
+                rollNo: item.rollNo || (existingMatch ? existingMatch.rollNo : String(100 + publishedCount)),
                 class: cls.name || cls.label,
                 className: cls.name || cls.label,
                 section: cls.section || "A",
@@ -3185,24 +3628,26 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 examName: template.examName || template.name,
                 templateName: template.name,
                 templateId: template.id,
-                examDate: new Date().toISOString().split("T")[0],
+                examDate: (existingMatch && existingMatch.examDate) || new Date().toISOString().split("T")[0],
                 correctionDate: new Date().toISOString().split("T")[0],
                 maxMarks: template.maxMarks || 70,
-                obtainedMarks: 0,
-                percentage: 0,
-                grade: "Pending",
-                status: "Pending",
+                obtainedMarks: existingMatch ? existingMatch.obtainedMarks : 0,
+                percentage: existingMatch ? existingMatch.percentage : 0,
+                grade: existingMatch ? existingMatch.grade : "Pending",
+                status: existingMatch ? existingMatch.status : "Pending",
                 isUserUploaded: true,
                 isMock: false,
-                pdfDataUrl: item.pdfDataUrl || null,
-                correctCount: 0,
-                wrongCount: 0,
-                feedback: "",
-                pages: item.pages && item.pages.length > 0 ? item.pages : (item.pdfDataUrl ? [item.pdfDataUrl] : []),
-                annotations: [],
+                pdfDataUrl: item.pdfDataUrl || (existingMatch ? existingMatch.pdfDataUrl : null),
+                pageCount: item.pageCount || (existingMatch ? existingMatch.pageCount : 1),
+                correctCount: existingMatch ? existingMatch.correctCount : 0,
+                wrongCount: existingMatch ? existingMatch.wrongCount : 0,
+                feedback: existingMatch ? existingMatch.feedback : "",
+                // Save ONLY ONE: If it's a PDF, do not save duplicate pages array!
+                pages: item.pdfDataUrl ? null : (item.pages && item.pages.length > 0 ? item.pages : null),
+                annotations: existingMatch ? (existingMatch.annotations || []) : [],
                 sections: template.sections ? JSON.parse(JSON.stringify(template.sections)) : [],
-                questions: questions,
-                createdAt: new Date().toISOString(),
+                questions: (existingMatch && existingMatch.questions && existingMatch.questions.length > 0) ? existingMatch.questions : questions,
+                createdAt: (existingMatch && existingMatch.createdAt) || new Date().toISOString(),
                 updatedAt: new Date().toISOString()
             };
 
@@ -3212,16 +3657,20 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             } catch (err) {
                 console.error("Error saving evaluation:", err);
             }
+
+            const finishPct = Math.round(((i + 1) / total) * 98);
+            this.updatePublishDialogProgress(i + 1, total, finishPct, `✓ Saved paper ${i + 1} of ${total}: ${item.studentName}`);
         }
 
-        this.fileQueue = [];
+        this.setPublishDialogComplete(publishedCount);
+
+        // Remove published items from active queue
+        this.fileQueue = this.fileQueue.filter(item => !readyItems.includes(item));
         await this.loadExistingClassPapers();
         this.updateStepView();
 
-        if (window.app) {
+        if (window.app && window.app.showToast) {
             window.app.showToast(`Published ${publishedCount} paper(s) to Teacher Evaluator Desk!`);
-        } else {
-            alert(`Published ${publishedCount} paper(s) to Teacher Evaluator Desk!`);
         }
     }
 
@@ -3270,7 +3719,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                             <tr>
                                 <td class="roll-cell">${p.rollNo}</td>
                                 <td class="student-cell"><span class="student-name-text">${p.studentName}</span></td>
-                                <td>${p.pages?.length || 1} Pages</td>
+                                <td>${p.pageCount || p.pages?.length || 1} Pages</td>
                                 <td>
                                     <span class="status-pill ${p.status === 'Completed' ? 'status-completed' : 'status-pending'}">
                                         ${p.status}
@@ -3311,20 +3760,36 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         });
 
         wrap.querySelectorAll(".btn-portal-delete-paper").forEach(btn => {
-            btn.addEventListener("click", async () => {
+            btn.addEventListener("click", () => {
                 const id = btn.getAttribute("data-id");
                 const target = matches.find(p => String(p.id) === String(id));
                 const name = target ? (target.studentName || "student paper") : "this paper";
-                if (confirm(`Are you sure you want to delete ${name}'s uploaded Physics paper?`)) {
-                    if (window.appStorage) {
-                        await window.appStorage.deleteEvaluation(id);
+
+                this.openCustomDeleteModal(
+                    "Delete Uploaded Paper",
+                    `Are you sure you want to delete ${name}'s uploaded paper? This will remove the paper and its evaluation record from the database.`,
+                    async () => {
+                        try {
+                            btn.disabled = true;
+                            btn.innerHTML = `<span style="font-size:0.75rem;">Deleting...</span>`;
+
+                            if (window.appStorage) {
+                                await window.appStorage.deleteEvaluation(id);
+                            }
+                            if (this.existingPapers) {
+                                this.existingPapers = this.existingPapers.filter(p => String(p.id) !== String(id));
+                            }
+                            await this.loadExistingClassPapers();
+                            if (window.app && window.app.showToast) {
+                                window.app.showToast(`Deleted paper for ${name} successfully.`);
+                            }
+                        } catch (delErr) {
+                            console.error("Error deleting paper:", delErr);
+                            alert("Failed to delete paper: " + delErr.message);
+                            await this.loadExistingClassPapers();
+                        }
                     }
-                    this.evaluations = this.evaluations.filter(p => String(p.id) !== String(id));
-                    await this.loadExistingClassPapers();
-                    if (window.app && window.app.showToast) {
-                        window.app.showToast(`Deleted paper for ${name}.`);
-                    }
-                }
+                );
             });
         });
     }

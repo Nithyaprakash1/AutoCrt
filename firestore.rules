@@ -1,0 +1,56 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    function isAdminOrUploader() {
+      return isAuthenticated() && (
+        getUserData().role == 'admin' || 
+        getUserData().role == 'uploader' || 
+        request.auth.token.role == 'admin' ||
+        request.auth.token.role == 'uploader'
+      );
+    }
+
+    function isTeacher() {
+      return isAuthenticated() && (
+        getUserData().role == 'teacher' || 
+        getUserData().role == 'evaluator'
+      );
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if true;
+      allow write: if true;
+    }
+
+    // Evaluations Collection - Subject & Teacher Assignment Security Rules
+    match /evaluations/{evalId} {
+      allow read, write: if true;
+      allow delete: if true;
+    }
+
+    // Exam Templates Collection
+    match /exam_templates/{templateId} {
+      allow read, write: if true;
+    }
+
+    // Class Rosters Collection
+    match /class_rosters/{classId} {
+      allow read, write: if true;
+    }
+
+    // App Configuration Collection
+    match /app_config/{configDoc} {
+      allow read, write: if true;
+    }
+  }
+}

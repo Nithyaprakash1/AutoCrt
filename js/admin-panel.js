@@ -378,41 +378,39 @@ class AdminPanelManager {
     }
 
     computeSubjectStats() {
-        const physicsEvals = this.evaluations.filter(e => e.subject === "Physics" || !e.subject);
-        const uploadedCount = physicsEvals.length;
-        const correctedCount = physicsEvals.filter(e => e.status === "Completed" || e.obtainedMarks > 0).length;
-        const pendingCount = Math.max(0, uploadedCount - correctedCount);
-        const pct = uploadedCount > 0 ? Math.round((correctedCount / uploadedCount) * 100) : 100;
-
-        return [
-            {
-                code: "PHY-CBSE-70",
-                name: "Physics (Board Assessment 2026)",
-                teacher: "Mrs. Nithya Prakash (Senior Faculty)",
-                uploaded: uploadedCount,
-                corrected: correctedCount,
-                pending: pendingCount,
-                pct: pct
-            },
-            {
-                code: "CHEM-CBSE-70",
-                name: "Chemistry (Board Assessment 2026)",
-                teacher: "Prof. Rajesh Verma",
-                uploaded: 0,
-                corrected: 0,
-                pending: 0,
-                pct: 100
-            },
-            {
-                code: "MATH-CBSE-80",
-                name: "Mathematics (Board Assessment 2026)",
-                teacher: "Mr. Arun Kumar",
-                uploaded: 0,
-                corrected: 0,
-                pending: 0,
-                pct: 100
+        // Build subject stats purely from real evaluation data
+        const subjectMap = new Map();
+        this.evaluations.forEach(ev => {
+            const subject = ev.subject || "General";
+            if (!subjectMap.has(subject)) {
+                subjectMap.set(subject, { uploaded: 0, corrected: 0 });
             }
-        ];
+            const entry = subjectMap.get(subject);
+            entry.uploaded++;
+            if (ev.status === "Completed" || ev.obtainedMarks > 0) {
+                entry.corrected++;
+            }
+        });
+
+        if (subjectMap.size === 0) return [];
+
+        return Array.from(subjectMap.entries()).map(([subject, stats]) => {
+            const { uploaded, corrected } = stats;
+            const pending = Math.max(0, uploaded - corrected);
+            const pct = uploaded > 0 ? Math.round((corrected / uploaded) * 100) : 100;
+            // Derive teacher name from most recent evaluation for this subject
+            const subjectEvals = this.evaluations.filter(e => (e.subject || "General") === subject);
+            const latestTeacher = subjectEvals.find(e => e.teacherName)?.teacherName || "—";
+            return {
+                code: subject.substring(0, 4).toUpperCase(),
+                name: subject,
+                teacher: latestTeacher,
+                uploaded,
+                corrected,
+                pending,
+                pct
+            };
+        });
     }
 
     computeStudentMatrix() {

@@ -73,7 +73,7 @@ class UploadedPapersPageManager {
 
         // Compute Metrics
         const totalPapers = this.papers.length;
-        const totalPages = this.papers.reduce((sum, p) => sum + (p.pages ? p.pages.length : (p.totalPages || 1)), 0);
+        const totalPages = this.papers.reduce((sum, p) => sum + (p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1))), 0);
         const completedPapers = this.papers.filter(p => p.status === "Completed").length;
         const pendingPapers = totalPapers - completedPapers;
 
@@ -227,7 +227,7 @@ class UploadedPapersPageManager {
                                         </td>
                                     </tr>
                                 ` : filtered.map(p => {
-                                    const pageCount = p.pages ? p.pages.length : (p.totalPages || 1);
+                                    const pageCount = p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1));
                                     const isComp = p.status === "Completed";
                                     const initials = (p.studentName || "ST").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
                                     return `
