@@ -904,7 +904,11 @@ class AppController {
             }
         }
 
-        // If pages is empty, fallback to raw PDF Data URL or generate clean student answer sheet
+        // If pages is empty, fallback to Cloud PDF Storage URL or raw PDF Data URL
+        if ((!evaluation.pages || evaluation.pages.length === 0) && evaluation.pdfStorageUrl) {
+            evaluation.pages = [evaluation.pdfStorageUrl];
+            if (!evaluation.pdfDataUrl) evaluation.pdfDataUrl = evaluation.pdfStorageUrl;
+        }
         if ((!evaluation.pages || evaluation.pages.length === 0) && evaluation.pdfDataUrl) {
             evaluation.pages = [evaluation.pdfDataUrl];
         }
@@ -2336,6 +2340,10 @@ class AppController {
                 barEl.style.width = `${Math.min(100, Math.max(1, usage.percentUsed))}%`;
             }
             if (badgeEl) {
+                // Show ONLY to Admin and Uploader desks! Hide from Teacher Desk & Workspace
+                const isUploaderOrAdmin = this.activePortal === "uploader" || this.activePortal === "admin" || (this.currentUser && (this.currentUser.role === "admin" || this.currentUser.role === "uploader"));
+                badgeEl.style.display = isUploaderOrAdmin ? "flex" : "none";
+
                 badgeEl.classList.toggle("near-limit", usage.isNearLimit && !usage.isExceeded);
                 badgeEl.classList.toggle("exceeded", usage.isExceeded);
                 badgeEl.title = `Institution Storage: ${usage.usedGB} GB of ${usage.totalGB} GB Used (${usage.percentUsed}%). Remaining: ${usage.remainingGB} GB. Click to manage.`;

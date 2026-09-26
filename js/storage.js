@@ -73,9 +73,66 @@ class StorageService {
         });
     }
 
-    purgeLegacyMockData() {
+    async purgeLegacyMockData() {
+        const isUnwanted = (e) => {
+            if (!e) return true;
+            // Real student papers uploaded by the user must NEVER be purged!
+            if (e.isUserUploaded === true && e.isMock !== true) return false;
+            const name = String(e.studentName || "").toLowerCase();
+            const id = String(e.id || "").toLowerCase();
+            const exam = String(e.examName || e.templateName || "").toLowerCase();
+            const isDharnishMock = (name.includes("dharnish") || id.includes("dharnish")) && (e.isMock === true || !e.isUserUploaded || exam.includes("sample") || id === "eval-005");
+            const isMock = e.isMock === true || ["eval-001", "eval-002", "eval-003", "eval-004", "eval-005", "eval-006", "eval-007"].includes(id);
+            const isLegacyMath = ["arun kumar", "bhavana sharma", "chetan reddy", "deepika patel", "eashwar nathan", "farhan ali", "gayathri devi"].includes(name);
+            return isDharnishMock || isMock || isLegacyMath;
+        };
+
         if (!this.memoryStore) this.memoryStore = [];
-        this.memoryStore = this.memoryStore.filter(e => e && e.id);
+        this.memoryStore = this.memoryStore.filter(e => e && e.id && !isUnwanted(e));
+
+        try {
+            const raw = localStorage.getItem("onespace_evaluations_summary") || localStorage.getItem("onespace_evaluations");
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) {
+                    const cleaned = parsed.filter(e => e && e.id && !isUnwanted(e));
+                    localStorage.setItem("onespace_evaluations_summary", JSON.stringify(cleaned));
+                    localStorage.setItem("onespace_evaluations", JSON.stringify(cleaned));
+                }
+            }
+        } catch (e) {}
+
+        if (this.db) {
+            try {
+                const tx = this.db.transaction(["evaluations"], "readwrite");
+                const store = tx.objectStore("evaluations");
+                const req = store.getAll();
+                req.onsuccess = () => {
+                    const all = req.result || [];
+                    all.forEach(item => {
+                        if (isUnwanted(item)) {
+                            store.delete(item.id);
+                        }
+                    });
+                };
+            } catch (err) {}
+        }
+    }
+
+    async purgeUnwantedData() {
+        await this.purgeLegacyMockData();
+        try {
+            if ('caches' in window) {
+                const cache = await caches.open('onespace-pdf-cache-v1');
+                const keys = await cache.keys();
+                for (const req of keys) {
+                    if (req.url.toLowerCase().includes("dharnish") || req.url.includes("eval-00")) {
+                        await cache.delete(req);
+                    }
+                }
+            }
+        } catch (e) {}
+        return true;
     }
 
     fallbackInit() {
@@ -95,13 +152,7 @@ class StorageService {
     }
 
     async seedInitialDataIfNeeded() {
-        const count = await this.countEvaluations();
-        if (count === 0 && window.MockData) {
-            const initialData = window.MockData.getInitialEvaluations();
-            for (const item of initialData) {
-                await this._putDirect(item);
-            }
-        }
+        // No auto-seeding of mock evaluations - keep evaluations clean
     }
 
     countEvaluations() {
@@ -183,10 +234,25 @@ class StorageService {
         return null;
     }
 
-    async getAllEvaluations() {
+    _saveEvaluationToIndexedDB(evaluation) {
+        if (!this.db || !evaluation || !evaluation.id) return;
+        try {
+            const tx = this.db.transaction(["evaluations"], "readwrite");
+            const store = tx.objectStore("evaluations");
+            const cleanRecord = Object.assign({}, evaluation);
+            if (cleanRecord.rawFile) delete cleanRecord.rawFile;
+            if (cleanRecord.pdfDataUrl) delete cleanRecord.pages;
+            store.put(cleanRecord);
+        } catch (e) {
+            console.warn("Error caching evaluation into IndexedDB:", e);
+        }
+    }
+
+    async getAllEvaluations(forceSync = false) {
         if (!this.isReady) await this.readyPromise;
         let list = [];
 
+        // 1. Instant local read: Load from IndexedDB
         if (this.db) {
             list = await new Promise((resolve) => {
                 const tx = this.db.transaction(["evaluations"], "readonly");
@@ -197,7 +263,7 @@ class StorageService {
             });
         }
 
-        // Merge with in-memory store so newly saved papers in the session are never lost
+        // Merge with in-memory store so newly saved papers in this session are never lost
         if (this.memoryStore && this.memoryStore.length > 0) {
             if (!list || list.length === 0) {
                 list = [...this.memoryStore];
@@ -210,7 +276,6 @@ class StorageService {
                             list.push(memItem);
                         } else {
                             const existing = listMap.get(sId);
-                            // If in-memory copy has newer marks or updated timestamp, prefer it
                             if ((memItem.updatedAt && (!existing.updatedAt || memItem.updatedAt >= existing.updatedAt)) ||
                                 (Number(memItem.obtainedMarks) > 0 && Number(existing.obtainedMarks) === 0)) {
                                 const idx = list.findIndex(e => String(e.id) === sId);
@@ -223,7 +288,6 @@ class StorageService {
         }
 
         if (!list || list.length === 0) {
-            // Also check localStorage summary
             try {
                 const raw = localStorage.getItem("onespace_evaluations_summary") || localStorage.getItem("onespace_evaluations");
                 if (raw) {
@@ -235,18 +299,73 @@ class StorageService {
             } catch (e) {}
         }
 
-        if ((!list || list.length === 0) && window.firebaseManager && window.firebaseManager.isConnected) {
+        // 2. CLOUD SYNCHRONIZATION: Always query Firebase (Firestore & Storage) to ensure multi-device consistency!
+        // When papers are uploaded on Machine A, Machine B must fetch and display them immediately.
+        if (window.firebaseManager) {
             try {
                 const fbList = await window.firebaseManager.getAllEvaluations();
-                if (fbList && fbList.length > 0) list = fbList;
+                if (Array.isArray(fbList) && fbList.length > 0) {
+                    const listMap = new Map(list.map(e => [String(e.id), e]));
+                    let addedCount = 0;
+
+                    for (const fbItem of fbList) {
+                        if (!fbItem || !fbItem.id) continue;
+                        const sId = String(fbItem.id);
+
+                        if (!listMap.has(sId)) {
+                            list.push(fbItem);
+                            listMap.set(sId, fbItem);
+                            this._saveEvaluationToIndexedDB(fbItem);
+                            addedCount++;
+                        } else {
+                            const existing = listMap.get(sId);
+                            // If cloud has newer evaluation or updated timestamp, update local record
+                            if (fbItem.updatedAt && (!existing.updatedAt || fbItem.updatedAt >= existing.updatedAt)) {
+                                const merged = Object.assign({}, existing, fbItem, {
+                                    // Retain local annotations if paper is actively being corrected here
+                                    annotations: (existing.annotations && existing.annotations.length > 0) ? existing.annotations : (fbItem.annotations || []),
+                                    obtainedMarks: (Number(existing.obtainedMarks) > 0) ? existing.obtainedMarks : fbItem.obtainedMarks
+                                });
+                                const idx = list.findIndex(e => String(e.id) === sId);
+                                if (idx >= 0) list[idx] = merged;
+                                this._saveEvaluationToIndexedDB(merged);
+                            }
+                        }
+                    }
+
+                    if (addedCount > 0) {
+                        console.log(`🔥 Synchronized ${addedCount} new evaluation(s) from Firebase Cloud! Total now: ${list.length}`);
+                    }
+                }
             } catch (e) {
-                console.warn("Firebase getAllEvaluations fallback warning:", e);
+                console.warn("Firebase getAllEvaluations sync warning:", e);
             }
         }
 
         // Update memoryStore with latest consolidated list
         if (list && list.length > 0) {
             this.memoryStore = [...list];
+            try {
+                const summaryList = list.map(e => ({
+                    id: e.id,
+                    studentName: e.studentName,
+                    rollNo: e.rollNo,
+                    class: e.class || e.className,
+                    className: e.className || e.class,
+                    section: e.section,
+                    subject: e.subject,
+                    examName: e.examName,
+                    templateName: e.templateName,
+                    obtainedMarks: e.obtainedMarks,
+                    maxMarks: e.maxMarks,
+                    percentage: e.percentage,
+                    status: e.status,
+                    pdfStorageUrl: e.pdfStorageUrl || null,
+                    isUserUploaded: true,
+                    isMock: false
+                }));
+                localStorage.setItem("onespace_evaluations_summary", JSON.stringify(summaryList));
+            } catch (e) {}
         }
 
         return this.filterEvaluationsForUser(list);
@@ -357,10 +476,16 @@ class StorageService {
             evalObj = (this.memoryStore || []).find(e => String(e.id) === targetId) || null;
         }
 
-        if (!evalObj && window.firebaseManager && window.firebaseManager.isConnected) {
+        if (!evalObj && window.firebaseManager) {
             try {
-                const fbList = await window.firebaseManager.getAllEvaluations();
-                evalObj = fbList.find(e => String(e.id) === targetId) || null;
+                evalObj = await window.firebaseManager.getEvaluationById(targetId);
+                if (!evalObj) {
+                    const fbList = await window.firebaseManager.getAllEvaluations();
+                    evalObj = fbList.find(e => String(e.id) === targetId) || null;
+                }
+                if (evalObj) {
+                    this._saveEvaluationToIndexedDB(evalObj);
+                }
             } catch (e) {}
         }
 
@@ -384,6 +509,7 @@ class StorageService {
             }
             if ((!evalObj.pages || evalObj.pages.length === 0) && evalObj.pdfStorageUrl) {
                 evalObj.pages = [evalObj.pdfStorageUrl];
+                if (!evalObj.pdfDataUrl) evalObj.pdfDataUrl = evalObj.pdfStorageUrl;
             }
             if (!evalObj.pages) evalObj.pages = evalObj.pdfDataUrl ? [evalObj.pdfDataUrl] : [];
         } else {
@@ -411,11 +537,15 @@ class StorageService {
 
         await this.storePdfCache(evaluation.id, cachePayload);
 
-        // Perform cloud sync asynchronously in background without blocking local save
-        if (window.firebaseManager && window.firebaseManager.isConnected) {
-            window.firebaseManager.saveEvaluation(evaluation).catch(fbErr => {
-                console.warn("Background cloud sync warning:", fbErr);
-            });
+        // Perform cloud sync asynchronously with FirebaseManager ensureReady
+        if (window.firebaseManager) {
+            window.firebaseManager.ensureReady().then(ready => {
+                if (ready || window.firebaseManager.isConnected) {
+                    window.firebaseManager.saveEvaluation(evaluation).catch(fbErr => {
+                        console.warn("Background cloud sync warning:", fbErr);
+                    });
+                }
+            }).catch(() => {});
         }
 
         return this._putDirect(evaluation);
@@ -836,17 +966,26 @@ class StorageService {
     async saveSubjectCatalog(catalog) {
         await this.readyPromise;
         const key = "onespace_custom_catalog";
+        // Strip svgIcon and iconColor - keep them strictly in code to eliminate database storage and transfer costs
+        const cleanCatalog = Array.isArray(catalog) ? catalog.map(sub => {
+            if (!sub || typeof sub !== 'object') return sub;
+            const copy = Object.assign({}, sub);
+            delete copy.svgIcon;
+            delete copy.iconColor;
+            return copy;
+        }) : catalog;
+
         try {
-            localStorage.setItem(key, JSON.stringify(catalog));
+            localStorage.setItem(key, JSON.stringify(cleanCatalog));
         } catch (e) {
             console.error("Error saving custom catalog", e);
         }
         if (window.firebaseManager && window.firebaseManager.isConnected) {
             try {
-                await window.firebaseManager.saveSubjectCatalog(catalog);
+                await window.firebaseManager.saveSubjectCatalog(cleanCatalog);
             } catch (e) {}
         }
-        return catalog;
+        return cleanCatalog;
     }
 
     async getClassesList() {

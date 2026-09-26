@@ -24,6 +24,7 @@ class DashboardManager {
         this.filteredEvaluations = [];
         this.activeTab = "all"; // 'all' | 'uncorrected' | 'corrected'
         this.selectedClassFilter = "all"; // 'all' or class name
+        this.selectedSubjectFilter = "all"; // 'all' or subject name
         this.searchQuery = "";
         this.selectedIds = new Set();
         this.teacherSubject = "";
@@ -38,6 +39,18 @@ class DashboardManager {
         if (!this.container) return;
         this.evaluations = await window.appStorage.getAllEvaluations();
 
+        // Check if uploader just published a new batch of papers
+        const lastCls = sessionStorage.getItem("niprak_last_uploaded_class");
+        const lastSub = sessionStorage.getItem("niprak_last_uploaded_subject");
+        if (lastCls) {
+            this.selectedClassFilter = lastCls;
+            sessionStorage.removeItem("niprak_last_uploaded_class");
+        }
+        if (lastSub) {
+            this.selectedSubjectFilter = lastSub;
+            sessionStorage.removeItem("niprak_last_uploaded_subject");
+        }
+
         // Get authenticated user profile for subject panel & greeting name
         const user = window.appStorage.getCurrentUser();
         if (user) {
@@ -51,6 +64,19 @@ class DashboardManager {
         this.render();
         this.bindEvents();
         this.renderCharts();
+
+        // Background Cloud Sync: Pull fresh papers from Firebase so papers uploaded from other machines show immediately
+        if (window.firebaseManager) {
+            window.appStorage.getAllEvaluations(true).then((freshList) => {
+                if (Array.isArray(freshList) && freshList.length > 0 && freshList.length !== this.evaluations.length) {
+                    this.evaluations = freshList;
+                    this.applyFilters();
+                    this.render();
+                    this.bindEvents();
+                    this.renderCharts();
+                }
+            }).catch(() => {});
+        }
     }
 
     getGreeting() {
@@ -100,10 +126,18 @@ class DashboardManager {
             if (this.activeTab === "uncorrected" && isCorr) return false;
             if (this.activeTab === "corrected" && !isCorr) return false;
 
-            // 2. Class filter
+            // 2. Class filter (flexible matching)
             if (this.selectedClassFilter && this.selectedClassFilter !== "all") {
-                const eCls = (e.class || e.className || e.classLabel || "").toLowerCase();
-                if (eCls !== this.selectedClassFilter.toLowerCase()) return false;
+                const fCls = this.selectedClassFilter.toLowerCase().trim();
+                const eCls = (e.class || e.className || e.classLabel || "").toLowerCase().trim();
+                if (eCls !== fCls && !eCls.includes(fCls) && !fCls.includes(eCls)) return false;
+            }
+
+            // 2b. Subject filter (flexible matching)
+            if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all") {
+                const fSub = this.selectedSubjectFilter.toLowerCase().trim();
+                const eSub = (e.subject || "").toLowerCase().trim();
+                if (eSub !== fSub && !eSub.includes(fSub) && !fSub.includes(eSub)) return false;
             }
 
             // 3. Search query filter
@@ -161,6 +195,8 @@ class DashboardManager {
                 .filter(Boolean)
         );
         const classList = Array.from(classSet);
+        const subjectSet = new Set(this.evaluations.map(e => e.subject).filter(Boolean));
+        const subjectList = Array.from(subjectSet);
 
         const ic = window.Icons || {};
         const greetingStr = this.getGreeting();
@@ -299,20 +335,29 @@ class DashboardManager {
                             </button>
                         </div>
 
-                        <!-- Center: Class Filter Dropdown & Search Input -->
-                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; max-width: 520px; justify-content: flex-end;">
-                            <select id="dash-filter-class" class="form-select-sm" style="font-size: 0.85rem; font-weight: 500; height: 36px; padding: 0 10px; border-radius: 8px; min-width: 140px;">
+                        <!-- Center: Subject & Class Filter Dropdowns & Search Input -->
+                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; max-width: 650px; justify-content: flex-end;">
+                            <select id="dash-filter-subject" class="form-select-sm" style="font-size: 0.85rem; font-weight: 500; height: 36px; padding: 0 10px; border-radius: 8px; min-width: 130px;">
+                                <option value="all">All Subjects</option>
+                                ${subjectList.map(sub => `<option value="${sub}" ${this.selectedSubjectFilter === sub ? 'selected' : ''}>${sub}</option>`).join("")}
+                            </select>
+
+                            <select id="dash-filter-class" class="form-select-sm" style="font-size: 0.85rem; font-weight: 500; height: 36px; padding: 0 10px; border-radius: 8px; min-width: 130px;">
                                 <option value="all">All Classes</option>
                                 ${classList.map(cls => `<option value="${cls}" ${this.selectedClassFilter === cls ? 'selected' : ''}>${cls}</option>`).join("")}
                             </select>
 
-                            <div style="position: relative; flex: 1; min-width: 200px;">
+                            <div style="position: relative; flex: 1; min-width: 180px;">
                                 <input type="text" id="dash-search-input" class="form-input form-input-sm" value="${this.searchQuery}" placeholder="🔍 Search student or roll no..." style="width: 100%; height: 36px; padding-left: 12px; font-size: 0.85rem; border-radius: 8px;" />
                             </div>
                         </div>
 
-                        <!-- Right: Bulk Actions -->
+                        <!-- Right: Actions & Cloud Sync -->
                         <div style="display: flex; align-items: center; gap: 8px;">
+                            <button type="button" class="btn-secondary" id="dash-btn-sync-cloud" title="Sync latest answer sheets from Firebase Cloud" style="background: #F0FDF4; border: 1px solid #16A34A; color: #16A34A; font-size: 0.84rem; font-weight: 600; padding: 7px 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
+                                <span>☁️ Sync Cloud</span>
+                            </button>
+
                             <button type="button" class="btn-secondary" id="dash-btn-bulk-pdf" title="Bulk download selected or filtered PDFs" style="background: #FFFFFF; border: 1px solid #007AFF; color: #007AFF; font-size: 0.84rem; font-weight: 600; padding: 7px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
                                 <span class="btn-icon">${ic.pdf || '📄'}</span> Bulk Download PDFs <span id="dash-pdf-count-badge" style="background: rgba(0, 122, 255, 0.12); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem;">(${this.selectedIds.size > 0 ? this.selectedIds.size : 'All'})</span>
                             </button>
@@ -336,7 +381,7 @@ class DashboardManager {
                                     <th>Class</th>
                                     <th>Subject & Exam</th>
                                     <th>Marks</th>
-                                    <th>Percentage</th>
+                                    <th>Grade & Result</th>
                                     <th>Status</th>
                                     <th>Last Updated</th>
                                     <th class="text-right">Actions</th>
@@ -408,7 +453,12 @@ class DashboardManager {
                         <strong class="${isCompleted ? 'text-green' : 'text-amber'}">${ev.obtainedMarks || 0}</strong> / ${ev.maxMarks || 70}
                     </td>
                     <td>
-                        <span class="pct-pill" style="font-weight: 700; ${pct >= 75 ? 'color: #16A34A;' : pct >= 50 ? 'color: #D97706;' : 'color: #DC2626;'}">${pct}%</span>
+                        ${isCompleted ? `
+                            <span class="pct-pill" style="font-weight: 700; ${pct >= 75 ? 'color: #16A34A;' : pct >= 33 ? 'color: #D97706;' : 'color: #DC2626;'}">
+                                ${(window.calculateGradeScale ? window.calculateGradeScale(ev.obtainedMarks, ev.maxMarks).grade : ev.grade || 'A1')}
+                                <span style="font-size: 0.76rem; font-weight: normal; color: #64748B;">(GP: ${(window.calculateGradeScale ? window.calculateGradeScale(ev.obtainedMarks, ev.maxMarks).gradePoint : 10)})</span>
+                            </span>
+                        ` : `<span style="color: #94A3B8; font-size: 0.84rem;">Pending</span>`}
                     </td>
                     <td>
                         <span class="status-pill ${statusClass}">${isCompleted ? 'Corrected' : 'Uncorrected'}</span>
@@ -567,6 +617,46 @@ class DashboardManager {
             tabCorrected.addEventListener("click", () => {
                 this.activeTab = "corrected";
                 this.updateFilterTabButtons();
+                this.applyFilters();
+                this.renderTableRows();
+            });
+        }
+
+        // Sync Cloud Button
+        const btnSyncCloud = this.container.querySelector("#dash-btn-sync-cloud");
+        if (btnSyncCloud) {
+            btnSyncCloud.addEventListener("click", async () => {
+                btnSyncCloud.disabled = true;
+                btnSyncCloud.innerHTML = `<span>⏳ Syncing...</span>`;
+                try {
+                    const freshList = await window.appStorage.getAllEvaluations(true);
+                    if (Array.isArray(freshList)) {
+                        this.evaluations = freshList;
+                        this.applyFilters();
+                        this.render();
+                        this.bindEvents();
+                        this.renderCharts();
+                        if (window.app && window.app.showToast) {
+                            window.app.showToast(`✓ Cloud sync complete: ${this.evaluations.length} papers available.`, "success");
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Cloud sync error:", err);
+                    if (window.app && window.app.showToast) {
+                        window.app.showToast("Cloud sync failed. Check network connection.", "warning");
+                    }
+                } finally {
+                    btnSyncCloud.disabled = false;
+                    btnSyncCloud.innerHTML = `<span>☁️ Sync Cloud</span>`;
+                }
+            });
+        }
+
+        // Subject Filter Dropdown
+        const subjectSelect = this.container.querySelector("#dash-filter-subject");
+        if (subjectSelect) {
+            subjectSelect.addEventListener("change", (e) => {
+                this.selectedSubjectFilter = e.target.value;
                 this.applyFilters();
                 this.renderTableRows();
             });

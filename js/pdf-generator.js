@@ -28,11 +28,11 @@ class PDFGenerator {
         const annotations = evaluation.annotations || [];
 
         // If paper was stored as optimized single PDF, expand pages on demand via pdfjsLib
-        const isPdf = (pages.length === 1 && typeof pages[0] === "string" && (pages[0].startsWith("data:application/pdf") || pages[0].includes(".pdf") || pages[0].includes("alt=media"))) ||
+        const isPdf = (pages.length === 1 && typeof pages[0] === "string" && (pages[0].startsWith("data:application/pdf") || pages[0].includes(".pdf") || pages[0].includes("alt=media") || pages[0].includes("firebasestorage"))) ||
                       (evaluation.pdfDataUrl && (!pages || pages.length <= 1));
-        const pdfSrc = (pages.length === 1 && typeof pages[0] === "string" && pages[0].startsWith("data:application/pdf")) 
+        const pdfSrc = (pages.length === 1 && typeof pages[0] === "string" && (pages[0].startsWith("data:application/pdf") || pages[0].includes("firebasestorage") || pages[0].includes(".pdf"))) 
                        ? pages[0] 
-                       : (evaluation.pdfDataUrl || pages[0]);
+                       : (evaluation.pdfStorageUrl || evaluation.pdfDataUrl || pages[0]);
 
         if (isPdf && pdfSrc && window.pdfjsLib) {
             try {

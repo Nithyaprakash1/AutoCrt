@@ -158,7 +158,8 @@ class CanvasEngine {
         const isPdfHttpUrl = expandedPages.length === 1 && typeof expandedPages[0] === "string" && (
             expandedPages[0].includes("evaluations_pdf") || 
             expandedPages[0].toLowerCase().includes(".pdf") || 
-            expandedPages[0].includes("alt=media")
+            expandedPages[0].includes("alt=media") ||
+            expandedPages[0].includes("firebasestorage")
         );
 
         if ((isPdfDataUrl || isPdfHttpUrl) && window.pdfjsLib) {

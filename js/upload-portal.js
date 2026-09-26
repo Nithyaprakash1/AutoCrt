@@ -22,16 +22,14 @@ class UploadPortalManager {
         this.fileQueue = []; // Array of { file, studentName, rollNo, pages: [], isProcessing: false, isReady: false }
         this.existingPapers = []; // Papers already uploaded for this Subject + Template + Class
 
-        // Predefined 3 Subjects with 2-3 Templates each
+        // Predefined Subjects with Templates
         this.catalog = [
             {
                 id: "phy",
                 name: "Physics",
                 code: "PHY-301",
-                iconColor: "#5856D6",
                 badge: "3 Templates",
                 description: "Electromagnetism, Optics, Mechanics & Modern Physics answer sheets",
-                svgIcon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5856D6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M5 5l14 14M5 19L19 5"/></svg>`,
                 templates: [
                     {
                         id: "phy-cbse-70",
@@ -203,6 +201,121 @@ class UploadPortalManager {
         this.activeTargetStudentForUpload = null;
     }
 
+    getSubjectColor(sub) {
+        if (!sub) return "#5856D6";
+        const id = String(sub.id || "").toLowerCase();
+        const name = String(sub.name || "").toLowerCase();
+        if (id.includes("phy") || name.includes("physic")) return "#5856D6";
+        if (id.includes("chem") || name.includes("chem")) return "#FF9500";
+        if (id.includes("bio") || name.includes("bio")) return "#34C759";
+        if (id.includes("math") || name.includes("math")) return "#007AFF";
+        return "#5856D6";
+    }
+
+    getSubjectIcon(sub) {
+        const color = this.getSubjectColor(sub);
+        const id = String(sub?.id || "").toLowerCase();
+        const name = String(sub?.name || "").toLowerCase();
+        if (id.includes("phy") || name.includes("physic")) {
+            return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M2 12h20M5 5l14 14M5 19L19 5"/></svg>`;
+        }
+        if (id.includes("chem") || name.includes("chem")) {
+            return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2v7.31L4.1 19.3A2 2 0 0 0 5.8 22h12.4a2 2 0 0 0 1.7-2.7L14 9.31V2h-4z"/><line x1="8.5" y1="2" x2="15.5" y2="2"/></svg>`;
+        }
+        if (id.includes("bio") || name.includes("bio")) {
+            return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22s5.5-1.5 8-6 2-8 2-8-3.5-.5-8 2-2 12-2 12z"/><path d="M12 8s3.5-.5 8 2 2 12 2 12-5.5-1.5-8-6"/></svg>`;
+        }
+        return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
+    }
+
+    loadManualChecks() {
+        this.manualCheckedRolls = new Set();
+        if (!this.selectedClass) return;
+        const subId = this.selectedSubject ? this.selectedSubject.id : "all";
+        const key = `niprak_recon_checked_${this.selectedClass.id}_${subId}`;
+        try {
+            const raw = localStorage.getItem(key);
+            if (raw) {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr)) {
+                    this.manualCheckedRolls = new Set(arr.map(r => String(r).trim()));
+                }
+            }
+        } catch (e) {}
+    }
+
+    saveManualChecks() {
+        if (!this.selectedClass) return;
+        const subId = this.selectedSubject ? this.selectedSubject.id : "all";
+        const key = `niprak_recon_checked_${this.selectedClass.id}_${subId}`;
+        try {
+            localStorage.setItem(key, JSON.stringify(Array.from(this.manualCheckedRolls)));
+        } catch (e) {}
+    }
+
+    openCleanUpConfirmationModal() {
+        let modalEl = document.getElementById("modal-cleanup-unwanted-confirm");
+        if (!modalEl) {
+            modalEl = document.createElement("div");
+            modalEl.id = "modal-cleanup-unwanted-confirm";
+            modalEl.className = "modal-backdrop active";
+            document.body.appendChild(modalEl);
+        }
+
+        modalEl.innerHTML = `
+            <div class="modal-dialog custom-delete-modal-dialog" style="max-width: 480px; padding: 28px; background: var(--bg-card); border-radius: 20px; box-shadow: 0 20px 40px rgba(0,0,0,0.25);">
+                <div class="delete-icon-ring" style="width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; background: rgba(239, 68, 68, 0.1); border: 2px solid rgba(239, 68, 68, 0.25);">
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                        <line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/>
+                    </svg>
+                </div>
+                <h3 class="delete-modal-title" style="color: var(--text-main); font-size: 1.3rem; font-weight: 600; text-align: center; margin-bottom: 8px;">Clean Up Unwanted / Demo Data</h3>
+                <p class="delete-modal-msg" style="color: var(--text-muted); font-size: 0.88rem; line-height: 1.6; text-align: center; margin-bottom: 24px;">
+                    This will permanently remove all test/mock evaluations, demo mathematics papers, and the <strong>5 Dharnish</strong> test paper from browser storage and cloud sync.
+                    <br><br>
+                    Your official blueprints, Physics question paper templates, and student rosters will remain completely intact.
+                </p>
+                <div class="delete-modal-actions" style="display: flex; gap: 12px; justify-content: center;">
+                    <button type="button" class="btn-secondary" id="btn-cancel-cleanup-modal" style="padding: 10px 20px; border-radius: 10px; cursor: pointer; font-size: 0.88rem;">Cancel</button>
+                    <button type="button" class="btn-danger-confirm" id="btn-confirm-cleanup-modal" style="background: #DC2626; color: #fff; border: none; padding: 10px 22px; border-radius: 10px; font-weight: 600; cursor: pointer; font-size: 0.88rem;">Clean Up Now</button>
+                </div>
+            </div>
+        `;
+        modalEl.classList.add("active");
+
+        const cancelBtn = modalEl.querySelector("#btn-cancel-cleanup-modal");
+        const confirmBtn = modalEl.querySelector("#btn-confirm-cleanup-modal");
+
+        const closeModal = () => {
+            modalEl.classList.remove("active");
+            modalEl.remove();
+        };
+
+        cancelBtn.addEventListener("click", closeModal);
+        modalEl.addEventListener("click", (e) => {
+            if (e.target === modalEl) closeModal();
+        });
+
+        confirmBtn.addEventListener("click", async () => {
+            confirmBtn.disabled = true;
+            confirmBtn.textContent = "Cleaning...";
+            if (window.appStorage && typeof window.appStorage.purgeUnwantedData === "function") {
+                await window.appStorage.purgeUnwantedData();
+            }
+            this.fileQueue = [];
+            await this.loadExistingClassPapers();
+            this.updateStepView();
+            closeModal();
+            if (window.app && window.app.showToast) {
+                window.app.showToast("✓ Cleaned up unwanted test data and Dharnish records successfully!", "success");
+            }
+            if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
+                window.app.updateStorageQuotaDisplay();
+            }
+        });
+    }
+
     async init() {
         if (window.appStorage) {
             const savedCatalog = await window.appStorage.getSubjectCatalog();
@@ -311,7 +424,7 @@ class UploadPortalManager {
                         <div class="upload-side-subjects-list">
                             ${this.catalog.map(sub => `
                                 <button type="button" class="upload-side-subject-btn ${this.selectedSubject && this.selectedSubject.id === sub.id ? 'active' : ''}" data-subject-id="${sub.id}">
-                                    <span class="subj-bullet" style="background: ${sub.iconColor};"></span>
+                                    <span class="subj-bullet" style="background: ${this.getSubjectColor(sub)};"></span>
                                     <span class="subj-name">${sub.name}</span>
                                     <span class="subj-code-tag">${sub.code}</span>
                                 </button>
@@ -425,8 +538,8 @@ class UploadPortalManager {
                     ${this.catalog.map(sub => `
                         <div class="subject-card ${this.selectedSubject && this.selectedSubject.id === sub.id ? 'selected' : ''}" data-subject-id="${sub.id}">
                             <div class="subject-card-top">
-                                <div class="subject-icon-box" style="background: ${sub.iconColor}15;">
-                                    ${sub.svgIcon}
+                                <div class="subject-icon-box" style="background: ${this.getSubjectColor(sub)}15;">
+                                    ${this.getSubjectIcon(sub)}
                                 </div>
                                 <span class="subject-count-badge">${sub.badge}</span>
                                 <div class="subject-header-actions" style="margin-left: auto; display: flex; gap: 4px;">
@@ -618,6 +731,7 @@ class UploadPortalManager {
     
     async loadClassRoster() {
         if (!this.selectedClass) return;
+        this.loadManualChecks();
         if (window.appStorage && typeof window.appStorage.getClassRoster === 'function') {
             this.currentClassRoster = await window.appStorage.getClassRoster(this.selectedClass.id);
         } else {
@@ -638,39 +752,69 @@ class UploadPortalManager {
             }
         }
 
+        if (this.manualCheckedRolls.size === 0) {
+            this.loadManualChecks();
+        }
+
         const roster = this.currentClassRoster || [];
         const queue = this.fileQueue || [];
+        const existing = this.existingPapers || [];
 
         const list = roster.map(student => {
             const sRoll = String(student.rollNo || "").trim();
             const sName = String(student.studentName || "").toLowerCase().trim();
             const sNameParts = sName.split(/\s+/).filter(Boolean);
 
-            const matchedItem = queue.find(q => {
+            // 1. Match against staged incoming file queue
+            const matchedQueueItem = queue.find(q => {
                 const qRoll = String(q.rollNo || "").trim();
                 const qName = String(q.studentName || "").toLowerCase().trim();
                 const qFileName = String(q.fileName || "").toLowerCase();
 
-                // Match by roll number
                 if (qRoll && sRoll && qRoll === sRoll) return true;
-                if (sRoll && (qFileName.includes(`_${sRoll}.`) || qFileName.includes(`-${sRoll}.`) || qFileName.includes(`${sRoll}_`))) return true;
-
-                // Match by student name
+                if (sRoll && (qFileName.includes(`_${sRoll}.`) || qFileName.includes(`-${sRoll}.`) || qFileName.includes(`${sRoll}_`) || qFileName.startsWith(`${sRoll} `))) return true;
                 if (qName && (qName === sName || qName.includes(sName) || sName.includes(qName))) return true;
-
-                // Match by first & last name parts in filename
-                if (sNameParts.length >= 2 && qFileName.includes(sNameParts[0]) && qFileName.includes(sNameParts[sNameParts.length - 1])) return true;
+                if (sNameParts.length >= 2 && (qName.includes(sNameParts[0]) || qFileName.includes(sNameParts[0]))) return true;
 
                 return false;
             });
 
-            const isPresent = !!matchedItem || (this.manualCheckedRolls && this.manualCheckedRolls.has(sRoll));
+            // 2. Match against existing published/saved papers for this class
+            const matchedExistingItem = !matchedQueueItem ? existing.find(p => {
+                const pRoll = String(p.rollNo || "").trim();
+                const pName = String(p.studentName || "").toLowerCase().trim();
+                const pFileName = String(p.fileName || "").toLowerCase();
+
+                if (pRoll && sRoll && pRoll === sRoll) return true;
+                if (sRoll && (pFileName.includes(`_${sRoll}.`) || pFileName.includes(`-${sRoll}.`) || pFileName.includes(`${sRoll}_`) || pFileName.startsWith(`${sRoll} `))) return true;
+                if (pName && (pName === sName || pName.includes(sName) || sName.includes(pName))) return true;
+                if (sNameParts.length >= 2 && (pName.includes(sNameParts[0]) || pFileName.includes(sNameParts[0]))) return true;
+
+                return false;
+            }) : null;
+
+            const isPresent = !!matchedQueueItem || !!matchedExistingItem || (this.manualCheckedRolls && this.manualCheckedRolls.has(sRoll));
+
+            let matchedFile = null;
+            if (matchedQueueItem) {
+                matchedFile = {
+                    fileName: matchedQueueItem.fileName,
+                    pages: matchedQueueItem.pages || [],
+                    isUploaded: false
+                };
+            } else if (matchedExistingItem) {
+                matchedFile = {
+                    fileName: matchedExistingItem.fileName || `${student.studentName}_AnswerSheet.pdf`,
+                    pages: new Array(matchedExistingItem.pageCount || (matchedExistingItem.pages ? matchedExistingItem.pages.length : 1)),
+                    isUploaded: true
+                };
+            }
 
             return {
                 ...student,
                 isPresent: isPresent,
-                matchedFile: matchedItem || null,
-                isManuallyTicked: !matchedItem && this.manualCheckedRolls && this.manualCheckedRolls.has(sRoll)
+                matchedFile: matchedFile,
+                isManuallyTicked: !matchedFile && this.manualCheckedRolls && this.manualCheckedRolls.has(sRoll)
             };
         });
 
@@ -910,10 +1054,10 @@ class UploadPortalManager {
                                         <td><span class="student-name-text">${student.studentName}</span></td>
                                         <td>
                                             ${student.matchedFile ? `
-                                                <div class="file-matched-chip">
+                                                <div class="file-matched-chip ${student.matchedFile.isUploaded ? 'chip-saved' : ''}">
                                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                                     <span class="matched-filename">${student.matchedFile.fileName}</span>
-                                                    <span class="matched-pages">(${student.matchedFile.pages.length} Pages)</span>
+                                                    <span class="matched-pages">(${student.matchedFile.pages.length} Pages • ${student.matchedFile.isUploaded ? 'Saved' : 'In Queue'})</span>
                                                 </div>
                                             ` : (student.isManuallyTicked ? `
                                                 <span class="badge-manually-verified">
@@ -946,11 +1090,17 @@ class UploadPortalManager {
 
                 <!-- Existing Uploaded Papers for this Class -->
                 <div class="existing-papers-card" id="existing-papers-section">
-                    <div class="existing-header">
-                        <h4 class="existing-title">
-                            Uploaded Papers in ${this.selectedClass.label} – ${this.selectedSubject.name} (${this.selectedTemplate.name})
-                        </h4>
-                        <span class="existing-badge" id="existing-count-badge">Loading papers...</span>
+                    <div class="existing-header" style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+                        <div>
+                            <h4 class="existing-title">
+                                Uploaded Papers in ${this.selectedClass.label} – ${this.selectedSubject.name} (${this.selectedTemplate.name})
+                            </h4>
+                            <span class="existing-badge" id="existing-count-badge">Loading papers...</span>
+                        </div>
+                        <button type="button" class="btn-clean-unwanted-data" id="btn-portal-clean-data" title="Clean up unwanted test/demo data and Dharnish records" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #DC2626; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; cursor: pointer;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            Clean Up Unwanted Data
+                        </button>
                     </div>
                     <div id="existing-papers-tbody-wrap"></div>
                 </div>
@@ -1215,10 +1365,8 @@ class UploadPortalManager {
                         id: "sub-" + Date.now(),
                         name,
                         code,
-                        iconColor: "#5856D6",
                         badge: "1 Template",
                         description: desc,
-                        svgIcon: `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#5856D6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`,
                         templates: [
                             {
                                 id: "tpl-" + Date.now(),
@@ -2835,18 +2983,25 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 });
             });
 
-            // Reconciliation Ticking Checkboxes
+            // Reconciliation Ticking Checkboxes (Persisted to localStorage)
             this.container.querySelectorAll(".recon-check-box").forEach(cb => {
                 cb.addEventListener("change", (e) => {
-                    const roll = cb.getAttribute("data-roll");
+                    const roll = String(cb.getAttribute("data-roll") || "").trim();
                     if (e.target.checked) {
                         this.manualCheckedRolls.add(roll);
                     } else {
                         this.manualCheckedRolls.delete(roll);
                     }
+                    this.saveManualChecks();
                     this.updateStepView();
                 });
             });
+
+            // Clean Up Unwanted / Demo Data Button
+            const cleanDataBtn = this.container.querySelector("#btn-portal-clean-data");
+            if (cleanDataBtn) {
+                cleanDataBtn.addEventListener("click", () => this.openCleanUpConfirmationModal());
+            }
 
             // Single student attach PDF trigger
             const inpSinglePdf = this.container.querySelector("#inp-single-student-pdf-file");
@@ -3714,6 +3869,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
             const newEvaluation = {
                 id: evalId,
+                rawFile: item.file || null,
                 studentName: item.studentName || (existingMatch ? existingMatch.studentName : "Unnamed Student"),
                 rollNo: item.rollNo || (existingMatch ? existingMatch.rollNo : String(100 + publishedCount)),
                 class: cls.name || cls.label,
@@ -3767,6 +3923,11 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         await this.loadExistingClassPapers();
         if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
             window.app.updateStorageQuotaDisplay();
+        }
+
+        if (cls && subject) {
+            sessionStorage.setItem("niprak_last_uploaded_class", cls.label || cls.name);
+            sessionStorage.setItem("niprak_last_uploaded_subject", subject.name);
         }
 
         if (window.app && window.app.showToast) {

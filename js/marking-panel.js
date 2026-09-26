@@ -437,6 +437,13 @@ class MarkingPanel {
         if (secBadge) secBadge.textContent = q.section || "Section";
         if (totalPill) totalPill.textContent = `Total: ${q.awardedMarks}/${q.maxMarks}M`;
 
+        // Update Top Workspace Bar active chip (e.g. "Section A - 1", "Section B - 17")
+        const topSecChip = document.getElementById("ws-active-sec-q-chip");
+        if (topSecChip) {
+            const secName = q.section || "Section A";
+            topSecChip.textContent = `${secName} - ${q.qNo !== undefined ? q.qNo : this.activeQuestionIndex + 1}`;
+        }
+
         // Active Section Ceiling & Question Max Ceiling Strip
         const secCeilingTag = this.container.querySelector("#sec-ceiling-tag");
         const secCeilingQMax = this.container.querySelector("#sec-ceiling-qmax");

@@ -61,7 +61,10 @@ class AdminPanelManager {
                         <p style="font-size: 0.92rem; color: var(--text-muted); margin-top: 2px;">Track teacher correction progress, view multi-subject student scorecards, and export class reports.</p>
                     </div>
 
-                    <div style="display: flex; gap: 12px;">
+                        <button type="button" class="btn-mgmt-secondary" id="btn-admin-clean-data" style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 12px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #DC2626; font-size: 0.88rem; cursor: pointer;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            Clean Up Data
+                        </button>
                         <button type="button" class="btn-mgmt-secondary" id="btn-admin-print-report" style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.88rem; cursor: pointer;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                             Print Summary Report
@@ -214,6 +217,26 @@ class AdminPanelManager {
         const exportBtn = this.container.querySelector("#btn-admin-export-excel");
         if (exportBtn) {
             exportBtn.addEventListener("click", () => this.exportExcelMatrix());
+        }
+
+        const cleanBtn = this.container.querySelector("#btn-admin-clean-data");
+        if (cleanBtn) {
+            cleanBtn.addEventListener("click", async () => {
+                if (confirm("Clean Up Unwanted / Demo Data?\n\nThis will permanently delete demo math evaluations and the 5 Dharnish test records from browser storage & cloud sync.\n\nOfficial curriculum blueprints and class rosters will remain intact.")) {
+                    cleanBtn.disabled = true;
+                    cleanBtn.textContent = "Cleaning...";
+                    if (window.appStorage && typeof window.appStorage.purgeUnwantedData === "function") {
+                        await window.appStorage.purgeUnwantedData();
+                    }
+                    if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
+                        window.app.updateStorageQuotaDisplay();
+                    }
+                    await this.init();
+                    if (window.app && window.app.showToast) {
+                        window.app.showToast("✓ Cleaned up unwanted test data and Dharnish records successfully!", "success");
+                    }
+                }
+            });
         }
     }
 

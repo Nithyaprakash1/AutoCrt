@@ -21,14 +21,33 @@ class FirebaseManager {
         this.storage = null;
         this.isConnected = false;
         this.currentUser = null;
+        this.readyPromise = new Promise((resolve) => {
+            this._resolveReady = resolve;
+        });
         
-        // Auto-initialize when window loads
+        // Initialize immediately if Firebase SDK is already available on window, otherwise on DOMContentLoaded
         if (typeof window !== "undefined") {
-            window.addEventListener("DOMContentLoaded", () => this.init());
+            if (typeof window.firebase !== "undefined") {
+                this.init();
+            } else {
+                window.addEventListener("DOMContentLoaded", () => this.init());
+            }
         }
     }
 
+    async ensureReady(timeoutMs = 2500) {
+        if (this.isConnected && this.firestore) return true;
+        let timer;
+        const timeoutPromise = new Promise((resolve) => {
+            timer = setTimeout(() => resolve(this.isConnected), timeoutMs);
+        });
+        const res = await Promise.race([this.readyPromise, timeoutPromise]);
+        clearTimeout(timer);
+        return res || this.isConnected;
+    }
+
     init() {
+        if (this.isConnected && this.app) return true;
         if (typeof window.firebase !== "undefined") {
             try {
                 if (!window.firebase.apps.length) {
@@ -55,14 +74,18 @@ class FirebaseManager {
 
                 this.isConnected = true;
                 console.log("🔥 Firebase connected successfully to project studio-5089173188-26125!");
+                if (this._resolveReady) this._resolveReady(true);
                 return true;
             } catch (err) {
                 console.warn("Firebase initialization warning:", err);
                 this.isConnected = false;
+                if (this._resolveReady) this._resolveReady(false);
                 return false;
             }
         } else {
             console.warn("Firebase CDN SDKs not loaded on window.");
+            this.isConnected = false;
+            if (this._resolveReady) this._resolveReady(false);
             return false;
         }
     }
@@ -390,16 +413,119 @@ class FirebaseManager {
         }
     }
 
-    // Firestore: Get All Evaluations
-    async getAllEvaluations() {
-        if (!this.isConnected || !this.firestore) return [];
-        try {
-            const snapshot = await this.firestore.collection("evaluations").get();
-            return snapshot.docs.map(doc => doc.data());
-        } catch (err) {
-            console.warn("Error fetching all evaluations from Firestore:", err);
-            return [];
+    // Helper: Parse Firestore REST field value to standard JS primitive or object
+    parseFirestoreValue(v) {
+        if (!v || typeof v !== 'object') return null;
+        if ('stringValue' in v) return v.stringValue;
+        if ('integerValue' in v) return Number(v.integerValue);
+        if ('doubleValue' in v) return Number(v.doubleValue);
+        if ('booleanValue' in v) return v.booleanValue;
+        if ('nullValue' in v) return null;
+        if ('arrayValue' in v) {
+            const arr = v.arrayValue && Array.isArray(v.arrayValue.values) ? v.arrayValue.values : [];
+            return arr.map(item => this.parseFirestoreValue(item));
         }
+        if ('mapValue' in v) {
+            const out = {};
+            const fields = (v.mapValue && v.mapValue.fields) ? v.mapValue.fields : {};
+            for (const [key, childVal] of Object.entries(fields)) {
+                out[key] = this.parseFirestoreValue(childVal);
+            }
+            return out;
+        }
+        return null;
+    }
+
+    // Helper: Parse complete Firestore REST document into evaluation object
+    parseFirestoreDocument(doc) {
+        if (!doc) return null;
+        const out = {};
+        const fields = doc.fields || {};
+        for (const [key, val] of Object.entries(fields)) {
+            out[key] = this.parseFirestoreValue(val);
+        }
+        if (!out.id && doc.name) {
+            out.id = doc.name.split('/').pop();
+        }
+        return out;
+    }
+
+    // Firestore: Get All Evaluations (Dual-Channel: Web SDK + Direct REST API Fallback)
+    async getAllEvaluations() {
+        await this.ensureReady(1800);
+        let list = [];
+
+        // 1. Try Firestore Web SDK first
+        if (this.isConnected && this.firestore) {
+            try {
+                const snapshot = await this.firestore.collection("evaluations").get();
+                if (snapshot && !snapshot.empty) {
+                    list = snapshot.docs.map(doc => {
+                        const d = doc.data() || {};
+                        if (!d.id) d.id = doc.id;
+                        return d;
+                    });
+                    if (list.length > 0) {
+                        return list;
+                    }
+                }
+            } catch (err) {
+                console.warn("Firestore Web SDK getAllEvaluations error, attempting REST fallback:", err);
+            }
+        }
+
+        // 2. High-speed Direct REST Fallback (Direct GET to Firestore REST API, ultra-reliable across all machines/browsers)
+        try {
+            const endpoint = `https://firestore.googleapis.com/v1/projects/${this.config.projectId}/databases/(default)/documents/evaluations?pageSize=100`;
+            const resp = await fetch(endpoint);
+            if (resp.ok) {
+                const json = await resp.json();
+                if (json.documents && Array.isArray(json.documents)) {
+                    list = json.documents.map(d => this.parseFirestoreDocument(d)).filter(Boolean);
+                    console.log(`🔥 Successfully loaded ${list.length} evaluations via Firestore REST API!`);
+                    return list;
+                }
+            }
+        } catch (restErr) {
+            console.warn("Firestore REST fallback getAllEvaluations warning:", restErr);
+        }
+
+        return list;
+    }
+
+    // Firestore: Get Single Evaluation by ID (Dual-Channel: Web SDK + REST)
+    async getEvaluationById(id) {
+        if (!id) return null;
+        const targetId = String(id);
+        await this.ensureReady(1500);
+
+        // 1. Try Web SDK
+        if (this.isConnected && this.firestore) {
+            try {
+                const doc = await this.firestore.collection("evaluations").doc(targetId).get();
+                if (doc.exists) {
+                    const d = doc.data() || {};
+                    if (!d.id) d.id = doc.id;
+                    return d;
+                }
+            } catch (err) {
+                console.warn("Firestore SDK getEvaluationById error:", err);
+            }
+        }
+
+        // 2. REST Fallback
+        try {
+            const endpoint = `https://firestore.googleapis.com/v1/projects/${this.config.projectId}/databases/(default)/documents/evaluations/${targetId}`;
+            const resp = await fetch(endpoint);
+            if (resp.ok) {
+                const json = await resp.json();
+                return this.parseFirestoreDocument(json);
+            }
+        } catch (restErr) {
+            console.warn("Firestore REST getEvaluationById warning:", restErr);
+        }
+
+        return null;
     }
 
     // Convert dataURL string to Blob object for Firebase Storage upload

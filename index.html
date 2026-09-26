@@ -313,8 +313,8 @@
                     </div>
 
                     <div class="navbar-user-actions">
-                        <!-- 50.0 GB Institution Storage Quota Widget -->
-                        <div class="navbar-storage-badge" id="navbar-storage-quota" title="Institution Storage Limit: 50.0 GB (Click to manage)">
+                        <!-- 50.0 GB Institution Storage Quota Widget (Only visible to Admin & Uploader) -->
+                        <div class="navbar-storage-badge" id="navbar-storage-quota" title="Institution Storage Limit: 50.0 GB (Click to manage)" style="display: none;">
                             <div class="storage-badge-icon">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                             </div>
@@ -406,11 +406,15 @@
                 </div>
             </div>
 
-            <!-- Prominent Score Status Counter -->
+            <!-- Prominent Score Status Counter & Active Question Chip -->
             <div class="ws-center-status">
+                <div class="ws-active-q-badge" id="ws-active-q-badge" title="Active Question & Section Indicator">
+                    <span class="active-sec-dot"></span>
+                    <span class="active-sec-q-chip" id="ws-active-sec-q-chip">Section A - 1</span>
+                </div>
                 <div class="ws-score-display">
                     <span class="ws-score-label">Score:</span>
-                    <span class="ws-score-val" id="ws-live-score-val">0 / 20</span>
+                    <span class="ws-score-val" id="ws-live-score-val">0 / 70</span>
                 </div>
                 <div class="autosave-pill" id="ws-autosave-status">
                     <span class="autosave-dot"></span>
