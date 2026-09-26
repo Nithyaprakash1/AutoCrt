@@ -150,70 +150,131 @@ class CanvasEngine {
         return canvas.toDataURL("image/jpeg", 0.92);
     }
 
-    async setPages(pageImages, savedAnnotations = []) {
-        let expandedPages = Array.isArray(pageImages) ? [...pageImages] : [];
+    /**
+     * Universally fetch PDF bytes from Base64 Data URL, Local Proxy, Direct Fetch, or Public CORS Proxies
+     */
+    static async fetchPdfBytes(url) {
+        if (!url || typeof url !== "string") return null;
 
-        // Check if pages is a single PDF (either Base64 or Firebase Storage URL)
-        const isPdfDataUrl = expandedPages.length === 1 && typeof expandedPages[0] === "string" && expandedPages[0].startsWith("data:application/pdf");
-        const isPdfHttpUrl = expandedPages.length === 1 && typeof expandedPages[0] === "string" && (
-            expandedPages[0].includes("evaluations_pdf") || 
-            expandedPages[0].toLowerCase().includes(".pdf") || 
-            expandedPages[0].includes("alt=media") ||
-            expandedPages[0].includes("firebasestorage")
-        );
-
-        if ((isPdfDataUrl || isPdfHttpUrl) && window.pdfjsLib) {
+        // 1. Base64 Data URL
+        if (url.startsWith("data:")) {
             try {
-                let loadingTask = null;
-                if (isPdfDataUrl) {
-                    const base64Data = expandedPages[0].split(",")[1] || expandedPages[0];
-                    const raw = atob(base64Data);
-                    const uint8Array = new Uint8Array(raw.length);
-                    for (let i = 0; i < raw.length; i++) {
-                        uint8Array[i] = raw.charCodeAt(i);
-                    }
-                    loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
-                } else {
-                    loadingTask = window.pdfjsLib.getDocument({ url: expandedPages[0] });
+                const base64Data = url.split(",")[1] || url;
+                const raw = atob(base64Data);
+                const uint8Array = new Uint8Array(raw.length);
+                for (let i = 0; i < raw.length; i++) {
+                    uint8Array[i] = raw.charCodeAt(i);
                 }
-
-                const pdfDoc = await loadingTask.promise;
-                if (pdfDoc && pdfDoc.numPages >= 1) {
-                    const rendered = [];
-                    for (let pNum = 1; pNum <= pdfDoc.numPages; pNum++) {
-                        const pdfPage = await pdfDoc.getPage(pNum);
-                        const viewport = pdfPage.getViewport({ scale: 1.8 });
-                        const offCanvas = document.createElement("canvas");
-                        offCanvas.width = viewport.width;
-                        offCanvas.height = viewport.height;
-                        const offCtx = offCanvas.getContext("2d");
-                        await pdfPage.render({ canvasContext: offCtx, viewport }).promise;
-                        rendered.push(offCanvas.toDataURL("image/jpeg", 0.92));
-                    }
-                    if (rendered.length > 0) expandedPages = rendered;
-                }
+                return uint8Array;
             } catch (e) {
-                console.warn("Could not expand PDF in setPages:", e);
+                console.warn("Error decoding Base64 PDF:", e);
+                return null;
             }
         }
 
-        if (!expandedPages || expandedPages.length === 0) {
-            expandedPages = [CanvasEngine.generateDefaultLinedPageDataUrl()];
+        // 2. HTTP/HTTPS URL: Multi-channel candidate URLs
+        const candidates = [];
+
+        // Check if served from local node server (e.g., http://127.0.0.1:8000 or localhost)
+        const isLocalHost = typeof window !== "undefined" && window.location && (
+            window.location.hostname === "127.0.0.1" || 
+            window.location.hostname === "localhost" ||
+            window.location.port === "8000"
+        );
+
+        if (isLocalHost) {
+            candidates.push(`/proxy?url=${encodeURIComponent(url)}`);
         }
 
-        this.pages = expandedPages.map((src, idx) => {
-            const pageAnn = savedAnnotations.filter(a => a.pageIndex === idx);
-            return {
-                imageSrc: src,
-                imgObj: null,
-                origWidth: 1200,
-                origHeight: 1650,
-                isLoaded: false,
-                annotations: JSON.parse(JSON.stringify(pageAnn)),
-                undoStack: [],
-                redoStack: []
-            };
-        });
+        // Direct fetch
+        candidates.push(url);
+
+        // High-availability CORS Proxies (for GitHub Pages / static deployments)
+        candidates.push(`https://corsproxy.io/?${encodeURIComponent(url)}`);
+        candidates.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
+
+        for (const targetUrl of candidates) {
+            try {
+                const resp = await fetch(targetUrl);
+                if (resp.ok) {
+                    const buf = await resp.arrayBuffer();
+                    if (buf && buf.byteLength > 100) {
+                        return new Uint8Array(buf);
+                    }
+                }
+            } catch (err) {
+                // Try next candidate in pipeline
+            }
+        }
+
+        return null;
+    }
+
+    async setPages(pageImages, savedAnnotations = []) {
+        let expandedPages = Array.isArray(pageImages) ? [...pageImages] : [];
+        this.pdfDoc = null;
+
+        // Check if pages contains a PDF (either Base64 or Firebase Storage / HTTP URL)
+        const firstPage = expandedPages.length > 0 ? expandedPages[0] : null;
+        const isPdf = typeof firstPage === "string" && (
+            firstPage.startsWith("data:application/pdf") ||
+            firstPage.includes("evaluations_pdf") ||
+            firstPage.toLowerCase().includes(".pdf") ||
+            firstPage.includes("alt=media") ||
+            firstPage.includes("firebasestorage")
+        );
+
+        if (isPdf && window.pdfjsLib) {
+            try {
+                const uint8Array = await CanvasEngine.fetchPdfBytes(firstPage);
+                if (uint8Array) {
+                    const loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
+                    this.pdfDoc = await loadingTask.promise;
+                }
+            } catch (e) {
+                console.warn("Could not load PDF document in setPages:", e);
+            }
+        }
+
+        // Build pages array:
+        if (this.pdfDoc && this.pdfDoc.numPages >= 1) {
+            const numPages = this.pdfDoc.numPages;
+            this.pages = [];
+            for (let i = 0; i < numPages; i++) {
+                const pageAnn = savedAnnotations.filter(a => a.pageIndex === i);
+                this.pages.push({
+                    pageIndex: i,
+                    pdfPageNum: i + 1,
+                    imageSrc: null,
+                    imgObj: null,
+                    origWidth: 1200,
+                    origHeight: 1650,
+                    isLoaded: false,
+                    annotations: JSON.parse(JSON.stringify(pageAnn)),
+                    undoStack: [],
+                    redoStack: []
+                });
+            }
+        } else {
+            if (!expandedPages || expandedPages.length === 0) {
+                expandedPages = [CanvasEngine.generateDefaultLinedPageDataUrl()];
+            }
+            this.pages = expandedPages.map((src, idx) => {
+                const pageAnn = savedAnnotations.filter(a => a.pageIndex === idx);
+                return {
+                    pageIndex: idx,
+                    pdfPageNum: null,
+                    imageSrc: src,
+                    imgObj: null,
+                    origWidth: 1200,
+                    origHeight: 1650,
+                    isLoaded: false,
+                    annotations: JSON.parse(JSON.stringify(pageAnn)),
+                    undoStack: [],
+                    redoStack: []
+                };
+            });
+        }
 
         this.currentPageIndex = 0;
         this.deselectAnnotation();
@@ -225,62 +286,121 @@ class CanvasEngine {
         const page = this.pages[this.currentPageIndex];
 
         if (!page.imgObj) {
-            let srcToLoad = page.imageSrc;
-
-            // Handle PDF Data URL
-            if (typeof srcToLoad === "string" && srcToLoad.startsWith("data:application/pdf")) {
+            // Case 1: Render on-demand directly from loaded this.pdfDoc
+            if (this.pdfDoc && page.pdfPageNum) {
                 try {
-                    if (window.pdfjsLib) {
-                        const base64Data = srcToLoad.split(",")[1] || srcToLoad;
-                        const raw = atob(base64Data);
-                        const uint8Array = new Uint8Array(raw.length);
-                        for (let i = 0; i < raw.length; i++) {
-                            uint8Array[i] = raw.charCodeAt(i);
+                    const pdfPage = await this.pdfDoc.getPage(page.pdfPageNum);
+                    const viewport = pdfPage.getViewport({ scale: 1.8 });
+                    const offCanvas = document.createElement("canvas");
+                    offCanvas.width = viewport.width;
+                    offCanvas.height = viewport.height;
+                    const offCtx = offCanvas.getContext("2d");
+                    await pdfPage.render({ canvasContext: offCtx, viewport }).promise;
+
+                    await new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            page.imgObj = img;
+                            page.origWidth = img.naturalWidth || viewport.width;
+                            page.origHeight = img.naturalHeight || viewport.height;
+                            page.isLoaded = true;
+                            resolve();
+                        };
+                        img.onerror = () => {
+                            page.origWidth = viewport.width;
+                            page.origHeight = viewport.height;
+                            page.isLoaded = true;
+                            resolve();
+                        };
+                        img.src = offCanvas.toDataURL("image/jpeg", 0.90);
+                    });
+                } catch (renderErr) {
+                    console.warn(`Error rendering PDF page ${page.pdfPageNum}:`, renderErr);
+                }
+            }
+
+            // Case 2: Render from imageSrc if still not loaded
+            if (!page.imgObj && page.imageSrc) {
+                let srcToLoad = page.imageSrc;
+
+                // Handle PDF Data URL or Remote PDF URL fallback
+                const isItemPdf = typeof srcToLoad === "string" && (
+                    srcToLoad.startsWith("data:application/pdf") ||
+                    srcToLoad.includes("evaluations_pdf") ||
+                    srcToLoad.toLowerCase().includes(".pdf") ||
+                    srcToLoad.includes("firebasestorage")
+                );
+
+                if (isItemPdf && window.pdfjsLib) {
+                    try {
+                        const uint8Array = await CanvasEngine.fetchPdfBytes(srcToLoad);
+                        if (uint8Array) {
+                            const loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
+                            const pdfDoc = await loadingTask.promise;
+                            const pdfPage = await pdfDoc.getPage(page.pdfPageNum || 1);
+                            const viewport = pdfPage.getViewport({ scale: 1.8 });
+                            const offCanvas = document.createElement("canvas");
+                            offCanvas.width = viewport.width;
+                            offCanvas.height = viewport.height;
+                            const offCtx = offCanvas.getContext("2d");
+                            await pdfPage.render({ canvasContext: offCtx, viewport }).promise;
+                            srcToLoad = offCanvas.toDataURL("image/jpeg", 0.90);
                         }
-                        const loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
-                        const pdfDoc = await loadingTask.promise;
-                        const pdfPage = await pdfDoc.getPage(1);
-                        const viewport = pdfPage.getViewport({ scale: 1.8 });
-                        const offCanvas = document.createElement("canvas");
-                        offCanvas.width = viewport.width;
-                        offCanvas.height = viewport.height;
-                        const offCtx = offCanvas.getContext("2d");
-                        await pdfPage.render({ canvasContext: offCtx, viewport }).promise;
-                        srcToLoad = offCanvas.toDataURL("image/jpeg", 0.92);
+                    } catch (pdfErr) {
+                        console.warn("Could not load PDF page via fetchPdfBytes:", pdfErr);
+                        srcToLoad = CanvasEngine.generateDefaultLinedPageDataUrl();
                     }
-                } catch (pdfErr) {
-                    console.warn("Error rendering PDF page in CanvasEngine:", pdfErr);
-                    srcToLoad = CanvasEngine.generateDefaultLinedPageDataUrl();
                 }
+
+                // If remote HTTP/HTTPS image URL
+                if (typeof srcToLoad === "string" && (srcToLoad.startsWith("http://") || srcToLoad.startsWith("https://"))) {
+                    try {
+                        const resp = await fetch(srcToLoad, { mode: "cors" });
+                        if (resp.ok) {
+                            const blob = await resp.blob();
+                            srcToLoad = URL.createObjectURL(blob);
+                        }
+                    } catch (corsErr) {}
+                }
+
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                await new Promise((resolve) => {
+                    img.onload = () => {
+                        page.imgObj = img;
+                        page.origWidth = img.naturalWidth || 1200;
+                        page.origHeight = img.naturalHeight || 1650;
+                        page.isLoaded = true;
+                        resolve();
+                    };
+                    img.onerror = () => {
+                        console.warn("Failed to load page image, generating default lined page:", srcToLoad);
+                        const fbData = CanvasEngine.generateDefaultLinedPageDataUrl();
+                        const fbImg = new Image();
+                        fbImg.onload = () => {
+                            page.imgObj = fbImg;
+                            page.origWidth = fbImg.naturalWidth || 1200;
+                            page.origHeight = fbImg.naturalHeight || 1650;
+                            page.isLoaded = true;
+                            resolve();
+                        };
+                        fbImg.onerror = () => {
+                            page.origWidth = 1200;
+                            page.origHeight = 1650;
+                            page.isLoaded = true;
+                            resolve();
+                        };
+                        fbImg.src = fbData;
+                    };
+                    img.src = srcToLoad;
+                });
             }
 
-            // Convert remote HTTP/HTTPS Firebase Storage URL to safe local blob URL
-            if (typeof srcToLoad === "string" && (srcToLoad.startsWith("http://") || srcToLoad.startsWith("https://"))) {
-                try {
-                    const resp = await fetch(srcToLoad, { mode: "cors" });
-                    if (resp.ok) {
-                        const blob = await resp.blob();
-                        srcToLoad = URL.createObjectURL(blob);
-                    }
-                } catch (corsErr) {
-                    console.warn("Fetch blob for cross-origin image notice:", corsErr);
-                }
-            }
-
-            const img = new Image();
-            img.crossOrigin = "anonymous";
-            await new Promise((resolve) => {
-                img.onload = () => {
-                    page.imgObj = img;
-                    page.origWidth = img.naturalWidth || 1200;
-                    page.origHeight = img.naturalHeight || 1650;
-                    page.isLoaded = true;
-                    resolve();
-                };
-                img.onerror = () => {
-                    console.warn("Failed to load page image, generating clean student answer sheet:", srcToLoad);
-                    const fbData = CanvasEngine.generateDefaultLinedPageDataUrl();
-                    const fbImg = new Image();
+            // Fallback: If still no image, generate lined page
+            if (!page.imgObj) {
+                const fbData = CanvasEngine.generateDefaultLinedPageDataUrl();
+                const fbImg = new Image();
+                await new Promise((resolve) => {
                     fbImg.onload = () => {
                         page.imgObj = fbImg;
                         page.origWidth = fbImg.naturalWidth || 1200;
@@ -288,16 +408,9 @@ class CanvasEngine {
                         page.isLoaded = true;
                         resolve();
                     };
-                    fbImg.onerror = () => {
-                        page.origWidth = 1200;
-                        page.origHeight = 1650;
-                        page.isLoaded = true;
-                        resolve();
-                    };
                     fbImg.src = fbData;
-                };
-                img.src = srcToLoad;
-            });
+                });
+            }
         }
 
         this.updateCanvasDimensions();
@@ -370,23 +483,23 @@ class CanvasEngine {
         this.setZoom(Math.min(zoomW, zoomH, 1.2));
     }
 
-    goToPage(index) {
+    async goToPage(index) {
         if (index >= 0 && index < this.pages.length) {
             this.deselectAnnotation();
             this.currentPageIndex = index;
-            this.loadCurrentPage();
+            await this.loadCurrentPage();
         }
     }
 
-    nextPage() {
+    async nextPage() {
         if (this.currentPageIndex < this.pages.length - 1) {
-            this.goToPage(this.currentPageIndex + 1);
+            await this.goToPage(this.currentPageIndex + 1);
         }
     }
 
-    prevPage() {
+    async prevPage() {
         if (this.currentPageIndex > 0) {
-            this.goToPage(this.currentPageIndex - 1);
+            await this.goToPage(this.currentPageIndex - 1);
         }
     }
 

@@ -1,4 +1,5 @@
 const http = require('http');
+const https = require('https');
 const fs = require('fs');
 const path = require('path');
 
@@ -20,6 +21,48 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+    // 1. CORS Proxy endpoint for remote assets (e.g. Firebase Cloud Storage PDFs)
+    if (req.url.startsWith('/proxy?') || req.url.startsWith('/proxy/')) {
+        let targetUrl = null;
+        try {
+            const parsed = new URL(req.url, `http://${req.headers.host || '127.0.0.1:8000'}`);
+            targetUrl = parsed.searchParams.get('url');
+        } catch (e) {}
+
+        if (!targetUrl) {
+            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+            res.end('Missing url parameter');
+            return;
+        }
+
+        const fetchRemote = (remoteUrl, redirectCount = 0) => {
+            if (redirectCount > 4) {
+                res.writeHead(508, { 'Content-Type': 'text/plain', 'Access-Control-Allow-Origin': '*' });
+                res.end('Too many redirects');
+                return;
+            }
+            const client = remoteUrl.startsWith('https:') ? https : http;
+            const proxyReq = client.get(remoteUrl, (pRes) => {
+                if (pRes.statusCode >= 300 && pRes.statusCode < 400 && pRes.headers.location) {
+                    return fetchRemote(pRes.headers.location, redirectCount + 1);
+                }
+                res.writeHead(pRes.statusCode, {
+                    'Content-Type': pRes.headers['content-type'] || 'application/pdf',
+                    'Access-Control-Allow-Origin': '*',
+                    'Cache-Control': 'public, max-age=86400'
+                });
+                pRes.pipe(res);
+            });
+            proxyReq.on('error', (err) => {
+                res.writeHead(502, { 'Content-Type': 'text/plain; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+                res.end('Proxy error: ' + err.message);
+            });
+        };
+
+        fetchRemote(targetUrl);
+        return;
+    }
+
     let reqUrl = req.url.split('?')[0];
     if (reqUrl === '/' || reqUrl === '') reqUrl = '/index.html';
 

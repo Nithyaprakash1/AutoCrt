@@ -904,12 +904,14 @@ class AppController {
             }
         }
 
-        // If pages is empty, fallback to Cloud PDF Storage URL or raw PDF Data URL
-        if ((!evaluation.pages || evaluation.pages.length === 0) && evaluation.pdfStorageUrl) {
-            evaluation.pages = [evaluation.pdfStorageUrl];
+        // Prioritize authentic Cloud PDF Storage URL over single-page placeholder
+        if (evaluation.pdfStorageUrl) {
+            const hasMultipleRealPages = Array.isArray(evaluation.pages) && evaluation.pages.length > 1;
+            if (!hasMultipleRealPages) {
+                evaluation.pages = [evaluation.pdfStorageUrl];
+            }
             if (!evaluation.pdfDataUrl) evaluation.pdfDataUrl = evaluation.pdfStorageUrl;
-        }
-        if ((!evaluation.pages || evaluation.pages.length === 0) && evaluation.pdfDataUrl) {
+        } else if (evaluation.pdfDataUrl && (!evaluation.pages || evaluation.pages.length <= 1)) {
             evaluation.pages = [evaluation.pdfDataUrl];
         }
         if (!evaluation.pages || evaluation.pages.length === 0) {
@@ -1056,7 +1058,7 @@ class AppController {
         });
 
         // Load evaluation data into canvas & marking panel
-        this.canvasEngine.setPages(evaluation.pages || [], evaluation.annotations || []);
+        await this.canvasEngine.setPages(evaluation.pages || [], evaluation.annotations || []);
         this.markingPanel.setEvaluationData(evaluation.questions || [], evaluation.maxMarks || 20, evaluation.feedback || "", evaluation.sections || []);
 
         // Sync initial Top HUD with Q1
@@ -1065,19 +1067,23 @@ class AppController {
         this.updatePageTotalDisplay();
         this.renderScorecardTable();
 
+        // Update pager UI
+        const pagerText = document.getElementById("ws-pager-text");
+        if (pagerText && this.canvasEngine && this.canvasEngine.pages) {
+            pagerText.textContent = `Page 1 of ${this.canvasEngine.pages.length}`;
+        }
+
         // Set default tool
         this.selectTool("tick");
 
         // Fit to page initially & hide loader
-        setTimeout(() => {
-            if (this.canvasEngine) this.canvasEngine.fitToPage();
-            if (wsOverlay) {
-                wsOverlay.style.opacity = "0";
-                setTimeout(() => {
-                    wsOverlay.style.display = "none";
-                }, 250);
-            }
-        }, 180);
+        if (this.canvasEngine) this.canvasEngine.fitToPage();
+        if (wsOverlay) {
+            wsOverlay.style.opacity = "0";
+            setTimeout(() => {
+                wsOverlay.style.display = "none";
+            }, 250);
+        }
 
         // Start autosave cycle
         this.startAutosave();

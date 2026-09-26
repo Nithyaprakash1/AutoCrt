@@ -38,13 +38,8 @@ class PDFGenerator {
             try {
                 if (onProgress) onProgress(25, "Extracting PDF answer sheet pages...");
                 let loadingTask = null;
-                if (typeof pdfSrc === "string" && pdfSrc.startsWith("data:application/pdf")) {
-                    const base64Data = pdfSrc.split(",")[1] || pdfSrc;
-                    const raw = atob(base64Data);
-                    const uint8Array = new Uint8Array(raw.length);
-                    for (let i = 0; i < raw.length; i++) {
-                        uint8Array[i] = raw.charCodeAt(i);
-                    }
+                const uint8Array = await CanvasEngine.fetchPdfBytes(pdfSrc);
+                if (uint8Array) {
                     loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
                 } else {
                     loadingTask = window.pdfjsLib.getDocument({ url: pdfSrc });

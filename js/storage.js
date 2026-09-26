@@ -507,8 +507,11 @@ class StorageService {
                     if (cached.pdfDataUrl) evalObj.pdfDataUrl = cached.pdfDataUrl;
                 }
             }
-            if ((!evalObj.pages || evalObj.pages.length === 0) && evalObj.pdfStorageUrl) {
-                evalObj.pages = [evalObj.pdfStorageUrl];
+            if (evalObj.pdfStorageUrl) {
+                const hasMultiplePages = Array.isArray(evalObj.pages) && evalObj.pages.length > 1;
+                if (!hasMultiplePages) {
+                    evalObj.pages = [evalObj.pdfStorageUrl];
+                }
                 if (!evalObj.pdfDataUrl) evalObj.pdfDataUrl = evalObj.pdfStorageUrl;
             }
             if (!evalObj.pages) evalObj.pages = evalObj.pdfDataUrl ? [evalObj.pdfDataUrl] : [];
