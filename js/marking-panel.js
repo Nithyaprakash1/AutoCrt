@@ -9,6 +9,50 @@
  * - Strict Regular Typography (0 Bold elements)
  */
 
+// Global Grading Engine adhering to Official Pattern:
+// A1: 91 – 100 (GP: 10)
+// A2: 81 – 90  (GP: 9)
+// B1: 71 – 80  (GP: 8)
+// B2: 61 – 70  (GP: 7)
+// C1: 51 – 60  (GP: 6)
+// C2: 41 – 50  (GP: 5)
+// D / D1 / D2: 33 – 40 (GP: 4)
+// E1: 21 – 32  (GP: 0, Fail / Essential Repeat)
+// E2: 0 – 20   (GP: 0, Fail / Essential Repeat)
+window.calculateGradeScale = function(obtainedMarks, maxMarks) {
+    const max = Number(maxMarks) || 70;
+    const obt = Number(obtainedMarks) || 0;
+    const pct = max > 0 ? Math.round((obt / max) * 100) : 0;
+
+    let grade = "E2";
+    let gradePoint = 0;
+    let marksRange = "0 – 20";
+    let remarks = "Fail / Essential Repeat";
+    let status = "Fail";
+
+    if (pct >= 91) {
+        grade = "A1"; gradePoint = 10; marksRange = "91 – 100"; remarks = "Outstanding"; status = "Pass";
+    } else if (pct >= 81) {
+        grade = "A2"; gradePoint = 9; marksRange = "81 – 90"; remarks = "Excellent"; status = "Pass";
+    } else if (pct >= 71) {
+        grade = "B1"; gradePoint = 8; marksRange = "71 – 80"; remarks = "Very Good"; status = "Pass";
+    } else if (pct >= 61) {
+        grade = "B2"; gradePoint = 7; marksRange = "61 – 70"; remarks = "Good"; status = "Pass";
+    } else if (pct >= 51) {
+        grade = "C1"; gradePoint = 6; marksRange = "51 – 60"; remarks = "Above Average"; status = "Pass";
+    } else if (pct >= 41) {
+        grade = "C2"; gradePoint = 5; marksRange = "41 – 50"; remarks = "Average"; status = "Pass";
+    } else if (pct >= 33) {
+        grade = "D"; gradePoint = 4; marksRange = "33 – 40"; remarks = "Pass"; status = "Pass";
+    } else if (pct >= 21) {
+        grade = "E1"; gradePoint = 0; marksRange = "21 – 32"; remarks = "Fail / Essential Repeat"; status = "Fail";
+    } else {
+        grade = "E2"; gradePoint = 0; marksRange = "0 – 20"; remarks = "Fail / Essential Repeat"; status = "Fail";
+    }
+
+    return { grade, gradePoint, marksRange, remarks, status, percentage: pct };
+};
+
 class MarkingPanel {
     constructor(containerElement, options = {}) {
         this.container = containerElement;
@@ -29,8 +73,41 @@ class MarkingPanel {
     }
 
     setEvaluationData(questions, maxMarks, feedback = "", sections = null) {
-        // Parse & normalize sections
-        if (Array.isArray(sections) && sections.length > 0) {
+        // Robust helper to extract accurate section information for each question
+        const getSecMeta = (q, idx) => {
+            const sName = q.section || q.sectionName || "";
+            let sId = q.sectionId;
+            const match = sName.match(/Section\s+([A-Za-z])/i);
+            let letter = match ? match[1].toUpperCase() : null;
+
+            if (!letter && sId && sId.startsWith("sec_")) {
+                letter = sId.replace("sec_", "").slice(0, 1).toUpperCase();
+            }
+
+            if (!letter) {
+                // Infer from question sequence for standard 33 Q paper if needed
+                if (idx < 16) letter = "A";
+                else if (idx < 21) letter = "B";
+                else if (idx < 28) letter = "C";
+                else if (idx < 30) letter = "D";
+                else letter = "E";
+            }
+
+            sId = `sec_${letter.toLowerCase()}`;
+            const finalName = `Section ${letter}`;
+            return { sId, letter, sName: finalName };
+        };
+
+        // Gather unique sections across questions
+        const distinctQSecs = new Map();
+        (questions || []).forEach((q, idx) => {
+            const meta = getSecMeta(q, idx);
+            if (!distinctQSecs.has(meta.sId)) {
+                distinctQSecs.set(meta.sId, meta);
+            }
+        });
+
+        if (Array.isArray(sections) && sections.length > 1 && sections.length >= distinctQSecs.size) {
             this.sections = sections.map((s, idx) => ({
                 id: s.id || `sec_${String.fromCharCode(97 + idx)}`,
                 letter: s.letter || String.fromCharCode(65 + idx),
@@ -42,16 +119,21 @@ class MarkingPanel {
                 hasChoice: !!s.hasChoice,
                 hasSubQuestions: !!s.hasSubQuestions
             }));
+        } else if (window.MockData?.physicsTemplate?.sections && (questions || []).length === 33) {
+            // For 33 Qs Physics Board paper, use the official 5-section blueprint
+            this.sections = JSON.parse(JSON.stringify(window.MockData.physicsTemplate.sections)).map(s => ({
+                ...s,
+                questionCount: Number(s.questionCount) || Number(s.qCount) || 1
+            }));
         } else {
-            // Check if questions have section metadata
+            // Detect from questions
             const detectedSections = new Map();
-            (questions || []).forEach(q => {
-                const sName = q.section || q.sectionName || "Section A";
-                const sId = q.sectionId || "sec_a";
+            (questions || []).forEach((q, idx) => {
+                const { sId, letter, sName } = getSecMeta(q, idx);
                 if (!detectedSections.has(sId)) {
                     detectedSections.set(sId, {
                         id: sId,
-                        letter: sName.replace(/[^A-Za-z]/g, "").slice(-1).toUpperCase() || "A",
+                        letter: letter,
                         name: sName,
                         title: sName,
                         questionCount: 0,
@@ -68,16 +150,20 @@ class MarkingPanel {
                 this.sections = Array.from(detectedSections.values());
             } else {
                 this.sections = [
-                    { id: "sec_a", letter: "A", name: "Section A", title: "General Questions", questionCount: (questions || []).length || 5, marksPerQ: 4, maxMarks: Number(maxMarks) || 20 }
+                    { id: "sec_a", letter: "A", name: "Section A", title: "Section A", questionCount: (questions || []).length || 5, marksPerQ: 1, maxMarks: Number(maxMarks) || 16 }
                 ];
             }
         }
 
         // Parse & normalize questions
         this.questions = (questions || []).map((q, idx) => {
-            const secName = q.section || q.sectionName || (this.sections[0] ? this.sections[0].name : "Section A");
-            const secId = q.sectionId || (this.sections.find(s => s.name === secName)?.id || "sec_a");
-            const maxM = Number(q.maxMarks) !== undefined && !isNaN(Number(q.maxMarks)) ? Number(q.maxMarks) : 2;
+            const meta = getSecMeta(q, idx);
+            const secObj = this.sections.find(s => s.id === meta.sId || s.letter === meta.letter || s.name === meta.sName) 
+                           || this.sections[0] 
+                           || { id: meta.sId, name: meta.sName };
+            const secName = secObj.name;
+            const secId = secObj.id;
+            const maxM = Number(q.maxMarks) !== undefined && !isNaN(Number(q.maxMarks)) ? Number(q.maxMarks) : 1;
 
             // Handle sub-questions
             let subQs = null;
@@ -903,13 +989,10 @@ class MarkingPanel {
 
         const pct = this.maxMarksTotal > 0 ? Math.round((this.obtainedMarksTotal / this.maxMarksTotal) * 100) : 0;
 
-        let grade = "F";
-        if (pct >= 90) grade = "A+";
-        else if (pct >= 80) grade = "A";
-        else if (pct >= 70) grade = "B";
-        else if (pct >= 60) grade = "C";
-        else if (pct >= 50) grade = "D";
-        else grade = "E";
+        const gradeInfo = window.calculateGradeScale 
+            ? window.calculateGradeScale(this.obtainedMarksTotal, this.maxMarksTotal)
+            : { grade: "A1", gradePoint: 10, marksRange: "91 – 100", remarks: "Outstanding", status: "Pass" };
+        const grade = gradeInfo.grade;
 
         let correct = 0;
         let wrong = 0;
@@ -921,60 +1004,66 @@ class MarkingPanel {
             else if (q.status === "partial") partial++;
         });
 
-        // Update score banner DOM
-        const obtEl = this.container.querySelector("#score-obtained-val");
-        const maxEl = this.container.querySelector("#score-max-val");
-        const pctEl = this.container.querySelector("#score-percent-val");
-        const grdEl = this.container.querySelector("#score-grade-val");
-
-        if (obtEl) obtEl.textContent = this.obtainedMarksTotal;
-        if (maxEl) maxEl.textContent = this.maxMarksTotal;
-        if (pctEl) pctEl.textContent = `${pct}%`;
-        if (grdEl) grdEl.textContent = grade;
-
-        const corrEl = this.container.querySelector("#stat-correct-count");
-        const wrgEl = this.container.querySelector("#stat-wrong-count");
-        const partEl = this.container.querySelector("#stat-partial-count");
-
-        if (corrEl) corrEl.textContent = correct;
-        if (wrgEl) wrgEl.textContent = wrong;
-        if (partEl) partEl.textContent = partial;
-
-        // Update section score pills in breakdown
         const secTotals = this.getSectionTotals();
-        secTotals.forEach(st => {
-            const secValEl = this.container.querySelector(`#sec-score-val-${st.id}`);
-            if (secValEl) secValEl.textContent = `${st.obtainedMarks}/${st.maxMarks}M`;
-        });
 
-        // Update compact Q breakdown table
-        const breakdownBody = this.container.querySelector('#q-breakdown-body');
-        if (breakdownBody) {
-            breakdownBody.innerHTML = this.questions.map((q, idx) => {
-                const isActive = idx === this.activeQuestionIndex;
-                const secObj = this.sections.find(s => s.id === q.sectionId || s.name === q.section);
-                const secLetter = secObj ? secObj.letter : (q.section ? q.section.replace(/[^A-Za-z]/g, '').slice(-1).toUpperCase() : 'A');
-                const statusIcon = q.status === 'correct' ? '✓' : q.status === 'wrong' ? '✗' : q.status === 'partial' ? '◑' : '○';
-                return `<div class="q-breakdown-row ${isActive ? 'active-brow' : ''} ${q.status}" data-index="${idx}">
-                    <span class="brow-sec">${secLetter}</span>
-                    <span class="brow-q">Q${q.qNo}</span>
-                    <span class="brow-marks">${statusIcon} ${q.awardedMarks}/${q.maxMarks}</span>
-                </div>`;
-            }).join('');
-            // Re-bind click events on breakdown rows
-            breakdownBody.querySelectorAll('.q-breakdown-row').forEach(row => {
-                row.addEventListener('click', () => {
-                    const idx = Number(row.getAttribute('data-index'));
-                    this.selectQuestion(idx);
-                });
+        // Update DOM if container exists
+        if (this.container) {
+            const obtEl = this.container.querySelector("#score-obtained-val");
+            const maxEl = this.container.querySelector("#score-max-val");
+            const pctEl = this.container.querySelector("#score-percent-val");
+            const grdEl = this.container.querySelector("#score-grade-val");
+
+            if (obtEl) obtEl.textContent = this.obtainedMarksTotal;
+            if (maxEl) maxEl.textContent = this.maxMarksTotal;
+            if (pctEl) pctEl.textContent = `${pct}%`;
+            if (grdEl) {
+                grdEl.textContent = grade;
+                grdEl.title = `Grade: ${grade} | Grade Point: ${gradeInfo.gradePoint} (${gradeInfo.marksRange}) - ${gradeInfo.remarks}`;
+            }
+
+            const corrEl = this.container.querySelector("#stat-correct-count");
+            const wrgEl = this.container.querySelector("#stat-wrong-count");
+            const partEl = this.container.querySelector("#stat-partial-count");
+
+            if (corrEl) corrEl.textContent = correct;
+            if (wrgEl) wrgEl.textContent = wrong;
+            if (partEl) partEl.textContent = partial;
+
+            // Update section score pills in breakdown
+            secTotals.forEach(st => {
+                const secValEl = this.container.querySelector(`#sec-score-val-${st.id}`);
+                if (secValEl) secValEl.textContent = `${st.obtainedMarks}/${st.maxMarks}M`;
             });
-        }
 
-        // Update active question detail total pill
-        const activeQ = this.getActiveQuestion();
-        if (activeQ) {
-            const qTotalPill = this.container.querySelector("#active-q-total-pill");
-            if (qTotalPill) qTotalPill.textContent = `Total: ${activeQ.awardedMarks}/${activeQ.maxMarks}M`;
+            // Update compact Q breakdown table
+            const breakdownBody = this.container.querySelector('#q-breakdown-body');
+            if (breakdownBody) {
+                breakdownBody.innerHTML = this.questions.map((q, idx) => {
+                    const isActive = idx === this.activeQuestionIndex;
+                    const secObj = this.sections.find(s => s.id === q.sectionId || s.name === q.section);
+                    const secLetter = secObj ? secObj.letter : (q.section ? q.section.replace(/[^A-Za-z]/g, '').slice(-1).toUpperCase() : 'A');
+                    const statusIcon = q.status === 'correct' ? '✓' : q.status === 'wrong' ? '✗' : q.status === 'partial' ? '◑' : '○';
+                    return `<div class="q-breakdown-row ${isActive ? 'active-brow' : ''} ${q.status}" data-index="${idx}">
+                        <span class="brow-sec">${secLetter}</span>
+                        <span class="brow-q">Q${q.qNo}</span>
+                        <span class="brow-marks">${statusIcon} ${q.awardedMarks}/${q.maxMarks}</span>
+                    </div>`;
+                }).join('');
+                // Re-bind click events on breakdown rows
+                breakdownBody.querySelectorAll('.q-breakdown-row').forEach(row => {
+                    row.addEventListener('click', () => {
+                        const idx = Number(row.getAttribute('data-index'));
+                        this.selectQuestion(idx);
+                    });
+                });
+            }
+
+            // Update active question detail total pill
+            const activeQ = this.getActiveQuestion();
+            if (activeQ) {
+                const qTotalPill = this.container.querySelector("#active-q-total-pill");
+                if (qTotalPill) qTotalPill.textContent = `Total: ${activeQ.awardedMarks}/${activeQ.maxMarks}M`;
+            }
         }
 
         const summary = {
@@ -982,6 +1071,9 @@ class MarkingPanel {
             maxMarks: this.maxMarksTotal,
             percentage: pct,
             grade: grade,
+            gradePoint: gradeInfo.gradePoint,
+            gradeRange: gradeInfo.marksRange,
+            gradeRemarks: gradeInfo.remarks,
             correctCount: correct,
             wrongCount: wrong,
             partialCount: partial,

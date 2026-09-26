@@ -258,7 +258,7 @@ class DashboardManager {
                     <div class="chart-card">
                         <div class="chart-header">
                             <h4 class="chart-title">Grade Breakdown</h4>
-                            <span class="chart-badge">Grades A+ to F</span>
+                            <span class="chart-badge">Grades A1 to E2</span>
                         </div>
                         <div class="chart-body" style="height: 180px;">
                             <canvas id="chart-grade-dist"></canvas>
@@ -794,11 +794,23 @@ class DashboardManager {
         // 2. Grade Breakdown Doughnut Chart
         const gradeCanvas = document.getElementById("chart-grade-dist");
         if (gradeCanvas) {
-            const grades = { "A+": 0, "A": 0, "B": 0, "C": 0, "D": 0, "E/F": 0 };
+            const grades = { "A1": 0, "A2": 0, "B1": 0, "B2": 0, "C1": 0, "C2": 0, "D": 0, "E1": 0, "E2": 0 };
             this.evaluations.forEach(e => {
-                const g = e.grade || (this.isPaperCorrected(e) ? "B" : "E/F");
-                if (grades[g] !== undefined) grades[g]++;
-                else grades["E/F"]++;
+                let g = e.grade;
+                if (!g && e.obtainedMarks !== undefined && e.maxMarks && window.calculateGradeScale) {
+                    g = window.calculateGradeScale(e.obtainedMarks, e.maxMarks).grade;
+                }
+                if (grades[g] !== undefined) {
+                    grades[g]++;
+                } else if (g === "A+") grades["A1"]++;
+                else if (g === "A") grades["A2"]++;
+                else if (g === "B") grades["B1"]++;
+                else if (g === "C") grades["C1"]++;
+                else if (g === "D") grades["D"]++;
+                else if (g === "E") grades["E1"]++;
+                else if (g === "F" || g === "E/F") grades["E2"]++;
+                else if (this.isPaperCorrected(e)) grades["B1"]++;
+                else grades["E2"]++;
             });
 
             const ctx = gradeCanvas.getContext("2d");
@@ -809,7 +821,7 @@ class DashboardManager {
                     datasets: [{
                         data: Object.values(grades),
                         backgroundColor: [
-                            "#34C759", "#30D158", "#007AFF", "#5856D6", "#FF9500", "#FF3B30"
+                            "#10B981", "#34C759", "#007AFF", "#5856D6", "#3B82F6", "#F59E0B", "#F97316", "#EF4444", "#DC2626"
                         ],
                         borderWidth: 2,
                         borderColor: "#FFFFFF"

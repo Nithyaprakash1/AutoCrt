@@ -71,7 +71,7 @@ class AdminPanelManager {
                             Export Excel Matrix
                         </button>
                     </div>
-                </div>`;
+                </div>
 
                 <!-- Section 1: Subject & Teacher Correction Tracker -->
                 <div style="margin-bottom: 32px;">
@@ -433,7 +433,7 @@ class AdminPanelManager {
                     totalObtained: ev.obtainedMarks || 0,
                     totalMax: ev.maxMarks || 70,
                     percentage: ev.percentage || Math.round(((ev.obtainedMarks || 0) / (ev.maxMarks || 70)) * 100),
-                    grade: ev.grade || (ev.obtainedMarks > 50 ? "A" : "B"),
+                    grade: ev.grade || (window.calculateGradeScale ? window.calculateGradeScale(ev.obtainedMarks || 0, ev.maxMarks || 70).grade : "B1"),
                     status: ev.status || "Pending"
                 });
             }

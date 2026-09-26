@@ -919,6 +919,25 @@ class AppController {
             evaluation.sections = window.MockData.physicsTemplate.sections || evaluation.sections || [];
         }
 
+        // Ensure 33 Qs Physics Board paper has full 5-section separation (Sections A to E)
+        if (evaluation.questions && evaluation.questions.length === 33 && window.MockData && window.MockData.physicsTemplate) {
+            const hasMissingSections = !evaluation.sections || evaluation.sections.length <= 1;
+            const hasCollapsedSectionIds = evaluation.questions.some((q, idx) => idx >= 16 && (!q.sectionId || q.sectionId === "sec_a"));
+            if (hasMissingSections || hasCollapsedSectionIds) {
+                evaluation.sections = JSON.parse(JSON.stringify(window.MockData.physicsTemplate.sections));
+                evaluation.maxMarks = 70;
+                evaluation.questions.forEach((q, idx) => {
+                    const templateQ = window.MockData.physicsTemplate.questions[idx];
+                    if (templateQ) {
+                        q.section = templateQ.section;
+                        q.sectionId = templateQ.sectionId;
+                        q.maxMarks = templateQ.maxMarks;
+                        if (!q.topic) q.topic = templateQ.topic;
+                    }
+                });
+            }
+        }
+
         this.activeEvaluation = evaluation;
         this.switchView("workspace");
 
@@ -1123,7 +1142,9 @@ class AppController {
 
         const totalMax = evalData.maxMarks || this.markingPanel.maxMarksTotal || 70;
         const totalObtained = evalData.obtainedMarks !== undefined ? evalData.obtainedMarks : (this.markingPanel.obtainedMarksTotal || 0);
-        const pct = Math.round((totalObtained / totalMax) * 1000) / 10;
+        const gradeInfo = window.calculateGradeScale 
+            ? window.calculateGradeScale(totalObtained, totalMax)
+            : { grade: evalData.grade || "A1", gradePoint: 10, marksRange: "91 – 100", remarks: "Outstanding" };
 
         tableHtml += `
                 </tbody>
@@ -1132,7 +1153,7 @@ class AppController {
                         <td colspan="3" class="foot-title">TOTAL EVALUATION SCORECARD SUMMARY</td>
                         <td class="foot-allotted">${totalMax} Marks</td>
                         <td class="foot-obtained">${totalObtained} Marks</td>
-                        <td class="foot-pct">${pct}% (Grade: ${evalData.grade || 'A'})</td>
+                        <td class="foot-pct">Grade: ${gradeInfo.grade} (GP: ${gradeInfo.gradePoint})</td>
                     </tr>
                 </tfoot>
             </table>

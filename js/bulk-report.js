@@ -435,13 +435,16 @@ class BulkReportManager {
             row.push(ev.obtainedMarks || 0);
             row.push(ev.maxMarks || 0);
             row.push(`${ev.percentage || 0}%`);
-            row.push(ev.grade || "--");
+            const gradeInfo = window.calculateGradeScale 
+                ? window.calculateGradeScale(ev.obtainedMarks, ev.maxMarks) 
+                : { grade: ev.grade || "--" };
+            row.push(ev.grade || gradeInfo.grade);
             return row;
         });
 
-        // Compute class aggregate stats
+        // Compute class aggregate stats (Passing threshold >= 33% as per official scale)
         const avgScore = Math.round(selected.reduce((s, e) => s + (e.obtainedMarks || 0), 0) / selected.length);
-        const passCount = selected.filter(e => (e.percentage || 0) >= 50).length;
+        const passCount = selected.filter(e => (e.percentage || 0) >= 33).length;
         const passRate = Math.round((passCount / selected.length) * 100);
 
         const examTitle = selected[0]?.examName || "Consolidated Examination Report";

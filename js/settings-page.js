@@ -44,7 +44,7 @@ class SettingsPageManager {
                     storageBucket: ""
                 },
                 preferences: {
-                    passingPercentage: 40,
+                    passingPercentage: 33,
                     quickMarkRange: 10,
                     autosaveInterval: 10
                 }
@@ -52,7 +52,7 @@ class SettingsPageManager {
         }
         if (!this.settings.preferences) {
             this.settings.preferences = {
-                passingPercentage: 40,
+                passingPercentage: 33,
                 quickMarkRange: 10,
                 autosaveInterval: 10
             };

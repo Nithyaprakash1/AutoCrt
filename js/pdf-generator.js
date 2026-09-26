@@ -365,21 +365,21 @@ class PDFGenerator {
 
         currentY += 44;
 
-        // Question Marks Table
+        // Question Marks Table - Clean format without individual question %
         const questions = evaluation.questions || [];
         const tableBody = questions.map((q, idx) => {
             const max = Number(q.maxMarks) || 0;
             const awarded = Number(q.awardedMarks) || 0;
-            const pct = max > 0 ? Math.round((awarded / max) * 100) : 0;
+            const sec = q.section || (q.sectionId ? q.sectionId.replace("sec_", "Section ").toUpperCase() : "Section A");
             let status = "Full Marks";
-            if (awarded === 0) status = "Incorrect (0)";
+            if (awarded === 0) status = "0 Marks";
             else if (awarded < max) status = "Partial";
 
             return [
-                `Question ${q.qNo !== undefined ? q.qNo : idx + 1}`,
+                `Q${q.qNo !== undefined ? q.qNo : idx + 1}`,
+                sec,
                 `${max}`,
                 `${awarded}`,
-                `${pct}%`,
                 status
             ];
         });
@@ -389,7 +389,7 @@ class PDFGenerator {
             doc.autoTable({
                 startY: currentY,
                 margin: { left: margin, right: margin },
-                head: [["Question", "Max Marks", "Marks Obtained", "Percentage", "Remarks"]],
+                head: [["Q.No", "Section", "Max Marks", "Marks Obtained", "Status"]],
                 body: tableBody,
                 theme: "striped",
                 headStyles: {
@@ -400,10 +400,10 @@ class PDFGenerator {
                     halign: "center"
                 },
                 columnStyles: {
-                    0: { halign: "left" },
-                    1: { halign: "center" },
-                    2: { halign: "center", fontStyle: "normal" },
-                    3: { halign: "center" },
+                    0: { halign: "center", cellWidth: 20 },
+                    1: { halign: "center", cellWidth: 32 },
+                    2: { halign: "center", cellWidth: 28 },
+                    3: { halign: "center", cellWidth: 35, fontStyle: "normal" },
                     4: { halign: "center" }
                 },
                 styles: {
@@ -415,28 +415,36 @@ class PDFGenerator {
             currentY = doc.lastAutoTable.finalY + 10;
         }
 
-        // Total Score Banner Card
+        // Official Total Score & Grade Banner Card (Total Marks + Grade + Grade Point)
+        const gradeInfo = (window.calculateGradeScale 
+            ? window.calculateGradeScale(evaluation.obtainedMarks, evaluation.maxMarks)
+            : null) || { grade: evaluation.grade || "A1", gradePoint: 10, marksRange: "91 – 100", remarks: "Pass", status: "Pass" };
+
         doc.setFillColor(240, 253, 244); // #F0FDF4 emerald-50
         doc.setDrawColor(16, 185, 129);
         doc.setLineWidth(0.6);
         doc.roundedRect(margin, currentY, pageWidth - margin * 2, 28, 3, 3, "FD");
 
         doc.setTextColor(6, 78, 59);
-        doc.setFontSize(11);
-        doc.setFont("helvetica", "normal");
-        doc.text("TOTAL MARKS OBTAINED:", margin + 8, currentY + 11);
-
-        doc.setFontSize(16);
-        doc.text(`${evaluation.obtainedMarks || 0} / ${evaluation.maxMarks || 0}`, margin + 8, currentY + 22);
-
-        doc.setFontSize(11);
-        doc.text(`PERCENTAGE: ${evaluation.percentage || 0}%`, margin + 80, currentY + 14);
-        doc.text(`FINAL GRADE: ${evaluation.grade || "--"}`, margin + 80, currentY + 22);
-
         doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(`Correct: ${evaluation.correctCount || 0}`, margin + 140, currentY + 14);
-        doc.text(`Wrong: ${evaluation.wrongCount || 0}`, margin + 140, currentY + 22);
+        doc.text("TOTAL MARKS:", margin + 8, currentY + 11);
+
+        doc.setFontSize(18);
+        doc.text(`${evaluation.obtainedMarks !== undefined ? evaluation.obtainedMarks : 0} / ${evaluation.maxMarks || 70}`, margin + 8, currentY + 22);
+
+        doc.setFontSize(12);
+        doc.text(`GRADE: ${gradeInfo.grade}`, margin + 75, currentY + 13);
+        doc.setFontSize(9.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`Grade Point: ${gradeInfo.gradePoint}  (${gradeInfo.marksRange})`, margin + 75, currentY + 22);
+
+        doc.setFontSize(10.5);
+        doc.setTextColor(6, 78, 59);
+        doc.text(`Result: ${gradeInfo.status}`, margin + 145, currentY + 13);
+        doc.setFontSize(9);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`${gradeInfo.remarks}`, margin + 145, currentY + 22);
 
         currentY += 36;
 
