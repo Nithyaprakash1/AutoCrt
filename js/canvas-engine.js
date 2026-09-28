@@ -151,7 +151,7 @@ class CanvasEngine {
     }
 
     /**
-     * Universally fetch PDF bytes from Base64 Data URL, Local Proxy, Direct Fetch, or Public CORS Proxies
+     * Universally fetch PDF bytes from Base64 Data URL, Direct Fetch (native CORS), or Local Proxy
      */
     static async fetchPdfBytes(url) {
         if (!url || typeof url !== "string") return null;
@@ -172,26 +172,19 @@ class CanvasEngine {
             }
         }
 
-        // 2. HTTP/HTTPS URL: Multi-channel candidate URLs
-        const candidates = [];
+        // 2. HTTP/HTTPS URL:
+        // Priority 1: Direct Fetch (works natively across all origins with bucket CORS configured)
+        // Priority 2: Local Node proxy if available
+        const candidates = [url];
 
-        // Check if served from local node server (e.g., http://127.0.0.1:8000 or localhost)
         const isLocalHost = typeof window !== "undefined" && window.location && (
             window.location.hostname === "127.0.0.1" || 
             window.location.hostname === "localhost" ||
             window.location.port === "8000"
         );
-
         if (isLocalHost) {
             candidates.push(`/proxy?url=${encodeURIComponent(url)}`);
         }
-
-        // Direct fetch
-        candidates.push(url);
-
-        // High-availability CORS Proxies (for GitHub Pages / static deployments)
-        candidates.push(`https://corsproxy.io/?${encodeURIComponent(url)}`);
-        candidates.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
 
         for (const targetUrl of candidates) {
             try {
@@ -199,11 +192,17 @@ class CanvasEngine {
                 if (resp.ok) {
                     const buf = await resp.arrayBuffer();
                     if (buf && buf.byteLength > 100) {
-                        return new Uint8Array(buf);
+                        const uint8 = new Uint8Array(buf);
+                        // Validate PDF signature: %PDF (0x25, 0x50, 0x44, 0x46)
+                        if (uint8[0] === 0x25 && uint8[1] === 0x50 && uint8[2] === 0x44 && uint8[3] === 0x46) {
+                            return uint8;
+                        } else {
+                            console.warn("Fetched response was not a valid PDF binary (%PDF signature missing) from", targetUrl);
+                        }
                     }
                 }
             } catch (err) {
-                // Try next candidate in pipeline
+                // Try next candidate
             }
         }
 

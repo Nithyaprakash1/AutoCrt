@@ -90,6 +90,6 @@ const server = http.createServer((req, res) => {
     });
 });
 
-server.listen(PORT, '127.0.0.1', () => {
-    console.log(`Niprak OSM Digital Correction Server running at http://127.0.0.1:${PORT}/`);
+server.listen(PORT, '0.0.0.0', () => {
+    console.log(`Niprak OSM Digital Correction Server running at http://0.0.0.0:${PORT}/ (Accessible locally and across LAN)`);
 });
