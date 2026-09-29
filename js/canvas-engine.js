@@ -1540,8 +1540,7 @@ class CanvasEngine {
         // When mark is 0, show "wrong" (X mark) not "tick"
         const stampType = isZero ? "wrong" : "tick";
 
-        // Stamp tick or X cross in red ink
-        // X means wrong on that line/step; purely visual, no mark badge, no margin total mark
+        // Stamp tick or X cross in red ink with marks badge
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
@@ -1549,27 +1548,29 @@ class CanvasEngine {
             x: normPos.x,
             y: normPos.y,
             color: "#DC2626", // Teacher Red Ink
-            marks: isZero ? "" : val,
+            marks: val,
             qNo: qInfo.qNo || 1,
             qLabel: qInfo.label || `Q${qInfo.qNo || 1}`,
-            isStep: isZero ? true : !!isStep,
-            hasMarginMark: isFull, // Only full marks stamp margin mark! NEVER zero
+            isStep: !!isStep,
+            hasMarginMark: isFull || isZero,
             scale: 1.0,
             timestamp: Date.now()
         };
 
         this.addAnnotation(stamp);
 
-        // If awarding full marks, stamp right margin question mark; NO margin mark for zero/wrong ("no need for mark total")
+        // If awarding full marks, stamp right margin question mark; if 0, stamp question mark label (e.g. Q1: 0M) as like before
         if (isFull) {
             this.stampRightMarginMark(qInfo.qNo || qInfo.label, val, normPos.y);
+        } else if (isZero) {
+            this.stampRightMarginMark(qInfo.qNo || qInfo.label, 0, normPos.y);
         }
 
         this.renderOverlay();
 
         // Callback to app / marking panel to calculate and update totals
         if (this.options.onRadialMarkAwarded) {
-            this.options.onRadialMarkAwarded(val, isZero ? true : !!isStep, normPos);
+            this.options.onRadialMarkAwarded(val, !!isStep, normPos);
         }
     }
 

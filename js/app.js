@@ -1209,18 +1209,19 @@ class AppController {
                     x: stampPos.x,
                     y: stampPos.y,
                     color: "#DC2626", // Teacher Red Ink
-                    marks: "",
+                    marks: 0,
                     qNo: q.qNo,
                     qLabel: q.label || `Q${q.qNo}`,
-                    isStep: true,
-                    hasMarginMark: false,
+                    isStep: false,
+                    hasMarginMark: true,
                     scale: 1.0,
                     timestamp: Date.now()
                 };
                 this.canvasEngine.addAnnotation(wrongStamp);
             }
 
-            // NO margin mark total! "no need for the mark total ok"
+            // Stamp question mark label on margin (e.g. Q1: 0M) as like before
+            this.canvasEngine.stampRightMarginMark(q.qNo, 0, stampPos.y);
             this.canvasEngine.renderOverlay();
         }
 
@@ -1251,13 +1252,14 @@ class AppController {
             questions.forEach((q, idx) => {
                 const annTotal = this.canvasEngine.getQuestionTotalFromAnnotations(q.qNo);
                 const annList = this.canvasEngine.getAnnotationsForQuestion(q.qNo);
-                const hasScoreAnnotations = annList.length > 0 && annTotal > 0;
+                const hasMarginMark = annList.some(a => a.type === "margin_mark" || a.type === "left_mark");
+                const hasScoreAnnotations = hasMarginMark || (annList.length > 0 && annTotal > 0);
 
                 if (hasScoreAnnotations) {
                     const clamped = Math.min(q.maxMarks, Math.max(0, annTotal));
                     if (q.awardedMarks !== clamped || q.status === "unmarked") {
                         if (this.markingPanel) {
-                            this.markingPanel.assignQuestionMarkDirect(idx, clamped);
+                            this.markingPanel.assignQuestionMarkDirect(idx, clamped, clamped === 0 ? "wrong" : (clamped === q.maxMarks ? "correct" : "partial"));
                         } else {
                             q.awardedMarks = clamped;
                             if (clamped === q.maxMarks) q.status = "correct";
@@ -1431,13 +1433,9 @@ class AppController {
             onRadialMarkAwarded: (markVal, isStep, normPos) => {
                 const q = this.markingPanel?.getActiveQuestion();
                 if (Number(markVal) === 0) {
-                    // X / 0 is a step mark of 0 (wrong step indicator)
-                    // "x means wrong ok but dont give the mark hence it can be a step mark 0 right so x means just wrong no need for the mark total ok"
-                    // Do NOT overwrite question total marks or force question to 0!
-                    this.showToast(`Marked step as Wrong (✗) for ${q ? q.label : 'question'}`);
-                    return;
-                }
-                if (isStep) {
+                    // In round mark dial selecting 0 awards 0 marks to that question and sets status to "wrong"
+                    this.markingPanel?.setActiveQuestionMark(0, "wrong");
+                } else if (isStep) {
                     this.markingPanel?.addStepMark(markVal);
                 } else {
                     if (q && markVal >= q.maxMarks) {
@@ -1449,7 +1447,7 @@ class AppController {
                 const activeQ = this.markingPanel?.getActiveQuestion();
                 if (activeQ) this.updateTopHud(activeQ);
                 this.updatePageTotalDisplay();
-                const markDesc = isStep ? `+${markVal} Step Mark` : `${markVal} Marks`;
+                const markDesc = Number(markVal) === 0 ? `0 Marks (Wrong)` : (isStep ? `+${markVal} Step Mark` : `${markVal} Marks`);
                 this.showToast(`Awarded ${markDesc} to ${activeQ ? activeQ.label : 'question'}`);
             }
         });
