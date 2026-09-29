@@ -631,10 +631,14 @@ class CanvasEngine {
                 break;
 
             case "margin_mark": {
-                const markW = ((String(ann.marks || "").length * 10 + 26) * scale) / w;
-                const markH = (28 * scale) / h;
-                minX = ann.x - markW / 2;
-                maxX = ann.x + markW / 2;
+                const markVal = ann.marks !== undefined ? ann.marks : (ann.text || "");
+                const qLabel = ann.qLabel || (ann.qNo ? `Q${ann.qNo}` : "");
+                const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
+                const markW = ((scoreText.length * 8 + 14) * scale) / w;
+                const markH = (21 * scale) / h;
+                const markX = (ann.x > 0.5 ? 0.08 : (ann.x || 0.08));
+                minX = markX - markW / 2;
+                maxX = markX + markW / 2;
                 minY = ann.y - markH / 2;
                 maxY = ann.y + markH / 2;
                 break;
@@ -2261,36 +2265,37 @@ class CanvasEngine {
                 ctx.fillText(markText, x, y);
                 break;
 
-            case "margin_mark": {
-                // Question Total Mark Stamp - ONLY ON THE LEFT SIDE, BIGGER & PROMINENT
+            case "margin_mark":
+            case "left_mark": {
+                // Question Total Mark Stamp - ONLY ON THE LEFT SIDE, COMPACT & NEAT
                 const markVal = ann.marks !== undefined ? ann.marks : (ann.text || "");
                 const qLabel = ann.qLabel || (ann.qNo ? `Q${ann.qNo}` : "");
                 const col = ann.color || "#DC2626"; // Teacher Red Ink
 
                 const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
-                const numFontSize = Math.max(18, Math.round(22 * effScale));
+                const numFontSize = Math.max(12, Math.round(14 * effScale));
 
-                ctx.font = `400 ${numFontSize}px system-ui, -apple-system, sans-serif`;
+                ctx.font = `600 ${numFontSize}px system-ui, -apple-system, sans-serif`;
                 const textMetrics = ctx.measureText(scoreText);
-                const bPadX = 10 * effScale;
-                const bPadY = 6 * effScale;
+                const bPadX = 7 * effScale;
+                const bPadY = 3.5 * effScale;
                 const bW = textMetrics.width + bPadX * 2;
                 const bH = numFontSize + bPadY * 2;
 
                 // Ensure question total stamp renders on the LEFT margin (0.08)
                 const markX = (ann.x > 0.5 ? 0.08 : (ann.x || 0.08)) * canvasW;
 
-                // High visibility pill badge on left margin of paper sheet
-                ctx.shadowColor = "rgba(220, 38, 38, 0.18)";
-                ctx.shadowBlur = 8 * effScale;
-                ctx.shadowOffsetY = 2 * effScale;
+                // Neat pill badge on left margin of paper sheet
+                ctx.shadowColor = "rgba(220, 38, 38, 0.14)";
+                ctx.shadowBlur = 4 * effScale;
+                ctx.shadowOffsetY = 1 * effScale;
                 ctx.fillStyle = "#FFFFFF";
                 ctx.beginPath();
                 ctx.roundRect(markX - bW / 2, y - bH / 2, bW, bH, [bH / 2]);
                 ctx.fill();
 
                 ctx.shadowColor = "transparent";
-                ctx.lineWidth = 2.2 * effScale;
+                ctx.lineWidth = 1.5 * effScale;
                 ctx.strokeStyle = col;
                 ctx.stroke();
 
@@ -2314,10 +2319,6 @@ class CanvasEngine {
                     }
                     ctx.stroke();
                 }
-                break;
-
-            case "left_mark":
-                // Left margin question total stamps disabled - question total is kept ONLY on the right side
                 break;
         }
 

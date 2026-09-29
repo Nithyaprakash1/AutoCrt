@@ -1123,15 +1123,37 @@ class AppController {
                         this.canvasEngine.setMarksValue(mark > 0 ? `+${mark}` : "0");
                     }
                     const activeQ = this.markingPanel?.getActiveQuestion();
-                    if (activeQ) this.updateTopHud(activeQ);
-                    this.updatePageTotalDisplay();
+                    if (activeQ) {
+                        this.updateTopHud(activeQ);
+                        this.updatePageTotalDisplay();
+                        if (activeQ.awardedMarks >= activeQ.maxMarks) {
+                            setTimeout(() => {
+                                const moved = this.markingPanel?.nextQuestion();
+                                if (moved) {
+                                    const nextQ = this.markingPanel?.getActiveQuestion();
+                                    if (nextQ) {
+                                        this.updateTopHud(nextQ);
+                                        this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
+                                    }
+                                }
+                            }, 280);
+                        }
+                    } else {
+                        this.updatePageTotalDisplay();
+                    }
                 });
             });
         }
     }
 
     awardFullMarksWithMarginStamp(targetQ = null) {
-        const q = targetQ || this.markingPanel?.getActiveQuestion();
+        if (targetQ && this.markingPanel) {
+            const idx = this.markingPanel.questions.findIndex(item => item === targetQ || item.id === targetQ.id || item.qNo === targetQ.qNo);
+            if (idx >= 0 && idx !== this.markingPanel.activeQuestionIndex) {
+                this.markingPanel.selectQuestion(idx);
+            }
+        }
+        const q = this.markingPanel?.getActiveQuestion() || targetQ;
         if (!q) return;
 
         const maxMarks = Number(q.maxMarks) || 0;
@@ -1159,6 +1181,8 @@ class AppController {
                     y: stampPos.y,
                     color: "#DC2626", // Teacher Red Ink
                     marks: maxMarks,
+                    qNo: q.qNo,
+                    qLabel: q.label || `Q${q.qNo}`,
                     isStep: false,
                     hasMarginMark: true,
                     scale: 1.0,
@@ -1177,10 +1201,22 @@ class AppController {
         this.updatePageTotalDisplay();
 
         // 5. User feedback
-        this.showToast(`[F Shortcut] Full Marks (${maxMarks}M) awarded to Q${q.qNo} with left-margin stamp!`);
+        this.showToast(`[Full Marks] Awarded (${maxMarks}M) to Q${q.qNo} with left-margin stamp!`);
 
         this.hasUnsavedChanges = true;
         this.setAutosaveBadge("saving");
+
+        // 6. Auto-advance to next question if full marks added
+        setTimeout(() => {
+            const moved = this.markingPanel?.nextQuestion();
+            if (moved) {
+                const nextQ = this.markingPanel?.getActiveQuestion();
+                if (nextQ) {
+                    this.updateTopHud(nextQ);
+                    this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
+                }
+            }
+        }, 280);
     }
 
     awardZeroMarks(targetQ = null, explicitPos = null) {
@@ -1432,16 +1468,26 @@ class AppController {
             },
             onRadialMarkAwarded: (markVal, isStep, normPos) => {
                 const q = this.markingPanel?.getActiveQuestion();
+                let awardedFull = false;
                 if (Number(markVal) === 0) {
                     // In round mark dial selecting 0 awards 0 marks to that question and sets status to "wrong"
                     this.markingPanel?.setActiveQuestionMark(0, "wrong");
                 } else if (isStep) {
                     this.markingPanel?.addStepMark(markVal);
+                    const updatedQ = this.markingPanel?.getActiveQuestion();
+                    if (updatedQ && updatedQ.awardedMarks >= updatedQ.maxMarks) {
+                        awardedFull = true;
+                    }
                 } else {
                     if (q && markVal >= q.maxMarks) {
                         this.markingPanel?.setActiveQuestionMark(q.maxMarks, "correct");
+                        awardedFull = true;
                     } else {
                         this.markingPanel?.addMarkToActiveQuestion(markVal);
+                        const updatedQ = this.markingPanel?.getActiveQuestion();
+                        if (updatedQ && updatedQ.awardedMarks >= updatedQ.maxMarks) {
+                            awardedFull = true;
+                        }
                     }
                 }
                 const activeQ = this.markingPanel?.getActiveQuestion();
@@ -1449,6 +1495,20 @@ class AppController {
                 this.updatePageTotalDisplay();
                 const markDesc = Number(markVal) === 0 ? `0 Marks (Wrong)` : (isStep ? `+${markVal} Step Mark` : `${markVal} Marks`);
                 this.showToast(`Awarded ${markDesc} to ${activeQ ? activeQ.label : 'question'}`);
+
+                // Auto-advance to next question when full mark is added
+                if (awardedFull) {
+                    setTimeout(() => {
+                        const moved = this.markingPanel?.nextQuestion();
+                        if (moved) {
+                            const nextQ = this.markingPanel?.getActiveQuestion();
+                            if (nextQ) {
+                                this.updateTopHud(nextQ);
+                                this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
+                            }
+                        }
+                    }, 280);
+                }
             }
         });
 
@@ -1851,7 +1911,22 @@ class AppController {
                     this.canvasEngine.setMarksValue(val > 0 ? `+${val}` : "0");
                 }
                 const activeQ = this.markingPanel?.getActiveQuestion();
-                if (activeQ) this.updateTopHud(activeQ);
+                if (activeQ) {
+                    this.updateTopHud(activeQ);
+                    this.updatePageTotalDisplay();
+                    if (activeQ.awardedMarks >= activeQ.maxMarks) {
+                        setTimeout(() => {
+                            const moved = this.markingPanel?.nextQuestion();
+                            if (moved) {
+                                const nextQ = this.markingPanel?.getActiveQuestion();
+                                if (nextQ) {
+                                    this.updateTopHud(nextQ);
+                                    this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
+                                }
+                            }
+                        }, 280);
+                    }
+                }
             });
         });
 
@@ -2051,8 +2126,22 @@ class AppController {
                     this.canvasEngine.setMarksValue(mark > 0 ? `+${mark}` : "0");
                 }
                 const activeQ = this.markingPanel?.getActiveQuestion();
-                if (activeQ) this.updateTopHud(activeQ);
-                this.updatePageTotalDisplay();
+                if (activeQ) {
+                    this.updateTopHud(activeQ);
+                    this.updatePageTotalDisplay();
+                    if (activeQ.awardedMarks >= activeQ.maxMarks) {
+                        setTimeout(() => {
+                            const moved = this.markingPanel?.nextQuestion();
+                            if (moved) {
+                                const nextQ = this.markingPanel?.getActiveQuestion();
+                                if (nextQ) {
+                                    this.updateTopHud(nextQ);
+                                    this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
+                                }
+                            }
+                        }, 280);
+                    }
+                }
             }
         });
     }
