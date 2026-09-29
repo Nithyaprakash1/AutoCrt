@@ -26,7 +26,7 @@ class BulkReportManager {
         const exams = [...new Set(this.evaluations.map(e => e.examName).filter(Boolean))];
         const classes = [...new Set(this.evaluations.map(e => e.class).filter(Boolean))];
         const sections = [...new Set(this.evaluations.map(e => e.section).filter(Boolean))];
-        const subjects = [...new Set(this.evaluations.map(e => e.subject).filter(Boolean))];
+        const subjects = [...new Set(["Physics", "English", ...this.evaluations.map(e => e.subject).filter(Boolean)])];
 
         const ic = window.Icons || {};
 

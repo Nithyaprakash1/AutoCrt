@@ -489,6 +489,17 @@ class StorageService {
             } catch (e) {}
         }
 
+        // If local record lacks cloud PDF storage URL, fetch latest record from Firebase
+        if (evalObj && !evalObj.pdfStorageUrl && !evalObj.pdfDataUrl && (!evalObj.pages || evalObj.pages.length <= 1) && window.firebaseManager) {
+            try {
+                const cloudObj = await window.firebaseManager.getEvaluationById(targetId);
+                if (cloudObj && cloudObj.pdfStorageUrl) {
+                    evalObj = Object.assign({}, evalObj, cloudObj);
+                    this._saveEvaluationToIndexedDB(evalObj);
+                }
+            } catch (e) {}
+        }
+
         if (evalObj) {
             const draft = this.getDraft(id);
             if (draft) {

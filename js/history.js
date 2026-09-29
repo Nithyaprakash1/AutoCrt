@@ -101,7 +101,7 @@ class EvaluationHistoryManager {
         }
 
         if (subjSelect) {
-            const subjects = [...new Set(this.evaluations.map(e => e.subject).filter(Boolean))];
+            const subjects = [...new Set(["Physics", "English", ...this.evaluations.map(e => e.subject).filter(Boolean)])];
             subjects.forEach(s => {
                 const opt = document.createElement("option");
                 opt.value = s;

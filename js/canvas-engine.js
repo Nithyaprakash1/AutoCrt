@@ -231,7 +231,17 @@ class CanvasEngine {
                     this.pdfDoc = await loadingTask.promise;
                 }
             } catch (e) {
-                console.warn("Could not load PDF document in setPages:", e);
+                console.warn("Could not load PDF document via bytes in setPages:", e);
+            }
+
+            // Direct URL streaming fallback in case fetchPdfBytes failed or was intercepted
+            if (!this.pdfDoc && typeof firstPage === "string" && (firstPage.startsWith("http://") || firstPage.startsWith("https://"))) {
+                try {
+                    const loadingTask = window.pdfjsLib.getDocument({ url: firstPage, withCredentials: false });
+                    this.pdfDoc = await loadingTask.promise;
+                } catch (urlErr) {
+                    console.warn("Direct URL streaming with pdfjsLib failed:", urlErr);
+                }
             }
         }
 
@@ -1530,36 +1540,36 @@ class CanvasEngine {
         // When mark is 0, show "wrong" (X mark) not "tick"
         const stampType = isZero ? "wrong" : "tick";
 
-        // Stamp tick or X cross in red ink with marks badge
+        // Stamp tick or X cross in red ink
+        // X means wrong on that line/step; purely visual, no mark badge, no margin total mark
         const stamp = {
+            id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
             type: stampType,
             x: normPos.x,
             y: normPos.y,
             color: "#DC2626", // Teacher Red Ink
-            marks: val,
+            marks: isZero ? "" : val,
             qNo: qInfo.qNo || 1,
             qLabel: qInfo.label || `Q${qInfo.qNo || 1}`,
-            isStep: !!isStep,
-            hasMarginMark: isFull || isZero,
+            isStep: isZero ? true : !!isStep,
+            hasMarginMark: isFull, // Only full marks stamp margin mark! NEVER zero
             scale: 1.0,
             timestamp: Date.now()
         };
 
         this.addAnnotation(stamp);
 
-        // If awarding full marks, stamp right margin question mark; if 0, stamp 0
+        // If awarding full marks, stamp right margin question mark; NO margin mark for zero/wrong ("no need for mark total")
         if (isFull) {
             this.stampRightMarginMark(qInfo.qNo || qInfo.label, val, normPos.y);
-        } else if (isZero) {
-            this.stampRightMarginMark(qInfo.qNo || qInfo.label, 0, normPos.y);
         }
 
         this.renderOverlay();
 
         // Callback to app / marking panel to calculate and update totals
         if (this.options.onRadialMarkAwarded) {
-            this.options.onRadialMarkAwarded(val, !!isStep, normPos);
+            this.options.onRadialMarkAwarded(val, isZero ? true : !!isStep, normPos);
         }
     }
 
@@ -1643,11 +1653,12 @@ class CanvasEngine {
 
     placeStamp(type, pos) {
         const stamp = {
+            id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
             type: type,
             x: pos.x,
             y: pos.y,
-            color: this.currentColor,
+            color: (type === "wrong") ? "#DC2626" : (this.currentColor || "#007AFF"),
             scale: 1.0,
             timestamp: Date.now()
         };
@@ -1885,6 +1896,8 @@ class CanvasEngine {
         const result = [];
         this.pages.forEach(page => {
             (page.annotations || []).forEach(a => {
+                // "wrong" (X mark) is purely a visual mistake/step-zero indicator, not score-bearing
+                if (a.type === "wrong") return;
                 if (this.normalizeQKey(a.qNo || a.qLabel) === targetKey) {
                     result.push(a);
                 }

@@ -148,6 +148,22 @@ class FirebaseManager {
         }
     }
 
+    // Firebase Auth: Send Password Reset Email
+    async sendPasswordReset(email) {
+        if (!email) return { success: false, error: "Email is required." };
+        const cleanEmail = email.trim().toLowerCase();
+        if (this.auth) {
+            try {
+                await this.auth.sendPasswordResetEmail(cleanEmail);
+                return { success: true };
+            } catch (err) {
+                console.warn("Firebase Auth Password Reset Error:", err);
+                return { success: false, error: err.message, code: err.code };
+            }
+        }
+        return { success: true, isLocal: true };
+    }
+
     // Firebase Auth: Create Teacher / Evaluator Account with Email & Password
     // Uses secondary Firebase App so current admin session is NOT signed out!
     async createTeacherAccount(teacherData) {

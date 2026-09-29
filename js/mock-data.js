@@ -128,6 +128,77 @@ const MockData = {
         ]
     },
 
+    // Official English Core Board Paper Template (13 Qs / 80 Marks)
+    englishTemplate: {
+        id: "eng-core-cbse-80",
+        name: "English Core Board Paper (13 Qs / 80 Marks)",
+        examName: "Annual English Core Board Assessment 2026",
+        subject: "English",
+        maxMarks: 80,
+        duration: "3 Hours",
+        badge: "Official CBSE Blueprint",
+        generalInstructions: [
+            "This question paper contains 13 questions. All questions are compulsory.",
+            "This question paper is divided into three sections – Section A (Reading Skills), Section B (Creative Writing Skills), and Section C (Literature).",
+            "In Section A – Questions no. 1 and 2 are unseen passage-based reading comprehension questions. Question no. 1 carries 12 marks. Question no. 2 carries 10 marks.",
+            "In Section B – Questions no. 3 to 6 are creative writing tasks. Internal choices are provided for all questions. Questions no. 3 and 4 are short writing tasks (Notice, Invitation/Reply) carrying 4 marks each. Questions no. 5 and 6 are long writing tasks (Letter Writing, Article/Report Writing) carrying 5 marks each.",
+            "In Section C – Questions no. 7 to 13 are literature-based questions. Questions no. 7, 8, and 9 are extract-based questions carrying 6, 4, and 6 marks respectively. Questions no. 10 and 11 are short answer type questions carrying 2 marks each (Question no. 10: 5 out of 6 to be attempted; Question no. 11: 2 out of 3 to be attempted). Questions no. 12 and 13 are long answer type questions carrying 5 marks each."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A (Reading Skills – 22 Marks)",
+                qStartNo: 1,
+                qEndNo: 2,
+                qCount: 2,
+                maxMarks: 22,
+                secTotal: 22,
+                description: "Reading Skills"
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B (Creative Writing Skills – 18 Marks)",
+                qStartNo: 3,
+                qEndNo: 6,
+                qCount: 4,
+                maxMarks: 18,
+                secTotal: 18,
+                description: "Creative Writing Skills"
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C (Literature – 40 Marks)",
+                qStartNo: 7,
+                qEndNo: 13,
+                qCount: 7,
+                maxMarks: 40,
+                secTotal: 40,
+                description: "Literature"
+            }
+        ],
+        questions: [
+            { id: "eng_q1", qNo: 1, qNumber: "Q1", label: "Q1", maxMarks: 12, section: "Section A (Reading Skills – 22 Marks)", sectionId: "sec_a", topic: "Unseen Passage (12 Marks)" },
+            { id: "eng_q2", qNo: 2, qNumber: "Q2", label: "Q2", maxMarks: 10, section: "Section A (Reading Skills – 22 Marks)", sectionId: "sec_a", topic: "Case-Based Unseen Passage (10 Marks)" },
+            { id: "eng_q3", qNo: 3, qNumber: "Q3", label: "Q3", maxMarks: 4, section: "Section B (Creative Writing Skills – 18 Marks)", sectionId: "sec_b", topic: "Short Writing – Notice (4 Marks)" },
+            { id: "eng_q4", qNo: 4, qNumber: "Q4", label: "Q4", maxMarks: 4, section: "Section B (Creative Writing Skills – 18 Marks)", sectionId: "sec_b", topic: "Short Writing – Invitation / Reply (4 Marks)" },
+            { id: "eng_q5", qNo: 5, qNumber: "Q5", label: "Q5", maxMarks: 5, section: "Section B (Creative Writing Skills – 18 Marks)", sectionId: "sec_b", topic: "Long Writing – Letter Writing (5 Marks)" },
+            { id: "eng_q6", qNo: 6, qNumber: "Q6", label: "Q6", maxMarks: 5, section: "Section B (Creative Writing Skills – 18 Marks)", sectionId: "sec_b", topic: "Long Writing – Article / Report Writing (5 Marks)" },
+            { id: "eng_q7", qNo: 7, qNumber: "Q7", label: "Q7", maxMarks: 6, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Extract – Flamingo Poetry (6 Marks)" },
+            { id: "eng_q8", qNo: 8, qNumber: "Q8", label: "Q8", maxMarks: 4, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Extract – Vistas Prose (4 Marks)" },
+            { id: "eng_q9", qNo: 9, qNumber: "Q9", label: "Q9", maxMarks: 6, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Extract – Flamingo Prose (6 Marks)" },
+            { id: "eng_q10", qNo: 10, qNumber: "Q10", label: "Q10", maxMarks: 10, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Short Answer – Flamingo (5 of 6, 2 Marks each = 10 Marks)" },
+            { id: "eng_q11", qNo: 11, qNumber: "Q11", label: "Q11", maxMarks: 4, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Short Answer – Vistas (2 of 3, 2 Marks each = 4 Marks)" },
+            { id: "eng_q12", qNo: 12, qNumber: "Q12", label: "Q12", maxMarks: 5, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Long Answer – Flamingo (5 Marks)" },
+            { id: "eng_q13", qNo: 13, qNumber: "Q13", label: "Q13", maxMarks: 5, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Long Answer – Vistas (5 Marks)" }
+        ]
+    },
+
     presetComments: [
         "Good presentation",
         "Step derivation complete",

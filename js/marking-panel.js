@@ -85,12 +85,18 @@ class MarkingPanel {
             }
 
             if (!letter) {
-                // Infer from question sequence for standard 33 Q paper if needed
-                if (idx < 16) letter = "A";
-                else if (idx < 21) letter = "B";
-                else if (idx < 28) letter = "C";
-                else if (idx < 30) letter = "D";
-                else letter = "E";
+                if ((questions || []).length === 13) {
+                    if (idx < 2) letter = "A";
+                    else if (idx < 6) letter = "B";
+                    else letter = "C";
+                } else {
+                    // Infer from question sequence for standard 33 Q paper if needed
+                    if (idx < 16) letter = "A";
+                    else if (idx < 21) letter = "B";
+                    else if (idx < 28) letter = "C";
+                    else if (idx < 30) letter = "D";
+                    else letter = "E";
+                }
             }
 
             sId = `sec_${letter.toLowerCase()}`;
@@ -112,12 +118,18 @@ class MarkingPanel {
                 id: s.id || `sec_${String.fromCharCode(97 + idx)}`,
                 letter: s.letter || String.fromCharCode(65 + idx),
                 name: s.name || `Section ${s.letter || String.fromCharCode(65 + idx)}`,
-                title: s.title || `Section ${s.letter || String.fromCharCode(65 + idx)}`,
+                title: s.title || s.name || `Section ${s.letter || String.fromCharCode(65 + idx)}`,
                 questionCount: Number(s.questionCount) || Number(s.qCount) || 1,
                 marksPerQ: Number(s.marksPerQ) || 1,
                 maxMarks: Number(s.maxMarks) || (Number(s.questionCount || s.qCount || 1) * Number(s.marksPerQ || 1)),
                 hasChoice: !!s.hasChoice,
                 hasSubQuestions: !!s.hasSubQuestions
+            }));
+        } else if (window.MockData?.englishTemplate?.sections && (questions || []).length === 13) {
+            // For 13 Qs English Core Board paper, use the official 3-section blueprint
+            this.sections = JSON.parse(JSON.stringify(window.MockData.englishTemplate.sections)).map(s => ({
+                ...s,
+                questionCount: Number(s.questionCount) || Number(s.qCount) || 1
             }));
         } else if (window.MockData?.physicsTemplate?.sections && (questions || []).length === 33) {
             // For 33 Qs Physics Board paper, use the official 5-section blueprint
@@ -158,9 +170,9 @@ class MarkingPanel {
         // Parse & normalize questions
         this.questions = (questions || []).map((q, idx) => {
             const meta = getSecMeta(q, idx);
-            const secObj = this.sections.find(s => s.id === meta.sId || s.letter === meta.letter || s.name === meta.sName) 
+            const secObj = this.sections.find(s => s.id === meta.sId || s.letter === meta.letter || s.name === meta.sName || s.title === meta.sName) 
                            || this.sections[0] 
-                           || { id: meta.sId, name: meta.sName };
+                           || { id: meta.sId, name: meta.sName, title: meta.sName };
             const secName = secObj.name;
             const secId = secObj.id;
             const maxM = Number(q.maxMarks) !== undefined && !isNaN(Number(q.maxMarks)) ? Number(q.maxMarks) : 1;
@@ -191,6 +203,7 @@ class MarkingPanel {
                 id: q.id || `q${idx + 1}`,
                 qNo: q.qNo !== undefined ? q.qNo : idx + 1,
                 label: q.label || `Q${idx + 1}`,
+                topic: q.topic || "",
                 section: secName,
                 sectionId: secId,
                 maxMarks: maxM,
@@ -219,7 +232,7 @@ class MarkingPanel {
 
     getSectionTotals() {
         return this.sections.map(sec => {
-            const secQuestions = this.questions.filter(q => q.sectionId === sec.id || q.section === sec.name);
+            const secQuestions = this.questions.filter(q => q.sectionId === sec.id || q.section === sec.name || q.section === sec.title);
             const obtained = secQuestions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
             const maxM = secQuestions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0) || sec.maxMarks;
             return {
@@ -269,14 +282,14 @@ class MarkingPanel {
                     <div class="q-breakdown-body" id="q-breakdown-body">
                         ${this.questions.map((q, idx) => {
                             const isActive = idx === this.activeQuestionIndex;
-                            const secObj = this.sections.find(s => s.id === q.sectionId || s.name === q.section);
+                            const secObj = this.sections.find(s => s.id === q.sectionId || s.name === q.section || s.title === q.section);
                             const secLetter = secObj ? secObj.letter : (q.section ? q.section.replace(/[^A-Za-z0-9]/g, '').slice(-1).toUpperCase() : 'A');
                             const isAllOk = q.awardedMarks === q.maxMarks && q.maxMarks > 0;
                             const statusIcon = isAllOk ? '✓' : (q.awardedMarks > 0 ? '◑' : (q.status === 'wrong' ? '✗' : '○'));
                             const statusLabel = isAllOk ? 'OK' : (q.awardedMarks > 0 ? 'Partial' : (q.status === 'wrong' ? 'Zero' : '-'));
                             const statusCls = isAllOk ? 'st-ok' : (q.awardedMarks > 0 ? 'st-part' : (q.status === 'wrong' ? 'st-zero' : 'st-unmarked'));
                             
-                            return `<div class="q-breakdown-row ${isActive ? 'active-brow' : ''}" data-index="${idx}">
+                            return `<div class="q-breakdown-row ${isActive ? 'active-brow' : ''}" data-index="${idx}" title="${q.topic || `Question ${q.qNo}`}">
                                 <span class="brow-col col-sec">${secLetter}</span>
                                 <span class="brow-col col-q">Q${q.qNo}</span>
                                 <span class="brow-col col-status ${statusCls}"><span class="st-icon">${statusIcon}</span> ${statusLabel}</span>
@@ -291,7 +304,7 @@ class MarkingPanel {
                     <div class="section-label">
                         <div class="quick-pad-title-wrap">
                             <span>QUICK MARKING PAD</span>
-                            <span class="active-sec-tag" id="active-sec-badge">${activeQ ? activeQ.section : 'Section A'}</span>
+                            <span class="active-sec-tag" id="active-sec-badge">${activeQ ? (activeQ.section || 'Section A') : 'Section A'}</span>
                         </div>
                         <div class="active-q-tags-wrap">
                             <span class="active-q-tag" id="active-q-name">${activeQ ? `Q${activeQ.qNo}` : 'Q1'}</span>
@@ -308,6 +321,11 @@ class MarkingPanel {
                         <div class="sec-ceiling-right">
                             <span class="sec-ceiling-sec-total" id="sec-ceiling-sec-total">Sec: 0/0M</span>
                         </div>
+                    </div>
+
+                    <!-- Active Question Topic Banner -->
+                    <div class="active-q-topic-banner" id="active-q-topic-banner" style="${activeQ && activeQ.topic ? 'display: block;' : 'display: none;'} padding: 7px 12px; background: #F1F5F9; border-radius: 6px; font-size: 0.82rem; font-weight: 600; color: #1E293B; margin-bottom: 10px; border-left: 3px solid #007AFF;">
+                        ${activeQ && activeQ.topic ? activeQ.topic : ''}
                     </div>
 
                     <!-- Choice / OR Question Selector (if applicable) -->
@@ -344,7 +362,7 @@ class MarkingPanel {
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                             </span> Full Mark (F)
                         </button>
-                        <button type="button" class="quick-action-btn btn-quick-wrong" id="btn-quick-cross" title="Mark 0 Marks [0]">
+                        <button type="button" class="quick-action-btn btn-quick-wrong" id="btn-quick-cross" title="Assign 0 Marks to Question">
                             <span class="btn-icon">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </span> Zero (0)
@@ -437,25 +455,35 @@ class MarkingPanel {
         if (secBadge) secBadge.textContent = q.section || "Section";
         if (totalPill) totalPill.textContent = `Total: ${q.awardedMarks}/${q.maxMarks}M`;
 
-        // Update Top Workspace Bar active chip (e.g. "Section A - 1", "Section B - 17")
+        // Update Top Workspace Bar active chip (e.g. "Section A - Q1: Unseen Passage (12M)")
         const topSecChip = document.getElementById("ws-active-sec-q-chip");
         if (topSecChip) {
             const secName = q.section || "Section A";
-            topSecChip.textContent = `${secName} - ${q.qNo !== undefined ? q.qNo : this.activeQuestionIndex + 1}`;
+            topSecChip.textContent = `${secName} - Q${q.qNo}${q.topic ? `: ${q.topic}` : ''}`;
         }
 
         // Active Section Ceiling & Question Max Ceiling Strip
         const secCeilingTag = this.container.querySelector("#sec-ceiling-tag");
         const secCeilingQMax = this.container.querySelector("#sec-ceiling-qmax");
         const secCeilingTotal = this.container.querySelector("#sec-ceiling-sec-total");
-
-        if (secCeilingTag) secCeilingTag.textContent = q.section || "Section";
-        if (secCeilingQMax) secCeilingQMax.textContent = `Question Ceiling: Max ${q.maxMarks}M`;
+        const topicBanner = this.container.querySelector("#active-q-topic-banner");
 
         const secTotals = this.getSectionTotals();
-        const currentSec = secTotals.find(s => s.id === q.sectionId || s.name === q.section);
+        const currentSec = secTotals.find(s => s.id === q.sectionId || s.name === q.section || s.title === q.section);
+
+        if (secCeilingTag) secCeilingTag.textContent = currentSec ? (currentSec.title || currentSec.name) : (q.section || "Section");
+        if (secCeilingQMax) secCeilingQMax.textContent = `Question Ceiling: Max ${q.maxMarks}M`;
         if (secCeilingTotal && currentSec) {
             secCeilingTotal.textContent = `Sec: ${currentSec.obtainedMarks}/${currentSec.maxMarks}M`;
+        }
+
+        if (topicBanner) {
+            if (q.topic) {
+                topicBanner.textContent = q.topic;
+                topicBanner.style.display = "block";
+            } else {
+                topicBanner.style.display = "none";
+            }
         }
 
         // Dynamically rebuild Quick Numbers keypad for question ceiling (up to 7M, 12M, 15M)
@@ -552,11 +580,12 @@ class MarkingPanel {
             // Render section header when section changes
             if (q.sectionId !== currentSectionId) {
                 currentSectionId = q.sectionId;
-                const sec = this.sections.find(s => s.id === q.sectionId) || { name: q.section || "Section" };
+                const sec = this.sections.find(s => s.id === q.sectionId) || { name: q.section || "Section", title: q.section || "Section" };
                 const secTotal = this.getSectionTotals().find(s => s.id === q.sectionId);
+                const displayTitle = sec.title || sec.name;
                 html += `
                     <div class="q-list-section-header">
-                        <span class="q-list-sec-title">${sec.name}</span>
+                        <span class="q-list-sec-title">${displayTitle}</span>
                         <span class="q-list-sec-score">${secTotal ? `${secTotal.obtainedMarks}/${secTotal.maxMarks} Marks` : ''}</span>
                     </div>
                 `;
@@ -583,8 +612,11 @@ class MarkingPanel {
             html += `
                 <div class="q-row ${isActive ? 'active-row' : ''}" data-index="${actualIdx}">
                     <div class="q-number-col">
-                        <span class="q-badge">Q${q.qNo}</span>
-                        ${choiceTag}
+                        <div style="display: flex; align-items: center; gap: 6px;">
+                            <span class="q-badge">Q${q.qNo}</span>
+                            ${choiceTag}
+                        </div>
+                        ${q.topic ? `<span class="q-topic-subtitle" style="display: block; font-size: 0.72rem; color: #64748B; font-weight: 500; margin-top: 2px; max-width: 175px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${q.topic}">${q.topic}</span>` : ''}
                     </div>
                     <div class="q-inputs-col">
                         <div class="score-input-group">
@@ -790,7 +822,11 @@ class MarkingPanel {
                     const idx = Number(miniBtn.getAttribute("data-index"));
                     const q = this.questions[idx];
                     if (action === "correct") {
-                        this.assignQuestionMarkDirect(idx, q.maxMarks, "correct");
+                        if (this.options.onAwardFullMarks) {
+                            this.options.onAwardFullMarks(q);
+                        } else {
+                            this.assignQuestionMarkDirect(idx, q.maxMarks, "correct");
+                        }
                     } else if (action === "wrong") {
                         this.assignQuestionMarkDirect(idx, 0, "wrong");
                     }

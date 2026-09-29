@@ -8455,3 +8455,20 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     background: rgba(46, 125, 50, 0.08) !important;
     transform: translateY(-1px);
 }
+
+/* Custom Alert & Auth Dialog Animations (Apple Cupertino Style) */
+@keyframes osDialogFade {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes osDialogPop {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}

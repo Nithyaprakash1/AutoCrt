@@ -65,15 +65,14 @@ class DashboardManager {
         this.bindEvents();
         this.renderCharts();
 
-        // Background Cloud Sync: Pull fresh papers from Firebase so papers uploaded from other machines show immediately
+        // Background Cloud Sync: Pull fresh papers from Firebase quietly without tearing down DOM
         if (window.firebaseManager) {
             window.appStorage.getAllEvaluations(true).then((freshList) => {
                 if (Array.isArray(freshList) && freshList.length > 0 && freshList.length !== this.evaluations.length) {
                     this.evaluations = freshList;
                     this.applyFilters();
-                    this.render();
-                    this.bindEvents();
-                    this.renderCharts();
+                    this.renderTableRows();
+                    this.updateCountsInUI();
                 }
             }).catch(() => {});
         }
@@ -97,12 +96,8 @@ class DashboardManager {
 
     isPaperCorrected(e) {
         if (!e) return false;
-        if (e.status === "Completed" || e.status === "Graded" || e.status === "Evaluated") return true;
-        if (Number(e.obtainedMarks) > 0) return true;
-        if (Array.isArray(e.questions) && e.questions.some(q => q.status === "correct" || q.status === "wrong" || Number(q.awardedMarks) > 0)) {
-            return true;
-        }
-        return false;
+        // Strictly consider corrected only when teacher explicitly saved/evaluated it
+        return e.status === "Completed" || e.status === "Corrected" || e.status === "Graded" || e.status === "Evaluated";
     }
 
     getSubjectEvals() {
@@ -196,6 +191,7 @@ class DashboardManager {
         );
         const classList = Array.from(classSet);
         const subjectSet = new Set(this.evaluations.map(e => e.subject).filter(Boolean));
+        ["Physics", "English"].forEach(s => subjectSet.add(s));
         const subjectList = Array.from(subjectSet);
 
         const ic = window.Icons || {};
@@ -321,49 +317,42 @@ class DashboardManager {
                     </div>
 
                     <!-- Comprehensive Filter and Control Bar -->
-                    <div class="dash-filters-toolbar" style="display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; background: #F8F9FA; padding: 12px 16px; border-radius: 12px; border: 1px solid #E5E7EB; margin-bottom: 18px;">
-                        <!-- Left: Status Tabs -->
-                        <div class="dash-filters-row" style="display: flex; gap: 6px;">
-                            <button type="button" class="btn-action-view ${this.activeTab === 'all' ? 'active' : ''}" id="tab-btn-all" style="padding: 6px 14px; font-size: 0.85rem; font-weight: 600; border-radius: 8px;">
-                                All Papers (${totalCount})
-                            </button>
-                            <button type="button" class="btn-action-view ${this.activeTab === 'uncorrected' ? 'active' : ''}" id="tab-btn-uncorrected" style="padding: 6px 14px; font-size: 0.85rem; font-weight: 600; border-radius: 8px; color: ${this.activeTab === 'uncorrected' ? '#FFFFFF' : '#D97706'};">
-                                Uncorrected (${uncorrectedCount})
-                            </button>
-                            <button type="button" class="btn-action-view ${this.activeTab === 'corrected' ? 'active' : ''}" id="tab-btn-corrected" style="padding: 6px 14px; font-size: 0.85rem; font-weight: 600; border-radius: 8px; color: ${this.activeTab === 'corrected' ? '#FFFFFF' : '#16A34A'};">
-                                Corrected (${correctedCount})
-                            </button>
-                        </div>
+                    <div class="dash-filters-toolbar" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: #FFFFFF; padding: 14px 18px; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                        <!-- Left: Filter Dropdowns & Search Box -->
+                        <div class="dash-filters-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 300px;">
+                            <!-- Status Filter Dropdown -->
+                            <select id="dash-filter-status" class="form-select-sm" title="Filter by paper status" style="font-size: 0.85rem; font-weight: 600; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; cursor: pointer; min-width: 160px;">
+                                <option value="all" ${this.activeTab === 'all' ? 'selected' : ''}>All Papers (${totalCount})</option>
+                                <option value="uncorrected" ${this.activeTab === 'uncorrected' ? 'selected' : ''}>Uncorrected (${uncorrectedCount})</option>
+                                <option value="corrected" ${this.activeTab === 'corrected' ? 'selected' : ''}>Corrected (${correctedCount})</option>
+                            </select>
 
-                        <!-- Center: Subject & Class Filter Dropdowns & Search Input -->
-                        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex: 1; max-width: 650px; justify-content: flex-end;">
-                            <select id="dash-filter-subject" class="form-select-sm" style="font-size: 0.85rem; font-weight: 500; height: 36px; padding: 0 10px; border-radius: 8px; min-width: 130px;">
+                            <!-- Subject Filter Dropdown -->
+                            <select id="dash-filter-subject" class="form-select-sm" title="Filter by subject" style="font-size: 0.85rem; font-weight: 500; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; cursor: pointer; min-width: 140px;">
                                 <option value="all">All Subjects</option>
                                 ${subjectList.map(sub => `<option value="${sub}" ${this.selectedSubjectFilter === sub ? 'selected' : ''}>${sub}</option>`).join("")}
                             </select>
 
-                            <select id="dash-filter-class" class="form-select-sm" style="font-size: 0.85rem; font-weight: 500; height: 36px; padding: 0 10px; border-radius: 8px; min-width: 130px;">
+                            <!-- Class Filter Dropdown -->
+                            <select id="dash-filter-class" class="form-select-sm" title="Filter by class" style="font-size: 0.85rem; font-weight: 500; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; cursor: pointer; min-width: 130px;">
                                 <option value="all">All Classes</option>
                                 ${classList.map(cls => `<option value="${cls}" ${this.selectedClassFilter === cls ? 'selected' : ''}>${cls}</option>`).join("")}
                             </select>
 
-                            <div style="position: relative; flex: 1; min-width: 180px;">
-                                <input type="text" id="dash-search-input" class="form-input form-input-sm" value="${this.searchQuery}" placeholder="🔍 Search student or roll no..." style="width: 100%; height: 36px; padding-left: 12px; font-size: 0.85rem; border-radius: 8px;" />
+                            <!-- Search Input -->
+                            <div style="position: relative; flex: 1; min-width: 200px;">
+                                <input type="text" id="dash-search-input" class="form-input form-input-sm" value="${this.searchQuery}" placeholder="🔍 Search student or roll no..." style="width: 100%; height: 38px; padding: 0 12px; font-size: 0.85rem; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF;" />
                             </div>
                         </div>
 
-                        <!-- Right: Actions & Cloud Sync -->
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <button type="button" class="btn-secondary" id="dash-btn-sync-cloud" title="Sync latest answer sheets from Firebase Cloud" style="background: #F0FDF4; border: 1px solid #16A34A; color: #16A34A; font-size: 0.84rem; font-weight: 600; padding: 7px 12px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer;">
-                                <span>☁️ Sync Cloud</span>
+                        <!-- Right: Bulk Actions Aligned Group -->
+                        <div class="dash-actions-group" style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                            <button type="button" class="btn-secondary" id="dash-btn-bulk-pdf" title="Bulk download selected or all PDFs" style="background: #FFFFFF; border: 1.5px solid #007AFF; color: #007AFF; font-size: 0.84rem; font-weight: 600; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
+                                <span class="btn-icon" style="display: flex; align-items: center;">${ic.pdf || '📄'}</span> Bulk Download PDFs <span id="dash-pdf-count-badge" style="background: rgba(0, 122, 255, 0.12); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">(${this.selectedIds.size > 0 ? this.selectedIds.size : 'All ' + this.filteredEvaluations.length})</span>
                             </button>
 
-                            <button type="button" class="btn-secondary" id="dash-btn-bulk-pdf" title="Bulk download selected or filtered PDFs" style="background: #FFFFFF; border: 1px solid #007AFF; color: #007AFF; font-size: 0.84rem; font-weight: 600; padding: 7px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
-                                <span class="btn-icon">${ic.pdf || '📄'}</span> Bulk Download PDFs <span id="dash-pdf-count-badge" style="background: rgba(0, 122, 255, 0.12); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem;">(${this.selectedIds.size > 0 ? this.selectedIds.size : 'All'})</span>
-                            </button>
-
-                            <button type="button" class="btn-secondary" id="dash-btn-bulk-excel" title="Bulk export spreadsheet" style="background: #FFFFFF; border: 1px solid #16A34A; color: #16A34A; font-size: 0.84rem; font-weight: 600; padding: 7px 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px;">
-                                <span class="btn-icon">${ic.csv || '📊'}</span> Bulk Export Excel
+                            <button type="button" class="btn-secondary" id="dash-btn-bulk-excel" title="Bulk export spreadsheet" style="background: #FFFFFF; border: 1.5px solid #16A34A; color: #16A34A; font-size: 0.84rem; font-weight: 600; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
+                                <span class="btn-icon" style="display: flex; align-items: center;">${ic.csv || '📊'}</span> Bulk Export Excel
                             </button>
                         </div>
                     </div>
@@ -422,7 +411,16 @@ class DashboardManager {
         tbody.innerHTML = this.filteredEvaluations.map(ev => {
             const isCompleted = this.isPaperCorrected(ev);
             const statusClass = isCompleted ? "badge-completed" : "badge-pending";
-            const dateStr = ev.updatedAt ? new Date(ev.updatedAt).toLocaleDateString() : "-";
+            const rawDate = ev.updatedAt || ev.lastUpdated || ev.createdAt;
+            let dateStr = "—";
+            if (rawDate) {
+                const d = new Date(rawDate);
+                if (!isNaN(d.getTime())) {
+                    const dStr = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+                    const tStr = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true });
+                    dateStr = `<div style="line-height: 1.3;"><span style="font-weight: 600; color: #1E293B; font-size: 0.82rem;">${dStr}</span><span style="display: block; font-size: 0.73rem; color: #64748B;">${tStr}</span></div>`;
+                }
+            }
             const isChecked = this.selectedIds.has(String(ev.id));
             const pct = (ev.percentage !== undefined && ev.percentage !== null)
                 ? Number(ev.percentage)
@@ -558,14 +556,25 @@ class DashboardManager {
             });
         }
 
+        // Status Filter Dropdown
+        const statusSelect = this.container.querySelector("#dash-filter-status");
+        if (statusSelect) {
+            statusSelect.addEventListener("change", (e) => {
+                this.activeTab = e.target.value;
+                this.applyFilters();
+                this.renderTableRows();
+                this.updateFilterTabButtons();
+            });
+        }
+
         // KPI Card: Uncorrected
         const cardUncorrected = this.container.querySelector("#card-tab-uncorrected");
         if (cardUncorrected) {
             cardUncorrected.addEventListener("click", () => {
                 this.activeTab = "uncorrected";
-                this.updateFilterTabButtons();
                 this.applyFilters();
                 this.renderTableRows();
+                this.updateFilterTabButtons();
             });
         }
 
@@ -574,9 +583,9 @@ class DashboardManager {
         if (cardCorrected) {
             cardCorrected.addEventListener("click", () => {
                 this.activeTab = "corrected";
-                this.updateFilterTabButtons();
                 this.applyFilters();
                 this.renderTableRows();
+                this.updateFilterTabButtons();
             });
         }
 
@@ -585,70 +594,9 @@ class DashboardManager {
         if (cardAll) {
             cardAll.addEventListener("click", () => {
                 this.activeTab = "all";
-                this.updateFilterTabButtons();
                 this.applyFilters();
                 this.renderTableRows();
-            });
-        }
-
-        // Status Tabs in Toolbar
-        const tabAll = this.container.querySelector("#tab-btn-all");
-        if (tabAll) {
-            tabAll.addEventListener("click", () => {
-                this.activeTab = "all";
                 this.updateFilterTabButtons();
-                this.applyFilters();
-                this.renderTableRows();
-            });
-        }
-
-        const tabUncorrected = this.container.querySelector("#tab-btn-uncorrected");
-        if (tabUncorrected) {
-            tabUncorrected.addEventListener("click", () => {
-                this.activeTab = "uncorrected";
-                this.updateFilterTabButtons();
-                this.applyFilters();
-                this.renderTableRows();
-            });
-        }
-
-        const tabCorrected = this.container.querySelector("#tab-btn-corrected");
-        if (tabCorrected) {
-            tabCorrected.addEventListener("click", () => {
-                this.activeTab = "corrected";
-                this.updateFilterTabButtons();
-                this.applyFilters();
-                this.renderTableRows();
-            });
-        }
-
-        // Sync Cloud Button
-        const btnSyncCloud = this.container.querySelector("#dash-btn-sync-cloud");
-        if (btnSyncCloud) {
-            btnSyncCloud.addEventListener("click", async () => {
-                btnSyncCloud.disabled = true;
-                btnSyncCloud.innerHTML = `<span>⏳ Syncing...</span>`;
-                try {
-                    const freshList = await window.appStorage.getAllEvaluations(true);
-                    if (Array.isArray(freshList)) {
-                        this.evaluations = freshList;
-                        this.applyFilters();
-                        this.render();
-                        this.bindEvents();
-                        this.renderCharts();
-                        if (window.app && window.app.showToast) {
-                            window.app.showToast(`✓ Cloud sync complete: ${this.evaluations.length} papers available.`, "success");
-                        }
-                    }
-                } catch (err) {
-                    console.warn("Cloud sync error:", err);
-                    if (window.app && window.app.showToast) {
-                        window.app.showToast("Cloud sync failed. Check network connection.", "warning");
-                    }
-                } finally {
-                    btnSyncCloud.disabled = false;
-                    btnSyncCloud.innerHTML = `<span>☁️ Sync Cloud</span>`;
-                }
             });
         }
 
@@ -738,38 +686,213 @@ class DashboardManager {
                     return;
                 }
 
-                // Delete paper
+                // Delete paper with modal dialog & loading indicator
                 const delBtn = e.target.closest(".btn-dash-delete");
                 if (delBtn) {
                     const id = delBtn.getAttribute("data-id");
                     const ev = await window.appStorage.getEvaluationById(id);
-                    const name = ev ? (ev.studentName || "student paper") : "this paper";
-                    if (confirm(`Are you sure you want to delete ${name}'s evaluation? This action cannot be undone.`)) {
-                        await window.appStorage.deleteEvaluation(id);
-                        this.evaluations = await window.appStorage.getAllEvaluations();
-                        this.applyFilters();
-                        this.render();
-                        this.bindEvents();
-                        this.renderCharts();
-                        if (window.appInstance && window.appInstance.showToast) {
-                            window.appInstance.showToast(`Deleted ${name}'s paper.`);
-                        }
+                    if (ev) {
+                        this.showDeleteModal(ev);
                     }
+                    return;
                 }
             });
         }
     }
 
-    updateFilterTabButtons() {
-        const tabs = [
-            { id: "#tab-btn-all", name: "all" },
-            { id: "#tab-btn-uncorrected", name: "uncorrected" },
-            { id: "#tab-btn-corrected", name: "corrected" }
-        ];
-        tabs.forEach(t => {
-            const btn = this.container.querySelector(t.id);
-            if (btn) btn.classList.toggle("active", this.activeTab === t.name);
+    showDeleteModal(ev) {
+        if (!ev || !ev.id) return;
+        const modalId = "dash-delete-modal-overlay";
+        const oldModal = document.getElementById(modalId);
+        if (oldModal) oldModal.remove();
+
+        const rawDate = ev.updatedAt || ev.lastUpdated || ev.createdAt;
+        let lastUpdatedStr = "—";
+        if (rawDate) {
+            const d = new Date(rawDate);
+            if (!isNaN(d.getTime())) {
+                lastUpdatedStr = `${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} at ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true })}`;
+            }
+        }
+
+        const isCorr = this.isPaperCorrected(ev);
+        const statusLabel = isCorr ? "Corrected" : "Uncorrected (Pending)";
+        const statusColor = isCorr ? "#16A34A" : "#D97706";
+
+        const modal = document.createElement("div");
+        modal.id = modalId;
+        modal.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: fadeInModal 0.2s ease-out;
+        `;
+
+        modal.innerHTML = `
+            <style>
+                @keyframes fadeInModal {
+                    from { opacity: 0; transform: scale(0.96); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                @keyframes spinLoading {
+                    to { transform: rotate(360deg); }
+                }
+            </style>
+            <div style="background: #FFFFFF; border-radius: 16px; max-width: 460px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.22); overflow: hidden; border: 1px solid #E2E8F0;">
+                <div style="padding: 24px; text-align: center;">
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                        </svg>
+                    </div>
+                    <h3 style="font-size: 1.2rem; font-weight: 700; color: #0F172A; margin: 0 0 8px;">Delete Answer Sheet</h3>
+                    <p style="font-size: 0.88rem; color: #64748B; margin: 0 0 18px; line-height: 1.45;">
+                        Are you sure you want to permanently delete this paper? All marks, annotations, and evaluations will be removed.
+                    </p>
+
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 16px; text-align: left; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Student:</span>
+                            <span style="font-size: 0.85rem; font-weight: 700; color: #1E293B;">${ev.studentName || "Unnamed Student"}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Roll Number:</span>
+                            <span style="font-size: 0.82rem; font-weight: 600; color: #334155; font-family: monospace;">${ev.rollNo || "—"}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Class & Subject:</span>
+                            <span style="font-size: 0.82rem; font-weight: 500; color: #334155;">${ev.class || ev.className || "Class 12"} • ${ev.subject || "Physics"}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Status:</span>
+                            <span style="font-size: 0.82rem; font-weight: 700; color: ${statusColor};">${statusLabel}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Last Updated:</span>
+                            <span style="font-size: 0.8rem; color: #475569;">${lastUpdatedStr}</span>
+                        </div>
+                    </div>
+
+                    <div id="delete-modal-error" style="display: none; padding: 8px 12px; background: #FEF2F2; border: 1px solid #F87171; border-radius: 8px; color: #991B1B; font-size: 0.8rem; margin-bottom: 14px; text-align: left;"></div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" id="btn-cancel-delete" style="flex: 1; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: all 0.15s ease;">
+                            Cancel
+                        </button>
+                        <button type="button" id="btn-confirm-delete" style="flex: 1; height: 42px; border-radius: 10px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 600; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;">
+                            <span id="btn-delete-text">Delete Paper</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const cancelBtn = modal.querySelector("#btn-cancel-delete");
+        const confirmBtn = modal.querySelector("#btn-confirm-delete");
+        const delText = modal.querySelector("#btn-delete-text");
+        const errBox = modal.querySelector("#delete-modal-error");
+
+        cancelBtn.addEventListener("click", () => modal.remove());
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) modal.remove();
         });
+
+        confirmBtn.addEventListener("click", async () => {
+            cancelBtn.disabled = true;
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = "0.75";
+            confirmBtn.style.cursor = "not-allowed";
+            delText.innerHTML = `<span style="display: inline-block; width: 15px; height: 15px; border: 2px solid #FFFFFF; border-top-color: transparent; border-radius: 50%; animation: spinLoading 0.7s linear infinite; margin-right: 6px; vertical-align: middle;"></span> Deleting...`;
+
+            try {
+                await window.appStorage.deleteEvaluation(ev.id);
+                this.selectedIds.delete(String(ev.id));
+                delText.innerHTML = `✓ Deleted`;
+                confirmBtn.style.background = "#16A34A";
+                await new Promise(r => setTimeout(r, 400));
+                modal.remove();
+
+                // Refresh evaluations smoothly without jarring screen flicker
+                this.evaluations = await window.appStorage.getAllEvaluations();
+                this.applyFilters();
+                this.renderTableRows();
+                this.updateCountsInUI();
+
+                if (window.appInstance && window.appInstance.showToast) {
+                    window.appInstance.showToast(`Deleted ${ev.studentName || 'student'}'s paper.`, "success");
+                }
+            } catch (err) {
+                console.error("Delete paper error:", err);
+                cancelBtn.disabled = false;
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = "1";
+                confirmBtn.style.cursor = "pointer";
+                delText.textContent = "Delete Paper";
+                if (errBox) {
+                    errBox.style.display = "block";
+                    errBox.textContent = `Error deleting paper: ${err.message || err}`;
+                }
+            }
+        });
+    }
+
+    updateFilterTabButtons() {
+        const statusSelect = this.container.querySelector("#dash-filter-status");
+        if (statusSelect && statusSelect.value !== this.activeTab) {
+            statusSelect.value = this.activeTab;
+        }
+
+        const cardAll = this.container.querySelector("#card-tab-all");
+        const cardUncorrected = this.container.querySelector("#card-tab-uncorrected");
+        const cardCorrected = this.container.querySelector("#card-tab-corrected");
+
+        if (cardAll) cardAll.style.outline = this.activeTab === "all" ? "2px solid #007AFF" : "none";
+        if (cardUncorrected) cardUncorrected.style.outline = this.activeTab === "uncorrected" ? "2px solid #D97706" : "none";
+        if (cardCorrected) cardCorrected.style.outline = this.activeTab === "corrected" ? "2px solid #16A34A" : "none";
+    }
+
+    updateCountsInUI() {
+        const subjectEvals = this.getSubjectEvals();
+        const totalCount = subjectEvals.length;
+        const correctedCount = subjectEvals.filter(e => this.isPaperCorrected(e)).length;
+        const uncorrectedCount = Math.max(0, totalCount - correctedCount);
+
+        const statusSelect = this.container.querySelector("#dash-filter-status");
+        if (statusSelect) {
+            const optAll = statusSelect.querySelector("option[value='all']");
+            const optUnc = statusSelect.querySelector("option[value='uncorrected']");
+            const optCor = statusSelect.querySelector("option[value='corrected']");
+            if (optAll) optAll.textContent = `All Papers (${totalCount})`;
+            if (optUnc) optUnc.textContent = `Uncorrected (${uncorrectedCount})`;
+            if (optCor) optCor.textContent = `Corrected (${correctedCount})`;
+        }
+
+        const cardUncVal = this.container.querySelector("#card-tab-uncorrected .kpi-value");
+        const cardUncBadge = this.container.querySelector("#card-tab-uncorrected .counter-badge");
+        if (cardUncVal) cardUncVal.textContent = uncorrectedCount;
+        if (cardUncBadge) cardUncBadge.textContent = `${uncorrectedCount} UNCORRECTED`;
+
+        const cardCorVal = this.container.querySelector("#card-tab-corrected .kpi-value");
+        const cardCorBadge = this.container.querySelector("#card-tab-corrected .counter-badge");
+        if (cardCorVal) cardCorVal.textContent = correctedCount;
+        if (cardCorBadge) cardCorBadge.textContent = `${correctedCount} GRADED`;
+
+        const cardAllVal = this.container.querySelector("#card-tab-all .kpi-value");
+        if (cardAllVal) cardAllVal.textContent = totalCount;
+
+        this.updateSelectionBadge();
     }
 
     triggerBulkPdfDownload() {

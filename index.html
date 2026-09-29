@@ -96,7 +96,10 @@
                 </div>
 
                 <div style="margin-bottom: 24px;">
-                    <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Password</label>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+                        <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0;">Password</label>
+                        <button type="button" id="btn-forgot-password" style="background: none; border: none; color: #0071E3; font-size: 0.78rem; font-weight: 500; cursor: pointer; padding: 0; transition: color 0.15s ease;">Forgot Password?</button>
+                    </div>
                     <input type="password" id="demo-login-password" value="" placeholder="Enter your password" style="width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 0.9rem; background: var(--bg-subtle); color: var(--text-main);" />
                 </div>
 
@@ -163,11 +166,11 @@
                             </button>
                         </li>
                         <li class="sidebar-menu-item-wrap">
-                            <button type="button" class="sidebar-menu-item" data-view="classes" id="side-nav-uploader-classes" title="Classes & Rosters">
+                            <button type="button" class="sidebar-menu-item" data-view="classes" id="side-nav-uploader-classes" title="Student & Classes">
                                 <span class="sidebar-menu-icon">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                                 </span>
-                                <span class="sidebar-menu-label">Classes & Rosters</span>
+                                <span class="sidebar-menu-label">Student & Classes</span>
                             </button>
                         </li>
                         <li class="sidebar-menu-item-wrap">
@@ -491,6 +494,7 @@
                 <span class="hud-choice-pill" id="hud-choice-badge" style="display: none;">OR Choice</span>
                 <span class="hud-q-total-pill" id="hud-q-total-badge">Q Total: 0/2M</span>
                 <span class="hud-sec-total-pill" id="hud-sec-total-badge">Sec Total: 0/10M</span>
+                <span class="hud-q-topic-pill" id="hud-active-q-topic" style="display: none; max-width: 220px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.75rem; background: rgba(0, 122, 255, 0.08); color: #007AFF; padding: 3px 8px; border-radius: 6px; font-weight: 500;" title=""></span>
             </div>
 
             <!-- Direct Quick Mark Buttons with Step Marks (+0.5, +1.0) and Half Marks -->
@@ -550,7 +554,7 @@
                     <span class="tool-name">Tick</span>
                 </button>
 
-                <button type="button" class="tool-button tool-wrong" data-tool="wrong" id="tool-wrong" title="Wrong - Incorrect Answer [W]">
+                <button type="button" class="tool-button tool-wrong" data-tool="wrong" id="tool-wrong" title="X Mark as Wrong [X / W]">
                     <span class="tool-icon">
                         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#DC2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                     </span>

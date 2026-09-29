@@ -181,6 +181,44 @@ class UploadPortalManager {
                         ]
                     }
                 ]
+            },
+            {
+                id: "eng",
+                name: "English",
+                code: "ENG-301",
+                badge: "Official Blueprint",
+                description: "English Core CBSE Board Assessment (13 Questions / 80 Marks)",
+                templates: [
+                    window.MockData && window.MockData.englishTemplate ? window.MockData.englishTemplate : {
+                        id: "eng-core-cbse-80",
+                        name: "English Core Board Paper (13 Qs / 80 Marks)",
+                        examName: "Annual English Core Board Assessment 2026",
+                        subject: "English",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Official CBSE Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A (Reading Skills – 22 Marks)", qStartNo: 1, qEndNo: 2, qCount: 2, maxMarks: 22, secTotal: 22 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B (Creative Writing Skills – 18 Marks)", qStartNo: 3, qEndNo: 6, qCount: 4, maxMarks: 18, secTotal: 18 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C (Literature – 40 Marks)", qStartNo: 7, qEndNo: 13, qCount: 7, maxMarks: 40, secTotal: 40 }
+                        ],
+                        questions: [
+                            { id: "eng_q1", qNo: 1, qNumber: "Q1", label: "Q1", maxMarks: 12, section: "Section A (Reading Skills – 22 Marks)", sectionId: "sec_a", topic: "Unseen Passage (12 Marks)" },
+                            { id: "eng_q2", qNo: 2, qNumber: "Q2", label: "Q2", maxMarks: 10, section: "Section A (Reading Skills – 22 Marks)", sectionId: "sec_a", topic: "Case-Based Unseen Passage (10 Marks)" },
+                            { id: "eng_q3", qNo: 3, qNumber: "Q3", label: "Q3", maxMarks: 4, section: "Section B (Creative Writing Skills – 18 Marks)", sectionId: "sec_b", topic: "Short Writing – Notice (4 Marks)" },
+                            { id: "eng_q4", qNo: 4, qNumber: "Q4", label: "Q4", maxMarks: 4, section: "Section B (Creative Writing Skills – 18 Marks)", sectionId: "sec_b", topic: "Short Writing – Invitation / Reply (4 Marks)" },
+                            { id: "eng_q5", qNo: 5, qNumber: "Q5", label: "Q5", maxMarks: 5, section: "Section B (Creative Writing Skills – 18 Marks)", sectionId: "sec_b", topic: "Long Writing – Letter Writing (5 Marks)" },
+                            { id: "eng_q6", qNo: 6, qNumber: "Q6", label: "Q6", maxMarks: 5, section: "Section B (Creative Writing Skills – 18 Marks)", sectionId: "sec_b", topic: "Long Writing – Article / Report Writing (5 Marks)" },
+                            { id: "eng_q7", qNo: 7, qNumber: "Q7", label: "Q7", maxMarks: 6, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Extract – Flamingo Poetry (6 Marks)" },
+                            { id: "eng_q8", qNo: 8, qNumber: "Q8", label: "Q8", maxMarks: 4, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Extract – Vistas Prose (4 Marks)" },
+                            { id: "eng_q9", qNo: 9, qNumber: "Q9", label: "Q9", maxMarks: 6, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Extract – Flamingo Prose (6 Marks)" },
+                            { id: "eng_q10", qNo: 10, qNumber: "Q10", label: "Q10", maxMarks: 10, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Short Answer – Flamingo (5 of 6, 2 Marks each = 10 Marks)" },
+                            { id: "eng_q11", qNo: 11, qNumber: "Q11", label: "Q11", maxMarks: 4, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Short Answer – Vistas (2 of 3, 2 Marks each = 4 Marks)" },
+                            { id: "eng_q12", qNo: 12, qNumber: "Q12", label: "Q12", maxMarks: 5, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Long Answer – Flamingo (5 Marks)" },
+                            { id: "eng_q13", qNo: 13, qNumber: "Q13", label: "Q13", maxMarks: 5, section: "Section C (Literature – 40 Marks)", sectionId: "sec_c", topic: "Long Answer – Vistas (5 Marks)" }
+                        ]
+                    }
+                ]
             }
         ];
 
@@ -209,6 +247,7 @@ class UploadPortalManager {
         if (id.includes("chem") || name.includes("chem")) return "#FF9500";
         if (id.includes("bio") || name.includes("bio")) return "#34C759";
         if (id.includes("math") || name.includes("math")) return "#007AFF";
+        if (id.includes("eng") || name.includes("english")) return "#0284C7";
         return "#5856D6";
     }
 
@@ -320,22 +359,45 @@ class UploadPortalManager {
         if (window.appStorage) {
             const savedCatalog = await window.appStorage.getSubjectCatalog();
             if (savedCatalog && Array.isArray(savedCatalog) && savedCatalog.length > 0) {
-                // Keep only Physics and any custom subjects created by the user
+                // Remove obsolete legacy mock subjects (math, sci, bio) but KEEP Physics and English
                 const filteredCatalog = savedCatalog.filter(s => {
-                    const isLegacyNonPhy = ["math", "sci", "eng", "bio"].includes(s.id);
-                    return !isLegacyNonPhy;
+                    const isLegacyObsolete = ["math", "sci", "bio"].includes(s.id);
+                    return !isLegacyObsolete;
                 });
 
                 // Ensure Physics exists with its standard templates
-                const hasPhy = filteredCatalog.some(s => s.id === "phy" || s.name.toLowerCase().includes("physic"));
+                const hasPhy = filteredCatalog.some(s => s.id === "phy" || (s.name && s.name.toLowerCase().includes("physic")));
                 if (!hasPhy) {
                     const defaultPhy = this.catalog.find(s => s.id === "phy");
                     if (defaultPhy) filteredCatalog.unshift(defaultPhy);
                 }
 
+                // Ensure English exists with its official 13-question blueprint
+                const defaultEng = this.catalog.find(s => s.id === "eng" || (s.name && s.name.toLowerCase().includes("english")));
+                const engSubs = filteredCatalog.filter(s => s.id === "eng" || (s.code && s.code.toUpperCase().includes("ENG")) || (s.name && s.name.toLowerCase().includes("english")));
+                if (engSubs.length === 0 && defaultEng) {
+                    filteredCatalog.push(defaultEng);
+                } else if (defaultEng) {
+                    engSubs.forEach(engSub => {
+                        if (!engSub.templates || engSub.templates.length === 0) {
+                            engSub.templates = JSON.parse(JSON.stringify(defaultEng.templates));
+                        }
+                    });
+                }
+
+                // Dynamically ensure all subjects have accurate badge labels reflecting their template count
+                filteredCatalog.forEach(sub => {
+                    const tplCount = (sub.templates && Array.isArray(sub.templates)) ? sub.templates.length : 0;
+                    sub.badge = tplCount === 1 ? "1 Template" : `${tplCount} Templates`;
+                });
+
                 this.catalog = filteredCatalog.length > 0 ? filteredCatalog : this.catalog;
                 await window.appStorage.saveSubjectCatalog(this.catalog);
             } else {
+                this.catalog.forEach(sub => {
+                    const tplCount = (sub.templates && Array.isArray(sub.templates)) ? sub.templates.length : 0;
+                    sub.badge = tplCount === 1 ? "1 Template" : `${tplCount} Templates`;
+                });
                 await window.appStorage.saveSubjectCatalog(this.catalog);
             }
             const savedClasses = await window.appStorage.getClassesList();
@@ -535,13 +597,16 @@ class UploadPortalManager {
                 </div>
 
                 <div class="subjects-grid">
-                    ${this.catalog.map(sub => `
+                    ${this.catalog.map(sub => {
+                        const tplCount = (sub.templates && Array.isArray(sub.templates)) ? sub.templates.length : 0;
+                        const badgeText = tplCount === 1 ? '1 Template' : `${tplCount} Templates`;
+                        return `
                         <div class="subject-card ${this.selectedSubject && this.selectedSubject.id === sub.id ? 'selected' : ''}" data-subject-id="${sub.id}">
                             <div class="subject-card-top">
                                 <div class="subject-icon-box" style="background: ${this.getSubjectColor(sub)}15;">
                                     ${this.getSubjectIcon(sub)}
                                 </div>
-                                <span class="subject-count-badge">${sub.badge}</span>
+                                <span class="subject-count-badge">${badgeText}</span>
                                 <div class="subject-header-actions" style="margin-left: auto; display: flex; gap: 4px;">
                                     <button type="button" class="btn-card-action btn-edit-subject" data-subject-id="${sub.id}" title="Edit Subject Details">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -561,7 +626,8 @@ class UploadPortalManager {
                                 </span>
                             </div>
                         </div>
-                    `).join('')}
+                    `;
+                    }).join('')}
 
                     <!-- Add New Subject Card -->
                     <div class="card-add-entity btn-create-subject-trigger" id="btn-add-subject-card" title="Add New Subject">
@@ -2749,7 +2815,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
                 if (!this.selectedSubject.templates) this.selectedSubject.templates = [];
                 this.selectedSubject.templates.push(newTemplate);
-                this.selectedSubject.badge = `${this.selectedSubject.templates.length} Templates`;
+                this.selectedSubject.badge = this.selectedSubject.templates.length === 1 ? "1 Template" : `${this.selectedSubject.templates.length} Templates`;
                 if (window.app) {
                     window.app.showToast(`Created template "${tplName}" (${totalMaxMarks} Marks, ${structuredSections.length} Sections)!`);
                 }
@@ -2871,7 +2937,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                         duplicated.examName = `${tpl.examName} (Copy)`;
 
                         this.selectedSubject.templates.push(duplicated);
-                        this.selectedSubject.badge = `${this.selectedSubject.templates.length} Templates`;
+                        this.selectedSubject.badge = this.selectedSubject.templates.length === 1 ? "1 Template" : `${this.selectedSubject.templates.length} Templates`;
                         if (window.appStorage) {
                             await window.appStorage.saveSubjectCatalog(this.catalog);
                         }
@@ -2893,7 +2959,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                             `Are you sure you want to delete template "${tpl.name}"? This action cannot be undone.`,
                             async () => {
                                 this.selectedSubject.templates = this.selectedSubject.templates.filter(t => t.id !== tplId);
-                                this.selectedSubject.badge = `${this.selectedSubject.templates.length} Templates`;
+                                this.selectedSubject.badge = this.selectedSubject.templates.length === 1 ? "1 Template" : `${this.selectedSubject.templates.length} Templates`;
                                 if (window.appStorage) {
                                     await window.appStorage.saveSubjectCatalog(this.catalog);
                                 }

@@ -34,6 +34,19 @@ class AppController {
         const settings = await window.appStorage.getSettings();
         this.applySettingsToUI(settings);
 
+        // Global App Alert Bridge & Safe Native Alert Upgrade (Apple Cupertino Dialogs)
+        window.showAppAlert = (opts) => this.showAlertDialog(opts);
+        window.alert = (msg) => {
+            const strMsg = String(msg || "");
+            const isErr = /error|incorrect|failed|invalid|not found|quota/i.test(strMsg);
+            const isWarn = /warning|please|required|must be/i.test(strMsg);
+            this.showAlertDialog({
+                title: isErr ? "Notice" : (isWarn ? "Attention" : "Information"),
+                message: strMsg,
+                type: isErr ? "error" : (isWarn ? "warning" : "info")
+            });
+        };
+
         // Bind global UI elements
         this.bindPortalControls();
         this.bindNavigation();
@@ -82,6 +95,291 @@ class AppController {
     hidePortalLoginScreen() {
         const overlay = document.getElementById("portal-login-screen");
         if (overlay) overlay.style.display = "none";
+    }
+
+    // --- Apple Cupertino Styled Dialogs for Alerts and Confirmations ---
+
+    showAlertDialog(options = {}) {
+        const {
+            title = "Notice",
+            message = "",
+            type = "info", // "error" | "warning" | "success" | "info"
+            primaryBtnText = "OK",
+            secondaryBtnText = null,
+            danger = false
+        } = (typeof options === "string" ? { message: options } : options);
+
+        return new Promise((resolve) => {
+            const existing = document.getElementById("app-global-alert-dialog");
+            if (existing) existing.remove();
+
+            const icons = {
+                error: `
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 59, 48, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #FF3B30;">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="15" y1="9" x2="9" y2="15"></line>
+                            <line x1="9" y1="9" x2="15" y2="15"></line>
+                        </svg>
+                    </div>
+                `,
+                warning: `
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(255, 149, 0, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #FF9500;">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                            <line x1="12" y1="9" x2="12" y2="13"></line>
+                            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                        </svg>
+                    </div>
+                `,
+                success: `
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(52, 199, 89, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #34C759;">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                            <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                        </svg>
+                    </div>
+                `,
+                info: `
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: rgba(0, 113, 227, 0.12); display: flex; align-items: center; justify-content: center; margin: 0 auto 16px; color: #0071E3;">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="12" cy="12" r="10"></circle>
+                            <line x1="12" y1="16" x2="12" y2="12"></line>
+                            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                        </svg>
+                    </div>
+                `
+            };
+
+            const overlay = document.createElement("div");
+            overlay.id = "app-global-alert-dialog";
+            overlay.style.cssText = `
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, 0.55);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                z-index: 100000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                animation: osDialogFade 0.18s ease-out;
+            `;
+
+            const card = document.createElement("div");
+            card.style.cssText = `
+                background: var(--bg-card, #ffffff);
+                color: var(--text-main, #1d1d1f);
+                width: 100%;
+                max-width: 400px;
+                border-radius: 22px;
+                padding: 26px 24px 22px;
+                box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1);
+                border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+                text-align: center;
+                animation: osDialogPop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            `;
+
+            card.innerHTML = `
+                ${icons[type] || icons.info}
+                <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main, #1d1d1f); margin: 0 0 8px; line-height: 1.35;">${title}</h3>
+                <p style="font-size: 0.92rem; color: var(--text-muted, #6e6e73); margin: 0 0 24px; line-height: 1.5; white-space: pre-line; word-break: break-word;">${message}</p>
+                <div style="display: flex; gap: 10px; justify-content: center;">
+                    ${secondaryBtnText ? `
+                        <button type="button" id="btn-dialog-secondary" style="flex: 1; height: 44px; border-radius: 12px; background: var(--bg-subtle, #f2f2f7); border: 1px solid var(--border-color, #e5e5ea); color: var(--text-main, #1d1d1f); font-size: 0.92rem; font-weight: 600; cursor: pointer; transition: background 0.15s ease;">
+                            ${secondaryBtnText}
+                        </button>
+                    ` : ""}
+                    <button type="button" id="btn-dialog-primary" style="flex: 1; height: 44px; border-radius: 12px; background: ${danger ? '#FF3B30' : (type === 'error' ? '#FF3B30' : '#0071E3')}; border: none; color: #ffffff; font-size: 0.92rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px ${type === 'error' ? 'rgba(255, 59, 48, 0.3)' : 'rgba(0, 113, 227, 0.3)'}; transition: transform 0.12s ease;">
+                        ${primaryBtnText}
+                    </button>
+                </div>
+            `;
+
+            overlay.appendChild(card);
+            document.body.appendChild(overlay);
+
+            const btnPrimary = card.querySelector("#btn-dialog-primary");
+            const btnSecondary = card.querySelector("#btn-dialog-secondary");
+
+            if (btnPrimary) {
+                btnPrimary.focus();
+                btnPrimary.addEventListener("click", () => {
+                    overlay.remove();
+                    resolve(true);
+                });
+            }
+
+            if (btnSecondary) {
+                btnSecondary.addEventListener("click", () => {
+                    overlay.remove();
+                    resolve(false);
+                });
+            }
+
+            const onKeyDown = (e) => {
+                if (e.key === "Escape") {
+                    document.removeEventListener("keydown", onKeyDown);
+                    overlay.remove();
+                    resolve(false);
+                } else if (e.key === "Enter" && !secondaryBtnText) {
+                    document.removeEventListener("keydown", onKeyDown);
+                    overlay.remove();
+                    resolve(true);
+                }
+            };
+            document.addEventListener("keydown", onKeyDown);
+        });
+    }
+
+    showForgotPasswordDialog(defaultEmail = "") {
+        return new Promise((resolve) => {
+            const existing = document.getElementById("app-forgot-password-dialog");
+            if (existing) existing.remove();
+
+            const overlay = document.createElement("div");
+            overlay.id = "app-forgot-password-dialog";
+            overlay.style.cssText = `
+                position: fixed;
+                inset: 0;
+                background: rgba(15, 23, 42, 0.55);
+                backdrop-filter: blur(10px);
+                -webkit-backdrop-filter: blur(10px);
+                z-index: 100000;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                padding: 20px;
+                animation: osDialogFade 0.18s ease-out;
+            `;
+
+            const card = document.createElement("div");
+            card.style.cssText = `
+                background: var(--bg-card, #ffffff);
+                color: var(--text-main, #1d1d1f);
+                width: 100%;
+                max-width: 440px;
+                border-radius: 22px;
+                padding: 28px 24px 24px;
+                box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(255, 255, 255, 0.1);
+                border: 1px solid var(--border-color, rgba(0, 0, 0, 0.1));
+                text-align: left;
+                animation: osDialogPop 0.22s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            `;
+
+            card.innerHTML = `
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+                    <div style="width: 44px; height: 44px; border-radius: 12px; background: rgba(0, 113, 227, 0.1); display: flex; align-items: center; justify-content: center; color: #0071E3;">
+                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h3 style="font-size: 1.15rem; font-weight: 700; color: var(--text-main, #1d1d1f); margin: 0; line-height: 1.3;">Reset Password</h3>
+                        <span style="font-size: 0.8rem; color: var(--text-muted, #6e6e73);">Niprak OSM Secure Recovery</span>
+                    </div>
+                </div>
+
+                <p style="font-size: 0.88rem; color: var(--text-muted, #6e6e73); margin: 0 0 18px; line-height: 1.5;">
+                    Enter your registered email address below. We'll send an official Firebase password reset link directly to your inbox.
+                </p>
+
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; font-size: 0.78rem; font-weight: 600; color: var(--text-muted, #6e6e73); margin-bottom: 6px;">Registered Email Address</label>
+                    <input type="email" id="inp-forgot-email" value="${defaultEmail || ''}" placeholder="name@school.edu" style="width: 100%; height: 44px; padding: 0 14px; border: 1px solid var(--border-color, #d2d2d7); border-radius: 12px; font-size: 0.92rem; background: var(--bg-subtle, #f5f5f7); color: var(--text-main, #1d1d1f); outline: none; box-sizing: border-box;" />
+                </div>
+
+                <div id="forgot-status-msg" style="display: none; padding: 10px 14px; border-radius: 10px; font-size: 0.84rem; margin-bottom: 16px;"></div>
+
+                <div style="display: flex; gap: 10px;">
+                    <button type="button" id="btn-forgot-cancel" style="flex: 1; height: 44px; border-radius: 12px; background: var(--bg-subtle, #f2f2f7); border: 1px solid var(--border-color, #e5e5ea); color: var(--text-main, #1d1d1f); font-size: 0.92rem; font-weight: 600; cursor: pointer;">
+                        Cancel
+                    </button>
+                    <button type="button" id="btn-forgot-submit" style="flex: 1.3; height: 44px; border-radius: 12px; background: #0071E3; border: none; color: #ffffff; font-size: 0.92rem; font-weight: 600; cursor: pointer; box-shadow: 0 4px 14px rgba(0, 113, 227, 0.3);">
+                        Send Reset Link
+                    </button>
+                </div>
+            `;
+
+            overlay.appendChild(card);
+            document.body.appendChild(overlay);
+
+            const emailInput = card.querySelector("#inp-forgot-email");
+            const btnSubmit = card.querySelector("#btn-forgot-submit");
+            const btnCancel = card.querySelector("#btn-forgot-cancel");
+            const statusBox = card.querySelector("#forgot-status-msg");
+
+            if (emailInput) emailInput.focus();
+
+            const closeDialog = () => {
+                overlay.remove();
+                resolve();
+            };
+
+            if (btnCancel) btnCancel.addEventListener("click", closeDialog);
+
+            const doSubmit = async () => {
+                const email = emailInput ? emailInput.value.trim().toLowerCase() : "";
+                if (!email || !email.includes("@")) {
+                    if (statusBox) {
+                        statusBox.style.display = "block";
+                        statusBox.style.background = "rgba(255, 59, 48, 0.1)";
+                        statusBox.style.color = "#FF3B30";
+                        statusBox.textContent = "Please enter a valid email address.";
+                    }
+                    if (emailInput) emailInput.focus();
+                    return;
+                }
+
+                btnSubmit.disabled = true;
+                btnSubmit.textContent = "Sending...";
+
+                try {
+                    let result = { success: true };
+                    if (window.firebaseManager && typeof window.firebaseManager.sendPasswordReset === "function") {
+                        result = await window.firebaseManager.sendPasswordReset(email);
+                    }
+
+                    if (result && result.success) {
+                        closeDialog();
+                        await this.showAlertDialog({
+                            title: "Reset Link Sent",
+                            message: `A password reset link has been dispatched to ${email}.\n\nPlease check your inbox (and spam folder) to set a new password.`,
+                            type: "success",
+                            primaryBtnText: "Understood"
+                        });
+                    } else {
+                        const errMsg = (result && result.error) ? result.error : "Could not send reset email. Please try again.";
+                        if (statusBox) {
+                            statusBox.style.display = "block";
+                            statusBox.style.background = "rgba(255, 59, 48, 0.1)";
+                            statusBox.style.color = "#FF3B30";
+                            statusBox.textContent = errMsg.replace("Firebase: ", "");
+                        }
+                        btnSubmit.disabled = false;
+                        btnSubmit.textContent = "Send Reset Link";
+                    }
+                } catch (err) {
+                    btnSubmit.disabled = false;
+                    btnSubmit.textContent = "Send Reset Link";
+                    if (statusBox) {
+                        statusBox.style.display = "block";
+                        statusBox.style.background = "rgba(255, 59, 48, 0.1)";
+                        statusBox.style.color = "#FF3B30";
+                        statusBox.textContent = err.message || "Failed to send reset link.";
+                    }
+                }
+            };
+
+            if (btnSubmit) btnSubmit.addEventListener("click", doSubmit);
+            if (emailInput) {
+                emailInput.addEventListener("keydown", (e) => {
+                    if (e.key === "Enter") doSubmit();
+                });
+            }
+        });
     }
 
     setPortal(portalName, doSwitchView = true) {
@@ -187,13 +485,24 @@ class AppController {
             }
         };
 
+        const btnForgot = document.getElementById("btn-forgot-password");
+
         if (btnToggleMode) {
             btnToggleMode.addEventListener("click", () => {
                 isCreateMode = !isCreateMode;
                 if (authTitle) authTitle.textContent = isCreateMode ? "Create Role Account" : "Account Sign In";
                 if (btnToggleMode) btnToggleMode.textContent = isCreateMode ? "← Back to Sign In" : "+ Create Account";
                 if (fieldName) fieldName.style.display = isCreateMode ? "block" : "none";
+                if (btnForgot) btnForgot.style.display = isCreateMode ? "none" : "block";
                 updateEnterBtnText();
+            });
+        }
+
+        if (btnForgot) {
+            btnForgot.addEventListener("click", (e) => {
+                e.preventDefault();
+                const curEmail = emailInp ? emailInp.value.trim() : "";
+                this.showForgotPasswordDialog(curEmail);
             });
         }
 
@@ -248,19 +557,34 @@ class AppController {
                 const userPass = passInp ? passInp.value.trim() : "";
 
                 if (!inputVal) {
-                    alert("Please enter your account email or User ID.");
+                    await this.showAlertDialog({
+                        title: "Account Required",
+                        message: "Please enter your account email or User ID to proceed.",
+                        type: "warning",
+                        primaryBtnText: "OK"
+                    });
                     if (emailInp) emailInp.focus();
                     return;
                 }
 
                 if (!userPass) {
-                    alert("Please enter your password.");
+                    await this.showAlertDialog({
+                        title: "Password Required",
+                        message: "Please enter your password to sign in.",
+                        type: "warning",
+                        primaryBtnText: "OK"
+                    });
                     if (passInp) passInp.focus();
                     return;
                 }
 
                 if (userPass.length < 6) {
-                    alert("Password must be at least 6 characters long.");
+                    await this.showAlertDialog({
+                        title: "Password Too Short",
+                        message: "Password must be at least 6 characters long.",
+                        type: "warning",
+                        primaryBtnText: "OK"
+                    });
                     if (passInp) passInp.focus();
                     return;
                 }
@@ -276,12 +600,23 @@ class AppController {
                 if (isCreateMode) {
                     // ACCOUNT REGISTRATION MODE (Self-registration)
                     if (!userName) {
-                        alert("Please enter your full name.");
+                        await this.showAlertDialog({
+                            title: "Full Name Required",
+                            message: "Please enter your full name to complete registration.",
+                            type: "warning",
+                            primaryBtnText: "OK"
+                        });
                         if (nameInp) nameInp.focus();
                         return;
                     }
                     if (userAccount) {
-                        alert(`Registration Error: An account with email or ID "${inputVal}" is already registered. Please switch to "Account Sign In" to log in.`);
+                        await this.showAlertDialog({
+                            title: "Account Already Exists",
+                            message: `An account with email or ID "${inputVal}" is already registered.\n\nPlease switch to "Account Sign In" to access your account.`,
+                            type: "warning",
+                            primaryBtnText: "Switch to Sign In"
+                        });
+                        if (btnToggleMode && isCreateMode) btnToggleMode.click();
                         if (emailInp) emailInp.focus();
                         return;
                     }
@@ -333,8 +668,18 @@ class AppController {
                             if (res && res.profile) {
                                 userAccount = res.profile;
                             } else if (res && res.error) {
-                                if (res.code === "auth/wrong-password") {
-                                    alert(`Incorrect password for ${userEmail}. Please verify your credentials.`);
+                                if (res.code === "auth/wrong-password" || res.code === "auth/invalid-credential") {
+                                    await this.showAlertDialog({
+                                        title: "Incorrect Password",
+                                        message: `The password you entered for "${userEmail}" is incorrect. Please verify your credentials or click "Forgot Password?".`,
+                                        type: "error",
+                                        primaryBtnText: "Try Again",
+                                        secondaryBtnText: "Forgot Password?"
+                                    }).then(proceed => {
+                                        if (!proceed) {
+                                            this.showForgotPasswordDialog(userEmail);
+                                        }
+                                    });
                                     if (passInp) passInp.focus();
                                     return;
                                 }
@@ -345,13 +690,33 @@ class AppController {
                     }
 
                     if (!userAccount) {
-                        alert(`No registered account found for "${inputVal}". Click "+ Create Account" or check credentials with Exam Department.`);
+                        await this.showAlertDialog({
+                            title: "No Account Found",
+                            message: `No registered account found for "${inputVal}".\n\nPlease check your email or click "+ Create Account" to register.`,
+                            type: "error",
+                            primaryBtnText: "Try Again",
+                            secondaryBtnText: "+ Create Account"
+                        }).then(proceed => {
+                            if (!proceed && btnToggleMode && !isCreateMode) {
+                                btnToggleMode.click();
+                            }
+                        });
                         if (emailInp) emailInp.focus();
                         return;
                     }
 
                     if (userAccount.password && userAccount.password !== userPass) {
-                        alert(`Incorrect password for ${userEmail}. Please verify your credentials.`);
+                        await this.showAlertDialog({
+                            title: "Incorrect Password",
+                            message: `The password you entered for "${userEmail}" is incorrect. Please verify your credentials or click "Forgot Password?".`,
+                            type: "error",
+                            primaryBtnText: "Try Again",
+                            secondaryBtnText: "Forgot Password?"
+                        }).then(proceed => {
+                            if (!proceed) {
+                                this.showForgotPasswordDialog(userEmail);
+                            }
+                        });
                         if (passInp) passInp.focus();
                         return;
                     }
@@ -712,6 +1077,17 @@ class AppController {
         if (secBadge) secBadge.textContent = q.section || "Section A";
         if (qTotalBadge) qTotalBadge.textContent = `Q Total: ${q.awardedMarks}/${q.maxMarks}M`;
 
+        const qTopicEl = document.getElementById("hud-active-q-topic");
+        if (qTopicEl) {
+            if (q.topic) {
+                qTopicEl.textContent = q.topic;
+                qTopicEl.title = q.topic;
+                qTopicEl.style.display = "inline-block";
+            } else {
+                qTopicEl.style.display = "none";
+            }
+        }
+
         if (this.markingPanel) {
             const secTotals = this.markingPanel.getSectionTotals();
             const currentSec = secTotals.find(s => s.id === q.sectionId || s.name === q.section);
@@ -807,6 +1183,58 @@ class AppController {
         this.setAutosaveBadge("saving");
     }
 
+    awardZeroMarks(targetQ = null, explicitPos = null) {
+        const q = targetQ || this.markingPanel?.getActiveQuestion();
+        if (!q) return;
+
+        // 1. Mark question as 0 marks & status "wrong" in marking panel
+        this.markingPanel?.setActiveQuestionMark(0, "wrong");
+
+        // 2. Determine stamping position: use explicitPos or last click position or smart default
+        let stampPos = explicitPos || this.canvasEngine?.lastClickNormPos;
+        if (!stampPos) {
+            stampPos = { x: 0.25, y: 0.35 };
+        }
+
+        if (this.canvasEngine) {
+            // Check if page already has a wrong mark near stampPos.y, if not place one
+            const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
+            const hasRecentWrong = curPage && (curPage.annotations || []).some(a => a.type === "wrong" && Math.abs(a.y - stampPos.y) < 0.08);
+
+            if (!hasRecentWrong) {
+                const wrongStamp = {
+                    id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                    pageIndex: this.canvasEngine.currentPageIndex,
+                    type: "wrong",
+                    x: stampPos.x,
+                    y: stampPos.y,
+                    color: "#DC2626", // Teacher Red Ink
+                    marks: "",
+                    qNo: q.qNo,
+                    qLabel: q.label || `Q${q.qNo}`,
+                    isStep: true,
+                    hasMarginMark: false,
+                    scale: 1.0,
+                    timestamp: Date.now()
+                };
+                this.canvasEngine.addAnnotation(wrongStamp);
+            }
+
+            // NO margin mark total! "no need for the mark total ok"
+            this.canvasEngine.renderOverlay();
+        }
+
+        // 4. Update HUD and page total display
+        this.updateTopHud(q);
+        this.updatePageTotalDisplay();
+
+        // 5. User feedback
+        this.showToast(`Marked Q${q.qNo} as 0 Marks`);
+
+        this.hasUnsavedChanges = true;
+        this.setAutosaveBadge("saving");
+    }
+
     updatePageTotalDisplay() {
         const valEl = document.getElementById("ws-page-total-val");
         if (!valEl || !this.canvasEngine) return;
@@ -823,9 +1251,9 @@ class AppController {
             questions.forEach((q, idx) => {
                 const annTotal = this.canvasEngine.getQuestionTotalFromAnnotations(q.qNo);
                 const annList = this.canvasEngine.getAnnotationsForQuestion(q.qNo);
-                const hasAnnotations = annList.length > 0;
+                const hasScoreAnnotations = annList.length > 0 && annTotal > 0;
 
-                if (hasAnnotations) {
+                if (hasScoreAnnotations) {
                     const clamped = Math.min(q.maxMarks, Math.max(0, annTotal));
                     if (q.awardedMarks !== clamped || q.status === "unmarked") {
                         if (this.markingPanel) {
@@ -835,17 +1263,6 @@ class AppController {
                             if (clamped === q.maxMarks) q.status = "correct";
                             else if (clamped === 0) q.status = "wrong";
                             else q.status = "partial";
-                        }
-                        updated = true;
-                    }
-                } else {
-                    // No annotations for this question: if annotations were erased, reset mark to 0
-                    if (q.awardedMarks !== 0 && q.status !== "unmarked") {
-                        if (this.markingPanel) {
-                            this.markingPanel.assignQuestionMarkDirect(idx, 0);
-                        } else {
-                            q.awardedMarks = 0;
-                            q.status = "unmarked";
                         }
                         updated = true;
                     }
@@ -918,15 +1335,40 @@ class AppController {
             evaluation.pages = [CanvasEngine.generateDefaultLinedPageDataUrl(evaluation.studentName, evaluation.rollNo)];
         }
 
-        // If questions array is empty, load official Physics Board Paper blueprint (33 Qs / 70 Marks)
-        if ((!evaluation.questions || evaluation.questions.length === 0) && window.MockData && window.MockData.physicsTemplate) {
+        // Detect English or Physics paper template
+        const subLower = (evaluation.subject || "").toLowerCase();
+        const tmplLower = (evaluation.templateName || evaluation.examName || "").toLowerCase();
+        const isEnglish = subLower.includes("english") || tmplLower.includes("english") || (evaluation.questions && evaluation.questions.length === 13);
+
+        if (isEnglish && window.MockData && window.MockData.englishTemplate) {
+            const tmpl = window.MockData.englishTemplate;
+            evaluation.subject = "English";
+            evaluation.maxMarks = tmpl.maxMarks || 80;
+            evaluation.sections = JSON.parse(JSON.stringify(tmpl.sections));
+            if (!evaluation.examName) evaluation.examName = tmpl.name;
+
+            if (!evaluation.questions || evaluation.questions.length !== 13) {
+                evaluation.questions = JSON.parse(JSON.stringify(tmpl.questions));
+            } else {
+                evaluation.questions.forEach((q, idx) => {
+                    const templateQ = tmpl.questions[idx];
+                    if (templateQ) {
+                        q.qNo = templateQ.qNo;
+                        q.qNumber = templateQ.qNumber;
+                        q.label = templateQ.label || `Q${idx + 1}`;
+                        q.section = templateQ.section;
+                        q.sectionId = templateQ.sectionId;
+                        q.maxMarks = templateQ.maxMarks;
+                        q.topic = templateQ.topic;
+                    }
+                });
+            }
+        } else if ((!evaluation.questions || evaluation.questions.length === 0) && window.MockData && window.MockData.physicsTemplate) {
             evaluation.questions = JSON.parse(JSON.stringify(window.MockData.physicsTemplate.questions));
             evaluation.maxMarks = window.MockData.physicsTemplate.maxMarks || 70;
             evaluation.sections = window.MockData.physicsTemplate.sections || evaluation.sections || [];
-        }
-
-        // Ensure 33 Qs Physics Board paper has full 5-section separation (Sections A to E)
-        if (evaluation.questions && evaluation.questions.length === 33 && window.MockData && window.MockData.physicsTemplate) {
+        } else if (evaluation.questions && evaluation.questions.length === 33 && window.MockData && window.MockData.physicsTemplate) {
+            // Ensure 33 Qs Physics Board paper has full 5-section separation (Sections A to E)
             const hasMissingSections = !evaluation.sections || evaluation.sections.length <= 1;
             const hasCollapsedSectionIds = evaluation.questions.some((q, idx) => idx >= 16 && (!q.sectionId || q.sectionId === "sec_a"));
             if (hasMissingSections || hasCollapsedSectionIds) {
@@ -988,13 +1430,18 @@ class AppController {
             },
             onRadialMarkAwarded: (markVal, isStep, normPos) => {
                 const q = this.markingPanel?.getActiveQuestion();
+                if (Number(markVal) === 0) {
+                    // X / 0 is a step mark of 0 (wrong step indicator)
+                    // "x means wrong ok but dont give the mark hence it can be a step mark 0 right so x means just wrong no need for the mark total ok"
+                    // Do NOT overwrite question total marks or force question to 0!
+                    this.showToast(`Marked step as Wrong (✗) for ${q ? q.label : 'question'}`);
+                    return;
+                }
                 if (isStep) {
                     this.markingPanel?.addStepMark(markVal);
                 } else {
                     if (q && markVal >= q.maxMarks) {
                         this.markingPanel?.setActiveQuestionMark(q.maxMarks, "correct");
-                    } else if (markVal === 0) {
-                        this.markingPanel?.setActiveQuestionMark(0, "wrong");
                     } else {
                         this.markingPanel?.addMarkToActiveQuestion(markVal);
                     }
@@ -1012,6 +1459,9 @@ class AppController {
         this.markingPanel = new MarkingPanel(markingContainer, {
             onAwardFullMarks: (q) => {
                 this.awardFullMarksWithMarginStamp(q);
+            },
+            onAwardZeroMarks: (q) => {
+                this.awardZeroMarks(q);
             },
             onScoreChange: (scoreSummary) => {
                 this.activeEvaluation.obtainedMarks = scoreSummary.obtainedMarks;
@@ -1035,9 +1485,10 @@ class AppController {
                 this.updatePageTotalDisplay();
                 this.renderScorecardTable();
 
-                // If all questions marked, mark Completed
-                const hasUnmarked = scoreSummary.questions.some(q => q.status === "unmarked");
-                this.activeEvaluation.status = hasUnmarked ? "Pending" : "Completed";
+                // STRICT RULE: Keep status Pending until teacher explicitly clicks Save or Save & Next
+                if (!this.activeEvaluation.status || (this.activeEvaluation.status !== "Completed" && this.activeEvaluation.status !== "Corrected")) {
+                    this.activeEvaluation.status = "Pending";
+                }
 
                 this.hasUnsavedChanges = true;
                 this.setAutosaveBadge("saving");
@@ -1332,19 +1783,19 @@ class AppController {
             });
         }
 
-        // Delete Current Physics Paper
+        // Delete Current Paper
         const btnDeletePaper = document.getElementById("ws-btn-delete-paper");
         if (btnDeletePaper) {
-            btnDeletePaper.addEventListener("click", async () => {
+            btnDeletePaper.addEventListener("click", () => {
                 if (!this.activeEvaluation || !this.activeEvaluation.id) return;
-                const name = this.activeEvaluation.studentName || "this paper";
-                if (confirm(`Are you sure you want to delete ${name}'s Physics paper? This action cannot be undone.`)) {
-                    const id = this.activeEvaluation.id;
-                    await window.appStorage.deleteEvaluation(id);
-                    this.showToast(`Deleted ${name}'s Physics paper.`);
+                const targetEval = this.activeEvaluation;
+                this.showDeletePaperDialog(targetEval, async () => {
+                    await window.appStorage.deleteEvaluation(targetEval.id);
+                    this.showToast(`Deleted ${targetEval.studentName || 'student'}'s paper.`);
+                    this.activeEvaluation = null;
                     await this.loadEvaluations();
                     this.switchView("dashboard");
-                }
+                });
             });
         }
 
@@ -1526,6 +1977,7 @@ class AppController {
                     this.selectTool("tick");
                     break;
                 case "w":
+                case "x":
                     this.selectTool("wrong");
                     break;
                 case "c":
@@ -1640,10 +2092,14 @@ class AppController {
             this.activeEvaluation.grade = summary.grade;
             this.activeEvaluation.feedback = summary.feedback;
             this.activeEvaluation.questions = summary.questions;
-            if (summary.obtainedMarks > 0 || !summary.questions.some(q => q.status === "unmarked")) {
+            // STRICT RULE: Only mark "Completed" / "Corrected" when teacher explicitly clicks Save or Save & Next!
+            if (notify === true) {
                 this.activeEvaluation.status = "Completed";
             }
         }
+
+        this.activeEvaluation.lastUpdated = new Date().toISOString();
+        this.activeEvaluation.updatedAt = new Date().toISOString();
 
         // Save to IndexedDB / local storage
         await window.appStorage.saveEvaluation(this.activeEvaluation);
@@ -1714,12 +2170,8 @@ class AppController {
 
     isPaperCorrected(e) {
         if (!e) return false;
-        if (e.status === "Completed" || e.status === "Graded" || e.status === "Evaluated") return true;
-        if (Number(e.obtainedMarks) > 0) return true;
-        if (Array.isArray(e.questions) && e.questions.some(q => q.status === "correct" || q.status === "wrong" || Number(q.awardedMarks) > 0)) {
-            return true;
-        }
-        return false;
+        // Strictly consider corrected only when teacher explicitly saved/evaluated it
+        return e.status === "Completed" || e.status === "Corrected" || e.status === "Graded" || e.status === "Evaluated";
     }
 
     // --- Save & Next Student Navigation ---
@@ -2048,6 +2500,136 @@ class AppController {
     closeActionProgressModal() {
         const backdrop = document.getElementById("modal-action-progress-dialog");
         if (backdrop) backdrop.remove();
+    }
+
+    showDeletePaperDialog(ev, onDeleted) {
+        if (!ev || !ev.id) return;
+        const modalId = "ws-delete-modal-overlay";
+        const oldModal = document.getElementById(modalId);
+        if (oldModal) oldModal.remove();
+
+        const rawDate = ev.updatedAt || ev.lastUpdated || ev.createdAt;
+        let lastUpdatedStr = "—";
+        if (rawDate) {
+            const d = new Date(rawDate);
+            if (!isNaN(d.getTime())) {
+                lastUpdatedStr = `${d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })} at ${d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true })}`;
+            }
+        }
+
+        const isCorr = this.isPaperCorrected(ev);
+        const statusLabel = isCorr ? "Corrected" : "Uncorrected (Pending)";
+        const statusColor = isCorr ? "#16A34A" : "#D97706";
+
+        const modal = document.createElement("div");
+        modal.id = modalId;
+        modal.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: fadeInModal 0.2s ease-out;
+        `;
+
+        modal.innerHTML = `
+            <style>
+                @keyframes fadeInModal {
+                    from { opacity: 0; transform: scale(0.96); }
+                    to { opacity: 1; transform: scale(1); }
+                }
+                @keyframes spinLoading {
+                    to { transform: rotate(360deg); }
+                }
+            </style>
+            <div style="background: #FFFFFF; border-radius: 16px; max-width: 460px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.22); overflow: hidden; border: 1px solid #E2E8F0;">
+                <div style="padding: 24px; text-align: center;">
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                        </svg>
+                    </div>
+                    <h3 style="font-size: 1.2rem; font-weight: 700; color: #0F172A; margin: 0 0 8px;">Delete Answer Sheet</h3>
+                    <p style="font-size: 0.88rem; color: #64748B; margin: 0 0 18px; line-height: 1.45;">
+                        Are you sure you want to permanently delete this paper? All marks, annotations, and evaluations will be removed.
+                    </p>
+
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 16px; text-align: left; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Student:</span>
+                            <span style="font-size: 0.85rem; font-weight: 700; color: #1E293B;">${ev.studentName || "Unnamed Student"}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Roll Number:</span>
+                            <span style="font-size: 0.82rem; font-weight: 600; color: #334155; font-family: monospace;">${ev.rollNo || "—"}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Class & Subject:</span>
+                            <span style="font-size: 0.82rem; font-weight: 500; color: #334155;">${ev.class || ev.className || "Class 12"} • ${ev.subject || "Physics"}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Status:</span>
+                            <span style="font-size: 0.82rem; font-weight: 700; color: ${statusColor};">${statusLabel}</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Last Updated:</span>
+                            <span style="font-size: 0.8rem; color: #475569;">${lastUpdatedStr}</span>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" id="ws-btn-cancel-delete" style="flex: 1; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: all 0.15s ease;">
+                            Cancel
+                        </button>
+                        <button type="button" id="ws-btn-confirm-delete" style="flex: 1; height: 42px; border-radius: 10px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 600; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;">
+                            <span id="ws-btn-delete-text">Delete Paper</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const cancelBtn = modal.querySelector("#ws-btn-cancel-delete");
+        const confirmBtn = modal.querySelector("#ws-btn-confirm-delete");
+        const delText = modal.querySelector("#ws-btn-delete-text");
+
+        cancelBtn.addEventListener("click", () => modal.remove());
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) modal.remove();
+        });
+
+        confirmBtn.addEventListener("click", async () => {
+            cancelBtn.disabled = true;
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = "0.75";
+            confirmBtn.style.cursor = "not-allowed";
+            delText.innerHTML = `<span style="display: inline-block; width: 15px; height: 15px; border: 2px solid #FFFFFF; border-top-color: transparent; border-radius: 50%; animation: spinLoading 0.7s linear infinite; margin-right: 6px; vertical-align: middle;"></span> Deleting...`;
+
+            try {
+                if (onDeleted) await onDeleted();
+                delText.innerHTML = `✓ Deleted`;
+                confirmBtn.style.background = "#16A34A";
+                await new Promise(r => setTimeout(r, 400));
+                modal.remove();
+            } catch (err) {
+                console.error("Delete error:", err);
+                cancelBtn.disabled = false;
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = "1";
+                confirmBtn.style.cursor = "pointer";
+                delText.textContent = "Delete Paper";
+            }
+        });
     }
 
     // --- Settings Modal & Firebase Bridge ---

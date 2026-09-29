@@ -2132,6 +2132,31 @@ p, span, div, strong, b, th, td, label, a,
     font-family: var(--font-mono);
 }
 
+.q-topic-subtitle {
+    display: block;
+    font-size: 0.73rem;
+    color: #475569;
+    font-weight: 500;
+    margin-top: 2px;
+    max-width: 175px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.2;
+}
+
+.active-q-topic-banner {
+    padding: 7px 12px;
+    background: #F1F5F9;
+    border-radius: 6px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #1E293B;
+    margin-bottom: 10px;
+    border-left: 3px solid #007AFF;
+    line-height: 1.35;
+}
+
 .q-row-subq-strip {
     display: flex;
     flex-wrap: wrap;

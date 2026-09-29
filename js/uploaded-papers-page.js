@@ -406,7 +406,11 @@ class UploadedPapersPageManager {
         this.container.querySelectorAll(".btn-action-eval").forEach(btn => {
             btn.addEventListener("click", async () => {
                 const id = btn.getAttribute("data-paper-id");
-                const target = this.papers.find(p => p.id === id);
+                let target = this.papers.find(p => p.id === id);
+                if (window.appStorage) {
+                    const fresh = await window.appStorage.getEvaluationById(id);
+                    if (fresh) target = fresh;
+                }
                 if (target && window.app) {
                     window.app.openWorkspace(target);
                 }
