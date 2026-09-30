@@ -1538,8 +1538,9 @@ class CanvasEngine {
 
         const qInfo = (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo() : null) || { label: "Q1", maxMarks: 2, qNo: 1 };
         const qMax = Number(qInfo.maxMarks) || 2;
-        const isFull = !isStep && val >= qMax;
-        const isZero = Number(val) === 0;
+        const numVal = Number(val) || 0;
+        const isFull = !isStep && numVal >= qMax;
+        const isZero = numVal === 0;
 
         // When mark is 0, show "wrong" (X mark) not "tick"
         const stampType = isZero ? "wrong" : "tick";
@@ -1552,29 +1553,27 @@ class CanvasEngine {
             x: normPos.x,
             y: normPos.y,
             color: "#DC2626", // Teacher Red Ink
-            marks: val,
+            marks: numVal,
             qNo: qInfo.qNo || 1,
             qLabel: qInfo.label || `Q${qInfo.qNo || 1}`,
             isStep: !!isStep,
-            hasMarginMark: isFull || isZero,
+            hasMarginMark: !isStep || isFull || isZero,
             scale: 1.0,
             timestamp: Date.now()
         };
 
         this.addAnnotation(stamp);
 
-        // If awarding full marks, stamp right margin question mark; if 0, stamp question mark label (e.g. Q1: 0M) as like before
-        if (isFull) {
-            this.stampRightMarginMark(qInfo.qNo || qInfo.label, val, normPos.y);
-        } else if (isZero) {
-            this.stampRightMarginMark(qInfo.qNo || qInfo.label, 0, normPos.y);
+        // If awarding direct question mark (not a step mark) or full or zero, stamp margin question mark (e.g. Q1: 0.5M, Q1: 2M, Q1: 0M)
+        if (!isStep || isFull || isZero) {
+            this.stampRightMarginMark(qInfo.qNo || qInfo.label, numVal, normPos.y);
         }
 
         this.renderOverlay();
 
         // Callback to app / marking panel to calculate and update totals
         if (this.options.onRadialMarkAwarded) {
-            this.options.onRadialMarkAwarded(val, !!isStep, normPos);
+            this.options.onRadialMarkAwarded(numVal, !!isStep, normPos);
         }
     }
 

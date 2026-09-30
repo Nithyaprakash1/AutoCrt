@@ -1121,6 +1121,18 @@ class AppController {
                     this.markingPanel?.setActiveQuestionMark(mark);
                     if (this.canvasEngine) {
                         this.canvasEngine.setMarksValue(mark > 0 ? `+${mark}` : "0");
+                        const activeQ = this.markingPanel?.getActiveQuestion();
+                        if (activeQ) {
+                            const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
+                            const existingMarginMark = (curPage?.annotations || []).find(a => 
+                                (a.type === "margin_mark" || a.type === "left_mark") && 
+                                this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(activeQ.qNo)
+                            );
+                            if (existingMarginMark) {
+                                existingMarginMark.marks = mark;
+                                this.canvasEngine.renderOverlay();
+                            }
+                        }
                     }
                     const activeQ = this.markingPanel?.getActiveQuestion();
                     if (activeQ) {
@@ -1469,25 +1481,24 @@ class AppController {
             onRadialMarkAwarded: (markVal, isStep, normPos) => {
                 const q = this.markingPanel?.getActiveQuestion();
                 let awardedFull = false;
-                if (Number(markVal) === 0) {
+                const numVal = Number(markVal) || 0;
+                if (numVal === 0) {
                     // In round mark dial selecting 0 awards 0 marks to that question and sets status to "wrong"
                     this.markingPanel?.setActiveQuestionMark(0, "wrong");
                 } else if (isStep) {
-                    this.markingPanel?.addStepMark(markVal);
+                    // Step marks (+0.5, +1.0): canvas annotation was added and syncQuestionScoresFromAnnotations
+                    // already computed the exact sum of all step marks on canvas. Never add a second time!
                     const updatedQ = this.markingPanel?.getActiveQuestion();
                     if (updatedQ && updatedQ.awardedMarks >= updatedQ.maxMarks) {
                         awardedFull = true;
                     }
                 } else {
-                    if (q && markVal >= q.maxMarks) {
-                        this.markingPanel?.setActiveQuestionMark(q.maxMarks, "correct");
+                    // Direct question mark (e.g. 0.5 Marks, 1.0 Marks, Full Marks):
+                    // Explicitly set question score to numVal (never add on top of existing!)
+                    const status = (q && numVal >= q.maxMarks) ? "correct" : (numVal === 0 ? "wrong" : "partial");
+                    this.markingPanel?.setActiveQuestionMark(numVal, status);
+                    if (q && numVal >= q.maxMarks) {
                         awardedFull = true;
-                    } else {
-                        this.markingPanel?.addMarkToActiveQuestion(markVal);
-                        const updatedQ = this.markingPanel?.getActiveQuestion();
-                        if (updatedQ && updatedQ.awardedMarks >= updatedQ.maxMarks) {
-                            awardedFull = true;
-                        }
                     }
                 }
                 const activeQ = this.markingPanel?.getActiveQuestion();
@@ -1909,6 +1920,18 @@ class AppController {
                 this.markingPanel?.setActiveQuestionMark(val);
                 if (this.canvasEngine) {
                     this.canvasEngine.setMarksValue(val > 0 ? `+${val}` : "0");
+                    const activeQ = this.markingPanel?.getActiveQuestion();
+                    if (activeQ) {
+                        const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
+                        const existingMarginMark = (curPage?.annotations || []).find(a => 
+                            (a.type === "margin_mark" || a.type === "left_mark") && 
+                            this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(activeQ.qNo)
+                        );
+                        if (existingMarginMark) {
+                            existingMarginMark.marks = val;
+                            this.canvasEngine.renderOverlay();
+                        }
+                    }
                 }
                 const activeQ = this.markingPanel?.getActiveQuestion();
                 if (activeQ) {
