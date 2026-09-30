@@ -636,7 +636,7 @@ class CanvasEngine {
                 const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
                 const markW = ((scoreText.length * 8 + 14) * scale) / w;
                 const markH = (21 * scale) / h;
-                const markX = (ann.x !== undefined && ann.x !== null ? ann.x : 0.08);
+                const markX = (ann.x > 0.5 ? 0.08 : (ann.x || 0.08));
                 minX = markX - markW / 2;
                 maxX = markX + markW / 2;
                 minY = ann.y - markH / 2;
@@ -1012,7 +1012,6 @@ class CanvasEngine {
                 y: pos.y / (page.origHeight * this.zoom)
             };
             this.lastClickNormPos = { ...normPos };
-            this.currentCursorNormPos = { ...normPos };
 
             // Check if clicked inside currently selected annotation body to drag
             if (this.selectedAnnotation) {
@@ -1085,7 +1084,6 @@ class CanvasEngine {
                 x: Math.max(0, Math.min(1, pos.x / (page.origWidth * this.zoom))),
                 y: Math.max(0, Math.min(1, pos.y / (page.origHeight * this.zoom)))
             };
-            this.currentCursorNormPos = { ...normPos };
 
             // 0. Marquee Selection Dragging
             if (this.isMarqueeSelecting && this.marqueeStartPixel && this.marqueeBoxEl) {
@@ -1346,20 +1344,16 @@ class CanvasEngine {
         return opts;
     }
 
-    stampRightMarginMark(qNo, marks, yNorm = null, xNorm = null) {
+    stampRightMarginMark(qNo, marks, yNorm = null) {
         const page = this.pages[this.currentPageIndex];
         if (!page) return null;
 
-        const x = (xNorm !== null && xNorm !== undefined)
-            ? xNorm
-            : (this.lastClickNormPos ? this.lastClickNormPos.x : (this.currentCursorNormPos ? this.currentCursorNormPos.x : 0.08));
-        const y = (yNorm !== null && yNorm !== undefined)
-            ? yNorm
-            : (this.lastClickNormPos ? this.lastClickNormPos.y : (this.currentCursorNormPos ? this.currentCursorNormPos.y : 0.4));
+        const y = (yNorm !== null && yNorm !== undefined) ? yNorm : (this.lastClickNormPos ? this.lastClickNormPos.y : 0.4);
+        const marginX = 0.08; // Left margin of paper sheet (Question Total on LEFT)
         const targetKey = this.normalizeQKey(qNo);
 
         // Check if there is already a margin_mark for this question on this page
-        const existingIdx = (page.annotations || []).findIndex(a => (a.type === "margin_mark" || a.type === "left_mark") && this.normalizeQKey(a.qNo || a.qLabel) === targetKey);
+        const existingIdx = (page.annotations || []).findIndex(a => a.type === "margin_mark" && this.normalizeQKey(a.qNo || a.qLabel) === targetKey);
         const newAnn = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
@@ -1368,8 +1362,8 @@ class CanvasEngine {
             qLabel: qNo ? (String(qNo).toUpperCase().startsWith("Q") ? String(qNo) : `Q${qNo}`) : "",
             marks: marks,
             color: "#DC2626", // Strict Teacher Red Ink
-            x: Math.max(0.02, Math.min(0.96, x)),
-            y: Math.max(0.02, Math.min(0.98, y)),
+            x: marginX,
+            y: y,
             scale: 1.0,
             timestamp: Date.now()
         };
@@ -1550,16 +1544,12 @@ class CanvasEngine {
         // When mark is 0, show "wrong" (X mark) not "tick"
         const stampType = isZero ? "wrong" : "tick";
 
-        // Place tick/cross slightly to the left and Question Marks Label right at the cursor position
-        const tickX = (isFull || isZero) ? Math.max(0.02, normPos.x - 0.025) : normPos.x;
-        const labelX = (isFull || isZero) ? Math.min(0.96, normPos.x + 0.035) : normPos.x;
-
         // Stamp tick or X cross in red ink with marks badge
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
             type: stampType,
-            x: tickX,
+            x: normPos.x,
             y: normPos.y,
             color: "#DC2626", // Teacher Red Ink
             marks: val,
@@ -1573,11 +1563,11 @@ class CanvasEngine {
 
         this.addAnnotation(stamp);
 
-        // If awarding full marks, stamp question mark label at cursor; if 0, stamp question mark label (e.g. Q1: 0M) at cursor
+        // If awarding full marks, stamp right margin question mark; if 0, stamp question mark label (e.g. Q1: 0M) as like before
         if (isFull) {
-            this.stampRightMarginMark(qInfo.qNo || qInfo.label, val, normPos.y, labelX);
+            this.stampRightMarginMark(qInfo.qNo || qInfo.label, val, normPos.y);
         } else if (isZero) {
-            this.stampRightMarginMark(qInfo.qNo || qInfo.label, 0, normPos.y, labelX);
+            this.stampRightMarginMark(qInfo.qNo || qInfo.label, 0, normPos.y);
         }
 
         this.renderOverlay();
@@ -1667,30 +1657,6 @@ class CanvasEngine {
     }
 
     placeStamp(type, pos) {
-        if (type === "marks") {
-            const qInfo = (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo() : null) || { label: "Q1", maxMarks: 2, qNo: 1 };
-            const qNo = qInfo.qNo || 1;
-            const qLabel = qInfo.label || `Q${qNo}`;
-            const marksVal = (qInfo.currentMarks !== undefined && qInfo.currentMarks !== null && qInfo.currentMarks > 0) ? qInfo.currentMarks : (qInfo.maxMarks || 1);
-
-            const newAnn = {
-                id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-                pageIndex: this.currentPageIndex,
-                type: "margin_mark",
-                qNo: qNo,
-                qLabel: qLabel,
-                marks: marksVal,
-                color: "#DC2626",
-                x: pos.x,
-                y: pos.y,
-                scale: 1.0,
-                timestamp: Date.now()
-            };
-            this.addAnnotation(newAnn);
-            this.renderOverlay();
-            return newAnn;
-        }
-
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
@@ -1701,6 +1667,10 @@ class CanvasEngine {
             scale: 1.0,
             timestamp: Date.now()
         };
+
+        if (type === "marks") {
+            stamp.text = this.activeMarksValue || "+1";
+        }
 
         this.addAnnotation(stamp);
         this.renderOverlay();
@@ -2128,7 +2098,7 @@ class CanvasEngine {
                 ctx.stroke();
 
                 // If this tick has an awarded mark or step mark attached (GTA V radial wheel mark)
-                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "" && !ann.hasMarginMark) {
+                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "") {
                     const rawVal = Number(ann.marks);
                     const markStr = String(ann.marks).startsWith("+") || rawVal <= 0 ? String(ann.marks) : `+${ann.marks}`;
                     const badgeText = ann.isStep ? `${markStr} Step` : `${markStr} M`;
@@ -2169,7 +2139,7 @@ class CanvasEngine {
                 ctx.stroke();
 
                 // Optional marks badge next to the X cross mark
-                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "" && !ann.hasMarginMark) {
+                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "") {
                     const badgeText = `${ann.marks}`;
                     ctx.font = `bold ${Math.round(11 * effScale)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
                     const textMetrics = ctx.measureText(badgeText);
@@ -2312,8 +2282,8 @@ class CanvasEngine {
                 const bW = textMetrics.width + bPadX * 2;
                 const bH = numFontSize + bPadY * 2;
 
-                // Render at the exact x coordinate of the annotation (where cursor was placed)
-                const markX = (ann.x !== undefined && ann.x !== null ? ann.x : 0.08) * canvasW;
+                // Ensure question total stamp renders on the LEFT margin (0.08)
+                const markX = (ann.x > 0.5 ? 0.08 : (ann.x || 0.08)) * canvasW;
 
                 // Neat pill badge on left margin of paper sheet
                 ctx.shadowColor = "rgba(220, 38, 38, 0.14)";

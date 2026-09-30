@@ -1161,8 +1161,8 @@ class AppController {
         // 1. Award full marks to active question in marking panel
         this.markingPanel?.setActiveQuestionMark(maxMarks, "correct");
 
-        // 2. Determine stamping position: use cursor position or last click position
-        let stampPos = this.canvasEngine?.currentCursorNormPos || this.canvasEngine?.lastClickNormPos;
+        // 2. Determine stamping position: use last click position or smart middle-margin
+        let stampPos = this.canvasEngine?.lastClickNormPos;
         if (!stampPos) {
             stampPos = { x: 0.25, y: 0.35 };
         }
@@ -1172,15 +1172,12 @@ class AppController {
             const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
             const hasRecentTick = curPage && (curPage.annotations || []).some(a => a.type === "tick" && Math.abs(a.y - stampPos.y) < 0.08);
 
-            const tickX = Math.max(0.02, stampPos.x - 0.025);
-            const labelX = Math.min(0.96, stampPos.x + 0.035);
-
             if (!hasRecentTick) {
                 const tickStamp = {
                     id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
                     pageIndex: this.canvasEngine.currentPageIndex,
                     type: "tick",
-                    x: tickX,
+                    x: stampPos.x,
                     y: stampPos.y,
                     color: "#DC2626", // Teacher Red Ink
                     marks: maxMarks,
@@ -1194,8 +1191,8 @@ class AppController {
                 this.canvasEngine.addAnnotation(tickStamp);
             }
 
-            // 3. Stamp question total marks where cursor is placed
-            this.canvasEngine.stampRightMarginMark(q.qNo, maxMarks, stampPos.y, labelX);
+            // 3. Stamp question total marks at the left margin of paper sheet horizontally aligned from tick
+            this.canvasEngine.stampRightMarginMark(q.qNo, maxMarks, stampPos.y);
             this.canvasEngine.renderOverlay();
         }
 
@@ -1229,8 +1226,8 @@ class AppController {
         // 1. Mark question as 0 marks & status "wrong" in marking panel
         this.markingPanel?.setActiveQuestionMark(0, "wrong");
 
-        // 2. Determine stamping position: use explicitPos or cursor position or last click position
-        let stampPos = explicitPos || this.canvasEngine?.currentCursorNormPos || this.canvasEngine?.lastClickNormPos;
+        // 2. Determine stamping position: use explicitPos or last click position or smart default
+        let stampPos = explicitPos || this.canvasEngine?.lastClickNormPos;
         if (!stampPos) {
             stampPos = { x: 0.25, y: 0.35 };
         }
@@ -1240,15 +1237,12 @@ class AppController {
             const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
             const hasRecentWrong = curPage && (curPage.annotations || []).some(a => a.type === "wrong" && Math.abs(a.y - stampPos.y) < 0.08);
 
-            const wrongX = Math.max(0.02, stampPos.x - 0.025);
-            const labelX = Math.min(0.96, stampPos.x + 0.035);
-
             if (!hasRecentWrong) {
                 const wrongStamp = {
                     id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
                     pageIndex: this.canvasEngine.currentPageIndex,
                     type: "wrong",
-                    x: wrongX,
+                    x: stampPos.x,
                     y: stampPos.y,
                     color: "#DC2626", // Teacher Red Ink
                     marks: 0,
@@ -1262,8 +1256,8 @@ class AppController {
                 this.canvasEngine.addAnnotation(wrongStamp);
             }
 
-            // Stamp question mark label where cursor was placed (e.g. Q1: 0M)
-            this.canvasEngine.stampRightMarginMark(q.qNo, 0, stampPos.y, labelX);
+            // Stamp question mark label on margin (e.g. Q1: 0M) as like before
+            this.canvasEngine.stampRightMarginMark(q.qNo, 0, stampPos.y);
             this.canvasEngine.renderOverlay();
         }
 
@@ -2110,9 +2104,8 @@ class AppController {
 
                     if (committingQ.awardedMarks > 0) {
                         if (this.canvasEngine) {
-                            const stampY = this.canvasEngine.currentCursorNormPos ? this.canvasEngine.currentCursorNormPos.y : (this.canvasEngine.lastClickNormPos ? this.canvasEngine.lastClickNormPos.y : 0.4);
-                            const stampX = this.canvasEngine.currentCursorNormPos ? this.canvasEngine.currentCursorNormPos.x : (this.canvasEngine.lastClickNormPos ? this.canvasEngine.lastClickNormPos.x : 0.08);
-                            this.canvasEngine.stampRightMarginMark(committingQ.qNo, committingQ.awardedMarks, stampY, stampX);
+                            const stampY = this.canvasEngine.lastClickNormPos ? this.canvasEngine.lastClickNormPos.y : 0.4;
+                            this.canvasEngine.stampRightMarginMark(committingQ.qNo, committingQ.awardedMarks, stampY);
                             this.canvasEngine.renderOverlay();
                         }
                         this.updatePageTotalDisplay();
