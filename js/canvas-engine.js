@@ -1351,12 +1351,10 @@ class CanvasEngine {
         const page = this.pages[this.currentPageIndex];
         if (!page) return null;
 
-        const x = (xNorm !== null && xNorm !== undefined)
-            ? xNorm
-            : (this.lastClickNormPos ? this.lastClickNormPos.x : (this.currentCursorNormPos ? this.currentCursorNormPos.x : 0.08));
         const y = (yNorm !== null && yNorm !== undefined)
             ? yNorm
             : (this.lastClickNormPos ? this.lastClickNormPos.y : (this.currentCursorNormPos ? this.currentCursorNormPos.y : 0.4));
+        const marginX = (xNorm !== null && xNorm !== undefined) ? Math.max(0.02, Math.min(0.96, xNorm)) : 0.08;
         const targetKey = this.normalizeQKey(qNo);
 
         // Check if there is already a margin_mark or left_mark for this question on this page
@@ -1372,7 +1370,7 @@ class CanvasEngine {
             qLabel: qNo ? (String(qNo).toUpperCase().startsWith("Q") ? String(qNo) : `Q${qNo}`) : "",
             marks: marks,
             color: "#DC2626", // Strict Teacher Red Ink
-            x: Math.max(0.02, Math.min(0.96, x)),
+            x: marginX,
             y: Math.max(0.02, Math.min(0.98, y)),
             scale: 1.0,
             timestamp: Date.now()
@@ -1527,11 +1525,11 @@ class CanvasEngine {
         // When mark is 0, show "wrong" (X mark) not "tick"
         const stampType = isZero ? "wrong" : "tick";
 
-        // Place tick/cross slightly to the left and Question Marks Label right beside it at the cursor position
-        const tickX = (isFull || isZero || !isStep) ? Math.max(0.02, normPos.x - 0.025) : normPos.x;
-        const labelX = (isFull || isZero || !isStep) ? Math.min(0.96, normPos.x + 0.035) : normPos.x;
+        // When giving full mark alone, place tick slightly left and print question label at the side edge of the mark
+        const tickX = isFull ? Math.max(0.02, normPos.x - 0.025) : normPos.x;
+        const labelX = Math.min(0.96, normPos.x + 0.035);
 
-        // Stamp tick or X cross in red ink with marks badge
+        // Stamp tick or X cross in red ink with marks badge at clicked position
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
@@ -1543,15 +1541,15 @@ class CanvasEngine {
             qNo: qInfo.qNo || 1,
             qLabel: qInfo.label || `Q${qInfo.qNo || 1}`,
             isStep: !!isStep,
-            hasMarginMark: !isStep || isFull || isZero,
+            hasMarginMark: isFull, // Full mark alone prints question label at side edge
             scale: 1.0,
             timestamp: Date.now()
         };
 
         this.addAnnotation(stamp);
 
-        // If awarding direct question mark (not a step mark) or full or zero, stamp question mark label (e.g. Q1: 0.5M, Q1: 2M, Q1: 0M) right at cursor position
-        if (!isStep || isFull || isZero) {
+        // When giving full mark alone, print the question label right at the side edge of the mark
+        if (isFull) {
             this.stampRightMarginMark(qInfo.qNo || qInfo.label, numVal, normPos.y, labelX);
         }
 
@@ -1642,30 +1640,6 @@ class CanvasEngine {
     }
 
     placeStamp(type, pos) {
-        if (type === "marks") {
-            const qInfo = (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo() : null) || { label: "Q1", maxMarks: 2, qNo: 1 };
-            const qNo = qInfo.qNo || 1;
-            const qLabel = qInfo.label || `Q${qNo}`;
-            const marksVal = (qInfo.currentMarks !== undefined && qInfo.currentMarks !== null && qInfo.currentMarks > 0) ? qInfo.currentMarks : (qInfo.maxMarks || 1);
-
-            const newAnn = {
-                id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-                pageIndex: this.currentPageIndex,
-                type: "margin_mark",
-                qNo: qNo,
-                qLabel: qLabel,
-                marks: marksVal,
-                color: "#DC2626",
-                x: pos.x,
-                y: pos.y,
-                scale: 1.0,
-                timestamp: Date.now()
-            };
-            this.addAnnotation(newAnn);
-            this.renderOverlay();
-            return newAnn;
-        }
-
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
@@ -1676,6 +1650,10 @@ class CanvasEngine {
             scale: 1.0,
             timestamp: Date.now()
         };
+
+        if (type === "marks") {
+            stamp.text = this.activeMarksValue || "+1";
+        }
 
         this.addAnnotation(stamp);
         this.renderOverlay();
@@ -2144,7 +2122,7 @@ class CanvasEngine {
                 ctx.stroke();
 
                 // Optional marks badge next to the X cross mark
-                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "" && !ann.hasMarginMark) {
+                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "") {
                     const badgeText = `${ann.marks}`;
                     ctx.font = `bold ${Math.round(11 * effScale)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
                     const textMetrics = ctx.measureText(badgeText);
