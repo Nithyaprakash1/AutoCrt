@@ -1131,6 +1131,10 @@ class AppController {
                             if (existingMarginMark) {
                                 existingMarginMark.marks = mark;
                                 this.canvasEngine.renderOverlay();
+                            } else if (mark >= activeQ.maxMarks) {
+                                const stampY = this.canvasEngine.lastClickNormPos ? this.canvasEngine.lastClickNormPos.y : (this.canvasEngine.currentCursorNormPos ? this.canvasEngine.currentCursorNormPos.y : 0.4);
+                                this.canvasEngine.stampRightMarginMark(activeQ.qNo, mark, stampY);
+                                this.canvasEngine.renderOverlay();
                             }
                         }
                     }
@@ -1491,6 +1495,18 @@ class AppController {
                     const updatedQ = this.markingPanel?.getActiveQuestion();
                     if (updatedQ && updatedQ.awardedMarks >= updatedQ.maxMarks) {
                         awardedFull = true;
+                        if (this.canvasEngine) {
+                            const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
+                            const hasMarginMark = (curPage?.annotations || []).some(a =>
+                                (a.type === "margin_mark" || a.type === "left_mark") &&
+                                this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(updatedQ.qNo)
+                            );
+                            if (!hasMarginMark) {
+                                const stampY = normPos ? normPos.y : 0.4;
+                                this.canvasEngine.stampRightMarginMark(updatedQ.qNo, updatedQ.awardedMarks, stampY);
+                                this.canvasEngine.renderOverlay();
+                            }
+                        }
                     }
                 } else {
                     // Direct question mark (e.g. 0.5 Marks, 1.0 Marks, Full Marks):
@@ -2153,6 +2169,10 @@ class AppController {
                         );
                         if (existingMarginMark) {
                             existingMarginMark.marks = mark;
+                            this.canvasEngine.renderOverlay();
+                        } else if (mark >= activeQ.maxMarks) {
+                            const stampY = this.canvasEngine.lastClickNormPos ? this.canvasEngine.lastClickNormPos.y : (this.canvasEngine.currentCursorNormPos ? this.canvasEngine.currentCursorNormPos.y : 0.4);
+                            this.canvasEngine.stampRightMarginMark(activeQ.qNo, mark, stampY);
                             this.canvasEngine.renderOverlay();
                         }
                     }
