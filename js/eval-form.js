@@ -359,6 +359,12 @@ class EvaluationForm {
     }
 
     async processPDFFile(file) {
+        if (!window.pdfjsLib && window.ensurePdfJs) {
+            await window.ensurePdfJs();
+        }
+        if (!window.pdfjsLib && window.CanvasEngine && window.CanvasEngine.ensurePdfJs) {
+            await window.CanvasEngine.ensurePdfJs();
+        }
         if (!window.pdfjsLib) {
             alert("PDF.js library is loading. Please try again in a few seconds.");
             return;

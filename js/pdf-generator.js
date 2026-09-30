@@ -27,43 +27,61 @@ class PDFGenerator {
         let pages = evaluation.pages || [];
         const annotations = evaluation.annotations || [];
 
-        // If paper was stored as optimized single PDF, expand pages on demand via pdfjsLib
-        const isPdf = (pages.length === 1 && typeof pages[0] === "string" && (pages[0].startsWith("data:application/pdf") || pages[0].includes(".pdf") || pages[0].includes("alt=media") || pages[0].includes("firebasestorage"))) ||
-                      (evaluation.pdfDataUrl && (!pages || pages.length <= 1));
-        const pdfSrc = (pages.length === 1 && typeof pages[0] === "string" && (pages[0].startsWith("data:application/pdf") || pages[0].includes("firebasestorage") || pages[0].includes(".pdf"))) 
-                       ? pages[0] 
-                       : (evaluation.pdfStorageUrl || evaluation.pdfDataUrl || pages[0]);
+        // If paper was stored as single PDF, extract pages via pdfjsLib
+        const pdfCandidate = evaluation.pdfStorageUrl || evaluation.pdfDataUrl || (pages.length > 0 ? pages[0] : null);
+        const isPdf = typeof pdfCandidate === "string" && (
+            pdfCandidate.startsWith("data:application/pdf") ||
+            pdfCandidate.includes("evaluations_pdf") ||
+            pdfCandidate.toLowerCase().includes(".pdf") ||
+            pdfCandidate.includes("alt=media") ||
+            pdfCandidate.includes("firebasestorage") ||
+            pdfCandidate.includes("/proxy?url=")
+        );
+        const hasMultipleRealPages = Array.isArray(pages) && pages.length > 1 && !pages[0].startsWith("data:application/pdf");
 
-        if (isPdf && pdfSrc && window.pdfjsLib) {
-            try {
-                if (onProgress) onProgress(25, "Extracting PDF answer sheet pages...");
-                let loadingTask = null;
-                const uint8Array = await CanvasEngine.fetchPdfBytes(pdfSrc);
-                if (uint8Array) {
-                    loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
-                } else {
-                    loadingTask = window.pdfjsLib.getDocument({ url: pdfSrc });
-                }
-                const pdfDoc = await loadingTask.promise;
-                if (pdfDoc && pdfDoc.numPages >= 1) {
-                    const rendered = [];
-                    for (let pNum = 1; pNum <= pdfDoc.numPages; pNum++) {
-                        const pdfPage = await pdfDoc.getPage(pNum);
-                        const unscaled = pdfPage.getViewport({ scale: 1.0 });
-                        const targetW = 1300;
-                        let sc = Math.max(1.0, Math.min(1.5, targetW / unscaled.width));
-                        const viewport = pdfPage.getViewport({ scale: sc });
-                        const offCanvas = document.createElement("canvas");
-                        offCanvas.width = viewport.width;
-                        offCanvas.height = viewport.height;
-                        const offCtx = offCanvas.getContext("2d");
-                        await pdfPage.render({ canvasContext: offCtx, viewport }).promise;
-                        rendered.push(offCanvas.toDataURL("image/jpeg", 0.82));
+        if (isPdf && !hasMultipleRealPages) {
+            if (window.CanvasEngine && window.CanvasEngine.ensurePdfJs) {
+                await window.CanvasEngine.ensurePdfJs();
+            }
+            if (window.pdfjsLib) {
+                try {
+                    if (onProgress) onProgress(25, "Extracting PDF answer sheet pages...");
+                    let loadingTask = null;
+                    const uint8Array = await CanvasEngine.fetchPdfBytes(pdfCandidate);
+                    if (uint8Array) {
+                        try {
+                            loadingTask = window.pdfjsLib.getDocument({ data: uint8Array });
+                        } catch (eWorker) {
+                            loadingTask = window.pdfjsLib.getDocument({ data: uint8Array, isEvalSupported: false });
+                        }
+                    } else if (pdfCandidate.startsWith("http://") || pdfCandidate.startsWith("https://")) {
+                        loadingTask = window.pdfjsLib.getDocument({ url: pdfCandidate, withCredentials: false });
                     }
-                    if (rendered.length > 0) pages = rendered;
+                    if (loadingTask) {
+                        const pdfDoc = await loadingTask.promise;
+                        if (pdfDoc && pdfDoc.numPages >= 1) {
+                            const rendered = [];
+                            for (let pNum = 1; pNum <= pdfDoc.numPages; pNum++) {
+                                const pdfPage = await pdfDoc.getPage(pNum);
+                                const unscaled = pdfPage.getViewport({ scale: 1.0 });
+                                const targetW = 1400;
+                                let sc = Math.max(1.0, Math.min(2.0, targetW / unscaled.width));
+                                const viewport = pdfPage.getViewport({ scale: sc });
+                                const offCanvas = document.createElement("canvas");
+                                offCanvas.width = viewport.width;
+                                offCanvas.height = viewport.height;
+                                const offCtx = offCanvas.getContext("2d");
+                                offCtx.fillStyle = "#ffffff";
+                                offCtx.fillRect(0, 0, viewport.width, viewport.height);
+                                await pdfPage.render({ canvasContext: offCtx, viewport }).promise;
+                                rendered.push(offCanvas.toDataURL("image/jpeg", 0.88));
+                            }
+                            if (rendered.length > 0) pages = rendered;
+                        }
+                    }
+                } catch (err) {
+                    console.warn("Could not expand PDF in PDFGenerator:", err);
                 }
-            } catch (err) {
-                console.warn("Could not expand PDF in PDFGenerator:", err);
             }
         }
 
@@ -144,8 +162,41 @@ class PDFGenerator {
     static async renderCompositePage(imageSrc, annotations) {
         let safeSrc = imageSrc;
 
-        // If remote HTTP/HTTPS Firebase Storage URL, load as local blob URL to avoid canvas taint
-        if (typeof safeSrc === "string" && (safeSrc.startsWith("http://") || safeSrc.startsWith("https://"))) {
+        const isPdf = typeof safeSrc === "string" && (
+            safeSrc.startsWith("data:application/pdf") ||
+            safeSrc.includes("evaluations_pdf") ||
+            safeSrc.toLowerCase().includes(".pdf") ||
+            safeSrc.includes("firebasestorage") ||
+            safeSrc.includes("alt=media") ||
+            safeSrc.includes("/proxy?url=")
+        );
+
+        if (isPdf) {
+            if (window.CanvasEngine && window.CanvasEngine.ensurePdfJs) {
+                await window.CanvasEngine.ensurePdfJs();
+            }
+            if (window.pdfjsLib) {
+                try {
+                    const uint8Array = await CanvasEngine.fetchPdfBytes(safeSrc);
+                    if (uint8Array) {
+                        const pdf = await window.pdfjsLib.getDocument({ data: uint8Array }).promise;
+                        const p = await pdf.getPage(1);
+                        const vp = p.getViewport({ scale: 1.8 });
+                        const c = document.createElement("canvas");
+                        c.width = vp.width;
+                        c.height = vp.height;
+                        const ctxC = c.getContext("2d");
+                        ctxC.fillStyle = "#ffffff";
+                        ctxC.fillRect(0, 0, vp.width, vp.height);
+                        await p.render({ canvasContext: ctxC, viewport: vp }).promise;
+                        safeSrc = c.toDataURL("image/jpeg", 0.92);
+                    }
+                } catch (pErr) {
+                    console.warn("PDFGenerator pdf render warning:", pErr);
+                }
+            }
+        } else if (typeof safeSrc === "string" && (safeSrc.startsWith("http://") || safeSrc.startsWith("https://"))) {
+            // If remote HTTP/HTTPS Firebase Storage URL, load as local blob URL to avoid canvas taint
             try {
                 const resp = await fetch(safeSrc, { mode: "cors" });
                 if (resp.ok) {
@@ -154,28 +205,6 @@ class PDFGenerator {
                 }
             } catch (fErr) {
                 console.warn("PDFGenerator fetch image blob warning:", fErr);
-            }
-        }
-
-        // If safeSrc is a PDF data URL, render it via PDF.js to image
-        if (typeof safeSrc === "string" && safeSrc.startsWith("data:application/pdf") && window.pdfjsLib) {
-            try {
-                const base64Data = safeSrc.split(",")[1] || safeSrc;
-                const raw = atob(base64Data);
-                const uint8Array = new Uint8Array(raw.length);
-                for (let i = 0; i < raw.length; i++) {
-                    uint8Array[i] = raw.charCodeAt(i);
-                }
-                const pdf = await window.pdfjsLib.getDocument({ data: uint8Array }).promise;
-                const p = await pdf.getPage(1);
-                const vp = p.getViewport({ scale: 1.8 });
-                const c = document.createElement("canvas");
-                c.width = vp.width;
-                c.height = vp.height;
-                await p.render({ canvasContext: c.getContext("2d"), viewport: vp }).promise;
-                safeSrc = c.toDataURL("image/jpeg", 0.92);
-            } catch (pErr) {
-                console.warn("PDFGenerator pdf render warning:", pErr);
             }
         }
 

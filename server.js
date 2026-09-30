@@ -21,6 +21,18 @@ const MIME_TYPES = {
 };
 
 const server = http.createServer((req, res) => {
+    // Universal CORS headers for all incoming requests (supports multi-device LAN & remote access)
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, HEAD');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range, Authorization, X-Requested-With');
+
+    // Handle OPTIONS CORS preflight
+    if (req.method === 'OPTIONS') {
+        res.writeHead(204);
+        res.end();
+        return;
+    }
+
     // 1. CORS Proxy endpoint for remote assets (e.g. Firebase Cloud Storage PDFs)
     if (req.url.startsWith('/proxy?') || req.url.startsWith('/proxy/')) {
         let targetUrl = null;
@@ -30,7 +42,7 @@ const server = http.createServer((req, res) => {
         } catch (e) {}
 
         if (!targetUrl) {
-            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8', 'Access-Control-Allow-Origin': '*' });
+            res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
             res.end('Missing url parameter');
             return;
         }

@@ -3579,11 +3579,17 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             console.warn("Failed to generate raw PDF Data URL:", e);
         }
 
-        // Wait up to 2 seconds for pdfjsLib to finish initializing if script is loading
-        let attempts = 0;
-        while (!window.pdfjsLib && attempts < 20) {
-            await new Promise(r => setTimeout(r, 100));
-            attempts++;
+        // Wait for pdfjsLib to finish initializing if script is loading
+        if (!window.pdfjsLib && window.ensurePdfJs) {
+            await window.ensurePdfJs(6000);
+        } else if (!window.pdfjsLib && window.CanvasEngine && window.CanvasEngine.ensurePdfJs) {
+            await window.CanvasEngine.ensurePdfJs(6000);
+        } else {
+            let attempts = 0;
+            while (!window.pdfjsLib && attempts < 30) {
+                await new Promise(r => setTimeout(r, 100));
+                attempts++;
+            }
         }
 
         if (!window.pdfjsLib) {

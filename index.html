@@ -14,12 +14,58 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
     
-    <!-- PDF.js CDN -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <!-- PDF.js: Local high-performance vendor bundle with CDN fallback -->
+    <script src="vendor/pdf.min.js"></script>
     <script>
-        // Configure PDF.js worker
+        if (!window.pdfjsLib) {
+            document.write('<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"><\/script>');
+        }
+    </script>
+    <script>
+        // Universally configure PDF.js worker across all devices, origins, and networks
+        window.initPdfWorker = function() {
+            if (!window.pdfjsLib) return;
+            try {
+                // Priority 1: Same-origin local worker when accessed over HTTP/HTTPS
+                if (window.location && window.location.protocol.startsWith("http")) {
+                    const localWorkerUrl = new URL("vendor/pdf.worker.min.js", window.location.href).href;
+                    window.pdfjsLib.GlobalWorkerOptions.workerSrc = localWorkerUrl;
+                    return;
+                }
+            } catch (e) {}
+
+            try {
+                // Priority 2: Create a local Blob worker wrapper using importScripts
+                // This completely bypasses cross-origin Web Worker security errors on remote/CDN setups
+                const cdnWorkerUrl = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+                const blob = new Blob([`importScripts("${cdnWorkerUrl}");`], { type: "application/javascript" });
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = URL.createObjectURL(blob);
+            } catch (e) {
+                // Priority 3: Fallback direct URL
+                window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+            }
+        };
+
+        window.ensurePdfJs = async function(timeoutMs = 6000) {
+            if (window.pdfjsLib) {
+                window.initPdfWorker();
+                return window.pdfjsLib;
+            }
+            const startTime = Date.now();
+            while (Date.now() - startTime < timeoutMs) {
+                if (window.pdfjsLib) {
+                    window.initPdfWorker();
+                    return window.pdfjsLib;
+                }
+                await new Promise(r => setTimeout(r, 60));
+            }
+            return window.pdfjsLib || null;
+        };
+
         if (window.pdfjsLib) {
-            window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+            window.initPdfWorker();
+        } else {
+            window.addEventListener("DOMContentLoaded", window.initPdfWorker);
         }
     </script>
     

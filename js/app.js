@@ -1519,7 +1519,8 @@ class AppController {
         });
 
         // Load evaluation data into canvas & marking panel
-        await this.canvasEngine.setPages(evaluation.pages || [], evaluation.annotations || []);
+        const pdfFallbackUrl = evaluation.pdfStorageUrl || evaluation.pdfDataUrl || null;
+        await this.canvasEngine.setPages(evaluation.pages || [], evaluation.annotations || [], pdfFallbackUrl);
         this.markingPanel.setEvaluationData(evaluation.questions || [], evaluation.maxMarks || 20, evaluation.feedback || "", evaluation.sections || []);
 
         // Sync initial Top HUD with Q1
