@@ -630,13 +630,14 @@ class CanvasEngine {
                 maxY = ann.y + mH / 2;
                 break;
 
-            case "margin_mark": {
+            case "margin_mark":
+            case "left_mark": {
                 const markVal = ann.marks !== undefined ? ann.marks : (ann.text || "");
                 const qLabel = ann.qLabel || (ann.qNo ? `Q${ann.qNo}` : "");
                 const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
                 const markW = ((scoreText.length * 8 + 14) * scale) / w;
                 const markH = (21 * scale) / h;
-                const markX = (ann.x > 0.5 ? 0.08 : (ann.x || 0.08));
+                const markX = (ann.x !== undefined && ann.x !== null ? ann.x : 0.08);
                 minX = markX - markW / 2;
                 maxX = markX + markW / 2;
                 minY = ann.y - markH / 2;
@@ -1012,6 +1013,7 @@ class CanvasEngine {
                 y: pos.y / (page.origHeight * this.zoom)
             };
             this.lastClickNormPos = { ...normPos };
+            this.currentCursorNormPos = { ...normPos };
 
             // Check if clicked inside currently selected annotation body to drag
             if (this.selectedAnnotation) {
@@ -1084,6 +1086,7 @@ class CanvasEngine {
                 x: Math.max(0, Math.min(1, pos.x / (page.origWidth * this.zoom))),
                 y: Math.max(0, Math.min(1, pos.y / (page.origHeight * this.zoom)))
             };
+            this.currentCursorNormPos = { ...normPos };
 
             // 0. Marquee Selection Dragging
             if (this.isMarqueeSelecting && this.marqueeStartPixel && this.marqueeBoxEl) {
@@ -1344,16 +1347,23 @@ class CanvasEngine {
         return opts;
     }
 
-    stampRightMarginMark(qNo, marks, yNorm = null) {
+    stampRightMarginMark(qNo, marks, yNorm = null, xNorm = null) {
         const page = this.pages[this.currentPageIndex];
         if (!page) return null;
 
-        const y = (yNorm !== null && yNorm !== undefined) ? yNorm : (this.lastClickNormPos ? this.lastClickNormPos.y : 0.4);
-        const marginX = 0.08; // Left margin of paper sheet (Question Total on LEFT)
+        const x = (xNorm !== null && xNorm !== undefined)
+            ? xNorm
+            : (this.lastClickNormPos ? this.lastClickNormPos.x : (this.currentCursorNormPos ? this.currentCursorNormPos.x : 0.08));
+        const y = (yNorm !== null && yNorm !== undefined)
+            ? yNorm
+            : (this.lastClickNormPos ? this.lastClickNormPos.y : (this.currentCursorNormPos ? this.currentCursorNormPos.y : 0.4));
         const targetKey = this.normalizeQKey(qNo);
 
-        // Check if there is already a margin_mark for this question on this page
-        const existingIdx = (page.annotations || []).findIndex(a => a.type === "margin_mark" && this.normalizeQKey(a.qNo || a.qLabel) === targetKey);
+        // Check if there is already a margin_mark or left_mark for this question on this page
+        const existingIdx = (page.annotations || []).findIndex(a => 
+            (a.type === "margin_mark" || a.type === "left_mark") && 
+            this.normalizeQKey(a.qNo || a.qLabel) === targetKey
+        );
         const newAnn = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
@@ -1362,14 +1372,17 @@ class CanvasEngine {
             qLabel: qNo ? (String(qNo).toUpperCase().startsWith("Q") ? String(qNo) : `Q${qNo}`) : "",
             marks: marks,
             color: "#DC2626", // Strict Teacher Red Ink
-            x: marginX,
-            y: y,
+            x: Math.max(0.02, Math.min(0.96, x)),
+            y: Math.max(0.02, Math.min(0.98, y)),
             scale: 1.0,
             timestamp: Date.now()
         };
 
         if (existingIdx >= 0) {
             page.annotations[existingIdx] = newAnn;
+            if (this.options.onAnnotationsChange) {
+                this.options.onAnnotationsChange(page.annotations);
+            }
         } else {
             this.addAnnotation(newAnn);
         }
@@ -1377,40 +1390,9 @@ class CanvasEngine {
         return newAnn;
     }
 
-    // Stamp a compact mark number at the left edge of the paper inline with tick y position
-    stampLeftMarginMark(qNo, marks, yNorm = null) {
-        const page = this.pages[this.currentPageIndex];
-        if (!page) return null;
-
-        const y = (yNorm !== null && yNorm !== undefined) ? yNorm : (this.lastClickNormPos ? this.lastClickNormPos.y : 0.4);
-        const marginX = 0.03; // Left edge of paper sheet
-        const targetKey = this.normalizeQKey(qNo);
-
-        // Check if there is already a left_mark for this question on this page
-        const existingIdx = (page.annotations || []).findIndex(a =>
-            a.type === 'left_mark' && this.normalizeQKey(a.qNo || a.qLabel) === targetKey
-        );
-        const newAnn = {
-            id: 'ann_lm_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-            pageIndex: this.currentPageIndex,
-            type: 'left_mark',
-            qNo: qNo,
-            qLabel: qNo ? (String(qNo).toUpperCase().startsWith('Q') ? String(qNo) : `Q${qNo}`) : '',
-            marks: marks,
-            color: '#DC2626',
-            x: marginX,
-            y: y,
-            scale: 1.0,
-            timestamp: Date.now()
-        };
-
-        if (existingIdx >= 0) {
-            page.annotations[existingIdx] = newAnn;
-        } else {
-            this.addAnnotation(newAnn);
-        }
-        this.renderOverlay();
-        return newAnn;
+    // Stamp question marks label (alias for compatibility)
+    stampLeftMarginMark(qNo, marks, yNorm = null, xNorm = null) {
+        return this.stampRightMarginMark(qNo, marks, yNorm, xNorm);
     }
 
     openRadialMarkingWheel(normPos, pixelPos) {
@@ -1545,12 +1527,16 @@ class CanvasEngine {
         // When mark is 0, show "wrong" (X mark) not "tick"
         const stampType = isZero ? "wrong" : "tick";
 
+        // Place tick/cross slightly to the left and Question Marks Label right beside it at the cursor position
+        const tickX = (isFull || isZero || !isStep) ? Math.max(0.02, normPos.x - 0.025) : normPos.x;
+        const labelX = (isFull || isZero || !isStep) ? Math.min(0.96, normPos.x + 0.035) : normPos.x;
+
         // Stamp tick or X cross in red ink with marks badge
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
             type: stampType,
-            x: normPos.x,
+            x: tickX,
             y: normPos.y,
             color: "#DC2626", // Teacher Red Ink
             marks: numVal,
@@ -1564,9 +1550,9 @@ class CanvasEngine {
 
         this.addAnnotation(stamp);
 
-        // If awarding direct question mark (not a step mark) or full or zero, stamp margin question mark (e.g. Q1: 0.5M, Q1: 2M, Q1: 0M)
+        // If awarding direct question mark (not a step mark) or full or zero, stamp question mark label (e.g. Q1: 0.5M, Q1: 2M, Q1: 0M) right at cursor position
         if (!isStep || isFull || isZero) {
-            this.stampRightMarginMark(qInfo.qNo || qInfo.label, numVal, normPos.y);
+            this.stampRightMarginMark(qInfo.qNo || qInfo.label, numVal, normPos.y, labelX);
         }
 
         this.renderOverlay();
@@ -1656,6 +1642,30 @@ class CanvasEngine {
     }
 
     placeStamp(type, pos) {
+        if (type === "marks") {
+            const qInfo = (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo() : null) || { label: "Q1", maxMarks: 2, qNo: 1 };
+            const qNo = qInfo.qNo || 1;
+            const qLabel = qInfo.label || `Q${qNo}`;
+            const marksVal = (qInfo.currentMarks !== undefined && qInfo.currentMarks !== null && qInfo.currentMarks > 0) ? qInfo.currentMarks : (qInfo.maxMarks || 1);
+
+            const newAnn = {
+                id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                pageIndex: this.currentPageIndex,
+                type: "margin_mark",
+                qNo: qNo,
+                qLabel: qLabel,
+                marks: marksVal,
+                color: "#DC2626",
+                x: pos.x,
+                y: pos.y,
+                scale: 1.0,
+                timestamp: Date.now()
+            };
+            this.addAnnotation(newAnn);
+            this.renderOverlay();
+            return newAnn;
+        }
+
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
@@ -1666,10 +1676,6 @@ class CanvasEngine {
             scale: 1.0,
             timestamp: Date.now()
         };
-
-        if (type === "marks") {
-            stamp.text = this.activeMarksValue || "+1";
-        }
 
         this.addAnnotation(stamp);
         this.renderOverlay();
@@ -2097,19 +2103,19 @@ class CanvasEngine {
                 ctx.stroke();
 
                 // If this tick has an awarded mark or step mark attached (GTA V radial wheel mark)
-                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "") {
+                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "" && !ann.hasMarginMark) {
                     const rawVal = Number(ann.marks);
                     const markStr = String(ann.marks).startsWith("+") || rawVal <= 0 ? String(ann.marks) : `+${ann.marks}`;
                     const badgeText = ann.isStep ? `${markStr} Step` : `${markStr} M`;
-                    const badgeFontSize = Math.max(12, 13 * effScale);
-                    ctx.font = `400 ${badgeFontSize}px system-ui, -apple-system, sans-serif`;
+                    const badgeFontSize = Math.max(11, Math.round(12 * effScale));
+                    ctx.font = `600 ${badgeFontSize}px system-ui, -apple-system, sans-serif`;
                     const textMetrics = ctx.measureText(badgeText);
-                    const bPadX = 7 * effScale;
-                    const bPadY = 3.5 * effScale;
+                    const bPadX = 6 * effScale;
+                    const bPadY = 3 * effScale;
                     const bW = textMetrics.width + bPadX * 2;
                     const bH = badgeFontSize + bPadY * 2;
-                    const bX = x + 24 * effScale;
-                    const bY = y - 14 * effScale;
+                    const bX = x + 20 * effScale;
+                    const bY = y - 12 * effScale;
 
                     ctx.fillStyle = tickCol;
                     ctx.beginPath();
@@ -2138,7 +2144,7 @@ class CanvasEngine {
                 ctx.stroke();
 
                 // Optional marks badge next to the X cross mark
-                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "") {
+                if (ann.marks !== undefined && ann.marks !== null && ann.marks !== "" && !ann.hasMarginMark) {
                     const badgeText = `${ann.marks}`;
                     ctx.font = `bold ${Math.round(11 * effScale)}px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif`;
                     const textMetrics = ctx.measureText(badgeText);
@@ -2266,25 +2272,25 @@ class CanvasEngine {
 
             case "margin_mark":
             case "left_mark": {
-                // Question Total Mark Stamp - ONLY ON THE LEFT SIDE, COMPACT & NEAT
+                // Question Total Mark Stamp - COMPACT & NEAT
                 const markVal = ann.marks !== undefined ? ann.marks : (ann.text || "");
                 const qLabel = ann.qLabel || (ann.qNo ? `Q${ann.qNo}` : "");
                 const col = ann.color || "#DC2626"; // Teacher Red Ink
 
                 const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
-                const numFontSize = Math.max(12, Math.round(14 * effScale));
+                const numFontSize = Math.max(11, Math.round(13 * effScale));
 
                 ctx.font = `600 ${numFontSize}px system-ui, -apple-system, sans-serif`;
                 const textMetrics = ctx.measureText(scoreText);
-                const bPadX = 7 * effScale;
-                const bPadY = 3.5 * effScale;
+                const bPadX = 6 * effScale;
+                const bPadY = 3 * effScale;
                 const bW = textMetrics.width + bPadX * 2;
                 const bH = numFontSize + bPadY * 2;
 
-                // Ensure question total stamp renders on the LEFT margin (0.08)
-                const markX = (ann.x > 0.5 ? 0.08 : (ann.x || 0.08)) * canvasW;
+                // Render at the exact x coordinate of the annotation (where cursor was placed)
+                const markX = (ann.x !== undefined && ann.x !== null ? ann.x : 0.08) * canvasW;
 
-                // Neat pill badge on left margin of paper sheet
+                // Neat pill badge on paper sheet
                 ctx.shadowColor = "rgba(220, 38, 38, 0.14)";
                 ctx.shadowBlur = 4 * effScale;
                 ctx.shadowOffsetY = 1 * effScale;
