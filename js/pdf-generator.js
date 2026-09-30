@@ -199,25 +199,21 @@ class PDFGenerator {
                 });
 
                 // Render Compact Smart Page Total Footer on composite page
-                let pageTotal = 0;
-                annotations.forEach(a => {
-                    if (a.type === "marks") {
-                        const raw = String(a.text || "").replace(/^\+/, "").trim();
-                        const val = parseFloat(raw);
-                        if (!isNaN(val)) pageTotal += val;
-                    } else if (a.type === "margin_mark") {
-                        const raw = String(a.marks !== undefined ? a.marks : (a.text || "")).replace(/^\+/, "").trim();
-                        const val = parseFloat(raw);
-                        if (!isNaN(val)) pageTotal += val;
-                    } else if (a.type === "tick" && a.marks !== undefined && a.marks !== null && a.marks !== "") {
-                        if (a.isStep || !a.hasMarginMark) {
-                            const raw = String(a.marks).replace(/^\+/, "").trim();
-                            const val = parseFloat(raw);
-                            if (!isNaN(val)) pageTotal += val;
-                        }
-                    }
-                });
-                pageTotal = Math.round(pageTotal * 10) / 10;
+                const pageTotal = (window.CanvasEngine && typeof window.CanvasEngine.calculatePageTotal === "function")
+                    ? window.CanvasEngine.calculatePageTotal(annotations)
+                    : (() => {
+                        let total = 0;
+                        annotations.forEach(a => {
+                            if (a.type === "margin_mark" || a.type === "left_mark") {
+                                const val = parseFloat(String(a.marks !== undefined ? a.marks : (a.text || "")).replace(/^\+/, "").trim());
+                                if (!isNaN(val)) total += val;
+                            } else if (a.type === "tick" || a.type === "marks") {
+                                const val = parseFloat(String(a.marks !== undefined && a.marks !== null ? a.marks : (a.text || "")).replace(/^\+/, "").trim());
+                                if (!isNaN(val)) total += val;
+                            }
+                        });
+                        return Math.round(total * 10) / 10;
+                    })();
 
                 const scale = 1.0;
                 const numText = String(pageTotal);

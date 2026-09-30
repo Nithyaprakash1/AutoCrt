@@ -685,10 +685,6 @@ class MarkingPanel {
             btn.addEventListener("click", () => {
                 const val = Number(btn.getAttribute("data-val"));
                 this.assignCurrentQuestionMark(val);
-                const q = this.questions[this.activeQuestionIndex];
-                if (q && q.awardedMarks >= q.maxMarks) {
-                    setTimeout(() => this.nextQuestion(), 280);
-                }
             });
         });
 
@@ -717,7 +713,6 @@ class MarkingPanel {
                         this.options.onAwardFullMarks(q);
                     } else {
                         this.assignCurrentQuestionMark(q.maxMarks, "correct");
-                        setTimeout(() => this.nextQuestion(), 280);
                     }
                 }
             });

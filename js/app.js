@@ -1121,42 +1121,12 @@ class AppController {
                     this.markingPanel?.setActiveQuestionMark(mark);
                     if (this.canvasEngine) {
                         this.canvasEngine.setMarksValue(mark > 0 ? `+${mark}` : "0");
-                        const activeQ = this.markingPanel?.getActiveQuestion();
-                        if (activeQ) {
-                            const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
-                            const existingMarginMark = (curPage?.annotations || []).find(a => 
-                                (a.type === "margin_mark" || a.type === "left_mark") && 
-                                this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(activeQ.qNo)
-                            );
-                            if (existingMarginMark) {
-                                existingMarginMark.marks = mark;
-                                this.canvasEngine.renderOverlay();
-                            } else if (mark >= activeQ.maxMarks) {
-                                const stampY = this.canvasEngine.lastClickNormPos ? this.canvasEngine.lastClickNormPos.y : (this.canvasEngine.currentCursorNormPos ? this.canvasEngine.currentCursorNormPos.y : 0.4);
-                                this.canvasEngine.stampRightMarginMark(activeQ.qNo, mark, stampY);
-                                this.canvasEngine.renderOverlay();
-                            }
-                        }
                     }
                     const activeQ = this.markingPanel?.getActiveQuestion();
                     if (activeQ) {
                         this.updateTopHud(activeQ);
-                        this.updatePageTotalDisplay();
-                        if (activeQ.awardedMarks >= activeQ.maxMarks) {
-                            setTimeout(() => {
-                                const moved = this.markingPanel?.nextQuestion();
-                                if (moved) {
-                                    const nextQ = this.markingPanel?.getActiveQuestion();
-                                    if (nextQ) {
-                                        this.updateTopHud(nextQ);
-                                        this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
-                                    }
-                                }
-                            }, 280);
-                        }
-                    } else {
-                        this.updatePageTotalDisplay();
                     }
+                    this.updatePageTotalDisplay();
                 });
             });
         }
@@ -1206,9 +1176,6 @@ class AppController {
                 };
                 this.canvasEngine.addAnnotation(tickStamp);
             }
-
-            // 3. Stamp question total marks label in right margin with 5px gap
-            this.canvasEngine.stampRightMarginMark(q.qNo, maxMarks, stampPos.y);
             this.canvasEngine.renderOverlay();
         }
 
@@ -1217,22 +1184,10 @@ class AppController {
         this.updatePageTotalDisplay();
 
         // 5. User feedback
-        this.showToast(`[Full Marks] Awarded (${maxMarks}M) to Q${q.qNo}`);
+        this.showToast(`[Full Marks] Awarded (${maxMarks}M) to Q${q.qNo}. Press Enter to calculate & advance.`);
 
         this.hasUnsavedChanges = true;
         this.setAutosaveBadge("saving");
-
-        // 6. Auto-advance to next question if full marks added
-        setTimeout(() => {
-            const moved = this.markingPanel?.nextQuestion();
-            if (moved) {
-                const nextQ = this.markingPanel?.getActiveQuestion();
-                if (nextQ) {
-                    this.updateTopHud(nextQ);
-                    this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
-                }
-            }
-        }, 280);
     }
 
     awardZeroMarks(targetQ = null, explicitPos = null) {
@@ -1271,9 +1226,6 @@ class AppController {
                 };
                 this.canvasEngine.addAnnotation(wrongStamp);
             }
-
-            // Stamp question mark label at the side (left margin: x = 0.08)
-            this.canvasEngine.stampRightMarginMark(q.qNo, 0, stampPos.y);
             this.canvasEngine.renderOverlay();
         }
 
@@ -1282,7 +1234,7 @@ class AppController {
         this.updatePageTotalDisplay();
 
         // 5. User feedback
-        this.showToast(`Marked Q${q.qNo} as 0 Marks`);
+        this.showToast(`Marked Q${q.qNo} as 0 Marks. Press Enter to calculate & advance.`);
 
         this.hasUnsavedChanges = true;
         this.setAutosaveBadge("saving");
@@ -1483,58 +1435,17 @@ class AppController {
                 return q ? { label: `Q${q.qNo}`, maxMarks: q.maxMarks, currentMarks: q.awardedMarks, qNo: q.qNo, section: q.section } : { label: "Q1", maxMarks: 2, qNo: 1, section: "Section A" };
             },
             onRadialMarkAwarded: (markVal, isStep, normPos) => {
-                const q = this.markingPanel?.getActiveQuestion();
-                let awardedFull = false;
                 const numVal = Number(markVal) || 0;
-                if (numVal === 0) {
-                    // In round mark dial selecting 0 awards 0 marks to that question and sets status to "wrong"
-                    this.markingPanel?.setActiveQuestionMark(0, "wrong");
-                } else if (isStep) {
-                    // Step marks (+0.5, +1.0): canvas annotation was added and syncQuestionScoresFromAnnotations
-                    // already computed the exact sum of all step marks on canvas. Never add a second time!
-                    const updatedQ = this.markingPanel?.getActiveQuestion();
-                    if (updatedQ && updatedQ.awardedMarks >= updatedQ.maxMarks) {
-                        awardedFull = true;
-                        if (this.canvasEngine) {
-                            const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
-                            const hasMarginMark = (curPage?.annotations || []).some(a =>
-                                (a.type === "margin_mark" || a.type === "left_mark") &&
-                                this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(updatedQ.qNo)
-                            );
-                            if (!hasMarginMark) {
-                                const stampY = normPos ? normPos.y : 0.4;
-                                this.canvasEngine.stampRightMarginMark(updatedQ.qNo, updatedQ.awardedMarks, stampY);
-                                this.canvasEngine.renderOverlay();
-                            }
-                        }
-                    }
-                } else {
-                    // Direct question mark (e.g. 0.5 Marks, 1.0 Marks, Full Marks):
-                    // Explicitly set question score to numVal (never add on top of existing!)
-                    const status = (q && numVal >= q.maxMarks) ? "correct" : (numVal === 0 ? "wrong" : "partial");
-                    this.markingPanel?.setActiveQuestionMark(numVal, status);
-                    if (q && numVal >= q.maxMarks) {
-                        awardedFull = true;
-                    }
-                }
                 const activeQ = this.markingPanel?.getActiveQuestion();
-                if (activeQ) this.updateTopHud(activeQ);
-                this.updatePageTotalDisplay();
-                const markDesc = Number(markVal) === 0 ? `0 Marks (Wrong)` : (isStep ? `+${markVal} Step Mark` : `${markVal} Marks`);
-                this.showToast(`Awarded ${markDesc} to ${activeQ ? activeQ.label : 'question'}`);
-
-                // Auto-advance to next question when full mark is added
-                if (awardedFull) {
-                    setTimeout(() => {
-                        const moved = this.markingPanel?.nextQuestion();
-                        if (moved) {
-                            const nextQ = this.markingPanel?.getActiveQuestion();
-                            if (nextQ) {
-                                this.updateTopHud(nextQ);
-                                this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
-                            }
-                        }
-                    }, 280);
+                if (activeQ && this.canvasEngine) {
+                    const stepSum = this.canvasEngine.getQuestionStepMarksSum(activeQ.qNo);
+                    const runningScore = stepSum > 0 ? Math.min(activeQ.maxMarks, stepSum) : (numVal === 0 ? 0 : (activeQ.awardedMarks || numVal));
+                    const status = runningScore >= activeQ.maxMarks ? "correct" : (runningScore === 0 ? "wrong" : "partial");
+                    this.markingPanel.assignCurrentQuestionMark(runningScore, status);
+                    this.updateTopHud(activeQ);
+                    this.updatePageTotalDisplay();
+                    const markDesc = numVal === 0 ? `0 Marks` : `+${numVal} Mark`;
+                    this.showToast(`Placed ${markDesc} on paper (Current: ${activeQ.awardedMarks}/${activeQ.maxMarks}M). Press Enter to calculate & advance.`);
                 }
             }
         });
@@ -1565,6 +1476,20 @@ class AppController {
                 }
 
                 const activeQ = this.markingPanel?.getActiveQuestion();
+                if (activeQ && this.canvasEngine) {
+                    let existingMarginMark = null;
+                    for (const p of this.canvasEngine.pages) {
+                        existingMarginMark = (p.annotations || []).find(a =>
+                            (a.type === "margin_mark" || a.type === "left_mark") &&
+                            this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(activeQ.qNo)
+                        );
+                        if (existingMarginMark) break;
+                    }
+                    if (existingMarginMark && existingMarginMark.marks !== activeQ.awardedMarks) {
+                        existingMarginMark.marks = activeQ.awardedMarks;
+                        this.canvasEngine.renderOverlay();
+                    }
+                }
                 if (activeQ) this.updateTopHud(activeQ);
 
                 this.updatePageTotalDisplay();
@@ -1908,9 +1833,11 @@ class AppController {
                 const activeQ = this.markingPanel?.getActiveQuestion();
                 if (activeQ) {
                     this.updateTopHud(activeQ);
+                    this.updatePageTotalDisplay();
                     if (this.canvasEngine) {
                         this.canvasEngine.setMarksValue(`+0.5`);
                     }
+                    this.showToast(`+0.5 Step added (Total: ${activeQ.awardedMarks}/${activeQ.maxMarks}M). Press Enter to calculate & advance.`);
                 }
             });
         }
@@ -1922,9 +1849,11 @@ class AppController {
                 const activeQ = this.markingPanel?.getActiveQuestion();
                 if (activeQ) {
                     this.updateTopHud(activeQ);
+                    this.updatePageTotalDisplay();
                     if (this.canvasEngine) {
                         this.canvasEngine.setMarksValue(`+1`);
                     }
+                    this.showToast(`+1.0 Step added (Total: ${activeQ.awardedMarks}/${activeQ.maxMarks}M). Press Enter to calculate & advance.`);
                 }
             });
         }
@@ -1946,6 +1875,7 @@ class AppController {
                         if (existingMarginMark) {
                             existingMarginMark.marks = val;
                             this.canvasEngine.renderOverlay();
+                            this.canvasEngine.notifyChange();
                         }
                     }
                 }
@@ -1953,18 +1883,7 @@ class AppController {
                 if (activeQ) {
                     this.updateTopHud(activeQ);
                     this.updatePageTotalDisplay();
-                    if (activeQ.awardedMarks >= activeQ.maxMarks) {
-                        setTimeout(() => {
-                            const moved = this.markingPanel?.nextQuestion();
-                            if (moved) {
-                                const nextQ = this.markingPanel?.getActiveQuestion();
-                                if (nextQ) {
-                                    this.updateTopHud(nextQ);
-                                    this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
-                                }
-                            }
-                        }, 280);
-                    }
+                    this.showToast(`Selected ${val}M for Q${activeQ.qNo}. Press Enter to calculate & advance.`);
                 }
             });
         });
@@ -2111,7 +2030,16 @@ class AppController {
                     const aq = this.markingPanel?.getActiveQuestion();
                     if (aq) this.updateTopHud(aq);
                     this.updatePageTotalDisplay();
-                    this.showToast("+0.5 Step Mark awarded");
+                    this.showToast(`+0.5 Step Mark awarded (Total: ${aq?.awardedMarks || 0}M). Press Enter to calculate & advance.`);
+                    break;
+                case "+":
+                case "=":
+                    e.preventDefault();
+                    this.markingPanel?.addStepMark(1.0);
+                    const stepQ = this.markingPanel?.getActiveQuestion();
+                    if (stepQ) this.updateTopHud(stepQ);
+                    this.updatePageTotalDisplay();
+                    this.showToast(`+1.0 Step Mark awarded (Total: ${stepQ?.awardedMarks || 0}M). Press Enter to calculate & advance.`);
                     break;
                 case "n":
                     e.preventDefault();
@@ -2127,75 +2055,79 @@ class AppController {
                     break;
             }
 
-            // Enter key: calculate total step marks for active question → stamp per-question total in left margin → advance to next question
+            // Enter key: calculate total step marks for active question (e.g. 1 + 1 + 1) → stamp question mark label in left margin → jump to next question
             if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                const committingQ = this.markingPanel?.getActiveQuestion();
-                if (committingQ) {
-                    if (this.canvasEngine) {
-                        // Calculate total from all step marks placed for this question on canvas
-                        const stepTotal = this.canvasEngine.getQuestionTotalFromAnnotations(committingQ.qNo);
-                        if (stepTotal > 0) {
-                            const finalQScore = Math.min(committingQ.maxMarks, stepTotal);
-                            this.markingPanel.assignCurrentQuestionMark(finalQScore);
-                        }
-                    }
-
-                    if (this.canvasEngine) {
-                        const stampY = this.canvasEngine.lastClickNormPos ? this.canvasEngine.lastClickNormPos.y : (this.canvasEngine.currentCursorNormPos ? this.canvasEngine.currentCursorNormPos.y : 0.4);
-                        const finalMarks = committingQ.awardedMarks !== undefined ? committingQ.awardedMarks : 0;
-                        this.canvasEngine.stampRightMarginMark(committingQ.qNo, finalMarks, stampY);
-                        this.canvasEngine.renderOverlay();
-                    }
-                    this.updatePageTotalDisplay();
-                    this.showToast(`Q${committingQ.qNo}: ${committingQ.awardedMarks}/${committingQ.maxMarks}M committed at side`);
-                }
-                this.markingPanel?.nextQuestion();
+                this.commitActiveQuestionAndAdvance();
                 return;
             }
 
-            // Numeric quick mark shortcut: press 0..9 to instantly mark active question!
+            // Numeric quick mark shortcut: press 0..9 to set mark for active question
             if (e.key >= "0" && e.key <= "9") {
                 const mark = Number(e.key);
                 this.markingPanel?.setActiveQuestionMark(mark);
                 if (this.canvasEngine) {
                     this.canvasEngine.setMarksValue(mark > 0 ? `+${mark}` : "0");
-                    const activeQ = this.markingPanel?.getActiveQuestion();
-                    if (activeQ) {
-                        const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
-                        const existingMarginMark = (curPage?.annotations || []).find(a =>
-                            (a.type === "margin_mark" || a.type === "left_mark") &&
-                            this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(activeQ.qNo)
-                        );
-                        if (existingMarginMark) {
-                            existingMarginMark.marks = mark;
-                            this.canvasEngine.renderOverlay();
-                        } else if (mark >= activeQ.maxMarks) {
-                            const stampY = this.canvasEngine.lastClickNormPos ? this.canvasEngine.lastClickNormPos.y : (this.canvasEngine.currentCursorNormPos ? this.canvasEngine.currentCursorNormPos.y : 0.4);
-                            this.canvasEngine.stampRightMarginMark(activeQ.qNo, mark, stampY);
-                            this.canvasEngine.renderOverlay();
-                        }
-                    }
                 }
                 const activeQ = this.markingPanel?.getActiveQuestion();
                 if (activeQ) {
                     this.updateTopHud(activeQ);
                     this.updatePageTotalDisplay();
-                    if (activeQ.awardedMarks >= activeQ.maxMarks) {
-                        setTimeout(() => {
-                            const moved = this.markingPanel?.nextQuestion();
-                            if (moved) {
-                                const nextQ = this.markingPanel?.getActiveQuestion();
-                                if (nextQ) {
-                                    this.updateTopHud(nextQ);
-                                    this.showToast(`Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
-                                }
-                            }
-                        }, 280);
-                    }
                 }
+                return;
             }
         });
+    }
+
+    commitActiveQuestionAndAdvance() {
+        const committingQ = this.markingPanel?.getActiveQuestion();
+        if (!committingQ) return;
+
+        let totalMarks = 0;
+        if (this.canvasEngine) {
+            // 1. Calculate sum from all step marks placed for this question on canvas (e.g. 1 + 1 + 1)
+            const stepTotal = this.canvasEngine.getQuestionStepMarksSum(committingQ.qNo);
+            if (stepTotal > 0) {
+                totalMarks = Math.min(committingQ.maxMarks, stepTotal);
+            } else if (committingQ.awardedMarks !== undefined && committingQ.awardedMarks !== null && committingQ.awardedMarks > 0) {
+                totalMarks = Math.min(committingQ.maxMarks, committingQ.awardedMarks);
+            } else {
+                totalMarks = 0;
+            }
+
+            // 2. Assign calculated total to active question in marking panel
+            const status = totalMarks >= committingQ.maxMarks ? "correct" : (totalMarks === 0 ? "wrong" : "partial");
+            this.markingPanel?.assignCurrentQuestionMark(totalMarks, status);
+
+            // 3. Stamp question mark label in left margin with 10px gap
+            // Determine vertical position: align with question's annotations or last click position
+            const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
+            const qAnns = (curPage?.annotations || []).filter(a =>
+                (a.type === "tick" || a.type === "marks" || a.type === "wrong") &&
+                this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(committingQ.qNo)
+            );
+            const targetY = qAnns.length > 0
+                ? qAnns[qAnns.length - 1].y
+                : (this.canvasEngine.lastClickNormPos ? this.canvasEngine.lastClickNormPos.y : (this.canvasEngine.currentCursorNormPos ? this.canvasEngine.currentCursorNormPos.y : 0.4));
+
+            this.canvasEngine.stampRightMarginMark(committingQ.qNo, totalMarks, targetY);
+            this.canvasEngine.renderOverlay();
+        }
+
+        this.updateTopHud(committingQ);
+        this.updatePageTotalDisplay();
+
+        // 4. Jump to next question
+        const moved = this.markingPanel?.nextQuestion();
+        if (moved) {
+            const nextQ = this.markingPanel?.getActiveQuestion();
+            if (nextQ) {
+                this.updateTopHud(nextQ);
+                this.showToast(`Q${committingQ.qNo}: ${totalMarks}/${committingQ.maxMarks}M stamped in left margin. Moved to ${nextQ.label || `Q${nextQ.qNo}`}`);
+            }
+        } else {
+            this.showToast(`Q${committingQ.qNo}: ${totalMarks}/${committingQ.maxMarks}M stamped in left margin (Final question)`);
+        }
     }
 
     // --- Autosave Engine ---

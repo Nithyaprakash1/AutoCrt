@@ -637,7 +637,8 @@ class CanvasEngine {
                 const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
                 const markW = ((scoreText.length * 8 + 14) * scale) / w;
                 const markH = (21 * scale) / h;
-                const markX = ann.x; // use stored normalized X coordinate
+                const leftGap = (10 * scale) / w;
+                const markX = leftGap + markW / 2;
                 minX = markX - markW / 2;
                 maxX = markX + markW / 2;
                 minY = ann.y - markH / 2;
@@ -1360,8 +1361,8 @@ class CanvasEngine {
         const qLabel = qNo ? (String(qNo).toUpperCase().startsWith("Q") ? String(qNo) : `Q${qNo}`) : "";
         const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
         const markW = (scoreText.length * 8 + 14) / w;
-        const leftGap = 5 / w;
-        const defaultLeftX = (markW / 2) + leftGap;
+        const leftGap = 10 / w;
+        const defaultLeftX = leftGap + (markW / 2);
 
         const y = (yNorm !== null && yNorm !== undefined)
             ? yNorm
@@ -1369,13 +1370,23 @@ class CanvasEngine {
         const marginX = (xNorm !== null && xNorm !== undefined) ? Math.max(0.02, Math.min(0.98, xNorm)) : defaultLeftX;
         const targetKey = this.normalizeQKey(qNo);
 
-        // Check if there is already a margin_mark or left_mark for this question on this page
+        // Remove any existing margin marks for this question from other pages to prevent double counting
+        this.pages.forEach((p, pIdx) => {
+            if (pIdx !== this.currentPageIndex && p.annotations) {
+                p.annotations = p.annotations.filter(a =>
+                    !(a.type === "margin_mark" || a.type === "left_mark") ||
+                    this.normalizeQKey(a.qNo || a.qLabel) !== targetKey
+                );
+            }
+        });
+
+        // Check if there is already a margin_mark or left_mark for this question on current page
         const existingIdx = (page.annotations || []).findIndex(a => 
             (a.type === "margin_mark" || a.type === "left_mark") && 
             this.normalizeQKey(a.qNo || a.qLabel) === targetKey
         );
         const newAnn = {
-            id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+            id: existingIdx >= 0 ? page.annotations[existingIdx].id : ('ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6)),
             pageIndex: this.currentPageIndex,
             type: "margin_mark",
             qNo: qNo,
@@ -1556,12 +1567,6 @@ class CanvasEngine {
         };
 
         this.addAnnotation(stamp);
-
-        // When giving full mark alone, stamp the Question Marks Label in the right margin (5px gap at end)
-        if (isFull) {
-            this.stampRightMarginMark(qInfo.qNo || qInfo.label, numVal, normPos.y);
-        }
-
         this.renderOverlay();
 
         // Callback to app / marking panel to calculate and update totals
@@ -1649,23 +1654,35 @@ class CanvasEngine {
     }
 
     placeStamp(type, pos) {
+        const qInfo = (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo() : null) || { label: "Q1", maxMarks: 2, qNo: 1 };
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
             type: type,
             x: pos.x,
             y: pos.y,
-            color: (type === "wrong") ? "#DC2626" : (this.currentColor || "#007AFF"),
+            color: (type === "wrong") ? "#DC2626" : (this.currentColor || "#DC2626"),
             scale: 1.0,
+            qNo: qInfo.qNo || 1,
+            qLabel: qInfo.label || `Q${qInfo.qNo || 1}`,
             timestamp: Date.now()
         };
 
         if (type === "marks") {
             stamp.text = this.activeMarksValue || "+1";
+            const val = parseFloat(String(stamp.text).replace(/^\+/, "").trim());
+            stamp.marks = isNaN(val) ? 1 : val;
+        } else if (type === "wrong") {
+            stamp.marks = 0;
         }
 
         this.addAnnotation(stamp);
         this.renderOverlay();
+
+        if (this.options.onRadialMarkAwarded) {
+            const numVal = stamp.marks !== undefined ? stamp.marks : (type === "wrong" ? 0 : 1);
+            this.options.onRadialMarkAwarded(numVal, type === "marks", pos);
+        }
     }
 
     promptComment(pos) {
@@ -1927,6 +1944,25 @@ class CanvasEngine {
         return result;
     }
 
+    getQuestionStepMarksSum(targetQNo) {
+        if (!targetQNo) return 0;
+        const targetKey = this.normalizeQKey(targetQNo);
+        let sum = 0;
+        this.pages.forEach(page => {
+            (page.annotations || []).forEach(a => {
+                if (a.type !== "tick" && a.type !== "marks") return;
+                const qKey = this.normalizeQKey(a.qNo || a.qLabel);
+                if (qKey !== targetKey) return;
+                const rawVal = a.marks !== undefined && a.marks !== null ? String(a.marks) : String(a.text || "");
+                const val = parseFloat(rawVal.replace(/^\+/, "").trim());
+                if (!isNaN(val)) {
+                    sum = Math.round((sum + val) * 10) / 10;
+                }
+            });
+        });
+        return sum;
+    }
+
     getQuestionTotalFromAnnotations(targetQNo) {
         if (!targetQNo) return 0;
         const targetKey = this.normalizeQKey(targetQNo);
@@ -1950,7 +1986,7 @@ class CanvasEngine {
             });
         });
 
-        const finalVal = (committedVal !== null && committedVal !== undefined) ? committedVal : ticksSum;
+        const finalVal = (ticksSum > 0) ? ticksSum : ((committedVal !== null && committedVal !== undefined) ? committedVal : 0);
         return Math.round(finalVal * 10) / 10;
     }
 
@@ -2298,10 +2334,11 @@ class CanvasEngine {
                 const bW = textMetrics.width + bPadX * 2;
                 const bH = numFontSize + bPadY * 2;
 
-                // Position using stored ann.x normalized coordinate (same as left margin alignment)
-                const markX = ann.x * canvasW;
+                // Position on left margin: keep 10px gap from edge
+                const leftGap = 10 * effScale;
+                const markX = leftGap + (bW / 2);
 
-                // Neat pill badge using left-margin coordinate alignment
+                // Neat pill badge on left margin of paper sheet
                 ctx.shadowColor = "rgba(220, 38, 38, 0.14)";
                 ctx.shadowBlur = 4 * effScale;
                 ctx.shadowOffsetY = 1 * effScale;
