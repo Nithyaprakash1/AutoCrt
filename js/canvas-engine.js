@@ -637,7 +637,8 @@ class CanvasEngine {
                 const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
                 const markW = ((scoreText.length * 8 + 14) * scale) / w;
                 const markH = (21 * scale) / h;
-                const markX = (ann.x !== undefined && ann.x !== null ? ann.x : 0.08);
+                const rightGap = (5 * scale) / w;
+                const markX = 1 - (markW / 2) - rightGap;
                 minX = markX - markW / 2;
                 maxX = markX + markW / 2;
                 minY = ann.y - markH / 2;
@@ -1525,32 +1526,28 @@ class CanvasEngine {
         // When mark is 0, show "wrong" (X mark) not "tick"
         const stampType = isZero ? "wrong" : "tick";
 
-        // When giving full mark alone, place tick slightly left and print question label at the side edge of the mark
-        const tickX = isFull ? Math.max(0.02, normPos.x - 0.025) : normPos.x;
-        const labelX = Math.min(0.96, normPos.x + 0.035);
-
         // Stamp tick or X cross in red ink with marks badge at clicked position
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
             type: stampType,
-            x: tickX,
+            x: normPos.x,
             y: normPos.y,
             color: "#DC2626", // Teacher Red Ink
             marks: numVal,
             qNo: qInfo.qNo || 1,
             qLabel: qInfo.label || `Q${qInfo.qNo || 1}`,
             isStep: !!isStep,
-            hasMarginMark: isFull, // Full mark alone prints question label at side edge
+            hasMarginMark: false,
             scale: 1.0,
             timestamp: Date.now()
         };
 
         this.addAnnotation(stamp);
 
-        // When giving full mark alone, print the question label right at the side edge of the mark
+        // When giving full mark alone, stamp the Question Marks Label in the right margin (5px gap at end)
         if (isFull) {
-            this.stampRightMarginMark(qInfo.qNo || qInfo.label, numVal, normPos.y, labelX);
+            this.stampRightMarginMark(qInfo.qNo || qInfo.label, numVal, normPos.y);
         }
 
         this.renderOverlay();
@@ -2265,10 +2262,11 @@ class CanvasEngine {
                 const bW = textMetrics.width + bPadX * 2;
                 const bH = numFontSize + bPadY * 2;
 
-                // Render at the exact x coordinate of the annotation (where cursor was placed)
-                const markX = (ann.x !== undefined && ann.x !== null ? ann.x : 0.08) * canvasW;
+                // Position in right margin: at end just keep 5px gap
+                const rightGap = 5 * effScale;
+                const markX = canvasW - (bW / 2) - rightGap;
 
-                // Neat pill badge on paper sheet
+                // Neat pill badge on right margin of paper sheet
                 ctx.shadowColor = "rgba(220, 38, 38, 0.14)";
                 ctx.shadowBlur = 4 * effScale;
                 ctx.shadowOffsetY = 1 * effScale;

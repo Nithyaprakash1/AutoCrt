@@ -1179,9 +1179,6 @@ class AppController {
             stampPos = { x: 0.25, y: 0.35 };
         }
 
-        const tickX = Math.max(0.02, stampPos.x - 0.025);
-        const labelX = Math.min(0.96, stampPos.x + 0.035);
-
         if (this.canvasEngine) {
             // Check if page already has a tick near stampPos.y, if not place one
             const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
@@ -1192,22 +1189,22 @@ class AppController {
                     id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
                     pageIndex: this.canvasEngine.currentPageIndex,
                     type: "tick",
-                    x: tickX,
+                    x: stampPos.x,
                     y: stampPos.y,
                     color: "#DC2626", // Teacher Red Ink
                     marks: maxMarks,
                     qNo: q.qNo,
                     qLabel: q.label || `Q${q.qNo}`,
                     isStep: false,
-                    hasMarginMark: true,
+                    hasMarginMark: false,
                     scale: 1.0,
                     timestamp: Date.now()
                 };
                 this.canvasEngine.addAnnotation(tickStamp);
             }
 
-            // 3. Stamp question total marks label at the side edge of the mark
-            this.canvasEngine.stampRightMarginMark(q.qNo, maxMarks, stampPos.y, labelX);
+            // 3. Stamp question total marks label in right margin with 5px gap
+            this.canvasEngine.stampRightMarginMark(q.qNo, maxMarks, stampPos.y);
             this.canvasEngine.renderOverlay();
         }
 
