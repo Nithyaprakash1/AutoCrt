@@ -373,35 +373,36 @@ class FirebaseManager {
             const rawFile = evaluation.rawFile || null;
             if (evalData.rawFile) delete evalData.rawFile;
 
-            // Upload PDF file and page images to Firebase Storage in parallel if connected
+            // Upload PDF file to Firebase Storage
+            await this.ensureReady(3000);
             if (this.storage) {
-                let uploadedPdfUrl = evalData.pdfStorageUrl || null;
+                const storagePath = `evaluations_pdf/${evalData.id}.pdf`;
+                let newUploadUrl = null;
 
-                // 1. Upload & strictly overwrite original single PDF document in Firebase Storage
-                if (!uploadedPdfUrl) {
-                    const storagePath = `evaluations_pdf/${evalData.id}.pdf`;
-                    if (rawFile instanceof File || rawFile instanceof Blob) {
-                        try {
-                            uploadedPdfUrl = await this.uploadStorageBlob(storagePath, rawFile, { contentType: 'application/pdf' });
-                        } catch (fErr) {
-                            console.warn("Direct file upload to Storage failed:", fErr);
-                        }
-                    }
-
-                    if (!uploadedPdfUrl && evalData.pdfDataUrl && evalData.pdfDataUrl.startsWith("data:")) {
-                        try {
-                            const blob = this.dataURLtoBlob(evalData.pdfDataUrl);
-                            if (blob) {
-                                uploadedPdfUrl = await this.uploadStorageBlob(storagePath, blob, { contentType: 'application/pdf' });
-                            }
-                        } catch (pdfErr) {
-                            console.warn("Base64 PDF upload to Storage failed:", pdfErr);
-                        }
+                // 1. If rawFile is provided (new file upload or replacement), always upload it directly to Storage
+                if (rawFile instanceof File || rawFile instanceof Blob) {
+                    try {
+                        newUploadUrl = await this.uploadStorageBlob(storagePath, rawFile, { contentType: 'application/pdf' });
+                    } catch (fErr) {
+                        console.warn("Direct file upload to Storage failed:", fErr);
                     }
                 }
 
-                if (uploadedPdfUrl) {
-                    evalData.pdfStorageUrl = uploadedPdfUrl;
+                // 2. If no rawFile, but pdfDataUrl is a Base64 data URL, upload it
+                if (!newUploadUrl && evalData.pdfDataUrl && evalData.pdfDataUrl.startsWith("data:")) {
+                    try {
+                        const blob = this.dataURLtoBlob(evalData.pdfDataUrl);
+                        if (blob) {
+                            newUploadUrl = await this.uploadStorageBlob(storagePath, blob, { contentType: 'application/pdf' });
+                        }
+                    } catch (pdfErr) {
+                        console.warn("Base64 PDF upload to Storage failed:", pdfErr);
+                    }
+                }
+
+                // Update evalData with newly uploaded Storage URL
+                if (newUploadUrl) {
+                    evalData.pdfStorageUrl = newUploadUrl;
                 }
             }
 
@@ -781,7 +782,11 @@ class FirebaseManager {
 
     // Firebase Storage: Upload File or Blob and return Public Download URL
     async uploadStorageBlob(filePath, blob, metadata = {}) {
-        if (!this.isConnected || !this.storage || !blob) return null;
+        await this.ensureReady(3000);
+        if (!this.storage || !blob) {
+            console.warn("Firebase Storage unavailable for upload:", filePath);
+            return null;
+        }
         try {
             const storageRef = this.storage.ref().child(filePath);
             const uploadTask = await storageRef.put(blob, metadata);

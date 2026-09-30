@@ -3962,6 +3962,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 isUserUploaded: true,
                 isMock: false,
                 pdfDataUrl: item.pdfDataUrl || (existingMatch ? existingMatch.pdfDataUrl : null),
+                pdfStorageUrl: item.file ? null : (existingMatch ? existingMatch.pdfStorageUrl : null),
                 pageCount: item.pageCount || (existingMatch ? existingMatch.pageCount : 1),
                 correctCount: existingMatch ? existingMatch.correctCount : 0,
                 wrongCount: existingMatch ? existingMatch.wrongCount : 0,

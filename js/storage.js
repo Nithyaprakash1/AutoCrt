@@ -551,15 +551,28 @@ class StorageService {
 
         await this.storePdfCache(evaluation.id, cachePayload);
 
-        // Perform cloud sync asynchronously with FirebaseManager ensureReady
+        // Perform cloud sync with Firebase
         if (window.firebaseManager) {
-            window.firebaseManager.ensureReady().then(ready => {
-                if (ready || window.firebaseManager.isConnected) {
-                    window.firebaseManager.saveEvaluation(evaluation).catch(fbErr => {
-                        console.warn("Background cloud sync warning:", fbErr);
-                    });
+            try {
+                const hasRawFile = !!(evaluation.rawFile || (evaluation.pdfDataUrl && evaluation.pdfDataUrl.startsWith("data:")));
+                if (hasRawFile) {
+                    await window.firebaseManager.ensureReady(3500);
+                    if (window.firebaseManager.isConnected || window.firebaseManager.firestore) {
+                        await window.firebaseManager.saveEvaluation(evaluation);
+                    }
+                } else {
+                    // For lightweight autosave strokes, sync in background to keep UI silky smooth
+                    window.firebaseManager.ensureReady(2000).then(ready => {
+                        if (ready || window.firebaseManager.isConnected) {
+                            window.firebaseManager.saveEvaluation(evaluation).catch(fbErr => {
+                                console.warn("Background cloud sync warning:", fbErr);
+                            });
+                        }
+                    }).catch(() => {});
                 }
-            }).catch(() => {});
+            } catch (syncErr) {
+                console.warn("Cloud sync error in saveEvaluation:", syncErr);
+            }
         }
 
         return this._putDirect(evaluation);
