@@ -637,8 +637,7 @@ class CanvasEngine {
                 const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
                 const markW = ((scoreText.length * 8 + 14) * scale) / w;
                 const markH = (21 * scale) / h;
-                const rightGap = (5 * scale) / w;
-                const markX = 1 - (markW / 2) - rightGap;
+                const markX = ann.x; // use stored normalized X coordinate
                 minX = markX - markW / 2;
                 maxX = markX + markW / 2;
                 minY = ann.y - markH / 2;
@@ -847,6 +846,8 @@ class CanvasEngine {
 
         const currentScalePct = Math.round((this.selectedAnnotation.scale || 1.0) * 100);
 
+        const inspX = Math.max(110, Math.min(canvasW - 110, left + width / 2));
+
         this.selectionLayer.innerHTML = `
             <!-- Selection Bounding Box -->
             <div class="ann-selection-box" style="left: ${left}px; top: ${top}px; width: ${width}px; height: ${height}px;">
@@ -857,7 +858,7 @@ class CanvasEngine {
             </div>
 
             <!-- Floating Apple Mini-Inspector -->
-            <div class="ann-floating-inspector" style="left: ${left + width / 2}px; top: ${Math.max(38, top)}px;">
+            <div class="ann-floating-inspector" style="left: ${inspX}px; top: ${Math.max(38, top)}px;">
                 <!-- Scale controls -->
                 <div class="inspector-scale-group">
                     <button type="button" class="inspector-btn" id="insp-btn-scale-down" title="Decrease Size">−</button>
@@ -1179,6 +1180,8 @@ class CanvasEngine {
                     this.selectedAnnotation.endY = Math.max(0, Math.min(1, this.dragInitialState.endY + dy));
                     this.selectedAnnotation.x = Math.max(0, Math.min(1, this.dragInitialState.x + dx));
                     this.selectedAnnotation.y = Math.max(0, Math.min(1, this.dragInitialState.y + dy));
+                } else if (this.selectedAnnotation.type === "margin_mark" || this.selectedAnnotation.type === "left_mark") {
+                    this.selectedAnnotation.y = Math.max(0.02, Math.min(0.98, this.dragInitialState.y + dy));
                 } else {
                     this.selectedAnnotation.x = Math.max(0, Math.min(1, this.dragInitialState.x + dx));
                     this.selectedAnnotation.y = Math.max(0, Math.min(1, this.dragInitialState.y + dy));
@@ -1352,10 +1355,18 @@ class CanvasEngine {
         const page = this.pages[this.currentPageIndex];
         if (!page) return null;
 
+        const w = page.origWidth || 1200;
+        const markVal = marks !== undefined ? marks : "";
+        const qLabel = qNo ? (String(qNo).toUpperCase().startsWith("Q") ? String(qNo) : `Q${qNo}`) : "";
+        const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
+        const markW = (scoreText.length * 8 + 14) / w;
+        const leftGap = 5 / w;
+        const defaultLeftX = (markW / 2) + leftGap;
+
         const y = (yNorm !== null && yNorm !== undefined)
             ? yNorm
             : (this.lastClickNormPos ? this.lastClickNormPos.y : (this.currentCursorNormPos ? this.currentCursorNormPos.y : 0.4));
-        const marginX = (xNorm !== null && xNorm !== undefined) ? Math.max(0.02, Math.min(0.96, xNorm)) : 0.08;
+        const marginX = (xNorm !== null && xNorm !== undefined) ? Math.max(0.02, Math.min(0.98, xNorm)) : defaultLeftX;
         const targetKey = this.normalizeQKey(qNo);
 
         // Check if there is already a margin_mark or left_mark for this question on this page
@@ -1378,10 +1389,11 @@ class CanvasEngine {
         };
 
         if (existingIdx >= 0) {
+            const oldAnn = page.annotations[existingIdx];
             page.annotations[existingIdx] = newAnn;
-            if (this.options.onAnnotationsChange) {
-                this.options.onAnnotationsChange(page.annotations);
-            }
+            page.undoStack.push({ action: "modify", item: newAnn, oldState: oldAnn, newState: newAnn });
+            page.redoStack = [];
+            this.notifyChange();
         } else {
             this.addAnnotation(newAnn);
         }
@@ -1693,6 +1705,22 @@ class CanvasEngine {
         const page = this.pages[this.currentPageIndex];
         if (!page) return;
 
+        // Use accurate bounding box hit testing for any annotation type (margin mark, tick, text, shape, etc.)
+        const hit = this.hitTestAnnotation(pos);
+        if (hit) {
+            const hitIdx = page.annotations.indexOf(hit);
+            if (hitIdx >= 0) {
+                const removed = page.annotations.splice(hitIdx, 1)[0];
+                page.undoStack.push({ action: "delete", item: removed });
+                page.redoStack = [];
+                this.deselectAnnotation();
+                this.renderOverlay();
+                this.notifyChange();
+                return;
+            }
+        }
+
+        // Fallback radius search for small strokes or points
         let hitIdx = -1;
         let minDist = 0.06;
 
@@ -1808,28 +1836,30 @@ class CanvasEngine {
         return all;
     }
 
-    normalizeQKey(val) {
+    static normalizeQKey(val) {
         if (val === null || val === undefined) return null;
         const str = String(val).trim().toLowerCase().replace(/^q/, "");
         const num = parseInt(str, 10);
         return isNaN(num) ? String(val).trim().toLowerCase() : `q${num}`;
     }
 
-    getPageTotalMarks(pageIndex = this.currentPageIndex) {
-        if (!this.pages || !this.pages[pageIndex]) return 0;
-        const page = this.pages[pageIndex];
-        if (!page.annotations || page.annotations.length === 0) return 0;
+    normalizeQKey(val) {
+        return CanvasEngine.normalizeQKey(val);
+    }
+
+    static calculatePageTotal(annotations) {
+        if (!annotations || annotations.length === 0) return 0;
 
         // Group mark annotations on this page by normalized qKey to prevent double-counting margin marks + ticks
         const questionMarksMap = new Map();
         let unassignedTotal = 0;
 
-        page.annotations.forEach(a => {
+        annotations.forEach(a => {
             const rawVal = a.marks !== undefined && a.marks !== null ? String(a.marks) : String(a.text || "");
             const val = parseFloat(rawVal.replace(/^\+/, "").trim());
             if (isNaN(val)) return;
 
-            const qKey = this.normalizeQKey(a.qNo || a.qLabel);
+            const qKey = CanvasEngine.normalizeQKey(a.qNo || a.qLabel);
 
             if (a.type === "margin_mark" || a.type === "left_mark") {
                 if (qKey) {
@@ -1864,6 +1894,12 @@ class CanvasEngine {
         });
 
         return Math.round(total * 10) / 10;
+    }
+
+    getPageTotalMarks(pageIndex = this.currentPageIndex) {
+        if (!this.pages || !this.pages[pageIndex]) return 0;
+        const page = this.pages[pageIndex];
+        return CanvasEngine.calculatePageTotal(page.annotations);
     }
 
     getPaperTotalMarks() {
@@ -2262,11 +2298,10 @@ class CanvasEngine {
                 const bW = textMetrics.width + bPadX * 2;
                 const bH = numFontSize + bPadY * 2;
 
-                // Position in right margin: at end just keep 5px gap
-                const rightGap = 5 * effScale;
-                const markX = canvasW - (bW / 2) - rightGap;
+                // Position using stored ann.x normalized coordinate (same as left margin alignment)
+                const markX = ann.x * canvasW;
 
-                // Neat pill badge on right margin of paper sheet
+                // Neat pill badge using left-margin coordinate alignment
                 ctx.shadowColor = "rgba(220, 38, 38, 0.14)";
                 ctx.shadowBlur = 4 * effScale;
                 ctx.shadowOffsetY = 1 * effScale;
