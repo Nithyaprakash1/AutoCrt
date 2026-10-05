@@ -105,17 +105,26 @@ class DashboardManager {
             return this.evaluations;
         }
         const tSub = this.teacherSubject.toLowerCase();
-        const matched = this.evaluations.filter(e => {
-            if (!e.subject) return true;
+        // Strictly return only papers that match this teacher's subject
+        return this.evaluations.filter(e => {
+            if (!e.subject) return false; // Papers with no subject are NOT shown to subject-specific teachers
             const s = e.subject.toLowerCase();
             return s === tSub || s.includes(tSub) || tSub.includes(s);
         });
-        return matched.length > 0 ? matched : this.evaluations;
     }
 
     applyFilters() {
         this.filteredEvaluations = this.evaluations.filter(e => {
             const isCorr = this.isPaperCorrected(e);
+
+            // 0. MANDATORY: Teacher subject isolation
+            // If this teacher has an assigned subject, they ONLY see their own subject's papers
+            if (this.teacherSubject && this.teacherSubject !== "all" && this.teacherSubject !== "All Subjects") {
+                const tSub = this.teacherSubject.toLowerCase();
+                const eSub = (e.subject || "").toLowerCase();
+                if (!eSub) return false; // No subject tag = not shown
+                if (eSub !== tSub && !eSub.includes(tSub) && !tSub.includes(eSub)) return false;
+            }
 
             // 1. Status Tab filter
             if (this.activeTab === "uncorrected" && isCorr) return false;
@@ -128,7 +137,7 @@ class DashboardManager {
                 if (eCls !== fCls && !eCls.includes(fCls) && !fCls.includes(eCls)) return false;
             }
 
-            // 2b. Subject filter (flexible matching)
+            // 2b. Subject filter dropdown (secondary — within the teacher's own subject)
             if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all") {
                 const fSub = this.selectedSubjectFilter.toLowerCase().trim();
                 const eSub = (e.subject || "").toLowerCase().trim();
@@ -190,9 +199,12 @@ class DashboardManager {
                 .filter(Boolean)
         );
         const classList = Array.from(classSet);
+        // Distinct subjects — only from real uploaded evaluations, no hardcoded list
+        // For subject-specific teachers: only show their own subject in dropdown
         const subjectSet = new Set(this.evaluations.map(e => e.subject).filter(Boolean));
-        ["Physics", "English"].forEach(s => subjectSet.add(s));
-        const subjectList = Array.from(subjectSet);
+        const subjectList = (this.teacherSubject && this.teacherSubject !== "all")
+            ? [this.teacherSubject]  // Teacher only sees their own subject in the dropdown
+            : Array.from(subjectSet);
 
         const ic = window.Icons || {};
         const greetingStr = this.getGreeting();

@@ -359,33 +359,13 @@ class UploadPortalManager {
         if (window.appStorage) {
             const savedCatalog = await window.appStorage.getSubjectCatalog();
             if (savedCatalog && Array.isArray(savedCatalog) && savedCatalog.length > 0) {
-                // Remove obsolete legacy mock subjects (math, sci, bio) but KEEP Physics and English
+                // Remove obsolete legacy mock subjects (math, sci, eng, bio) if any remain
                 const filteredCatalog = savedCatalog.filter(s => {
-                    const isLegacyObsolete = ["math", "sci", "bio"].includes(s.id);
+                    const isLegacyObsolete = ["math", "sci", "bio", "eng"].includes(s.id);
                     return !isLegacyObsolete;
                 });
 
-                // Ensure Physics exists with its standard templates
-                const hasPhy = filteredCatalog.some(s => s.id === "phy" || (s.name && s.name.toLowerCase().includes("physic")));
-                if (!hasPhy) {
-                    const defaultPhy = this.catalog.find(s => s.id === "phy");
-                    if (defaultPhy) filteredCatalog.unshift(defaultPhy);
-                }
-
-                // Ensure English exists with its official 13-question blueprint
-                const defaultEng = this.catalog.find(s => s.id === "eng" || (s.name && s.name.toLowerCase().includes("english")));
-                const engSubs = filteredCatalog.filter(s => s.id === "eng" || (s.code && s.code.toUpperCase().includes("ENG")) || (s.name && s.name.toLowerCase().includes("english")));
-                if (engSubs.length === 0 && defaultEng) {
-                    filteredCatalog.push(defaultEng);
-                } else if (defaultEng) {
-                    engSubs.forEach(engSub => {
-                        if (!engSub.templates || engSub.templates.length === 0) {
-                            engSub.templates = JSON.parse(JSON.stringify(defaultEng.templates));
-                        }
-                    });
-                }
-
-                // Dynamically ensure all subjects have accurate badge labels reflecting their template count
+                // Dynamically ensure all subjects have accurate badge labels
                 filteredCatalog.forEach(sub => {
                     const tplCount = (sub.templates && Array.isArray(sub.templates)) ? sub.templates.length : 0;
                     sub.badge = tplCount === 1 ? "1 Template" : `${tplCount} Templates`;
@@ -394,15 +374,37 @@ class UploadPortalManager {
                 this.catalog = filteredCatalog.length > 0 ? filteredCatalog : this.catalog;
                 await window.appStorage.saveSubjectCatalog(this.catalog);
             } else {
+                // First-time run: use default catalog (Physics + English built-in templates)
                 this.catalog.forEach(sub => {
                     const tplCount = (sub.templates && Array.isArray(sub.templates)) ? sub.templates.length : 0;
                     sub.badge = tplCount === 1 ? "1 Template" : `${tplCount} Templates`;
                 });
                 await window.appStorage.saveSubjectCatalog(this.catalog);
             }
+
+            // USER SUBJECT ISOLATION: If this uploader has assigned subjects, show only those
+            const currentUser = window.appStorage.getCurrentUser();
+            if (currentUser && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0) {
+                const assigned = currentUser.assignedSubjects.map(s => s.toLowerCase().trim());
+                this.catalog = this.catalog.filter(sub => {
+                    const subName = (sub.name || "").toLowerCase().trim();
+                    const subId = (sub.id || "").toLowerCase().trim();
+                    return assigned.some(a => subName.includes(a) || a.includes(subName) || subId.includes(a) || a.includes(subId));
+                });
+            }
+
             const savedClasses = await window.appStorage.getClassesList();
             if (savedClasses && Array.isArray(savedClasses) && savedClasses.length > 0) {
                 this.classes = savedClasses;
+            }
+
+            // USER CLASS ISOLATION: If this uploader has assigned classes, show only those
+            if (currentUser && currentUser.assignedClasses && currentUser.assignedClasses.length > 0) {
+                const assignedCls = currentUser.assignedClasses.map(c => c.toLowerCase().trim());
+                this.classes = this.classes.filter(cls => {
+                    const clsLabel = (cls.label || cls.id || "").toLowerCase().trim();
+                    return assignedCls.some(a => clsLabel.includes(a) || a.includes(clsLabel));
+                });
             }
 
             // Update dynamic student counts for all classes from actual rosters
