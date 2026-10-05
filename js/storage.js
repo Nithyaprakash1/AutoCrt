@@ -393,61 +393,76 @@ class StorageService {
     filterEvaluationsForUser(list) {
         if (!Array.isArray(list)) return [];
         const user = this.getCurrentUser();
-        if (!user) return list;
+        const activePortal = localStorage.getItem("onespace_active_portal") || "evaluator";
+
+        // If no user is logged in and viewing teacher desk, do not expose all evaluations
+        if (!user) {
+            if (activePortal === 'evaluator') return [];
+            return list;
+        }
 
         // Admin or Uploader role accesses all evaluations
         if (user.role === 'admin' || user.role === 'uploader') {
             return list;
         }
 
-        // Teacher / Evaluator role: filter by assigned subject / class / teacher UID
+        // Teacher / Evaluator role: filter strictly by assigned subject(s) & class(es)
         const teacherUid = user.uid || user.id;
         const assignedSubjects = Array.isArray(user.assignedSubjects) && user.assignedSubjects.length > 0
             ? user.assignedSubjects
             : (user.subject ? [user.subject] : []);
         const assignedClasses = Array.isArray(user.assignedClasses) ? user.assignedClasses : [];
 
-        // If teacher has no restrictions at all — show nothing (admin must assign subjects)
-        // This prevents a newly-registered teacher from accidentally seeing all papers
-        if (assignedSubjects.length === 0 && assignedClasses.length === 0 && !teacherUid) {
+        // If teacher has no assigned subjects, they are not authorized to see papers until allotted
+        if (assignedSubjects.length === 0) {
             return [];
         }
 
+        const allowsAllSubjects = assignedSubjects.some(s => s === "All Subjects" || s === "all");
+        const allowsAllClasses = assignedClasses.length === 0 || assignedClasses.some(c => c === "All Classes" || c === "all");
+
         const filtered = list.filter(e => {
-            // 1. Direct teacher assignment
+            if (!e) return false;
+
+            // Direct teacher assignment takes priority if specifically assigned to this teacher
             if (e.assignedTeacherId && teacherUid && String(e.assignedTeacherId) === String(teacherUid)) {
                 return true;
             }
-            // 2. Flexible subject match (e.g. "Physics" matches "Physics Board Paper 2026")
-            if (assignedSubjects.length > 0) {
-                if (assignedSubjects.some(s => s === "All Subjects")) return true;
-                if (e.subject) {
-                    const subLower = e.subject.toLowerCase();
-                    if (assignedSubjects.some(s => {
-                        const sLow = s.toLowerCase();
-                        return sLow === subLower || subLower.includes(sLow) || sLow.includes(subLower);
-                    })) {
-                        return true;
-                    }
-                }
+
+            // 1. MANDATORY SUBJECT MATCH
+            if (!allowsAllSubjects) {
+                const subLower = (e.subject || "").toLowerCase().trim();
+                const examLower = (e.examName || e.templateName || "").toLowerCase().trim();
+                if (!subLower && !examLower) return false;
+
+                const subjectMatches = assignedSubjects.some(s => {
+                    const sLow = s.toLowerCase().trim();
+                    if (!sLow) return false;
+                    return subLower === sLow || subLower.includes(sLow) || sLow.includes(subLower) || examLower.includes(sLow);
+                });
+
+                if (!subjectMatches) return false;
             }
-            // 3. Flexible class match (e.g. "Class 12-A" matches "Class 12", "12-A", etc.)
-            if (assignedClasses.length > 0) {
-                if (assignedClasses.some(c => c === "All Classes")) return true;
-                const eClass = (e.class || e.className || e.classLabel || "").toLowerCase();
-                if (eClass && assignedClasses.some(c => {
-                    const cLow = c.toLowerCase();
-                    return cLow === eClass || eClass.includes(cLow) || cLow.includes(eClass);
-                })) {
-                    return true;
-                }
+
+            // 2. MANDATORY CLASS MATCH (if teacher has specific class restrictions)
+            if (!allowsAllClasses) {
+                const eClass = (e.class || e.className || e.classLabel || "").toLowerCase().trim();
+                if (!eClass) return false;
+
+                const classMatches = assignedClasses.some(c => {
+                    const cLow = c.toLowerCase().trim();
+                    if (!cLow) return false;
+                    return eClass === cLow || eClass.includes(cLow) || cLow.includes(eClass);
+                });
+
+                if (!classMatches) return false;
             }
-            return false;
+
+            return true;
         });
 
-        // Fail-safe: if strict filtering resulted in 0 papers but evaluations exist,
-        // fallback to returning all papers so the teacher desk is never blocked with 0s
-        return filtered.length > 0 ? filtered : list;
+        // Strictly return only matching papers — NEVER fallback to full list
+        return filtered;
     }
 
     async getEvaluationById(id) {

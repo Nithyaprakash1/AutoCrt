@@ -30,7 +30,15 @@ class UploadedPapersPageManager {
             if (savedCatalog) {
                 this.subjects = savedCatalog.map(s => s.name);
             } else {
-                this.subjects = ["Physics"];
+                this.subjects = ["Physics", "English"];
+            }
+
+            const currentUser = window.appStorage.getCurrentUser();
+            if (currentUser && currentUser.role === 'evaluator' && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0 && !currentUser.assignedSubjects.includes("All Subjects")) {
+                this.subjects = currentUser.assignedSubjects;
+                if (this.selectedSubject === "all") {
+                    this.selectedSubject = currentUser.assignedSubjects[0];
+                }
             }
 
             const savedClasses = await window.appStorage.getClassesList();

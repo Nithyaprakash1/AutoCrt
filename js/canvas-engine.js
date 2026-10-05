@@ -63,14 +63,28 @@ class CanvasEngine {
         this.container.style.justifyContent = "center";
         this.container.style.alignItems = "flex-start";
         this.container.style.backgroundColor = "#E2E8F0";
+        this.container.style.boxSizing = "border-box";
+        this.container.style.padding = "20px";
+        this.container.style.width = "100%";
+        this.container.style.height = "100%";
 
         this.wrapper = document.createElement("div");
         this.wrapper.className = "canvas-stage-wrapper";
         this.wrapper.style.position = "relative";
         this.wrapper.style.boxShadow = "0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.1)";
-        this.wrapper.style.margin = "20px auto";
+        this.wrapper.style.margin = "0 auto";
+        this.wrapper.style.flexShrink = "0";
         this.wrapper.style.backgroundColor = "#FFFFFF";
         this.wrapper.style.transition = "width 0.15s ease, height 0.15s ease";
+
+        if (!this._resizeBound) {
+            this._resizeBound = true;
+            window.addEventListener("resize", () => {
+                if (!this._hasUserZoomed && this.wrapper && document.getElementById("view-workspace")?.style.display !== "none") {
+                    this.fitToPage();
+                }
+            });
+        }
 
         // Base image canvas (paper page)
         this.baseCanvas = document.createElement("canvas");
@@ -485,8 +499,12 @@ class CanvasEngine {
             }
         }
 
-        this.updateCanvasDimensions();
-        this.renderAll();
+        if (!this._hasUserZoomed) {
+            this.fitToPage();
+        } else {
+            this.updateCanvasDimensions();
+            this.renderAll();
+        }
 
         if (this.options.onPageChange) {
             this.options.onPageChange(this.currentPageIndex, this.pages.length);
@@ -529,30 +547,60 @@ class CanvasEngine {
     }
 
     zoomIn() {
+        this._hasUserZoomed = true;
         this.setZoom(this.zoom + 0.15);
     }
 
     zoomOut() {
+        this._hasUserZoomed = true;
         this.setZoom(this.zoom - 0.15);
     }
 
     fitToWidth() {
+        this._hasUserZoomed = false;
         const page = this.pages[this.currentPageIndex];
         if (!page) return;
-        const availableWidth = this.container.clientWidth - 60;
-        if (availableWidth > 200) {
-            this.setZoom(availableWidth / page.origWidth);
+
+        const pad = 48;
+        let availableWidth = (this.container.clientWidth || 0) - pad;
+        if (availableWidth < 200) {
+            const stage = document.getElementById("ws-viewport-container");
+            availableWidth = (stage?.clientWidth || window.innerWidth - 380) - pad;
+        }
+
+        if (availableWidth > 150 && page.origWidth > 0) {
+            const targetZoom = availableWidth / page.origWidth;
+            this.setZoom(Math.max(0.3, Math.min(2.5, targetZoom)));
         }
     }
 
     fitToPage() {
+        this._hasUserZoomed = false;
         const page = this.pages[this.currentPageIndex];
         if (!page) return;
-        const availableWidth = this.container.clientWidth - 60;
-        const availableHeight = this.container.clientHeight - 60;
-        const zoomW = availableWidth / page.origWidth;
-        const zoomH = availableHeight / page.origHeight;
-        this.setZoom(Math.min(zoomW, zoomH, 1.2));
+
+        const padX = 48;
+        const padY = 48;
+        let availableWidth = (this.container.clientWidth || 0) - padX;
+        let availableHeight = (this.container.clientHeight || 0) - padY;
+
+        const stage = document.getElementById("ws-viewport-container");
+        if (availableWidth < 200) {
+            availableWidth = (stage?.clientWidth || window.innerWidth - 380) - padX;
+        }
+        if (availableHeight < 200) {
+            availableHeight = (stage?.clientHeight || window.innerHeight - 150) - padY;
+        }
+
+        const origW = page.origWidth || 1200;
+        const origH = page.origHeight || 1650;
+
+        if (origW > 0 && origH > 0 && availableWidth > 100 && availableHeight > 100) {
+            const zoomW = availableWidth / origW;
+            const zoomH = availableHeight / origH;
+            const targetZoom = Math.min(zoomW, zoomH);
+            this.setZoom(Math.max(0.3, Math.min(2.0, targetZoom)));
+        }
     }
 
     async goToPage(index) {

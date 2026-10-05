@@ -464,8 +464,8 @@ class UserManagementPageManager {
             email: "",
             password: this.generateRandomPassword(),
             role: "evaluator",
-            assignedSubjects: ["Physics"],
-            assignedClasses: ["Class 12-A"],
+            assignedSubjects: [],
+            assignedClasses: [],
             status: "active"
         };
 

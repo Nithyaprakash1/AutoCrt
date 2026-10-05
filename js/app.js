@@ -57,9 +57,15 @@ class AppController {
 
         // Respect page data-default-portal attribute if set (uploader.html vs teacher.html)
         const pageDefaultPortal = document.body.getAttribute("data-default-portal");
-        const targetPortal = pageDefaultPortal || this.activePortal || "evaluator";
+        const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        const targetPortal = pageDefaultPortal || (currentUser?.role === "admin" ? "admin" : (currentUser?.role === "uploader" ? "uploader" : this.activePortal)) || "evaluator";
 
         this.setPortal(targetPortal, true);
+
+        // If no user is logged in and not a standalone portal page, show login overlay
+        if (!currentUser && !pageDefaultPortal) {
+            this.showPortalLoginScreen();
+        }
 
         // Check for direct workspace load via URL query param (e.g. ?evalId=eval-123)
         const urlParams = new URLSearchParams(window.location.search);
@@ -70,7 +76,7 @@ class AppController {
                 await this.openWorkspace(ev);
             }
         } else {
-            this.switchView("dashboard");
+            this.switchView(targetPortal === "uploader" ? "upload-portal" : (targetPortal === "admin" ? "admin-panel" : "dashboard"));
         }
 
         // Dismiss app preloader smoothly
@@ -752,7 +758,10 @@ class AppController {
         }
 
         // Header, Sidebar & Mobile Logout / Change Desk button
-        const handleLogout = () => this.showPortalLoginScreen();
+        const handleLogout = () => {
+            if (window.appStorage) window.appStorage.setCurrentUser(null);
+            this.showPortalLoginScreen();
+        };
         const btnLogout = document.getElementById("btn-header-logout");
         if (btnLogout) btnLogout.addEventListener("click", handleLogout);
         const btnSideLogout = document.getElementById("btn-side-logout");
@@ -1539,7 +1548,14 @@ class AppController {
         this.selectTool("tick");
 
         // Fit to page initially & hide loader
-        if (this.canvasEngine) this.canvasEngine.fitToPage();
+        if (this.canvasEngine) {
+            this.canvasEngine.fitToPage();
+            requestAnimationFrame(() => {
+                this.canvasEngine?.fitToPage();
+                setTimeout(() => this.canvasEngine?.fitToPage(), 100);
+                setTimeout(() => this.canvasEngine?.fitToPage(), 300);
+            });
+        }
         if (wsOverlay) {
             wsOverlay.style.opacity = "0";
             setTimeout(() => {
@@ -2270,7 +2286,19 @@ class AppController {
 
         // Match current class/exam/subject or all assigned papers
         const currentClass = this.activeEvaluation?.class || this.activeEvaluation?.className;
+        const currentSubject = this.activeEvaluation?.subject;
         let queue = Array.isArray(allEvaluations) ? [...allEvaluations] : [];
+
+        if (currentSubject) {
+            const curSubLower = currentSubject.toLowerCase().trim();
+            const sameSub = queue.filter(e => {
+                const s = (e.subject || "").toLowerCase().trim();
+                const exam = (e.examName || e.templateName || "").toLowerCase().trim();
+                return s === curSubLower || s.includes(curSubLower) || curSubLower.includes(s) || exam.includes(curSubLower);
+            });
+            if (sameSub.length > 0) queue = sameSub;
+        }
+
         if (currentClass) {
             const sameClass = queue.filter(e => (e.class || e.className) === currentClass);
             if (sameClass.length > 0) queue = sameClass;

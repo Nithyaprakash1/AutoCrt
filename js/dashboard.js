@@ -105,15 +105,25 @@ class DashboardManager {
     }
 
     getSubjectEvals() {
-        if (!this.teacherSubject || this.teacherSubject === "all" || this.teacherSubject === "All Subjects") {
+        const subjects = this.teacherSubjects && this.teacherSubjects.length > 0
+            ? this.teacherSubjects
+            : (this.teacherSubject ? [this.teacherSubject] : []);
+
+        if (subjects.length === 0) {
+            return [];
+        }
+        if (subjects.some(s => s === "all" || s === "All Subjects")) {
             return this.evaluations;
         }
-        const tSub = this.teacherSubject.toLowerCase();
-        // Strictly return only papers that match this teacher's subject
+
         return this.evaluations.filter(e => {
-            if (!e.subject) return false; // Papers with no subject are NOT shown to subject-specific teachers
-            const s = e.subject.toLowerCase();
-            return s === tSub || s.includes(tSub) || tSub.includes(s);
+            const eSub = (e.subject || "").toLowerCase().trim();
+            const eExam = (e.examName || e.templateName || "").toLowerCase().trim();
+            if (!eSub && !eExam) return false;
+            return subjects.some(s => {
+                const tSub = s.toLowerCase().trim();
+                return eSub === tSub || eSub.includes(tSub) || tSub.includes(eSub) || eExam.includes(tSub);
+            });
         });
     }
 
@@ -129,12 +139,17 @@ class DashboardManager {
 
             if (subjects.length > 0 && !subjects.some(s => s === "all" || s === "All Subjects")) {
                 const eSub = (e.subject || "").toLowerCase().trim();
-                if (!eSub) return false; // Paper with no subject tag — not shown
+                const eExam = (e.examName || e.templateName || "").toLowerCase().trim();
+                if (!eSub && !eExam) return false; // Paper with no subject or exam info — not shown
                 const matches = subjects.some(s => {
                     const tSub = s.toLowerCase().trim();
-                    return eSub === tSub || eSub.includes(tSub) || tSub.includes(eSub);
+                    return eSub === tSub || eSub.includes(tSub) || tSub.includes(eSub) || eExam.includes(tSub);
                 });
                 if (!matches) return false;
+            } else if (subjects.length === 0) {
+                // If on teacher desk and no subject allotted to this teacher -> show 0 papers
+                const activePortal = localStorage.getItem("onespace_active_portal") || "evaluator";
+                if (activePortal === "evaluator") return false;
             }
 
             // 1. Status Tab filter
@@ -210,11 +225,12 @@ class DashboardManager {
                 .filter(Boolean)
         );
         const classList = Array.from(classSet);
-        // Distinct subjects — only from real uploaded evaluations, no hardcoded list
-        // For subject-specific teachers: only show their own subject in dropdown
         const subjectSet = new Set(this.evaluations.map(e => e.subject).filter(Boolean));
-        const subjectList = (this.teacherSubject && this.teacherSubject !== "all")
-            ? [this.teacherSubject]  // Teacher only sees their own subject in the dropdown
+        const teacherAssigned = this.teacherSubjects && this.teacherSubjects.length > 0
+            ? this.teacherSubjects
+            : (this.teacherSubject && this.teacherSubject !== "all" ? [this.teacherSubject] : []);
+        const subjectList = (teacherAssigned.length > 0 && !teacherAssigned.includes("All Subjects"))
+            ? teacherAssigned
             : Array.from(subjectSet);
 
         const ic = window.Icons || {};
