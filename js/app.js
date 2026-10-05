@@ -631,8 +631,8 @@ class AppController {
                                 name: userName,
                                 username: userEmail.split('@')[0],
                                 role: selectedRole,
-                                assignedSubjects: selectedRole === "evaluator" ? ["Physics"] : ["All Subjects"],
-                                assignedClasses: ["Class 12-A"]
+                                assignedSubjects: [],
+                                assignedClasses: []
                             });
                             if (res.success && res.profile) {
                                 createdProfile = res.profile;
@@ -651,8 +651,8 @@ class AppController {
                         password: userPass,
                         role: selectedRole,
                         roleLabel: selectedRole === "uploader" ? "Uploader / Exam Dept" : (selectedRole === "admin" ? "Admin Panel" : "Evaluator / Teacher"),
-                        assignedSubjects: selectedRole === "evaluator" ? ["Physics"] : ["All Subjects"],
-                        assignedClasses: ["Class 12-A"],
+                        assignedSubjects: [],
+                        assignedClasses: [],
                         status: "active",
                         createdAt: new Date().toISOString()
                     };

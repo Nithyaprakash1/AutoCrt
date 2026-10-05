@@ -402,14 +402,15 @@ class StorageService {
 
         // Teacher / Evaluator role: filter by assigned subject / class / teacher UID
         const teacherUid = user.uid || user.id;
-        const assignedSubjects = Array.isArray(user.assignedSubjects) && user.assignedSubjects.length > 0 
-            ? user.assignedSubjects 
+        const assignedSubjects = Array.isArray(user.assignedSubjects) && user.assignedSubjects.length > 0
+            ? user.assignedSubjects
             : (user.subject ? [user.subject] : []);
         const assignedClasses = Array.isArray(user.assignedClasses) ? user.assignedClasses : [];
 
-        // If no specific restrictions, show all evaluations
+        // If teacher has no restrictions at all — show nothing (admin must assign subjects)
+        // This prevents a newly-registered teacher from accidentally seeing all papers
         if (assignedSubjects.length === 0 && assignedClasses.length === 0 && !teacherUid) {
-            return list;
+            return [];
         }
 
         const filtered = list.filter(e => {

@@ -58,6 +58,10 @@ class DashboardManager {
             this.teacherSubject = (user.assignedSubjects && user.assignedSubjects.length > 0)
                 ? user.assignedSubjects[0]
                 : (user.subject || "");
+            // Store all assigned subjects for multi-subject teachers
+            this.teacherSubjects = (user.assignedSubjects && user.assignedSubjects.length > 0)
+                ? user.assignedSubjects
+                : (user.subject ? [user.subject] : []);
         }
 
         this.applyFilters();
@@ -118,12 +122,19 @@ class DashboardManager {
             const isCorr = this.isPaperCorrected(e);
 
             // 0. MANDATORY: Teacher subject isolation
-            // If this teacher has an assigned subject, they ONLY see their own subject's papers
-            if (this.teacherSubject && this.teacherSubject !== "all" && this.teacherSubject !== "All Subjects") {
-                const tSub = this.teacherSubject.toLowerCase();
-                const eSub = (e.subject || "").toLowerCase();
-                if (!eSub) return false; // No subject tag = not shown
-                if (eSub !== tSub && !eSub.includes(tSub) && !tSub.includes(eSub)) return false;
+            // If this teacher has assigned subjects, they ONLY see those subjects' papers
+            const subjects = this.teacherSubjects && this.teacherSubjects.length > 0
+                ? this.teacherSubjects
+                : (this.teacherSubject ? [this.teacherSubject] : []);
+
+            if (subjects.length > 0 && !subjects.some(s => s === "all" || s === "All Subjects")) {
+                const eSub = (e.subject || "").toLowerCase().trim();
+                if (!eSub) return false; // Paper with no subject tag — not shown
+                const matches = subjects.some(s => {
+                    const tSub = s.toLowerCase().trim();
+                    return eSub === tSub || eSub.includes(tSub) || tSub.includes(eSub);
+                });
+                if (!matches) return false;
             }
 
             // 1. Status Tab filter
