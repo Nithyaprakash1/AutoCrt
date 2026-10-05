@@ -359,22 +359,30 @@ class UploadPortalManager {
         if (window.appStorage) {
             const savedCatalog = await window.appStorage.getSubjectCatalog();
             if (savedCatalog && Array.isArray(savedCatalog) && savedCatalog.length > 0) {
-                // Remove obsolete legacy mock subjects (math, sci, eng, bio) if any remain
-                const filteredCatalog = savedCatalog.filter(s => {
-                    const isLegacyObsolete = ["math", "sci", "bio", "eng"].includes(s.id);
-                    return !isLegacyObsolete;
-                });
+                // Ensure Physics exists with its standard templates
+                const hasPhy = savedCatalog.some(s => s.id === "phy" || (s.name && s.name.toLowerCase().includes("physic")));
+                if (!hasPhy) {
+                    const defaultPhy = this.catalog.find(s => s.id === "phy");
+                    if (defaultPhy) savedCatalog.unshift(defaultPhy);
+                }
+
+                // Ensure English exists with its official blueprint
+                const hasEng = savedCatalog.some(s => s.id === "eng" || (s.name && s.name.toLowerCase().includes("english")));
+                if (!hasEng) {
+                    const defaultEng = this.catalog.find(s => s.id === "eng");
+                    if (defaultEng) savedCatalog.push(defaultEng);
+                }
 
                 // Dynamically ensure all subjects have accurate badge labels
-                filteredCatalog.forEach(sub => {
+                savedCatalog.forEach(sub => {
                     const tplCount = (sub.templates && Array.isArray(sub.templates)) ? sub.templates.length : 0;
                     sub.badge = tplCount === 1 ? "1 Template" : `${tplCount} Templates`;
                 });
 
-                this.catalog = filteredCatalog.length > 0 ? filteredCatalog : this.catalog;
+                this.catalog = savedCatalog;
                 await window.appStorage.saveSubjectCatalog(this.catalog);
             } else {
-                // First-time run: use default catalog (Physics + English built-in templates)
+                // First-time run: use full default catalog (Physics + English built-in templates)
                 this.catalog.forEach(sub => {
                     const tplCount = (sub.templates && Array.isArray(sub.templates)) ? sub.templates.length : 0;
                     sub.badge = tplCount === 1 ? "1 Template" : `${tplCount} Templates`;
@@ -382,29 +390,10 @@ class UploadPortalManager {
                 await window.appStorage.saveSubjectCatalog(this.catalog);
             }
 
-            // USER SUBJECT ISOLATION: If this uploader has assigned subjects, show only those
-            const currentUser = window.appStorage.getCurrentUser();
-            if (currentUser && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0) {
-                const assigned = currentUser.assignedSubjects.map(s => s.toLowerCase().trim());
-                this.catalog = this.catalog.filter(sub => {
-                    const subName = (sub.name || "").toLowerCase().trim();
-                    const subId = (sub.id || "").toLowerCase().trim();
-                    return assigned.some(a => subName.includes(a) || a.includes(subName) || subId.includes(a) || a.includes(subId));
-                });
-            }
-
+            // Uploader desk must ALWAYS have access to all classes for exam uploading
             const savedClasses = await window.appStorage.getClassesList();
             if (savedClasses && Array.isArray(savedClasses) && savedClasses.length > 0) {
                 this.classes = savedClasses;
-            }
-
-            // USER CLASS ISOLATION: If this uploader has assigned classes, show only those
-            if (currentUser && currentUser.assignedClasses && currentUser.assignedClasses.length > 0) {
-                const assignedCls = currentUser.assignedClasses.map(c => c.toLowerCase().trim());
-                this.classes = this.classes.filter(cls => {
-                    const clsLabel = (cls.label || cls.id || "").toLowerCase().trim();
-                    return assignedCls.some(a => clsLabel.includes(a) || a.includes(clsLabel));
-                });
             }
 
             // Update dynamic student counts for all classes from actual rosters
