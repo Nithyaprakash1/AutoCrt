@@ -17,6 +17,18 @@ class BulkReportManager {
     async init() {
         if (!this.container) return;
         this.evaluations = await window.appStorage.getAllEvaluations();
+
+        // If teacher is allotted specific subject(s) (e.g. English), scope evaluations strictly to that subject
+        const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        if (currentUser && currentUser.role === 'evaluator' && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0 && !currentUser.assignedSubjects.includes("All Subjects")) {
+            const assigned = currentUser.assignedSubjects.map(s => s.toLowerCase().trim());
+            this.evaluations = this.evaluations.filter(e => {
+                const sub = (e.subject || "").toLowerCase().trim();
+                const exam = (e.examName || e.templateName || "").toLowerCase().trim();
+                return assigned.some(a => sub === a || sub.includes(a) || a.includes(sub) || exam.includes(a));
+            });
+        }
+
         this.render();
         this.applyFilter();
     }
@@ -26,7 +38,14 @@ class BulkReportManager {
         const exams = [...new Set(this.evaluations.map(e => e.examName).filter(Boolean))];
         const classes = [...new Set(this.evaluations.map(e => e.class).filter(Boolean))];
         const sections = [...new Set(this.evaluations.map(e => e.section).filter(Boolean))];
-        const subjects = [...new Set(["Physics", "English", ...this.evaluations.map(e => e.subject).filter(Boolean)])];
+
+        const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        let subjects = [...new Set(this.evaluations.map(e => e.subject).filter(Boolean))];
+        if (currentUser && currentUser.role === 'evaluator' && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0 && !currentUser.assignedSubjects.includes("All Subjects")) {
+            subjects = currentUser.assignedSubjects;
+        } else if (subjects.length === 0) {
+            subjects = ["Physics", "English"];
+        }
 
         const ic = window.Icons || {};
 
@@ -240,12 +259,6 @@ class BulkReportManager {
         const thead = this.container.querySelector("#bulk-table-head");
         if (!thead) return;
 
-        const maxQ = this.getMaxQuestions();
-        let qHeaders = "";
-        for (let i = 1; i <= maxQ; i++) {
-            qHeaders += `<th>Q${i}</th>`;
-        }
-
         thead.innerHTML = `
             <tr>
                 <th style="width: 45px;"><input type="checkbox" id="header-select-all" checked /></th>
@@ -253,9 +266,9 @@ class BulkReportManager {
                 <th>Register No</th>
                 <th>Student Name</th>
                 <th>Class & Sec</th>
-                ${qHeaders}
-                <th>Total</th>
-                <th>Max</th>
+                <th>Subject</th>
+                <th>Total Marks</th>
+                <th>Max Marks</th>
                 <th>Percentage</th>
                 <th>Grade</th>
                 <th>Status</th>
@@ -279,24 +292,14 @@ class BulkReportManager {
         const tbody = this.container.querySelector("#bulk-table-body");
         if (!tbody) return;
 
-        const maxQ = this.getMaxQuestions();
-
         if (this.filteredEvaluations.length === 0) {
-            tbody.innerHTML = `<tr><td colspan="${10 + maxQ}" class="empty-state-cell">No evaluations found matching the selected filters.</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="11" class="empty-state-cell">No evaluations found matching the selected filters.</td></tr>`;
             this.updateCounter();
             return;
         }
 
         tbody.innerHTML = this.filteredEvaluations.map((ev, idx) => {
             const isChecked = this.selectedIds.has(ev.id);
-            const questions = ev.questions || [];
-
-            let qCols = "";
-            for (let q = 0; q < maxQ; q++) {
-                const mark = questions[q] ? questions[q].awardedMarks : "-";
-                qCols += `<td class="text-center">${mark}</td>`;
-            }
-
             const statusClass = ev.status === "Completed" ? "badge-completed" : "badge-pending";
 
             return `
@@ -306,8 +309,8 @@ class BulkReportManager {
                     <td class="font-mono">${ev.rollNo || "-"}</td>
                     <td class="font-regular">${ev.studentName || "-"}</td>
                     <td>${ev.class || ""} - ${ev.section || ""}</td>
-                    ${qCols}
-                    <td class="text-center text-green">${ev.obtainedMarks || 0}</td>
+                    <td><span class="badge" style="background: rgba(0,122,255,0.08); color: #007AFF;">${ev.subject || "-"}</span></td>
+                    <td class="text-center text-green" style="font-weight: 600;">${ev.obtainedMarks !== undefined ? ev.obtainedMarks : 0}</td>
                     <td class="text-center text-muted">${ev.maxMarks || 0}</td>
                     <td class="text-center">${ev.percentage || 0}%</td>
                     <td class="text-center">${ev.grade || "--"}</td>
@@ -337,12 +340,8 @@ class BulkReportManager {
             return;
         }
 
-        const maxQ = this.getMaxQuestions();
-        const headers = ["S.No", "Register No", "Student Name", "Class", "Section", "Subject", "Exam Name"];
-        for (let i = 1; i <= maxQ; i++) {
-            headers.push(`Q${i}`);
-        }
-        headers.push("Total Marks", "Max Marks", "Percentage", "Grade", "Status");
+        // Only total marks columns - no individual questions
+        const headers = ["S.No", "Register No", "Student Name", "Class", "Section", "Subject", "Exam Name", "Total Marks Obtained", "Max Marks", "Percentage", "Grade", "Status"];
 
         const rows = [headers];
 
@@ -354,19 +353,13 @@ class BulkReportManager {
                 `"${ev.class || ''}"`,
                 `"${ev.section || ''}"`,
                 `"${ev.subject || ''}"`,
-                `"${ev.examName || ''}"`
+                `"${ev.examName || ''}"`,
+                ev.obtainedMarks || 0,
+                ev.maxMarks || 0,
+                `"${ev.percentage || 0}%"`,
+                `"${ev.grade || '--'}"`,
+                `"${ev.status || 'Completed'}"`
             ];
-
-            for (let q = 0; q < maxQ; q++) {
-                const mark = ev.questions && ev.questions[q] ? ev.questions[q].awardedMarks : "";
-                row.push(mark);
-            }
-
-            row.push(ev.obtainedMarks || 0);
-            row.push(ev.maxMarks || 0);
-            row.push(`${ev.percentage || 0}%`);
-            row.push(ev.grade || "--");
-            row.push(ev.status || "Pending");
 
             rows.push(row);
         });
@@ -376,7 +369,8 @@ class BulkReportManager {
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
         link.setAttribute("href", url);
-        link.setAttribute("download", `Bulk_Mark_Report_${new Date().toISOString().split("T")[0]}.csv`);
+        const subName = (selected[0]?.subject || "Marks").replace(/\s+/g, "_");
+        link.setAttribute("download", `${subName}_Total_Marks_Report_${new Date().toISOString().split("T")[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
@@ -412,34 +406,24 @@ class BulkReportManager {
         const pageHeight = 210;
         const margin = 12;
 
-        const maxQ = this.getMaxQuestions();
-        const headers = ["S.No", "Reg No", "Student Name", "Class-Sec"];
-        for (let i = 1; i <= maxQ; i++) {
-            headers.push(`Q${i}`);
-        }
-        headers.push("Total", "Max", "%", "Grade");
+        const headers = ["S.No", "Reg No", "Student Name", "Class & Sec", "Subject", "Total Marks", "Max Marks", "Percentage", "Grade", "Status"];
 
         const body = selected.map((ev, idx) => {
-            const row = [
+            const gradeInfo = window.calculateGradeScale 
+                ? window.calculateGradeScale(ev.obtainedMarks, ev.maxMarks) 
+                : { grade: ev.grade || "--", status: ev.status || "Pass" };
+            return [
                 idx + 1,
                 ev.rollNo || "-",
                 ev.studentName || "-",
-                `${ev.class || ""}-${ev.section || ""}`
+                `${ev.class || ""}-${ev.section || ""}`,
+                ev.subject || "-",
+                ev.obtainedMarks || 0,
+                ev.maxMarks || 0,
+                `${ev.percentage || 0}%`,
+                ev.grade || gradeInfo.grade,
+                ev.status || gradeInfo.status || "Completed"
             ];
-
-            for (let q = 0; q < maxQ; q++) {
-                const mark = ev.questions && ev.questions[q] ? ev.questions[q].awardedMarks : "-";
-                row.push(mark);
-            }
-
-            row.push(ev.obtainedMarks || 0);
-            row.push(ev.maxMarks || 0);
-            row.push(`${ev.percentage || 0}%`);
-            const gradeInfo = window.calculateGradeScale 
-                ? window.calculateGradeScale(ev.obtainedMarks, ev.maxMarks) 
-                : { grade: ev.grade || "--" };
-            row.push(ev.grade || gradeInfo.grade);
-            return row;
         });
 
         // Compute class aggregate stats (Passing threshold >= 33% as per official scale)
@@ -459,8 +443,8 @@ class BulkReportManager {
                 margin: { left: margin, right: margin, bottom: 20 },
                 theme: "grid",
                 styles: {
-                    fontSize: 8.5,
-                    cellPadding: 2.2,
+                    fontSize: 9,
+                    cellPadding: 3,
                     valign: "middle",
                     fontStyle: "normal"
                 },
@@ -471,14 +455,19 @@ class BulkReportManager {
                     halign: "center"
                 },
                 columnStyles: {
-                    0: { halign: "center", cellWidth: 12 },
-                    1: { halign: "center", cellWidth: 20, fontStyle: "normal" },
-                    2: { halign: "left", fontStyle: "normal" },
-                    3: { halign: "center", cellWidth: 22 }
+                    0: { halign: "center", cellWidth: 14 },
+                    1: { halign: "center", cellWidth: 26 },
+                    2: { halign: "left" },
+                    3: { halign: "center", cellWidth: 26 },
+                    4: { halign: "center", cellWidth: 32 },
+                    5: { halign: "center", cellWidth: 26 },
+                    6: { halign: "center", cellWidth: 24 },
+                    7: { halign: "center", cellWidth: 26 },
+                    8: { halign: "center", cellWidth: 22 },
+                    9: { halign: "center", cellWidth: 26 }
                 },
-                // Set question columns to center
                 didParseCell: (data) => {
-                    if (data.column.index >= 4) {
+                    if (data.column.index >= 5) {
                         data.cell.styles.halign = "center";
                     }
                 },

@@ -2435,19 +2435,39 @@ class AppController {
         try {
             this.showActionProgressModal({
                 title: "Exporting Results Spreadsheet",
-                subtitle: "Compiling student roster marks, section breakdowns, and grades...",
+                subtitle: "Compiling student roster total marks and final grades...",
                 statusText: "Fetching evaluation records from storage...",
-                badgeText: "Excel / CSV Matrix"
+                badgeText: "Excel / CSV"
             });
 
             this.updateActionProgressModal(25, "Reading evaluated papers from database...");
-            await new Promise(r => setTimeout(r, 180));
+            await new Promise(r => setTimeout(r, 150));
 
             if (this.activeEvaluation) {
                 await this.saveActiveEvaluation(false);
             }
 
-            let allEvaluations = Array.isArray(evaluationsList) && evaluationsList.length > 0 ? evaluationsList : null;
+            // Determine active subject from current panel / evaluation / teacher
+            let activeSubject = null;
+            if (this.activeEvaluation && this.activeEvaluation.subject) {
+                activeSubject = this.activeEvaluation.subject;
+            } else if (this.dashboardManager) {
+                if (this.dashboardManager.selectedSubjectFilter && this.dashboardManager.selectedSubjectFilter !== "all") {
+                    activeSubject = this.dashboardManager.selectedSubjectFilter;
+                } else if (this.dashboardManager.teacherSubject && this.dashboardManager.teacherSubject !== "all") {
+                    activeSubject = this.dashboardManager.teacherSubject;
+                }
+            }
+            if (!activeSubject && window.appStorage) {
+                const user = window.appStorage.getCurrentUser();
+                if (user && user.assignedSubjects && user.assignedSubjects.length > 0 && !user.assignedSubjects.includes("All Subjects")) {
+                    activeSubject = user.assignedSubjects[0];
+                } else if (user && user.subject && user.subject !== "All Subjects") {
+                    activeSubject = user.subject;
+                }
+            }
+
+            let allEvaluations = Array.isArray(evaluationsList) && evaluationsList.length > 0 ? [...evaluationsList] : null;
             if (!allEvaluations) {
                 allEvaluations = await window.appStorage.getAllEvaluations();
                 if ((!allEvaluations || allEvaluations.length === 0) && this.activeEvaluation) {
@@ -2457,43 +2477,62 @@ class AppController {
                 }
             }
 
+            // CRITICAL: Strictly isolate to that particular subject alone if in a subject panel (e.g. English)
+            if (activeSubject) {
+                const sLow = activeSubject.toLowerCase().trim();
+                allEvaluations = allEvaluations.filter(ev => {
+                    const sub = (ev.subject || "").toLowerCase().trim();
+                    const exam = (ev.examName || ev.templateName || "").toLowerCase().trim();
+                    return sub === sLow || sub.includes(sLow) || sLow.includes(sub) || exam.includes(sLow);
+                });
+            }
+
             if (!allEvaluations || allEvaluations.length === 0) {
                 this.closeActionProgressModal();
-                this.showToast("No evaluations to export.", "error");
+                this.showToast(`No evaluation records found for ${activeSubject || 'selected criteria'}.`, "warning");
                 return;
             }
 
-            this.updateActionProgressModal(65, `Formatting ${allEvaluations.length} student scores & question matrices...`);
-            await new Promise(r => setTimeout(r, 220));
+            this.updateActionProgressModal(65, `Formatting ${allEvaluations.length} student total marks records...`);
+            await new Promise(r => setTimeout(r, 180));
 
-            // Build detailed question-by-question header and student mark rows
-            const maxQs = Math.max(...allEvaluations.map(e => (e.questions ? e.questions.length : 0)), 0);
-            const qHeaders = [];
-            for (let i = 1; i <= Math.min(maxQs, 50); i++) {
-                qHeaders.push(`Q${i} Marks`);
-            }
-
+            // Clean total marks format — NO individual question marks
             const headers = [
-                "Roll No", "Student Name", "Subject", "Exam", "Class/Section",
-                "Obtained Marks", "Max Marks", "Percentage", "Grade", "Status",
-                ...qHeaders
+                "S.No",
+                "Roll No",
+                "Student Name",
+                "Class",
+                "Section",
+                "Subject",
+                "Examination",
+                "Total Marks Obtained",
+                "Max Marks",
+                "Percentage",
+                "Grade",
+                "Status"
             ];
 
-            const rows = allEvaluations.map(ev => {
-                const pct = ev.maxMarks > 0 ? Math.round(((ev.obtainedMarks || 0) / ev.maxMarks) * 100) : 0;
-                const qMarks = (ev.questions || []).map(q => q.awardedMarks !== undefined ? q.awardedMarks : 0);
+            const rows = allEvaluations.map((ev, idx) => {
+                const pct = ev.maxMarks > 0 
+                    ? Math.round(((ev.obtainedMarks || 0) / ev.maxMarks) * 100) 
+                    : (ev.percentage !== undefined ? ev.percentage : 0);
+                const gradeInfo = window.calculateGradeScale 
+                    ? window.calculateGradeScale(ev.obtainedMarks, ev.maxMarks) 
+                    : { grade: ev.grade || "--" };
+
                 return [
+                    idx + 1,
                     ev.rollNo || "",
                     ev.studentName || "",
-                    ev.subject || "",
-                    ev.examName || "",
-                    `${ev.class || ev.className || ""} ${ev.section || ""}`.trim(),
+                    ev.class || ev.className || "",
+                    ev.section || "",
+                    ev.subject || activeSubject || "General",
+                    ev.examName || ev.templateName || "Examination",
                     ev.obtainedMarks !== undefined ? ev.obtainedMarks : 0,
                     ev.maxMarks || 0,
                     `${pct}%`,
-                    ev.grade || "--",
-                    ev.status || "Pending",
-                    ...qMarks
+                    ev.grade || gradeInfo.grade || "--",
+                    ev.status || "Completed"
                 ];
             });
 
@@ -2505,8 +2544,9 @@ class AppController {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
+            const safeSub = (activeSubject || "Total_Marks").replace(/[^a-zA-Z0-9_-]/g, "_");
             const date = new Date().toISOString().slice(0, 10);
-            a.download = `Niprak_OSM_Physics_Marks_Matrix_${date}.csv`;
+            a.download = `${safeSub}_Marks_Report_${date}.csv`;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
@@ -2514,8 +2554,8 @@ class AppController {
 
             this.setActionProgressModalSuccess({
                 title: "✓ Excel Spreadsheet Ready!",
-                subtitle: `Exported ${allEvaluations.length} student results successfully.`,
-                statusText: "Downloaded CSV/Excel matrix file.",
+                subtitle: `Exported ${allEvaluations.length} student total marks records for ${activeSubject || 'selected subject'}.`,
+                statusText: "Downloaded CSV/Excel marks file.",
                 delayMs: 1100
             });
         } catch (err) {
