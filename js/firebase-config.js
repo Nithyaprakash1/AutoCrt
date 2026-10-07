@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Firebase Configuration & Connection
+ * Niprak Digital Correction - Firebase Configuration & Connection
  * Connected to Project: studio-5089173188-26125
  */
 

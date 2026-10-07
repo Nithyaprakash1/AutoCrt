@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Evaluation Creation & File Dropzone
+ * Niprak Digital Correction - Evaluation Creation & File Dropzone
  * Handles Step 1 metadata, dynamic question max marks generator,
  * Step 2 drag-and-drop file upload, client-side image compression,
  * multi-page PDF extraction via PDF.js, and instant sample paper loading.

@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Bulk Mark Report Generator
+ * Niprak Digital Correction - Bulk Mark Report Generator
  * Supports class/exam filtering, multi-student selection, sorting,
  * Landscape A4 PDF generation with repeated headers & pagination, and CSV/Excel export.
  */

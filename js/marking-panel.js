@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Question-Wise Marking & Scoring Engine
+ * Niprak Digital Correction - Question-Wise Marking & Scoring Engine
  * Supports:
  * - Structured Sections (A, B, C...) with Question Count, Marks per Question, & Section Totals
  * - Choice Questions ("this or that" / Option 1 OR Option 2) with fixed question ceiling

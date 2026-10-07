@@ -1,12 +1,12 @@
 /**
- * OneSpace Digital Correction - Storage Layer (Dual Mode)
+ * Niprak Digital Correction - Storage Layer (Dual Mode)
  * Provides IndexedDB persistence with LocalStorage fallback and MockData auto-seeding.
  * Also hooks into Firebase Firestore & Storage if configured.
  */
 
 class StorageService {
     constructor() {
-        this.dbName = "OneSpaceEvaluationDB";
+        this.dbName = "NiprakEvaluationDB";
         this.dbVersion = 1;
         this.db = null;
         this.isReady = false;
@@ -49,6 +49,7 @@ class StorageService {
 
                 request.onsuccess = async (event) => {
                     this.db = event.target.result;
+                    await this._migrateFromLegacyDB();
                     await this.seedInitialDataIfNeeded();
                     this.purgeLegacyMockData();
                     this.isReady = true;
@@ -74,6 +75,33 @@ class StorageService {
         });
     }
 
+    async _migrateFromLegacyDB() {
+        if (!window.indexedDB || !this.db) return;
+        try {
+            const oldReq = indexedDB.open("OneSpaceEvaluationDB");
+            oldReq.onsuccess = (e) => {
+                const oldDb = e.target.result;
+                if (oldDb.objectStoreNames.contains("evaluations")) {
+                    const tx = oldDb.transaction(["evaluations"], "readonly");
+                    const store = tx.objectStore("evaluations");
+                    const getAllReq = store.getAll();
+                    getAllReq.onsuccess = () => {
+                        const legacyEvals = getAllReq.result || [];
+                        if (legacyEvals.length > 0 && this.db) {
+                            try {
+                                const newTx = this.db.transaction(["evaluations"], "readwrite");
+                                const newStore = newTx.objectStore("evaluations");
+                                legacyEvals.forEach(ev => {
+                                    if (ev && ev.id) newStore.put(ev);
+                                });
+                            } catch (err) {}
+                        }
+                    };
+                }
+            };
+        } catch (e) {}
+    }
+
     async purgeLegacyMockData() {
         const isUnwanted = (e) => {
             if (!e) return true;
@@ -92,12 +120,14 @@ class StorageService {
         this.memoryStore = this.memoryStore.filter(e => e && e.id && !isUnwanted(e));
 
         try {
-            const raw = localStorage.getItem("onespace_evaluations_summary") || localStorage.getItem("onespace_evaluations");
+            const raw = localStorage.getItem("niprak_evaluations_summary") || localStorage.getItem("onespace_evaluations_summary") || localStorage.getItem("niprak_evaluations") || localStorage.getItem("onespace_evaluations");
             if (raw) {
                 const parsed = JSON.parse(raw);
                 if (Array.isArray(parsed)) {
                     const cleaned = parsed.filter(e => e && e.id && !isUnwanted(e));
+                    localStorage.setItem("niprak_evaluations_summary", JSON.stringify(cleaned));
                     localStorage.setItem("onespace_evaluations_summary", JSON.stringify(cleaned));
+                    localStorage.setItem("niprak_evaluations", JSON.stringify(cleaned));
                     localStorage.setItem("onespace_evaluations", JSON.stringify(cleaned));
                 }
             }
@@ -124,12 +154,16 @@ class StorageService {
         await this.purgeLegacyMockData();
         try {
             if ('caches' in window) {
-                const cache = await caches.open('onespace-pdf-cache-v1');
-                const keys = await cache.keys();
-                for (const req of keys) {
-                    if (req.url.toLowerCase().includes("dharnish") || req.url.includes("eval-00")) {
-                        await cache.delete(req);
-                    }
+                for (const cacheName of ['niprak-pdf-cache-v1', 'onespace-pdf-cache-v1']) {
+                    try {
+                        const cache = await caches.open(cacheName);
+                        const keys = await cache.keys();
+                        for (const req of keys) {
+                            if (req.url.toLowerCase().includes("dharnish") || req.url.includes("eval-00")) {
+                                await cache.delete(req);
+                            }
+                        }
+                    } catch (e) {}
                 }
             }
         } catch (e) {}
@@ -138,7 +172,7 @@ class StorageService {
 
     _loadDeletedIds() {
         try {
-            const raw = localStorage.getItem("onespace_deleted_ids");
+            const raw = localStorage.getItem("niprak_deleted_ids") || localStorage.getItem("onespace_deleted_ids");
             if (raw) {
                 const arr = JSON.parse(raw);
                 if (Array.isArray(arr)) return new Set(arr.map(String));
@@ -153,7 +187,9 @@ class StorageService {
         if (!this.deletedEvaluations) this.deletedEvaluations = new Set();
         this.deletedEvaluations.add(targetId);
         try {
-            localStorage.setItem("onespace_deleted_ids", JSON.stringify(Array.from(this.deletedEvaluations)));
+            const json = JSON.stringify(Array.from(this.deletedEvaluations));
+            localStorage.setItem("niprak_deleted_ids", json);
+            localStorage.setItem("onespace_deleted_ids", json);
         } catch (e) {}
     }
 
@@ -163,14 +199,16 @@ class StorageService {
         if (this.deletedEvaluations.has(targetId)) {
             this.deletedEvaluations.delete(targetId);
             try {
-                localStorage.setItem("onespace_deleted_ids", JSON.stringify(Array.from(this.deletedEvaluations)));
+                const json = JSON.stringify(Array.from(this.deletedEvaluations));
+                localStorage.setItem("niprak_deleted_ids", json);
+                localStorage.setItem("onespace_deleted_ids", json);
             } catch (e) {}
         }
     }
 
     fallbackInit() {
         try {
-            const raw = localStorage.getItem("onespace_evaluations_summary") || localStorage.getItem("onespace_evaluations");
+            const raw = localStorage.getItem("niprak_evaluations_summary") || localStorage.getItem("onespace_evaluations_summary") || localStorage.getItem("niprak_evaluations") || localStorage.getItem("onespace_evaluations");
             if (!raw) {
                 this.memoryStore = [];
             } else {
@@ -220,7 +258,7 @@ class StorageService {
         // 2. Persistent Cache API (supports multi-gigabyte payloads without LocalStorage 5MB quota errors)
         try {
             if ('caches' in window) {
-                const cache = await caches.open('onespace-pdf-cache-v1');
+                const cache = await caches.open('niprak-pdf-cache-v1');
                 const response = new Response(JSON.stringify(payloadToStore), {
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -239,11 +277,15 @@ class StorageService {
             return this.pdfCacheMap.get(targetId);
         }
 
-        // 2. Check Cache API
+        // 2. Check Cache API (check niprak-pdf-cache-v1 first, then legacy onespace-pdf-cache-v1)
         try {
             if ('caches' in window) {
-                const cache = await caches.open('onespace-pdf-cache-v1');
-                const resp = await cache.match(new Request(`/pdf-cache/${targetId}`));
+                let cache = await caches.open('niprak-pdf-cache-v1');
+                let resp = await cache.match(new Request(`/pdf-cache/${targetId}`));
+                if (!resp) {
+                    const oldCache = await caches.open('onespace-pdf-cache-v1');
+                    resp = await oldCache.match(new Request(`/pdf-cache/${targetId}`));
+                }
                 if (resp) {
                     const data = await resp.json();
                     if (data) {
@@ -256,7 +298,7 @@ class StorageService {
 
         // 3. Fallback: check session/local storage if small
         try {
-            const sRaw = sessionStorage.getItem(`onespace_pdf_${targetId}`) || localStorage.getItem(`onespace_pdf_${targetId}`);
+            const sRaw = sessionStorage.getItem(`niprak_pdf_${targetId}`) || localStorage.getItem(`niprak_pdf_${targetId}`) || sessionStorage.getItem(`onespace_pdf_${targetId}`) || localStorage.getItem(`onespace_pdf_${targetId}`);
             if (sRaw) {
                 const parsed = JSON.parse(sRaw);
                 this.pdfCacheMap.set(targetId, parsed);
@@ -328,7 +370,7 @@ class StorageService {
 
         if (!list || list.length === 0) {
             try {
-                const raw = localStorage.getItem("onespace_evaluations_summary") || localStorage.getItem("onespace_evaluations");
+                const raw = localStorage.getItem("niprak_evaluations_summary") || localStorage.getItem("onespace_evaluations_summary") || localStorage.getItem("niprak_evaluations") || localStorage.getItem("onespace_evaluations");
                 if (raw) {
                     const parsed = JSON.parse(raw);
                     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -444,6 +486,7 @@ class StorageService {
                     isUserUploaded: true,
                     isMock: false
                 }));
+                localStorage.setItem("niprak_evaluations_summary", JSON.stringify(summaryList));
                 localStorage.setItem("onespace_evaluations_summary", JSON.stringify(summaryList));
             } catch (e) {}
         }
@@ -453,7 +496,7 @@ class StorageService {
 
     getCurrentUser() {
         try {
-            const raw = localStorage.getItem("onespace_active_user");
+            const raw = localStorage.getItem("niprak_active_user") || localStorage.getItem("onespace_active_user");
             if (raw) return JSON.parse(raw);
         } catch (e) {}
         return this.currentUser || null;
@@ -463,8 +506,11 @@ class StorageService {
         this.currentUser = user;
         try {
             if (user) {
-                localStorage.setItem("onespace_active_user", JSON.stringify(user));
+                const uStr = JSON.stringify(user);
+                localStorage.setItem("niprak_active_user", uStr);
+                localStorage.setItem("onespace_active_user", uStr);
             } else {
+                localStorage.removeItem("niprak_active_user");
                 localStorage.removeItem("onespace_active_user");
             }
         } catch (e) {}
@@ -473,7 +519,7 @@ class StorageService {
     filterEvaluationsForUser(list) {
         if (!Array.isArray(list)) return [];
         const user = this.getCurrentUser();
-        const activePortal = localStorage.getItem("onespace_active_portal") || "evaluator";
+        const activePortal = localStorage.getItem("niprak_active_portal") || localStorage.getItem("onespace_active_portal") || "evaluator";
 
         // If no user is logged in and viewing teacher desk, do not expose all evaluations
         if (!user) {
@@ -712,6 +758,7 @@ class StorageService {
                 isUserUploaded: true,
                 isMock: false
             }));
+            localStorage.setItem("niprak_evaluations_summary", JSON.stringify(summaryList));
             localStorage.setItem("onespace_evaluations_summary", JSON.stringify(summaryList));
         } catch (e) {
             console.warn("LocalStorage summary write error:", e);
@@ -760,15 +807,12 @@ class StorageService {
 
         // 2. Remove from localStorage
         try {
-            const legacy = localStorage.getItem("onespace_evaluations");
-            if (legacy) {
-                const arr = JSON.parse(legacy).filter(e => String(e.id) !== targetId);
-                localStorage.setItem("onespace_evaluations", JSON.stringify(arr));
-            }
-            const summary = localStorage.getItem("onespace_evaluations_summary");
-            if (summary) {
-                const arr = JSON.parse(summary).filter(e => String(e.id) !== targetId);
-                localStorage.setItem("onespace_evaluations_summary", JSON.stringify(arr));
+            for (const key of ["niprak_evaluations", "onespace_evaluations", "niprak_evaluations_summary", "onespace_evaluations_summary"]) {
+                const raw = localStorage.getItem(key);
+                if (raw) {
+                    const arr = JSON.parse(raw).filter(e => String(e.id) !== targetId);
+                    localStorage.setItem(key, JSON.stringify(arr));
+                }
             }
         } catch (e) {
             console.warn("localStorage delete evaluation error:", e);
@@ -776,15 +820,21 @@ class StorageService {
 
         // 3. Remove from sessionStorage
         try {
+            sessionStorage.removeItem(`niprak_draft_${targetId}`);
             sessionStorage.removeItem(`onespace_draft_${targetId}`);
+            sessionStorage.removeItem(`niprak_pdf_${targetId}`);
             sessionStorage.removeItem(`onespace_pdf_${targetId}`);
         } catch (e) {}
 
         // 4. Remove from CacheStorage (PDF binary cache)
         try {
             if ('caches' in window) {
-                const cache = await caches.open("onespace-pdf-cache-v1");
-                await cache.delete(`/pdf-cache/${targetId}`);
+                for (const cName of ["niprak-pdf-cache-v1", "onespace-pdf-cache-v1"]) {
+                    try {
+                        const cache = await caches.open(cName);
+                        await cache.delete(`/pdf-cache/${targetId}`);
+                    } catch (e) {}
+                }
             }
         } catch (e) {
             console.warn("CacheStorage delete error:", e);
@@ -876,7 +926,9 @@ class StorageService {
     saveDraft(id, evaluation) {
         if (!id || !evaluation) return;
         try {
-            sessionStorage.setItem(`onespace_draft_${id}`, JSON.stringify(evaluation));
+            const evStr = JSON.stringify(evaluation);
+            sessionStorage.setItem(`niprak_draft_${id}`, evStr);
+            sessionStorage.setItem(`onespace_draft_${id}`, evStr);
             const idx = this.memoryStore.findIndex(e => e.id === id);
             if (idx >= 0) {
                 this.memoryStore[idx] = evaluation;
@@ -891,7 +943,7 @@ class StorageService {
     getDraft(id) {
         if (!id) return null;
         try {
-            const raw = sessionStorage.getItem(`onespace_draft_${id}`);
+            const raw = sessionStorage.getItem(`niprak_draft_${id}`) || sessionStorage.getItem(`onespace_draft_${id}`);
             if (raw) return JSON.parse(raw);
         } catch (e) {}
         return this.memoryStore.find(e => e.id === id) || null;
@@ -927,7 +979,7 @@ class StorageService {
         }
 
         try {
-            const raw = localStorage.getItem("onespace_settings");
+            const raw = localStorage.getItem("niprak_settings") || localStorage.getItem("onespace_settings");
             if (raw) {
                 const parsed = JSON.parse(raw);
                 return { ...defaultSettings, ...parsed };
@@ -941,7 +993,9 @@ class StorageService {
     async saveSettings(settings) {
         await this.readyPromise;
         try {
-            localStorage.setItem("onespace_settings", JSON.stringify(settings));
+            const str = JSON.stringify(settings);
+            localStorage.setItem("niprak_settings", str);
+            localStorage.setItem("onespace_settings", str);
         } catch (e) {
             console.error("Error saving settings", e);
         }
@@ -978,10 +1032,12 @@ class StorageService {
                 questions: data.questions || [],
                 feedback: data.feedback || ""
             };
-            sessionStorage.setItem(`onespace_draft_${evalId}`, JSON.stringify({
+            const draftPayload = JSON.stringify({
                 data: cleanDraft,
                 timestamp: Date.now()
-            }));
+            });
+            sessionStorage.setItem(`niprak_draft_${evalId}`, draftPayload);
+            sessionStorage.setItem(`onespace_draft_${evalId}`, draftPayload);
         } catch (e) {
             // Silently ignore session quota
         }
@@ -989,7 +1045,7 @@ class StorageService {
 
     getDraft(evalId) {
         try {
-            const raw = sessionStorage.getItem(`onespace_draft_${evalId}`);
+            const raw = sessionStorage.getItem(`niprak_draft_${evalId}`) || sessionStorage.getItem(`onespace_draft_${evalId}`);
             if (raw) {
                 return JSON.parse(raw);
             }
@@ -1001,6 +1057,7 @@ class StorageService {
 
     clearDraft(evalId) {
         try {
+            sessionStorage.removeItem(`niprak_draft_${evalId}`);
             sessionStorage.removeItem(`onespace_draft_${evalId}`);
         } catch (e) {}
     }
@@ -1017,9 +1074,8 @@ class StorageService {
             }
         }
 
-        const key = `onespace_roster_${classId}`;
         try {
-            const raw = localStorage.getItem(key);
+            const raw = localStorage.getItem(`niprak_roster_${classId}`) || localStorage.getItem(`onespace_roster_${classId}`);
             if (raw) return JSON.parse(raw);
         } catch (e) {
             console.error("Error loading roster for", classId, e);
@@ -1032,9 +1088,10 @@ class StorageService {
 
     async saveClassRoster(classId, roster) {
         await this.readyPromise;
-        const key = `onespace_roster_${classId}`;
         try {
-            localStorage.setItem(key, JSON.stringify(roster));
+            const rStr = JSON.stringify(roster);
+            localStorage.setItem(`niprak_roster_${classId}`, rStr);
+            localStorage.setItem(`onespace_roster_${classId}`, rStr);
         } catch (e) {
             console.error("Error saving roster for", classId, e);
         }
@@ -1056,7 +1113,7 @@ class StorageService {
         try {
             // Remove mock rosters from localStorage
             Object.keys(localStorage).forEach(key => {
-                if (key.startsWith("onespace_roster_")) {
+                if (key.startsWith("niprak_roster_") || key.startsWith("onespace_roster_")) {
                     const raw = localStorage.getItem(key);
                     if (raw && (raw.includes("Aarav") || raw.includes("Diya") || raw.includes("Rohan"))) {
                         localStorage.removeItem(key);
@@ -1082,9 +1139,8 @@ class StorageService {
             } catch (e) {}
         }
 
-        const key = "onespace_custom_catalog";
         try {
-            const raw = localStorage.getItem(key);
+            const raw = localStorage.getItem("niprak_custom_catalog") || localStorage.getItem("onespace_custom_catalog");
             if (raw) return JSON.parse(raw);
         } catch (e) {
             console.error("Error loading custom catalog", e);
@@ -1094,7 +1150,6 @@ class StorageService {
 
     async saveSubjectCatalog(catalog) {
         await this.readyPromise;
-        const key = "onespace_custom_catalog";
         // Strip svgIcon and iconColor - keep them strictly in code to eliminate database storage and transfer costs
         const cleanCatalog = Array.isArray(catalog) ? catalog.map(sub => {
             if (!sub || typeof sub !== 'object') return sub;
@@ -1105,7 +1160,9 @@ class StorageService {
         }) : catalog;
 
         try {
-            localStorage.setItem(key, JSON.stringify(cleanCatalog));
+            const catStr = JSON.stringify(cleanCatalog);
+            localStorage.setItem("niprak_custom_catalog", catStr);
+            localStorage.setItem("onespace_custom_catalog", catStr);
         } catch (e) {
             console.error("Error saving custom catalog", e);
         }
@@ -1126,9 +1183,8 @@ class StorageService {
             } catch (e) {}
         }
 
-        const key = "onespace_custom_classes";
         try {
-            const raw = localStorage.getItem(key);
+            const raw = localStorage.getItem("niprak_custom_classes") || localStorage.getItem("onespace_custom_classes");
             if (raw) return JSON.parse(raw);
         } catch (e) {
             console.error("Error loading custom classes", e);
@@ -1138,9 +1194,10 @@ class StorageService {
 
     async saveClassesList(classes) {
         await this.readyPromise;
-        const key = "onespace_custom_classes";
         try {
-            localStorage.setItem(key, JSON.stringify(classes));
+            const clsStr = JSON.stringify(classes);
+            localStorage.setItem("niprak_custom_classes", clsStr);
+            localStorage.setItem("onespace_custom_classes", clsStr);
         } catch (e) {
             console.error("Error saving custom classes", e);
         }
@@ -1154,11 +1211,12 @@ class StorageService {
 
     async getUserPassword() {
         await this.readyPromise;
-        return localStorage.getItem("onespace_user_password") || "";
+        return localStorage.getItem("niprak_user_password") || localStorage.getItem("onespace_user_password") || "";
     }
 
     async saveUserPassword(password) {
         await this.readyPromise;
+        localStorage.setItem("niprak_user_password", password);
         localStorage.setItem("onespace_user_password", password);
         return true;
     }
@@ -1172,9 +1230,8 @@ class StorageService {
             } catch (e) {}
         }
 
-        const key = "onespace_users";
         try {
-            const raw = localStorage.getItem(key);
+            const raw = localStorage.getItem("niprak_users") || localStorage.getItem("onespace_users");
             if (raw) return JSON.parse(raw);
         } catch (e) {
             console.error("Error loading users", e);
@@ -1184,9 +1241,10 @@ class StorageService {
 
     async saveUsersList(users) {
         await this.readyPromise;
-        const key = "onespace_users";
         try {
-            localStorage.setItem(key, JSON.stringify(users));
+            const uStr = JSON.stringify(users);
+            localStorage.setItem("niprak_users", uStr);
+            localStorage.setItem("onespace_users", uStr);
         } catch (e) {
             console.error("Error saving users", e);
         }

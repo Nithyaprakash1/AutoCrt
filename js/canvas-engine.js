@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Canvas Annotation Engine
+ * Niprak Digital Correction - Canvas Annotation Engine
  * Handles high-DPI multi-page paper rendering, relative coordinate projection,
  * vector tools (Select, Tick, Wrong, Circle, Underline, Highlight, Comment, Eraser, Pen, Arrow, Marks),
  * hold-and-drag repositioning, 4-corner resize handles, floating Apple inspector,

@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Student Evaluation History
+ * Niprak Digital Correction - Student Evaluation History
  * Search & filter evaluation archives by Student Name, Register No, Class, Subject, Exam.
  * Allows instant viewing, continuing correction, and re-downloading PDFs.
  */

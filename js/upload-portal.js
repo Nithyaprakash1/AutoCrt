@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Upload Desk & Hierarchical PDF Ingestion
+ * Niprak Digital Correction - Upload Desk & Hierarchical PDF Ingestion
  * Workflow: Subject (3 subjects) -> Exam Template (2-3 templates) -> Class -> PDF Upload Studio
  * Integrates with PDF.js for client-side page rendering and pushes directly to appStorage.
  */
@@ -1203,7 +1203,7 @@ class UploadPortalManager {
                             <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><polyline points="12 18 12 12 9 15"/><polyline points="12 12 15 15"/></svg>
                         </div>
                         <h4 class="dropzone-heading">Drop Student Answer Sheet PDFs Here</h4>
-                        <p class="dropzone-sub">Upload individual student PDFs or multiple files at once (Strict 5MB Limit per file • Auto-optimized & compressed). The system automatically reconciles files with the student roster below.</p>
+                        <p class="dropzone-sub">Bulk upload student PDFs or multiple files at once (Auto-compressed & optimized for high-speed evaluation). The system automatically reconciles files with the student roster below.</p>
                         <div class="dropzone-buttons-row">
                             <button type="button" class="btn-browse-pdf" id="btn-portal-browse-pdf">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -1366,8 +1366,8 @@ class UploadPortalManager {
             return `
                 <div class="queue-empty-placeholder" style="text-align: center; padding: 26px 20px; background: var(--bg-subtle); border: 1.5px dashed var(--border-color); border-radius: 16px; margin-bottom: 16px;">
                     <div style="font-size: 0.95rem; font-weight: 500; color: var(--text-main); margin-bottom: 4px;">No student answer sheets staged in queue</div>
-                    <div style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 10px;">Drop or browse PDF answer sheets (Max 5MB each) into the dropzone above to stage them.</div>
-                    <span class="publish-badge-pill pill-green" style="font-size: 0.74rem;">Strict 5MB Limit • Dynamic Image Compression • Fast Cloud Sync</span>
+                    <div style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 10px;">Drop or browse student PDF answer sheets into the dropzone above to stage them.</div>
+                    <span class="publish-badge-pill pill-green" style="font-size: 0.74rem;">Bulk Upload Ready • Smart High-Ratio Compression • Instant Sync</span>
                 </div>
             `;
         }
@@ -3499,9 +3499,11 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         }
 
         try {
-            const MAX_FILE_SIZE = 5 * 1024 * 1024; // Strict 5MB limit
+            const MAX_FILE_SIZE = 60 * 1024 * 1024; // Generous 60MB limit per file with client compression
             let duplicateCount = 0;
+            const stagedItems = [];
 
+            // PASS 1: Validate, deduce student details, check duplicates, and stage all items immediately
             for (let i = 0; i < files.length; i++) {
                 const file = files[i];
                 const isPdf = file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
@@ -3512,7 +3514,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     continue;
                 }
 
-                // Enforce strict 5MB limit per file
+                // Check 60MB file limit
                 if (file.size > MAX_FILE_SIZE) {
                     const sizeMb = (file.size / (1024 * 1024)).toFixed(2);
                     this.showFileSizeLimitModal(file.name, sizeMb);
@@ -3529,15 +3531,18 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 }
 
                 // --- DUPLICATE PREVENTION ---
-                // 1. Check if already staged in this.fileQueue
                 const isDuplicateInQueue = (this.fileQueue || []).some(item => {
+                    const rollMatch = possibleRoll && String(item.rollNo).trim() === possibleRoll;
+                    const nameMatch = possibleName && String(item.studentName).toLowerCase().trim() === possibleName.toLowerCase();
+                    const fileMatch = item.fileName && item.fileName.toLowerCase() === file.name.toLowerCase();
+                    return rollMatch || nameMatch || fileMatch;
+                }) || stagedItems.some(item => {
                     const rollMatch = possibleRoll && String(item.rollNo).trim() === possibleRoll;
                     const nameMatch = possibleName && String(item.studentName).toLowerCase().trim() === possibleName.toLowerCase();
                     const fileMatch = item.fileName && item.fileName.toLowerCase() === file.name.toLowerCase();
                     return rollMatch || nameMatch || fileMatch;
                 });
 
-                // 2. Check if already uploaded/published in this class
                 const isDuplicateInExisting = (this.existingPapers || []).some(paper => {
                     const rollMatch = possibleRoll && String(paper.rollNo).trim() === possibleRoll;
                     const nameMatch = possibleName && String(paper.studentName).toLowerCase().trim() === possibleName.toLowerCase();
@@ -3556,25 +3561,40 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 const queueItem = {
                     file: file,
                     fileName: file.name,
-                    studentName: possibleName || `Student ${this.fileQueue.length + 1}`,
-                    rollNo: possibleRoll || String(100 + this.fileQueue.length + 1),
+                    studentName: possibleName || `Student ${this.fileQueue.length + stagedItems.length + 1}`,
+                    rollNo: possibleRoll || String(100 + this.fileQueue.length + stagedItems.length + 1),
                     pages: [],
                     pageCount: 1,
                     thumbnail: null,
                     pdfDataUrl: null,
                     isProcessing: true,
-                    isReady: false
+                    isReady: false,
+                    progressPercent: 5,
+                    statusText: "Queued for compression..."
                 };
 
+                stagedItems.push(queueItem);
                 this.fileQueue.push(queueItem);
-                this.refreshQueueUI();
+            }
+
+            // Immediately display all staged files in the queue so user gets instant visual confirmation
+            this.refreshQueueUI();
+            this.updateBatchProgress();
+
+            // PASS 2: Progressively compress and extract pages for each staged document
+            for (let i = 0; i < stagedItems.length; i++) {
+                const queueItem = stagedItems[i];
+                const isImage = queueItem.file.type.startsWith("image/") || /\.(png|jpe?g|webp|gif)$/i.test(queueItem.file.name);
 
                 if (isImage) {
                     await this.extractImagePages(queueItem);
                 } else {
                     await this.extractPdfPages(queueItem);
                 }
-                this.refreshQueueUI();
+
+                this.updateBatchProgress();
+                // Brief pause to keep UI responsive during bulk uploads
+                await new Promise(r => setTimeout(r, 20));
             }
 
             if (duplicateCount > 0 && window.app && window.app.showToast) {
@@ -3684,16 +3704,16 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             const reader = new FileReader();
             reader.onprogress = (e) => {
                 if (e.lengthComputable) {
-                    const loadedPct = Math.round(20 + (e.loaded / e.total) * 75);
+                    const loadedPct = Math.round(20 + (e.loaded / e.total) * 40);
                     queueItem.progressPercent = loadedPct;
-                    queueItem.statusText = `Compressing & Ingesting Image (${loadedPct}%)...`;
+                    queueItem.statusText = `Compressing image (${loadedPct}%)...`;
                     this.updateQueueItemProgress(queueItem);
                 }
             };
             reader.onload = (e) => {
                 const img = new Image();
                 img.onload = () => {
-                    // Downscale and compress image if large to ensure high performance
+                    // Downscale and compress image (Max 1400px - optimal for A4 handwriting)
                     const maxDim = 1400;
                     let w = img.width;
                     let h = img.height;
@@ -3710,23 +3730,40 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     canvas.width = w;
                     canvas.height = h;
                     const ctx = canvas.getContext("2d");
+                    // Ensure white background behind handwritten scans
+                    ctx.fillStyle = "#ffffff";
+                    ctx.fillRect(0, 0, w, h);
                     ctx.drawImage(img, 0, 0, w, h);
-                    const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.80);
+
+                    // High efficiency JPEG compression (0.74 quality)
+                    const compressedDataUrl = canvas.toDataURL("image/jpeg", 0.74);
 
                     queueItem.pages = [compressedDataUrl];
+                    queueItem.thumbnail = compressedDataUrl;
+                    queueItem.pageCount = 1;
                     queueItem.progressPercent = 100;
-                    queueItem.statusText = "✓ Image Compressed & Ready (1 Page)";
+
+                    const origBytes = queueItem.file.size;
+                    const compBytes = Math.round(compressedDataUrl.length * 0.75);
+                    const origMb = (origBytes / (1024 * 1024)).toFixed(1);
+                    const compKb = Math.round(compBytes / 1024);
+                    const savedPct = Math.max(1, Math.round((1 - compBytes / origBytes) * 100));
+
+                    queueItem.statusText = `✓ Compressed ${origMb}MB → ${compKb}KB (${savedPct}% smaller • 1 Page)`;
                     queueItem.isProcessing = false;
                     queueItem.isReady = true;
+                    queueItem.isUserUploaded = true;
                     this.updateQueueItemProgress(queueItem);
                     resolve();
                 };
                 img.onerror = () => {
                     queueItem.pages = [e.target.result];
+                    queueItem.thumbnail = e.target.result;
                     queueItem.progressPercent = 100;
                     queueItem.statusText = "✓ Image Extracted (1 Page)";
                     queueItem.isProcessing = false;
                     queueItem.isReady = true;
+                    queueItem.isUserUploaded = true;
                     this.updateQueueItemProgress(queueItem);
                     resolve();
                 };
@@ -3752,20 +3789,6 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         queueItem.statusText = "Reading PDF file buffer...";
         this.updateQueueItemProgress(queueItem);
 
-        // Always generate a raw PDF Data URL payload from the uploaded file
-        try {
-            if (queueItem.file) {
-                queueItem.pdfDataUrl = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onload = (e) => resolve(e.target.result);
-                    reader.onerror = () => resolve(null);
-                    reader.readAsDataURL(queueItem.file);
-                });
-            }
-        } catch (e) {
-            console.warn("Failed to generate raw PDF Data URL:", e);
-        }
-
         // Wait for pdfjsLib to finish initializing if script is loading
         if (!window.pdfjsLib && window.ensurePdfJs) {
             await window.ensurePdfJs(6000);
@@ -3780,7 +3803,17 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         }
 
         if (!window.pdfjsLib) {
-            console.warn("PDF.js unavailable, using single PDF data URL payload");
+            console.warn("PDF.js unavailable, generating raw data URL payload");
+            try {
+                if (queueItem.file) {
+                    queueItem.pdfDataUrl = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.onerror = () => resolve(null);
+                        reader.readAsDataURL(queueItem.file);
+                    });
+                }
+            } catch (e) {}
             queueItem.pages = queueItem.pdfDataUrl ? [queueItem.pdfDataUrl] : [];
             queueItem.pageCount = 1;
             queueItem.progressPercent = 100;
@@ -3793,8 +3826,8 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         }
 
         try {
-            queueItem.progressPercent = 35;
-            queueItem.statusText = "Parsing PDF document structure...";
+            queueItem.progressPercent = 25;
+            queueItem.statusText = "Parsing PDF pages structure...";
             this.updateQueueItemProgress(queueItem);
 
             const arrayBuffer = await queueItem.file.arrayBuffer();
@@ -3802,37 +3835,110 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             const numPages = pdf.numPages;
             queueItem.pageCount = numPages;
 
-            queueItem.progressPercent = 65;
-            queueItem.statusText = `PDF Loaded: ${numPages} Page${numPages === 1 ? '' : 's'}. Generating cover preview...`;
-            this.updateQueueItemProgress(queueItem);
+            const compressedPages = [];
+            const pageDims = [];
 
-            // Generate ONLY the Page 1 thumbnail for fast UI preview (saving only the single optimized PDF!)
-            try {
-                const page1 = await pdf.getPage(1);
-                const unscaled = page1.getViewport({ scale: 1.0 });
-                const optScale = Math.min(1.0, 360 / unscaled.width);
-                const viewport = page1.getViewport({ scale: optScale });
+            // Standard A4 at 150 DPI is ~1240 x 1754 px. Target 1300px gives ultra-sharp handwriting with tiny file size
+            const TARGET_WIDTH = 1300;
+
+            for (let pNum = 1; pNum <= numPages; pNum++) {
+                const curPct = Math.round(25 + (pNum / numPages) * 65);
+                queueItem.progressPercent = curPct;
+                queueItem.statusText = `Compressing page ${pNum} of ${numPages}...`;
+                this.updateQueueItemProgress(queueItem);
+
+                const page = await pdf.getPage(pNum);
+                const unscaled = page.getViewport({ scale: 1.0 });
+                const sc = Math.min(2.0, Math.max(0.75, TARGET_WIDTH / unscaled.width));
+                const viewport = page.getViewport({ scale: sc });
+
                 const canvas = document.createElement("canvas");
-                canvas.width = viewport.width;
-                canvas.height = viewport.height;
+                canvas.width = Math.round(viewport.width);
+                canvas.height = Math.round(viewport.height);
                 const ctx = canvas.getContext("2d");
-                await page1.render({ canvasContext: ctx, viewport }).promise;
-                queueItem.thumbnail = canvas.toDataURL("image/jpeg", 0.80);
-            } catch (tErr) {
-                console.warn("Could not generate Page 1 thumbnail:", tErr);
+
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+                await page.render({ canvasContext: ctx, viewport: viewport }).promise;
+
+                // High quality-to-ratio compression: JPEG quality 0.74 (~120KB per page)
+                const compressedJpeg = canvas.toDataURL("image/jpeg", 0.74);
+                compressedPages.push(compressedJpeg);
+                pageDims.push({ width: canvas.width, height: canvas.height });
+
+                // Brief yield every page to keep UI silky responsive during bulk uploads
+                await new Promise(r => setTimeout(r, 10));
             }
 
-            // Save single optimized PDF reference in pages array
-            queueItem.pages = [queueItem.thumbnail || queueItem.pdfDataUrl];
+            queueItem.thumbnail = compressedPages[0];
+            queueItem.pages = compressedPages;
+
+            // Re-assemble into ultra-compact compressed PDF if jsPDF is available
+            let compressedPdf = null;
+            if (window.jspdf && window.jspdf.jsPDF && compressedPages.length > 0) {
+                try {
+                    const { jsPDF } = window.jspdf;
+                    const p1 = pageDims[0];
+                    const doc = new jsPDF({
+                        orientation: p1.height > p1.width ? "portrait" : "landscape",
+                        unit: "px",
+                        format: [p1.width, p1.height],
+                        compress: true
+                    });
+                    doc.addImage(compressedPages[0], "JPEG", 0, 0, p1.width, p1.height, undefined, "FAST");
+                    for (let p = 1; p < compressedPages.length; p++) {
+                        const dim = pageDims[p];
+                        doc.addPage([dim.width, dim.height], dim.height > dim.width ? "portrait" : "landscape");
+                        doc.addImage(compressedPages[p], "JPEG", 0, 0, dim.width, dim.height, undefined, "FAST");
+                    }
+                    compressedPdf = doc.output("datauristring");
+                } catch (pdfErr) {
+                    console.warn("jsPDF bundle compression note:", pdfErr);
+                }
+            }
+
+            if (compressedPdf) {
+                queueItem.pdfDataUrl = compressedPdf;
+            } else if (queueItem.file.size < 3 * 1024 * 1024) {
+                try {
+                    queueItem.pdfDataUrl = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.onerror = () => resolve(null);
+                        reader.readAsDataURL(queueItem.file);
+                    });
+                } catch (e) {}
+            } else {
+                queueItem.pdfDataUrl = null;
+            }
+
+            // Calculate compression metrics
+            const origBytes = queueItem.file.size;
+            const compBytes = compressedPdf ? Math.round(compressedPdf.length * 0.75) : Math.round(compressedPages.reduce((acc, p) => acc + p.length * 0.75, 0));
+            const origMb = (origBytes / (1024 * 1024)).toFixed(1);
+            const compKb = Math.round(compBytes / 1024);
+            const savedPct = Math.max(1, Math.round((1 - compBytes / origBytes) * 100));
+
             queueItem.progressPercent = 100;
-            queueItem.statusText = `✓ Complete (${numPages} Pages Optimized PDF Ready)`;
+            queueItem.statusText = `✓ Compressed ${origMb}MB → ${compKb}KB (${savedPct}% smaller • ${numPages} Pgs)`;
             queueItem.isProcessing = false;
             queueItem.isReady = true;
             queueItem.isUserUploaded = true;
             this.updateQueueItemProgress(queueItem);
         } catch (err) {
-            console.error("PDF Parsing error:", err);
-            // Fallback to raw PDF Data URL
+            console.error("PDF Parsing & compression error:", err);
+            // Fallback to reading raw file if small
+            try {
+                if (queueItem.file) {
+                    queueItem.pdfDataUrl = await new Promise((resolve) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target.result);
+                        reader.onerror = () => resolve(null);
+                        reader.readAsDataURL(queueItem.file);
+                    });
+                }
+            } catch (e) {}
             queueItem.pages = queueItem.pdfDataUrl ? [queueItem.pdfDataUrl] : [];
             queueItem.pageCount = 1;
             queueItem.progressPercent = 100;
@@ -3849,7 +3955,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         alert("Please browse or drop your actual Physics PDF answer sheet file to upload.");
     }
 
-    // --- 5MB Limit Modal ---
+    // --- File Size Limit Modal ---
     showFileSizeLimitModal(fileName, sizeMb) {
         const modalId = "modal-file-size-error";
         const existing = document.getElementById(modalId);
@@ -3863,16 +3969,16 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 <div class="publish-modal-icon-wrap" style="background: rgba(245, 158, 11, 0.1); border: 2px solid rgba(245, 158, 11, 0.25);">
                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#F59E0B" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
                 </div>
-                <h3 class="publish-modal-title">File Exceeds 5MB Limit</h3>
+                <h3 class="publish-modal-title">File Exceeds 60MB Limit</h3>
                 <p class="publish-modal-subtitle">
-                    The file <strong style="color: var(--text-main); font-weight: 600;">"${fileName}"</strong> (${sizeMb} MB) exceeds the strict <strong>5MB file limit</strong>.
+                    The file <strong style="color: var(--text-main); font-weight: 600;">"${fileName}"</strong> (${sizeMb} MB) exceeds the <strong>60MB file limit</strong>.
                 </p>
                 <div class="publish-pills-row">
-                    <span class="publish-badge-pill pill-orange">Max Size: 5.0 MB</span>
+                    <span class="publish-badge-pill pill-orange">Max Size: 60.0 MB</span>
                     <span class="publish-badge-pill">Auto Compression Active</span>
                 </div>
                 <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin-bottom: 24px;">
-                    To protect browser stability and ensure fast page rendering for evaluators, answer sheets must be under 5MB. Please compress your document before uploading.
+                    To protect browser stability and ensure fast page rendering for evaluators, please select an answer sheet under 60MB.
                 </p>
                 <div class="publish-modal-actions">
                     <button type="button" class="publish-btn-primary" id="btn-close-size-modal">Understand & Select Again</button>
@@ -3909,16 +4015,16 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     There are currently <strong>0 answer sheets</strong> staged for publishing to the Teacher Evaluator Desk.
                 </p>
                 <div class="publish-pills-row">
-                    <span class="publish-badge-pill pill-green">5MB Strict Limit</span>
+                    <span class="publish-badge-pill pill-green">Bulk Ingestion Active</span>
                     <span class="publish-badge-pill">High-DPI Compression</span>
                     <span class="publish-badge-pill">Cloud Server Sync</span>
                 </div>
                 <div class="publish-progress-section" style="text-align: left; margin-bottom: 20px;">
                     <div style="font-size: 0.85rem; color: var(--text-main); font-weight: 500; margin-bottom: 6px;">How to Publish Answer Sheets:</div>
                     <ul style="margin: 0; padding-left: 20px; font-size: 0.82rem; color: var(--text-muted); line-height: 1.6;">
-                        <li>Drop or select student PDF answer sheets (Max 5MB each).</li>
+                        <li>Drop or select multiple student PDF answer sheets in bulk.</li>
                         <li>The system automatically detects student names & rolls.</li>
-                        <li>Pages are compressed (JPEG 0.80) to maximize loading speed.</li>
+                        <li>Pages are compressed (JPEG 0.74) to maximize loading speed.</li>
                         <li>Click "Publish Papers" to make them live on the Evaluator Desk.</li>
                     </ul>
                 </div>
@@ -3926,7 +4032,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     <button type="button" class="publish-btn-secondary" id="btn-close-zero-modal">Close</button>
                     <button type="button" class="publish-btn-primary" id="btn-upload-from-zero-modal">
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        <span>Select Answer Sheets (&lt;5MB)</span>
+                        <span>Select Answer Sheets (Bulk)</span>
                     </button>
                 </div>
             </div>
@@ -3967,8 +4073,8 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     Optimizing, compressing, and dispatching <strong id="publish-dialog-count">${totalCount}</strong> answer sheet(s)...
                 </p>
                 <div class="publish-pills-row">
-                    <span class="publish-badge-pill pill-green">5MB Limit Enforced</span>
-                    <span class="publish-badge-pill">0.80 JPEG Compression</span>
+                    <span class="publish-badge-pill pill-green">Bulk Ingestion Active</span>
+                    <span class="publish-badge-pill">Smart Client Compression</span>
                 </div>
                 <div class="publish-progress-section">
                     <div class="publish-progress-row">
@@ -4154,8 +4260,8 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 correctCount: existingMatch ? existingMatch.correctCount : 0,
                 wrongCount: existingMatch ? existingMatch.wrongCount : 0,
                 feedback: existingMatch ? existingMatch.feedback : "",
-                // Save ONLY ONE: If it's a PDF, do not save duplicate pages array!
-                pages: item.pdfDataUrl ? null : (item.pages && item.pages.length > 0 ? item.pages : null),
+                // Save compressed pages array for fast instant rendering in canvas engine
+                pages: (item.pages && item.pages.length > 0) ? item.pages : (item.pdfDataUrl ? [item.pdfDataUrl] : null),
                 annotations: existingMatch ? (existingMatch.annotations || []) : [],
                 sections: (template.sections && template.sections.length > 0)
                     ? JSON.parse(JSON.stringify(template.sections))
@@ -4269,6 +4375,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 const id = btn.getAttribute("data-id");
                 const pageDefault = document.body.getAttribute("data-default-portal");
                 if (pageDefault === "uploader") {
+                    localStorage.setItem("niprak_active_portal", "evaluator");
                     localStorage.setItem("onespace_active_portal", "evaluator");
                     window.location.href = `teacher.html?evalId=${id}`;
                     return;

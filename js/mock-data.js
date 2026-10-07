@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Exam Template Data
+ * Niprak Digital Correction - Exam Template Data
  * Contains the Physics Board Examination Template (33 Qs / 70 Marks)
  * All institution, teacher, and class mock data removed.
  */

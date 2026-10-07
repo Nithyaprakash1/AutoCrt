@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Teacher Dashboard
+ * Niprak Digital Correction - Teacher Dashboard
  * Features:
  * 1. Time-of-day greeting (Good morning, Good afternoon, Good evening) with teacher name & subject.
  * 2. KPI metrics cards with live uncorrected / corrected counters and performance percentage.
@@ -148,7 +148,7 @@ class DashboardManager {
                 if (!matches) return false;
             } else if (subjects.length === 0) {
                 // If on teacher desk and no subject allotted to this teacher -> show 0 papers
-                const activePortal = localStorage.getItem("onespace_active_portal") || "evaluator";
+                const activePortal = localStorage.getItem("niprak_active_portal") || localStorage.getItem("onespace_active_portal") || "evaluator";
                 if (activePortal === "evaluator") return false;
             }
 

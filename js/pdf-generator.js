@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - PDF Generator
+ * Niprak Digital Correction - PDF Generator
  * Renders original paper pages overlaid with crisp annotations,
  * followed by a professional final Student Mark Summary Page.
  */
@@ -314,7 +314,7 @@ class PDFGenerator {
             }
         }
 
-        // Top-Right: OneSpace OSM Branding (fulllogo.png)
+        // Top-Right: Niprak OSM Branding (fulllogo.png)
         if (logos.appLogo) {
             try {
                 doc.addImage(logos.appLogo, "PNG", pageWidth - margin - 49, currentY + 3.8, 46, 13.8);

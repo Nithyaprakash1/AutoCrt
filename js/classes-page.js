@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Classes & Rosters Page Manager
+ * Niprak Digital Correction - Classes & Rosters Page Manager
  * Full-page management of grades, sections, and enrolled student rosters.
  * Supports CSV/Excel demo template download and bulk roster ingestion.
  */

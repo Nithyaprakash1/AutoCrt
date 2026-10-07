@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Uploaded Papers & Pages Repository Manager
+ * Niprak Digital Correction - Uploaded Papers & Pages Repository Manager
  * Full-page archive of all uploaded exam papers, multi-page answer sheets,
  * multi-dimensional filtering, page count metrics, and page inspection lightbox.
  */

@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Full-Page Settings Manager
+ * Niprak Digital Correction - Full-Page Settings Manager
  * Modern macOS / iPadOS System Settings layout with left vertical category nav,
  * profile preview, client password verification, database sync, and evaluation options.
  */

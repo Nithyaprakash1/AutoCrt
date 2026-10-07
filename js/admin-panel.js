@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Admin Panel & Master Analytics Manager
+ * Niprak Digital Correction - Admin Panel & Master Analytics Manager
  * Features:
  * 1. Subject & Teacher Correction Tracker (Papers Uploaded vs Graded by Teacher)
  * 2. Student All-Subject Score Matrix Table (Roll No, Name, Physics, Chem, Math, Bio, Total, %, Grade)

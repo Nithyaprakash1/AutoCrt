@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Main Application Coordinator
+ * Niprak Digital Correction - Main Application Coordinator
  * Handles view switching, workspace lifecycle, autosave loops,
  * keyboard shortcuts, and component coordination.
  */
@@ -21,7 +21,7 @@ class AppController {
         this.uploadPortalManager = null;
 
         // Dual Portal Role Management: 'uploader' vs 'evaluator'
-        this.activePortal = localStorage.getItem("onespace_active_portal") || null;
+        this.activePortal = localStorage.getItem("niprak_active_portal") || localStorage.getItem("onespace_active_portal") || null;
     }
 
     async init() {
@@ -394,18 +394,21 @@ class AppController {
         // Only redirect if page has a data-default-portal attribute (e.g. standalone uploader.html or admin.html)
         if (pageDefault) {
             if (portalName === "admin" && pageDefault !== "admin") {
+                localStorage.setItem("niprak_active_portal", "admin");
                 localStorage.setItem("onespace_active_portal", "admin");
                 window.location.href = "admin.html";
                 return;
             }
 
             if (portalName === "evaluator" && pageDefault === "uploader") {
+                localStorage.setItem("niprak_active_portal", "evaluator");
                 localStorage.setItem("onespace_active_portal", "evaluator");
                 window.location.href = "teacher.html";
                 return;
             }
 
             if (portalName === "uploader" && pageDefault === "evaluator") {
+                localStorage.setItem("niprak_active_portal", "uploader");
                 localStorage.setItem("onespace_active_portal", "uploader");
                 window.location.href = "uploader.html";
                 return;
@@ -413,6 +416,7 @@ class AppController {
         }
 
         this.activePortal = portalName;
+        localStorage.setItem("niprak_active_portal", portalName);
         localStorage.setItem("onespace_active_portal", portalName);
         this.hidePortalLoginScreen();
 
@@ -771,13 +775,14 @@ class AppController {
 
         // Sidebar Collapse / Expand Toggle
         const sidebar = document.getElementById("app-side-menu-bar");
-        const isCollapsed = localStorage.getItem("onespace_sidebar_collapsed") === "true";
+        const isCollapsed = (localStorage.getItem("niprak_sidebar_collapsed") || localStorage.getItem("onespace_sidebar_collapsed")) === "true";
         if (sidebar && isCollapsed) {
             sidebar.classList.add("collapsed");
         }
         const toggleSidebarCollapse = () => {
             if (!sidebar) return;
             const nowCollapsed = sidebar.classList.toggle("collapsed");
+            localStorage.setItem("niprak_sidebar_collapsed", nowCollapsed ? "true" : "false");
             localStorage.setItem("onespace_sidebar_collapsed", nowCollapsed ? "true" : "false");
         };
 

@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - User Management Page Manager
+ * Niprak Digital Correction - User Management Page Manager
  * Dedicated to Exam Department / Uploader Desk for managing:
  * - Evaluator / Teacher credentials (User ID & Password)
  * - Assigned Subjects (Biology, Chemistry, Physics, Mathematics, Science, etc.)

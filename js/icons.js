@@ -1,5 +1,5 @@
 /**
- * OneSpace Digital Correction - Apple SF Symbols Inspired SVG Icon Library
+ * Niprak Digital Correction - Apple SF Symbols Inspired SVG Icon Library
  * Provides crisp, scalable vector icons to replace all emojis across the application.
  */
 
