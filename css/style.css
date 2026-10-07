@@ -8472,3 +8472,64 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
         transform: scale(1) translateY(0);
     }
 }
+
+/* ==========================================================================
+   Modern Skeleton Loading & Shimmer Animation System
+   Apple-grade high-fidelity placeholder states for tables, cards, & workspace
+   ========================================================================== */
+
+@keyframes skeletonShimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.skeleton-shimmer {
+    background: linear-gradient(
+        90deg,
+        rgba(226, 232, 240, 0.6) 25%,
+        rgba(241, 245, 249, 0.95) 37%,
+        rgba(226, 232, 240, 0.6) 63%
+    ) !important;
+    background-size: 200% 100% !important;
+    animation: skeletonShimmer 1.5s ease-in-out infinite !important;
+    border-radius: 6px;
+    display: inline-block;
+    color: transparent !important;
+    user-select: none;
+    pointer-events: none;
+}
+
+.skeleton-bone {
+    height: 14px;
+    border-radius: 6px;
+    display: block;
+}
+
+.skeleton-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 50% !important;
+    display: inline-block;
+    flex-shrink: 0;
+}
+
+.skeleton-chip {
+    height: 22px;
+    width: 68px;
+    border-radius: 12px !important;
+}
+
+.skeleton-btn {
+    height: 28px;
+    width: 74px;
+    border-radius: 6px !important;
+}
+
+.skeleton-table-row td {
+    padding: 14px 12px;
+    vertical-align: middle;
+}

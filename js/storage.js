@@ -342,6 +342,42 @@ class StorageService {
             }
         }
 
+        // 3. RECONCILIATION: For each evaluation, reconcile draft data and verify question sum consistency
+        if (Array.isArray(list) && list.length > 0) {
+            list = list.map(ev => {
+                if (!ev || !ev.id) return ev;
+                const draft = this.getDraft(ev.id);
+                let merged = ev;
+                if (draft) {
+                    merged = Object.assign({}, ev, {
+                        obtainedMarks: draft.obtainedMarks !== undefined ? draft.obtainedMarks : ev.obtainedMarks,
+                        maxMarks: draft.maxMarks || ev.maxMarks,
+                        percentage: draft.percentage !== undefined ? draft.percentage : ev.percentage,
+                        grade: draft.grade || ev.grade,
+                        status: draft.status || ev.status,
+                        questions: (draft.questions && draft.questions.length > 0) ? draft.questions : ev.questions
+                    });
+                }
+
+                // If questions exist, calculate exact awarded sum to prevent stale or divergent totalMarks
+                if (Array.isArray(merged.questions) && merged.questions.length > 0) {
+                    const qSum = merged.questions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
+                    const roundedQSum = Math.round(qSum * 10) / 10;
+                    if (roundedQSum > 0 || (merged.obtainedMarks === undefined || merged.obtainedMarks === null)) {
+                        merged.obtainedMarks = roundedQSum;
+                        if (merged.maxMarks && Number(merged.maxMarks) > 0) {
+                            merged.percentage = Math.round((roundedQSum / Number(merged.maxMarks)) * 100);
+                            if (window.calculateGradeScale) {
+                                merged.grade = window.calculateGradeScale(roundedQSum, merged.maxMarks).grade;
+                            }
+                        }
+                    }
+                }
+
+                return merged;
+            });
+        }
+
         // Update memoryStore with latest consolidated list
         if (list && list.length > 0) {
             this.memoryStore = [...list];

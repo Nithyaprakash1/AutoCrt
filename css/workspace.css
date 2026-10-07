@@ -1631,6 +1631,30 @@ p, span, div, strong, b, th, td, label, a,
     color: var(--text-muted);
 }
 
+.ws-skeleton-paper-preview {
+    margin-top: 18px;
+    width: 220px;
+    padding: 16px 14px;
+    background: #F8FAFC;
+    border: 1px dashed #CBD5E1;
+    border-radius: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.ws-skeleton-header {
+    height: 18px;
+    width: 65%;
+    border-radius: 4px;
+    margin-bottom: 4px;
+}
+
+.ws-skeleton-line {
+    height: 9px;
+    border-radius: 3px;
+}
+
 /* ==========================================================================
    Advanced Scoring, Section Breakdown, Step Marks, and Page Total Styles
    Strict Regular Typography (0 Bold Fonts: font-weight: 400 !important;)

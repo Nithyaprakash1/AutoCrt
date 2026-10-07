@@ -416,7 +416,7 @@ class DashboardManager {
                                 </tr>
                             </thead>
                             <tbody id="dash-papers-tbody">
-                                <!-- Rendered dynamically -->
+                                ${this.renderSkeletonRows(4)}
                             </tbody>
                         </table>
                     </div>
@@ -425,6 +425,37 @@ class DashboardManager {
         `;
 
         this.renderTableRows();
+    }
+
+    renderSkeletonRows(count = 4) {
+        let html = "";
+        for (let i = 0; i < count; i++) {
+            html += `
+                <tr class="skeleton-table-row">
+                    <td style="text-align: center;"><div class="skeleton-shimmer" style="width: 16px; height: 16px; border-radius: 4px;"></div></td>
+                    <td>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div class="skeleton-shimmer skeleton-avatar"></div>
+                            <div class="skeleton-shimmer skeleton-bone" style="width: 110px;"></div>
+                        </div>
+                    </td>
+                    <td><div class="skeleton-shimmer skeleton-bone" style="width: 48px;"></div></td>
+                    <td><div class="skeleton-shimmer skeleton-bone" style="width: 72px;"></div></td>
+                    <td><div class="skeleton-shimmer skeleton-bone" style="width: 130px;"></div></td>
+                    <td><div class="skeleton-shimmer skeleton-bone" style="width: 50px;"></div></td>
+                    <td><div class="skeleton-shimmer skeleton-chip"></div></td>
+                    <td><div class="skeleton-shimmer skeleton-chip"></div></td>
+                    <td><div class="skeleton-shimmer skeleton-bone" style="width: 80px;"></div></td>
+                    <td class="text-right">
+                        <div style="display: inline-flex; gap: 6px;">
+                            <div class="skeleton-shimmer skeleton-btn"></div>
+                            <div class="skeleton-shimmer skeleton-btn" style="width: 50px;"></div>
+                        </div>
+                    </td>
+                </tr>
+            `;
+        }
+        return html;
     }
 
     renderTableRows() {

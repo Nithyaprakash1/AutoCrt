@@ -135,7 +135,32 @@ class BulkReportManager {
                             <!-- Dynamic head -->
                         </thead>
                         <tbody id="bulk-table-body">
-                            <!-- Dynamic rows -->
+                            <tr class="skeleton-table-row">
+                                <td style="text-align: center;"><div class="skeleton-shimmer" style="width: 16px; height: 16px; border-radius: 4px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 24px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 50px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 120px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 60px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 60px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 40px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 40px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 45px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-chip"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-chip"></div></td>
+                            </tr>
+                            <tr class="skeleton-table-row">
+                                <td style="text-align: center;"><div class="skeleton-shimmer" style="width: 16px; height: 16px; border-radius: 4px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 24px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 50px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 140px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 60px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 60px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 40px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 40px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-bone" style="width: 45px;"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-chip"></div></td>
+                                <td><div class="skeleton-shimmer skeleton-chip"></div></td>
+                            </tr>
                         </tbody>
                     </table>
                 </div>
@@ -346,6 +371,40 @@ class BulkReportManager {
         const rows = [headers];
 
         selected.forEach((ev, idx) => {
+            let actualObtained = ev.obtainedMarks;
+            let actualMax = ev.maxMarks;
+            let actualQuestions = ev.questions;
+
+            // Check draft if record has 0 or undefined
+            if ((actualObtained === undefined || actualObtained === null || actualObtained === 0) && window.appStorage && typeof window.appStorage.getDraft === "function") {
+                const draft = window.appStorage.getDraft(ev.id);
+                if (draft && draft.obtainedMarks !== undefined && Number(draft.obtainedMarks) > 0) {
+                    actualObtained = draft.obtainedMarks;
+                    if (draft.maxMarks) actualMax = draft.maxMarks;
+                    if (draft.questions && draft.questions.length > 0) actualQuestions = draft.questions;
+                }
+            }
+
+            if (Array.isArray(actualQuestions) && actualQuestions.length > 0) {
+                const qSum = actualQuestions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
+                const roundedQSum = Math.round(qSum * 10) / 10;
+                if (roundedQSum > 0 || (actualObtained === undefined || actualObtained === null)) {
+                    actualObtained = roundedQSum;
+                }
+            }
+
+            const finalObtained = actualObtained !== undefined && actualObtained !== null && !isNaN(Number(actualObtained)) 
+                ? Number(actualObtained) 
+                : 0;
+            const finalMax = actualMax !== undefined && actualMax !== null && Number(actualMax) > 0 
+                ? Number(actualMax) 
+                : 70;
+
+            const pct = finalMax > 0 ? Math.round((finalObtained / finalMax) * 100) : (ev.percentage || 0);
+            const gradeInfo = window.calculateGradeScale 
+                ? window.calculateGradeScale(finalObtained, finalMax) 
+                : { grade: ev.grade || "--" };
+
             const row = [
                 idx + 1,
                 `"${ev.rollNo || ''}"`,
@@ -354,10 +413,10 @@ class BulkReportManager {
                 `"${ev.section || ''}"`,
                 `"${ev.subject || ''}"`,
                 `"${ev.examName || ''}"`,
-                ev.obtainedMarks || 0,
-                ev.maxMarks || 0,
-                `"${ev.percentage || 0}%"`,
-                `"${ev.grade || '--'}"`,
+                finalObtained,
+                finalMax,
+                `"${pct}%"`,
+                `"${ev.grade || gradeInfo.grade || '--'}"`,
                 `"${ev.status || 'Completed'}"`
             ];
 
@@ -409,27 +468,60 @@ class BulkReportManager {
         const headers = ["S.No", "Reg No", "Student Name", "Class & Sec", "Subject", "Total Marks", "Max Marks", "Percentage", "Grade", "Status"];
 
         const body = selected.map((ev, idx) => {
+            let actualObtained = ev.obtainedMarks;
+            let actualMax = ev.maxMarks;
+            let actualQuestions = ev.questions;
+
+            if ((actualObtained === undefined || actualObtained === null || actualObtained === 0) && window.appStorage && typeof window.appStorage.getDraft === "function") {
+                const draft = window.appStorage.getDraft(ev.id);
+                if (draft && draft.obtainedMarks !== undefined && Number(draft.obtainedMarks) > 0) {
+                    actualObtained = draft.obtainedMarks;
+                    if (draft.maxMarks) actualMax = draft.maxMarks;
+                    if (draft.questions && draft.questions.length > 0) actualQuestions = draft.questions;
+                }
+            }
+
+            if (Array.isArray(actualQuestions) && actualQuestions.length > 0) {
+                const qSum = actualQuestions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
+                const roundedQSum = Math.round(qSum * 10) / 10;
+                if (roundedQSum > 0 || (actualObtained === undefined || actualObtained === null)) {
+                    actualObtained = roundedQSum;
+                }
+            }
+
+            const finalObtained = actualObtained !== undefined && actualObtained !== null && !isNaN(Number(actualObtained)) 
+                ? Number(actualObtained) 
+                : 0;
+            const finalMax = actualMax !== undefined && actualMax !== null && Number(actualMax) > 0 
+                ? Number(actualMax) 
+                : 70;
+
+            const pct = finalMax > 0 ? Math.round((finalObtained / finalMax) * 100) : (ev.percentage || 0);
             const gradeInfo = window.calculateGradeScale 
-                ? window.calculateGradeScale(ev.obtainedMarks, ev.maxMarks) 
+                ? window.calculateGradeScale(finalObtained, finalMax) 
                 : { grade: ev.grade || "--", status: ev.status || "Pass" };
+
             return [
                 idx + 1,
                 ev.rollNo || "-",
                 ev.studentName || "-",
                 `${ev.class || ""}-${ev.section || ""}`,
                 ev.subject || "-",
-                ev.obtainedMarks || 0,
-                ev.maxMarks || 0,
-                `${ev.percentage || 0}%`,
+                finalObtained,
+                finalMax,
+                `${pct}%`,
                 ev.grade || gradeInfo.grade,
                 ev.status || gradeInfo.status || "Completed"
             ];
         });
 
         // Compute class aggregate stats (Passing threshold >= 33% as per official scale)
-        const avgScore = Math.round(selected.reduce((s, e) => s + (e.obtainedMarks || 0), 0) / selected.length);
-        const passCount = selected.filter(e => (e.percentage || 0) >= 33).length;
-        const passRate = Math.round((passCount / selected.length) * 100);
+        const avgScore = Math.round(body.reduce((s, row) => s + (Number(row[5]) || 0), 0) / body.length);
+        const passCount = body.filter(row => {
+            const pctVal = parseFloat(String(row[7]).replace("%", "")) || 0;
+            return pctVal >= 33;
+        }).length;
+        const passRate = Math.round((passCount / body.length) * 100);
 
         const examTitle = selected[0]?.examName || "Consolidated Examination Report";
         const subjectTitle = selected[0]?.subject || "All Subjects";

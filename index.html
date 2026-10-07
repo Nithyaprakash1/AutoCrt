@@ -669,7 +669,7 @@
 
             <!-- Center Answer Sheet Canvas Viewport -->
             <section class="ws-viewport-stage" id="ws-viewport-container">
-                <!-- Workspace PDF Loading / Processing Overlay -->
+                <!-- Workspace PDF Loading / Processing Overlay with Skeleton Shimmer -->
                 <div class="ws-loading-overlay" id="ws-loading-overlay" style="display: none;">
                     <div class="ws-loader-box">
                         <div class="ws-loader-spinner-wrap">
@@ -679,6 +679,15 @@
                         <div class="ws-loader-text-group">
                             <span class="ws-loader-msg" id="ws-loader-msg">Loading Student Answer Sheet...</span>
                             <span class="ws-loader-subtext">Rendering high-resolution vector pages</span>
+                        </div>
+                        <!-- Paper Sheet Skeleton Preview with Shimmer Effect -->
+                        <div class="ws-skeleton-paper-preview">
+                            <div class="ws-skeleton-header skeleton-shimmer"></div>
+                            <div class="ws-skeleton-line skeleton-shimmer" style="width: 85%;"></div>
+                            <div class="ws-skeleton-line skeleton-shimmer" style="width: 95%;"></div>
+                            <div class="ws-skeleton-line skeleton-shimmer" style="width: 72%;"></div>
+                            <div class="ws-skeleton-line skeleton-shimmer" style="width: 90%;"></div>
+                            <div class="ws-skeleton-line skeleton-shimmer" style="width: 60%;"></div>
                         </div>
                     </div>
                 </div>

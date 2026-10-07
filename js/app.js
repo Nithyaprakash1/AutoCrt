@@ -2513,11 +2513,55 @@ class AppController {
             ];
 
             const rows = allEvaluations.map((ev, idx) => {
-                const pct = ev.maxMarks > 0 
-                    ? Math.round(((ev.obtainedMarks || 0) / ev.maxMarks) * 100) 
+                // If this is currently the active evaluation in session, use live scoring from markingPanel / activeEvaluation
+                let actualObtained = ev.obtainedMarks;
+                let actualMax = ev.maxMarks;
+                let actualQuestions = ev.questions;
+
+                if (this.activeEvaluation && String(this.activeEvaluation.id) === String(ev.id)) {
+                    if (this.markingPanel && typeof this.markingPanel.obtainedMarksTotal === "number") {
+                        actualObtained = this.markingPanel.obtainedMarksTotal;
+                        actualMax = this.markingPanel.maxMarksTotal || actualMax;
+                        actualQuestions = this.markingPanel.questions || actualQuestions;
+                    } else if (this.activeEvaluation.obtainedMarks !== undefined) {
+                        actualObtained = this.activeEvaluation.obtainedMarks;
+                        actualMax = this.activeEvaluation.maxMarks || actualMax;
+                        actualQuestions = this.activeEvaluation.questions || actualQuestions;
+                    }
+                }
+
+                // Check draft if record in list is missing marks or has stale 0
+                if ((actualObtained === undefined || actualObtained === null || actualObtained === 0) && window.appStorage && typeof window.appStorage.getDraft === "function") {
+                    const draft = window.appStorage.getDraft(ev.id);
+                    if (draft && draft.obtainedMarks !== undefined && Number(draft.obtainedMarks) > 0) {
+                        actualObtained = draft.obtainedMarks;
+                        if (draft.maxMarks) actualMax = draft.maxMarks;
+                        if (draft.questions && draft.questions.length > 0) actualQuestions = draft.questions;
+                    }
+                }
+
+                // If questions array exists and has scored answers, ensure obtained marks strictly reflects question sum
+                if (Array.isArray(actualQuestions) && actualQuestions.length > 0) {
+                    const qSum = actualQuestions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
+                    const roundedQSum = Math.round(qSum * 10) / 10;
+                    // If question marks sum is greater than 0, or if ev.obtainedMarks was 0/undefined while questions had awarded marks
+                    if (roundedQSum > 0 || (actualObtained === undefined || actualObtained === null)) {
+                        actualObtained = roundedQSum;
+                    }
+                }
+
+                const finalObtained = actualObtained !== undefined && actualObtained !== null && !isNaN(Number(actualObtained)) 
+                    ? Number(actualObtained) 
+                    : 0;
+                const finalMax = actualMax !== undefined && actualMax !== null && Number(actualMax) > 0 
+                    ? Number(actualMax) 
+                    : 70;
+
+                const pct = finalMax > 0 
+                    ? Math.round((finalObtained / finalMax) * 100) 
                     : (ev.percentage !== undefined ? ev.percentage : 0);
                 const gradeInfo = window.calculateGradeScale 
-                    ? window.calculateGradeScale(ev.obtainedMarks, ev.maxMarks) 
+                    ? window.calculateGradeScale(finalObtained, finalMax) 
                     : { grade: ev.grade || "--" };
 
                 return [
@@ -2528,8 +2572,8 @@ class AppController {
                     ev.section || "",
                     ev.subject || activeSubject || "General",
                     ev.examName || ev.templateName || "Examination",
-                    ev.obtainedMarks !== undefined ? ev.obtainedMarks : 0,
-                    ev.maxMarks || 0,
+                    finalObtained,
+                    finalMax,
                     `${pct}%`,
                     ev.grade || gradeInfo.grade || "--",
                     ev.status || "Completed"
