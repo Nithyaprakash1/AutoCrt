@@ -13,7 +13,7 @@ class UserManagementPageManager {
         this.container = container;
         this.options = options;
         this.users = [];
-        this.subjectsList = ["Physics"];
+        this.subjectsList = ["Physics", "English", "Political Science", "Economics"];
         this.classesList = ["Class 12-A", "Class 12-B", "Class 12-C", "Class 12-D", "Class 10-A", "Class 10-B"];
         this.searchQuery = "";
         this.roleFilter = "all";

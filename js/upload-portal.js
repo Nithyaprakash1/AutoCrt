@@ -152,6 +152,23 @@ class UploadPortalManager {
                         ]
                     },
                     {
+                        id: "phy-rev1-80",
+                        name: "Grade 12 Physics Revision 1 (80 Marks)",
+                        examName: "Grade 12 Physics Revision 1 Assessment 2026",
+                        subject: "Physics",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Revision 1 Blueprint",
+                        sections: (window.MockData && window.MockData.physicsRevision1Template) ? window.MockData.physicsRevision1Template.sections : [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Revision 1 Objectives (MCQ 40 × 1 = 40)", qStartNo: 1, qEndNo: 40, qCount: 40, marksPerQ: 1, maxMarks: 40, secTotal: 40 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Subjective I (5 × 2 = 10 Marks)", qStartNo: 41, qEndNo: 45, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective II (4 × 3 = 12 Marks)", qStartNo: 46, qEndNo: 49, qCount: 4, marksPerQ: 3, maxMarks: 12, secTotal: 12 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective III (2 × 5 = 10 Marks)", qStartNo: 50, qEndNo: 51, qCount: 2, marksPerQ: 5, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Subjective IV Case Study (2 × 4 = 8 Marks)", qStartNo: 52, qEndNo: 53, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8 }
+                        ],
+                        questions: (window.MockData && window.MockData.physicsRevision1Template) ? window.MockData.physicsRevision1Template.questions : []
+                    },
+                    {
                         id: "phy-mid-50",
                         name: "Physics Mid-Term Exam (50 Marks)",
                         examName: "Physics Half-Yearly Assessment",
@@ -179,6 +196,57 @@ class UploadPortalManager {
                             { qNumber: "Q3", maxMarks: 5, topic: "Potentiometer & Meter Bridge" },
                             { qNumber: "Q4", maxMarks: 10, topic: "Kirchhoff Circuit Laws" }
                         ]
+                    }
+                ]
+            },
+            {
+                id: "pol",
+                name: "Political Science",
+                code: "POL-301",
+                badge: "Official Blueprint",
+                description: "Political Science Board Assessment (40 MCQs + 40 Marks Subjective / 80 Marks)",
+                templates: [
+                    window.MockData && window.MockData.politicalScienceTemplate ? window.MockData.politicalScienceTemplate : {
+                        id: "pol-cbse-80",
+                        name: "Political Science (80 Marks: 40 MCQs + 40 Subjective)",
+                        examName: "Annual Political Science Assessment 2026",
+                        subject: "Political Science",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Official Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Objective MCQs (Q1 to Q40)", qStartNo: 1, qEndNo: 40, qCount: 40, marksPerQ: 1, maxMarks: 40, secTotal: 40 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Short Answer I (4 × 2 = 8 Marks)", qStartNo: 41, qEndNo: 44, qCount: 4, marksPerQ: 2, maxMarks: 8, secTotal: 8 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Short Answer II (3 × 4 = 12 Marks)", qStartNo: 45, qEndNo: 47, qCount: 3, marksPerQ: 4, maxMarks: 12, secTotal: 12 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Map / Cartoon / Passage (2 × 4 = 8 Marks)", qStartNo: 48, qEndNo: 49, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8 },
+                            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Long Answer (2 × 6 = 12 Marks)", qStartNo: 50, qEndNo: 51, qCount: 2, marksPerQ: 6, maxMarks: 12, secTotal: 12 }
+                        ],
+                        questions: []
+                    }
+                ]
+            },
+            {
+                id: "eco",
+                name: "Economics",
+                code: "ECO-301",
+                badge: "Official Blueprint",
+                description: "Economics Board Assessment (40 MCQs + 40 Marks Subjective / 80 Marks)",
+                templates: [
+                    window.MockData && window.MockData.economicsTemplate ? window.MockData.economicsTemplate : {
+                        id: "eco-cbse-80",
+                        name: "Economics (80 Marks: 40 MCQs + 40 Subjective)",
+                        examName: "Annual Economics Assessment 2026",
+                        subject: "Economics",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Official Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Objective MCQs (Q1 to Q40)", qStartNo: 1, qEndNo: 40, qCount: 40, marksPerQ: 1, maxMarks: 40, secTotal: 40 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Short Answer I (4 × 3 = 12 Marks)", qStartNo: 41, qEndNo: 44, qCount: 4, marksPerQ: 3, maxMarks: 12, secTotal: 12 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Short Answer II (4 × 4 = 16 Marks)", qStartNo: 45, qEndNo: 48, qCount: 4, marksPerQ: 4, maxMarks: 16, secTotal: 16 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Long Answer (2 × 6 = 12 Marks)", qStartNo: 49, qEndNo: 50, qCount: 2, marksPerQ: 6, maxMarks: 12, secTotal: 12 }
+                        ],
+                        questions: []
                     }
                 ]
             },
@@ -248,6 +316,8 @@ class UploadPortalManager {
         if (id.includes("bio") || name.includes("bio")) return "#34C759";
         if (id.includes("math") || name.includes("math")) return "#007AFF";
         if (id.includes("eng") || name.includes("english")) return "#0284C7";
+        if (id.includes("pol") || name.includes("politic")) return "#8B5CF6";
+        if (id.includes("eco") || name.includes("econom")) return "#10B981";
         return "#5856D6";
     }
 
@@ -263,6 +333,12 @@ class UploadPortalManager {
         }
         if (id.includes("bio") || name.includes("bio")) {
             return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22s5.5-1.5 8-6 2-8 2-8-3.5-.5-8 2-2 12-2 12z"/><path d="M12 8s3.5-.5 8 2 2 12 2 12-5.5-1.5-8-6"/></svg>`;
+        }
+        if (id.includes("pol") || name.includes("politic")) {
+            return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V18a1 1 0 0 1-2 0v-1.07A7 7 0 0 1 5.07 11H6a1 1 0 0 1 0-2h-.93A7 7 0 0 1 11 3.07V4a1 1 0 0 1 2 0v-.93A7 7 0 0 1 18.93 9H18a1 1 0 0 1 0 2h.93A7 7 0 0 1 13 16.93z"/></svg>`;
+        }
+        if (id.includes("eco") || name.includes("econom")) {
+            return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
         }
         return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
     }
@@ -360,10 +436,33 @@ class UploadPortalManager {
             const savedCatalog = await window.appStorage.getSubjectCatalog();
             if (savedCatalog && Array.isArray(savedCatalog) && savedCatalog.length > 0) {
                 // Ensure Physics exists with its standard templates
-                const hasPhy = savedCatalog.some(s => s.id === "phy" || (s.name && s.name.toLowerCase().includes("physic")));
-                if (!hasPhy) {
-                    const defaultPhy = this.catalog.find(s => s.id === "phy");
+                let phySub = savedCatalog.find(s => s.id === "phy" || (s.name && s.name.toLowerCase().includes("physic")));
+                const defaultPhy = this.catalog.find(s => s.id === "phy");
+                if (!phySub) {
                     if (defaultPhy) savedCatalog.unshift(defaultPhy);
+                } else if (defaultPhy && defaultPhy.templates) {
+                    // Ensure Grade 12 Physics Revision 1 template exists in Physics
+                    defaultPhy.templates.forEach(defTpl => {
+                        if (!phySub.templates) phySub.templates = [];
+                        const existingTpl = phySub.templates.find(t => t.id === defTpl.id || t.name === defTpl.name);
+                        if (!existingTpl) {
+                            phySub.templates.push(defTpl);
+                        }
+                    });
+                }
+
+                // Ensure Political Science exists with its official blueprint
+                const hasPol = savedCatalog.some(s => s.id === "pol" || (s.name && s.name.toLowerCase().includes("political")));
+                if (!hasPol) {
+                    const defaultPol = this.catalog.find(s => s.id === "pol");
+                    if (defaultPol) savedCatalog.push(defaultPol);
+                }
+
+                // Ensure Economics exists with its official blueprint
+                const hasEco = savedCatalog.some(s => s.id === "eco" || (s.name && s.name.toLowerCase().includes("economic")));
+                if (!hasEco) {
+                    const defaultEco = this.catalog.find(s => s.id === "eco");
+                    if (defaultEco) savedCatalog.push(defaultEco);
                 }
 
                 // Ensure English exists with its official blueprint
