@@ -12,6 +12,7 @@ class StorageService {
         this.isReady = false;
         this.memoryStore = [];
         this.pdfCacheMap = new Map();
+        this.deletedEvaluations = this._loadDeletedIds();
         this.readyPromise = this.init();
     }
 
@@ -133,6 +134,38 @@ class StorageService {
             }
         } catch (e) {}
         return true;
+    }
+
+    _loadDeletedIds() {
+        try {
+            const raw = localStorage.getItem("onespace_deleted_ids");
+            if (raw) {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr)) return new Set(arr.map(String));
+            }
+        } catch (e) {}
+        return new Set();
+    }
+
+    _recordDeletedId(id) {
+        if (!id) return;
+        const targetId = String(id);
+        if (!this.deletedEvaluations) this.deletedEvaluations = new Set();
+        this.deletedEvaluations.add(targetId);
+        try {
+            localStorage.setItem("onespace_deleted_ids", JSON.stringify(Array.from(this.deletedEvaluations)));
+        } catch (e) {}
+    }
+
+    _clearDeletedId(id) {
+        if (!id || !this.deletedEvaluations) return;
+        const targetId = String(id);
+        if (this.deletedEvaluations.has(targetId)) {
+            this.deletedEvaluations.delete(targetId);
+            try {
+                localStorage.setItem("onespace_deleted_ids", JSON.stringify(Array.from(this.deletedEvaluations)));
+            } catch (e) {}
+        }
     }
 
     fallbackInit() {
@@ -263,6 +296,11 @@ class StorageService {
             });
         }
 
+        // Filter out any tombstoned deleted IDs immediately from local read
+        if (this.deletedEvaluations && this.deletedEvaluations.size > 0) {
+            list = list.filter(e => e && e.id && !this.deletedEvaluations.has(String(e.id)));
+        }
+
         // Merge with in-memory store so newly saved papers in this session are never lost
         if (this.memoryStore && this.memoryStore.length > 0) {
             if (!list || list.length === 0) {
@@ -272,6 +310,7 @@ class StorageService {
                 for (const memItem of this.memoryStore) {
                     if (memItem && memItem.id) {
                         const sId = String(memItem.id);
+                        if (this.deletedEvaluations && this.deletedEvaluations.has(sId)) continue;
                         if (!listMap.has(sId)) {
                             list.push(memItem);
                         } else {
@@ -293,7 +332,7 @@ class StorageService {
                 if (raw) {
                     const parsed = JSON.parse(raw);
                     if (Array.isArray(parsed) && parsed.length > 0) {
-                        list = parsed.filter(e => e && e.id);
+                        list = parsed.filter(e => e && e.id && !(this.deletedEvaluations && this.deletedEvaluations.has(String(e.id))));
                     }
                 }
             } catch (e) {}
@@ -311,6 +350,11 @@ class StorageService {
                     for (const fbItem of fbList) {
                         if (!fbItem || !fbItem.id) continue;
                         const sId = String(fbItem.id);
+
+                        // If this paper was explicitly deleted by the user, ignore resurrected copies from cloud/cache
+                        if (this.deletedEvaluations && this.deletedEvaluations.has(sId)) {
+                            continue;
+                        }
 
                         if (!listMap.has(sId)) {
                             list.push(fbItem);
@@ -636,6 +680,9 @@ class StorageService {
             evaluation.createdAt = new Date().toISOString();
         }
 
+        // Clear any previous tombstone since user is creating/saving this paper
+        this._clearDeletedId(evaluation.id);
+
         // Memory store update: strictly overwrite existing record by matching ID
         const targetId = String(evaluation.id);
         const idx = this.memoryStore.findIndex(e => String(e.id) === targetId);
@@ -701,6 +748,9 @@ class StorageService {
         if (id === null || id === undefined) return false;
         await this.readyPromise;
         const targetId = String(id);
+
+        // Record permanent tombstone so cloud background sync never resurrects this deleted paper
+        this._recordDeletedId(targetId);
 
         // 1. Remove from in-memory cache and map
         this.memoryStore = (this.memoryStore || []).filter(e => String(e.id) !== targetId);

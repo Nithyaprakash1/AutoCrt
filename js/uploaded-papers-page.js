@@ -30,7 +30,7 @@ class UploadedPapersPageManager {
             if (savedCatalog) {
                 this.subjects = savedCatalog.map(s => s.name);
             } else {
-                this.subjects = ["Physics", "English", "Political Science", "Economics"];
+                this.subjects = ["Physics", "English", "Political Science", "Economics", "History", "Social Science"];
             }
 
             const currentUser = window.appStorage.getCurrentUser();

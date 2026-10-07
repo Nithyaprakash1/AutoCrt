@@ -251,12 +251,79 @@ class UploadPortalManager {
                 ]
             },
             {
+                id: "his",
+                name: "History",
+                code: "HIS-301",
+                badge: "Revision 1 Blueprint",
+                description: "Grade 12 History Board Assessment (40 MCQs + 40 Marks Subjective / 80 Marks)",
+                templates: [
+                    window.MockData && window.MockData.historyRevision1Template ? window.MockData.historyRevision1Template : {
+                        id: "his-rev1-80",
+                        name: "Grade 12 History Revision 1 (80 Marks)",
+                        examName: "Grade 12 History Revision 1 Assessment 2026",
+                        subject: "History",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Revision 1 Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Revision 1 Objectives (MCQ 40 × 1 = 40)", qStartNo: 1, qEndNo: 40, qCount: 40, marksPerQ: 1, maxMarks: 40, secTotal: 40 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Subjective I (3 Marks × 5 = 15 Marks)", qStartNo: 41, qEndNo: 45, qCount: 5, marksPerQ: 3, maxMarks: 15, secTotal: 15 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective II (8 Marks × 2 = 16 Marks)", qStartNo: 46, qEndNo: 47, qCount: 2, marksPerQ: 8, maxMarks: 16, secTotal: 16 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective III Case Study (3 Marks × 3 = 9 Marks)", qStartNo: 48, qEndNo: 50, qCount: 3, marksPerQ: 3, maxMarks: 9, secTotal: 9 }
+                        ],
+                        questions: []
+                    }
+                ]
+            },
+            {
+                id: "soc",
+                name: "Social Science",
+                code: "SOC-101",
+                badge: "Revision 1 Blueprint",
+                description: "Grade X Social Science Revision 1 Assessment (40 MCQs + 40 Marks Subjective / 80 Marks)",
+                templates: [
+                    window.MockData && window.MockData.socialGrade10Revision1Template ? window.MockData.socialGrade10Revision1Template : {
+                        id: "soc-x-rev1-80",
+                        name: "Grade X Social Revision 1 (80 Marks)",
+                        examName: "Grade X Social Science Revision 1 Assessment 2026",
+                        subject: "Social Science",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Revision 1 Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Revision 1 Objectives (MCQ 40 × 1 = 40)", qStartNo: 1, qEndNo: 40, qCount: 40, marksPerQ: 1, maxMarks: 40, secTotal: 40 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Subjective I (2 Marks × 3 = 6 Marks)", qStartNo: 41, qEndNo: 43, qCount: 3, marksPerQ: 2, maxMarks: 6, secTotal: 6 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective II (3 Marks × 5 = 15 Marks)", qStartNo: 44, qEndNo: 48, qCount: 5, marksPerQ: 3, maxMarks: 15, secTotal: 15 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective III (5 Marks × 3 = 15 Marks)", qStartNo: 49, qEndNo: 51, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15 },
+                            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Subjective IV Case Study (4 Marks × 1 = 4 Marks)", qStartNo: 52, qEndNo: 52, qCount: 1, marksPerQ: 4, maxMarks: 4, secTotal: 4 }
+                        ],
+                        questions: []
+                    }
+                ]
+            },
+            {
                 id: "eng",
                 name: "English",
                 code: "ENG-301",
-                badge: "Official Blueprint",
-                description: "English Core CBSE Board Assessment (13 Questions / 80 Marks)",
+                badge: "2 Templates",
+                description: "English Core & Revision Assessment (80 Marks)",
                 templates: [
+                    window.MockData && window.MockData.englishGrade12ObjSubjTemplate ? window.MockData.englishGrade12ObjSubjTemplate : {
+                        id: "eng-xii-rev-80",
+                        name: "Grade XII English (80 Marks: 40 Objective + 40 Subjective)",
+                        examName: "Grade XII English Assessment 2026",
+                        subject: "English",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Official Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Objective (MCQs & Fill ups – 40 Marks)", qStartNo: 1, qEndNo: 40, qCount: 40, marksPerQ: 1, maxMarks: 40, secTotal: 40 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Subjective One Mark Fill Ups (10 × 1 = 10 Marks)", qStartNo: 41, qEndNo: 50, qCount: 10, marksPerQ: 1, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective Short Answer (2 Marks × 5 = 10 Marks)", qStartNo: 51, qEndNo: 55, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective Long Answer (5 Marks × 4 = 20 Marks)", qStartNo: 56, qEndNo: 59, qCount: 4, marksPerQ: 5, maxMarks: 20, secTotal: 20 }
+                        ],
+                        questions: []
+                    },
                     window.MockData && window.MockData.englishTemplate ? window.MockData.englishTemplate : {
                         id: "eng-core-cbse-80",
                         name: "English Core Board Paper (13 Qs / 80 Marks)",
@@ -318,6 +385,8 @@ class UploadPortalManager {
         if (id.includes("eng") || name.includes("english")) return "#0284C7";
         if (id.includes("pol") || name.includes("politic")) return "#8B5CF6";
         if (id.includes("eco") || name.includes("econom")) return "#10B981";
+        if (id.includes("his") || name.includes("histor")) return "#D97706";
+        if (id.includes("soc") || name.includes("social")) return "#EA580C";
         return "#5856D6";
     }
 
@@ -339,6 +408,12 @@ class UploadPortalManager {
         }
         if (id.includes("eco") || name.includes("econom")) {
             return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`;
+        }
+        if (id.includes("his") || name.includes("histor")) {
+            return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
+        }
+        if (id.includes("soc") || name.includes("social")) {
+            return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`;
         }
         return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>`;
     }
@@ -465,11 +540,33 @@ class UploadPortalManager {
                     if (defaultEco) savedCatalog.push(defaultEco);
                 }
 
-                // Ensure English exists with its official blueprint
-                const hasEng = savedCatalog.some(s => s.id === "eng" || (s.name && s.name.toLowerCase().includes("english")));
-                if (!hasEng) {
-                    const defaultEng = this.catalog.find(s => s.id === "eng");
+                // Ensure History exists with its official blueprint
+                const hasHis = savedCatalog.some(s => s.id === "his" || (s.name && s.name.toLowerCase().includes("histor")));
+                if (!hasHis) {
+                    const defaultHis = this.catalog.find(s => s.id === "his");
+                    if (defaultHis) savedCatalog.push(defaultHis);
+                }
+
+                // Ensure Social Science exists with its official blueprint
+                const hasSoc = savedCatalog.some(s => s.id === "soc" || (s.name && s.name.toLowerCase().includes("social")));
+                if (!hasSoc) {
+                    const defaultSoc = this.catalog.find(s => s.id === "soc");
+                    if (defaultSoc) savedCatalog.push(defaultSoc);
+                }
+
+                // Ensure English exists with all its templates (including Grade XII English Revision)
+                let engSub = savedCatalog.find(s => s.id === "eng" || (s.name && s.name.toLowerCase().includes("english")));
+                const defaultEng = this.catalog.find(s => s.id === "eng");
+                if (!engSub) {
                     if (defaultEng) savedCatalog.push(defaultEng);
+                } else if (defaultEng && defaultEng.templates) {
+                    defaultEng.templates.forEach(defTpl => {
+                        if (!engSub.templates) engSub.templates = [];
+                        const existingTpl = engSub.templates.find(t => t.id === defTpl.id || t.name === defTpl.name);
+                        if (!existingTpl) {
+                            engSub.templates.unshift(defTpl);
+                        }
+                    });
                 }
 
                 // Dynamically ensure all subjects have accurate badge labels
