@@ -168,6 +168,23 @@ class UploadPortalManager {
                         ],
                         questions: (window.MockData && window.MockData.physicsRevision1Template) ? window.MockData.physicsRevision1Template.questions : []
                     },
+                    (window.MockData && window.MockData.grade12RevisionTest1Template) ? window.MockData.grade12RevisionTest1Template : {
+                        id: "g12-rev1-80",
+                        name: "Grade 12 Revision Test 1 (80 Marks)",
+                        examName: "Grade 12 Revision Test 1 Assessment 2026",
+                        subject: "Physics",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Revision 1 Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - MCQ Test 1 (40 × 1 = 40 Marks)", qStartNo: 1, qEndNo: 40, qCount: 40, marksPerQ: 1, maxMarks: 40, secTotal: 40 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Subjective I (5 × 2 = 10 Marks)", qStartNo: 41, qEndNo: 45, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective II (4 × 3 = 12 Marks)", qStartNo: 46, qEndNo: 49, qCount: 4, marksPerQ: 3, maxMarks: 12, secTotal: 12 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective III (2 × 4 = 8 Marks)", qStartNo: 50, qEndNo: 51, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8 },
+                            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Subjective IV (2 × 5 = 10 Marks)", qStartNo: 52, qEndNo: 53, qCount: 2, marksPerQ: 5, maxMarks: 10, secTotal: 10 }
+                        ],
+                        questions: []
+                    },
                     {
                         id: "phy-mid-50",
                         name: "Physics Mid-Term Exam (50 Marks)",
@@ -354,6 +371,124 @@ class UploadPortalManager {
                         ]
                     }
                 ]
+            },
+            {
+                id: "ent",
+                name: "Entrepreneurship",
+                code: "ENT-301",
+                badge: "Official Blueprint",
+                description: "Grade 12 Entrepreneurship Assessment (40 MCQs + 40 Marks Subjective / 80 Marks)",
+                templates: [
+                    window.MockData && window.MockData.entrepreneurshipGrade12Template ? window.MockData.entrepreneurshipGrade12Template : {
+                        id: "ent-xii-80",
+                        name: "Grade 12 Entrepreneurship (80 Marks)",
+                        examName: "Grade 12 Entrepreneurship Assessment 2026",
+                        subject: "Entrepreneurship",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Official Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Objective MCQs (40 × 1 = 40 Marks)", qStartNo: 1, qEndNo: 40, qCount: 40, marksPerQ: 1, maxMarks: 40, secTotal: 40 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Subjective I (5 × 2 = 10 Marks)", qStartNo: 41, qEndNo: 45, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective II (5 × 3 = 15 Marks)", qStartNo: 46, qEndNo: 50, qCount: 5, marksPerQ: 3, maxMarks: 15, secTotal: 15 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective III (3 × 5 = 15 Marks)", qStartNo: 51, qEndNo: 53, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15 }
+                        ],
+                        questions: []
+                    }
+                ]
+            },
+            {
+                id: "mat",
+                name: "Mathematics",
+                code: "MAT-301",
+                badge: "2 Templates",
+                description: "Class 10 & 12 Mathematics Assessments (80 Marks)",
+                templates: [
+                    window.MockData && window.MockData.mathGrade12Template ? window.MockData.mathGrade12Template : {
+                        id: "mat-xii-80",
+                        name: "Grade 12 Mathematics (80 Marks)",
+                        examName: "Grade 12 Mathematics Assessment 2026",
+                        subject: "Mathematics",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Official Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Objective I (28 × 1 = 28 Marks)", qStartNo: 1, qEndNo: 28, qCount: 28, marksPerQ: 1, maxMarks: 28, secTotal: 28 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Objective II (3 × 4 = 12 Marks)", qStartNo: 29, qEndNo: 31, qCount: 3, marksPerQ: 4, maxMarks: 12, secTotal: 12 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective I (5 × 2 = 10 Marks)", qStartNo: 32, qEndNo: 36, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective II (5 × 3 = 15 Marks)", qStartNo: 37, qEndNo: 41, qCount: 5, marksPerQ: 3, maxMarks: 15, secTotal: 15 },
+                            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Subjective III (3 × 5 = 15 Marks)", qStartNo: 42, qEndNo: 44, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15 }
+                        ],
+                        questions: []
+                    },
+                    window.MockData && window.MockData.mathGrade10Template ? window.MockData.mathGrade10Template : {
+                        id: "mat-x-80",
+                        name: "Grade 10 Mathematics (80 Marks)",
+                        examName: "Grade 10 Mathematics Assessment 2026",
+                        subject: "Mathematics",
+                        maxMarks: 80,
+                        duration: "3 Hours",
+                        badge: "Official Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Objective I (MCQ & AR 28 × 1 = 28 Marks)", qStartNo: 1, qEndNo: 28, qCount: 28, marksPerQ: 1, maxMarks: 28, secTotal: 28 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Objective II (Case-based 3 × 4 = 12 Marks)", qStartNo: 29, qEndNo: 31, qCount: 3, marksPerQ: 4, maxMarks: 12, secTotal: 12 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective I (5 × 2 = 10 Marks)", qStartNo: 32, qEndNo: 36, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective II (5 × 3 = 15 Marks)", qStartNo: 37, qEndNo: 41, qCount: 5, marksPerQ: 3, maxMarks: 15, secTotal: 15 },
+                            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Subjective III (3 × 5 = 15 Marks)", qStartNo: 42, qEndNo: 44, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15 }
+                        ],
+                        questions: []
+                    }
+                ]
+            },
+            {
+                id: "bio",
+                name: "Biology",
+                code: "BIO-101",
+                badge: "Official Blueprint",
+                description: "Grade 10 Science Biology Assessment (MCQ 15 + Subjective 15 / 30 Marks)",
+                templates: [
+                    window.MockData && window.MockData.scienceGrade10BiologyTemplate ? window.MockData.scienceGrade10BiologyTemplate : {
+                        id: "bio-x-30",
+                        name: "Grade 10 Biology (30 Marks)",
+                        examName: "Grade 10 Science Biology Assessment 2026",
+                        subject: "Biology",
+                        maxMarks: 30,
+                        duration: "1.5 Hours",
+                        badge: "Official Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - MCQ 1 (15 × 1 = 15 Marks)", qStartNo: 1, qEndNo: 15, qCount: 15, marksPerQ: 1, maxMarks: 15, secTotal: 15 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Subjective I (4 × 2 = 8 Marks)", qStartNo: 16, qEndNo: 19, qCount: 4, marksPerQ: 2, maxMarks: 8, secTotal: 8 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective II (1 × 3 = 3 Marks)", qStartNo: 20, qEndNo: 20, qCount: 1, marksPerQ: 3, maxMarks: 3, secTotal: 3 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective III (1 × 4 = 4 Marks)", qStartNo: 21, qEndNo: 21, qCount: 1, marksPerQ: 4, maxMarks: 4, secTotal: 4 }
+                        ],
+                        questions: []
+                    }
+                ]
+            },
+            {
+                id: "chem",
+                name: "Chemistry",
+                code: "CHE-101",
+                badge: "Official Blueprint",
+                description: "Grade 10 Science Chemistry Assessment (MCQ 13 + Subjective 13 / 26 Marks)",
+                templates: [
+                    window.MockData && window.MockData.scienceGrade10ChemistryTemplate ? window.MockData.scienceGrade10ChemistryTemplate : {
+                        id: "che-x-26",
+                        name: "Grade 10 Chemistry (26 Marks)",
+                        examName: "Grade 10 Science Chemistry Assessment 2026",
+                        subject: "Chemistry",
+                        maxMarks: 26,
+                        duration: "1.5 Hours",
+                        badge: "Official Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - MCQ Test 1 (13 × 1 = 13 Marks)", qStartNo: 1, qEndNo: 13, qCount: 13, marksPerQ: 1, maxMarks: 13, secTotal: 13 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Subjective I (1 × 2 = 2 Marks with choice)", qStartNo: 14, qEndNo: 14, qCount: 1, marksPerQ: 2, maxMarks: 2, secTotal: 2, hasChoice: true },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Subjective II (2 × 3 = 6 Marks)", qStartNo: 15, qEndNo: 16, qCount: 2, marksPerQ: 3, maxMarks: 6, secTotal: 6 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Subjective III (1 × 5 = 5 Marks with choice)", qStartNo: 17, qEndNo: 17, qCount: 1, marksPerQ: 5, maxMarks: 5, secTotal: 5, hasChoice: true }
+                        ],
+                        questions: []
+                    }
+                ]
             }
         ];
 
@@ -381,7 +516,8 @@ class UploadPortalManager {
         if (id.includes("phy") || name.includes("physic")) return "#5856D6";
         if (id.includes("chem") || name.includes("chem")) return "#FF9500";
         if (id.includes("bio") || name.includes("bio")) return "#34C759";
-        if (id.includes("math") || name.includes("math")) return "#007AFF";
+        if (id.includes("math") || name.includes("math") || id === "mat") return "#007AFF";
+        if (id.includes("ent") || name.includes("entrepreneur")) return "#6366F1";
         if (id.includes("eng") || name.includes("english")) return "#0284C7";
         if (id.includes("pol") || name.includes("politic")) return "#8B5CF6";
         if (id.includes("eco") || name.includes("econom")) return "#10B981";
@@ -402,6 +538,12 @@ class UploadPortalManager {
         }
         if (id.includes("bio") || name.includes("bio")) {
             return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 22s5.5-1.5 8-6 2-8 2-8-3.5-.5-8 2-2 12-2 12z"/><path d="M12 8s3.5-.5 8 2 2 12 2 12-5.5-1.5-8-6"/></svg>`;
+        }
+        if (id.includes("math") || name.includes("math") || id === "mat") {
+            return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18"/><circle cx="8" cy="8" r="2"/><circle cx="16" cy="16" r="2"/><line x1="4" y1="20" x2="20" y2="4"/></svg>`;
+        }
+        if (id.includes("ent") || name.includes("entrepreneur")) {
+            return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg>`;
         }
         if (id.includes("pol") || name.includes("politic")) {
             return `<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm1 14.93V18a1 1 0 0 1-2 0v-1.07A7 7 0 0 1 5.07 11H6a1 1 0 0 1 0-2h-.93A7 7 0 0 1 11 3.07V4a1 1 0 0 1 2 0v-.93A7 7 0 0 1 18.93 9H18a1 1 0 0 1 0 2h.93A7 7 0 0 1 13 16.93z"/></svg>`;

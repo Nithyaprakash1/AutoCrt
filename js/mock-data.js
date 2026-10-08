@@ -1141,6 +1141,925 @@ const MockData = {
         })()
     },
 
+    // Grade 12 Entrepreneurship Blueprint (Objective 40 + Subjective 40 = 80 Marks Total)
+    entrepreneurshipGrade12Template: {
+        id: "ent-xii-80",
+        name: "Grade 12 Entrepreneurship (80 Marks)",
+        examName: "Grade 12 Entrepreneurship Assessment 2026",
+        subject: "Entrepreneurship",
+        maxMarks: 80,
+        duration: "3 Hours",
+        badge: "Official Blueprint",
+        generalInstructions: [
+            "This question paper consists of Objective (40 MCQs) and Subjective (40 Marks) sections carrying 80 Marks total.",
+            "Objective: 40 MCQs × 1 = 40 Marks (Q1 to Q40).",
+            "Subjective Section I: 5 questions × 2 marks = 10 Marks (Q41 to Q45).",
+            "Subjective Section II: 5 questions × 3 marks = 15 Marks (Q46 to Q50).",
+            "Subjective Section III: 3 questions × 5 marks = 15 Marks (Q51 to Q53)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A - Objective MCQs (40 × 1 = 40 Marks)",
+                qStartNo: 1,
+                qEndNo: 40,
+                qCount: 40,
+                marksPerQ: 1,
+                maxMarks: 40,
+                secTotal: 40,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B - Subjective I (5 × 2 = 10 Marks)",
+                qStartNo: 41,
+                qEndNo: 45,
+                qCount: 5,
+                marksPerQ: 2,
+                maxMarks: 10,
+                secTotal: 10,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C - Subjective II (5 × 3 = 15 Marks)",
+                qStartNo: 46,
+                qEndNo: 50,
+                qCount: 5,
+                marksPerQ: 3,
+                maxMarks: 15,
+                secTotal: 15,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_d",
+                letter: "D",
+                name: "Section D",
+                title: "Section D - Subjective III (3 × 5 = 15 Marks)",
+                qStartNo: 51,
+                qEndNo: 53,
+                qCount: 3,
+                marksPerQ: 5,
+                maxMarks: 15,
+                secTotal: 15,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 40; i++) {
+                qs.push({
+                    id: `ent_xii_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `Entrepreneurship MCQ ${i}`
+                });
+            }
+            for (let i = 1; i <= 5; i++) {
+                const qNum = 40 + i;
+                qs.push({
+                    id: `ent_xii_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 2,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Short Answer (2 Marks)`
+                });
+            }
+            for (let i = 1; i <= 5; i++) {
+                const qNum = 45 + i;
+                qs.push({
+                    id: `ent_xii_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 3,
+                    section: "Section C",
+                    sectionId: "sec_c",
+                    topic: `Short Answer (3 Marks)`
+                });
+            }
+            for (let i = 1; i <= 3; i++) {
+                const qNum = 50 + i;
+                qs.push({
+                    id: `ent_xii_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 5,
+                    section: "Section D",
+                    sectionId: "sec_d",
+                    topic: `Long Answer (5 Marks)`
+                });
+            }
+            return qs;
+        })()
+    },
+
+    // Grade 12 Math Blueprint (Objective 40 + Subjective 40 = 80 Marks Total)
+    mathGrade12Template: {
+        id: "mat-xii-80",
+        name: "Grade 12 Mathematics (80 Marks)",
+        examName: "Grade 12 Mathematics Assessment 2026",
+        subject: "Mathematics",
+        maxMarks: 80,
+        duration: "3 Hours",
+        badge: "Official Blueprint",
+        generalInstructions: [
+            "This question paper consists of Objective (40 Marks) and Subjective (40 Marks) sections carrying 80 Marks total.",
+            "Objective Section I: 28 MCQs × 1 mark = 28 Marks (Q1 to Q28).",
+            "Objective Section II: 3 questions × 4 marks = 12 Marks (Q29 to Q31).",
+            "Subjective Section I: 5 questions × 2 marks = 10 Marks (Q32 to Q36).",
+            "Subjective Section II: 5 questions × 3 marks = 15 Marks (Q37 to Q41).",
+            "Subjective Section III: 3 questions × 5 marks = 15 Marks (Q42 to Q44)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A - Objective I (28 × 1 = 28 Marks)",
+                qStartNo: 1,
+                qEndNo: 28,
+                qCount: 28,
+                marksPerQ: 1,
+                maxMarks: 28,
+                secTotal: 28,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B - Objective II (3 × 4 = 12 Marks)",
+                qStartNo: 29,
+                qEndNo: 31,
+                qCount: 3,
+                marksPerQ: 4,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C - Subjective I (5 × 2 = 10 Marks)",
+                qStartNo: 32,
+                qEndNo: 36,
+                qCount: 5,
+                marksPerQ: 2,
+                maxMarks: 10,
+                secTotal: 10,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_d",
+                letter: "D",
+                name: "Section D",
+                title: "Section D - Subjective II (5 × 3 = 15 Marks)",
+                qStartNo: 37,
+                qEndNo: 41,
+                qCount: 5,
+                marksPerQ: 3,
+                maxMarks: 15,
+                secTotal: 15,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_e",
+                letter: "E",
+                name: "Section E",
+                title: "Section E - Subjective III (3 × 5 = 15 Marks)",
+                qStartNo: 42,
+                qEndNo: 44,
+                qCount: 3,
+                marksPerQ: 5,
+                maxMarks: 15,
+                secTotal: 15,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            // Section A: 28 x 1 = 28M (Q1 to Q28)
+            for (let i = 1; i <= 28; i++) {
+                qs.push({
+                    id: `mat_xii_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `Mathematics MCQ ${i}`
+                });
+            }
+            // Section B: 3 x 4 = 12M (Q29 to Q31)
+            for (let i = 1; i <= 3; i++) {
+                const qNum = 28 + i;
+                qs.push({
+                    id: `mat_xii_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 4,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Case-based / Short Answer (4 Marks)`
+                });
+            }
+            // Section C: 5 x 2 = 10M (Q32 to Q36)
+            for (let i = 1; i <= 5; i++) {
+                const qNum = 31 + i;
+                qs.push({
+                    id: `mat_xii_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 2,
+                    section: "Section C",
+                    sectionId: "sec_c",
+                    topic: `Very Short Answer (2 Marks)`
+                });
+            }
+            // Section D: 5 x 3 = 15M (Q37 to Q41)
+            for (let i = 1; i <= 5; i++) {
+                const qNum = 36 + i;
+                qs.push({
+                    id: `mat_xii_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 3,
+                    section: "Section D",
+                    sectionId: "sec_d",
+                    topic: `Short Answer (3 Marks)`
+                });
+            }
+            // Section E: 3 x 5 = 15M (Q42 to Q44)
+            for (let i = 1; i <= 3; i++) {
+                const qNum = 41 + i;
+                qs.push({
+                    id: `mat_xii_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 5,
+                    section: "Section E",
+                    sectionId: "sec_e",
+                    topic: `Long Answer (5 Marks)`
+                });
+            }
+            return qs;
+        })()
+    },
+
+    // Grade 10 Math Blueprint (Objective MCQ & AR + Case Based + Subjective = 80 Marks Total)
+    mathGrade10Template: {
+        id: "mat-x-80",
+        name: "Grade 10 Mathematics (80 Marks)",
+        examName: "Grade 10 Mathematics Assessment 2026",
+        subject: "Mathematics",
+        maxMarks: 80,
+        duration: "3 Hours",
+        badge: "Official Blueprint",
+        generalInstructions: [
+            "This question paper consists of Objective (40 Marks) and Subjective (40 Marks) sections carrying 80 Marks total.",
+            "Objective Section I: MCQ & AR 28 × 1 mark = 28 Marks (Q1 to Q28).",
+            "Objective Section II: Case-based 3 × 4 marks = 12 Marks (Q29 to Q31).",
+            "Subjective Section I: 5 questions × 2 marks = 10 Marks (Q32 to Q36).",
+            "Subjective Section II: 5 questions × 3 marks = 15 Marks (Q37 to Q41).",
+            "Subjective Section III: 3 questions × 5 marks = 15 Marks (Q42 to Q44)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A - Objective I (MCQ & AR 28 × 1 = 28 Marks)",
+                qStartNo: 1,
+                qEndNo: 28,
+                qCount: 28,
+                marksPerQ: 1,
+                maxMarks: 28,
+                secTotal: 28,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B - Objective II (Case-based 3 × 4 = 12 Marks)",
+                qStartNo: 29,
+                qEndNo: 31,
+                qCount: 3,
+                marksPerQ: 4,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C - Subjective I (5 × 2 = 10 Marks)",
+                qStartNo: 32,
+                qEndNo: 36,
+                qCount: 5,
+                marksPerQ: 2,
+                maxMarks: 10,
+                secTotal: 10,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_d",
+                letter: "D",
+                name: "Section D",
+                title: "Section D - Subjective II (5 × 3 = 15 Marks)",
+                qStartNo: 37,
+                qEndNo: 41,
+                qCount: 5,
+                marksPerQ: 3,
+                maxMarks: 15,
+                secTotal: 15,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_e",
+                letter: "E",
+                name: "Section E",
+                title: "Section E - Subjective III (3 × 5 = 15 Marks)",
+                qStartNo: 42,
+                qEndNo: 44,
+                qCount: 3,
+                marksPerQ: 5,
+                maxMarks: 15,
+                secTotal: 15,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            // Section A: 28 x 1 = 28M (Q1 to Q28)
+            for (let i = 1; i <= 28; i++) {
+                qs.push({
+                    id: `mat_x_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `MCQ & Assertion-Reason ${i}`
+                });
+            }
+            // Section B: Case based 3 x 4 = 12M (Q29 to Q31)
+            for (let i = 1; i <= 3; i++) {
+                const qNum = 28 + i;
+                qs.push({
+                    id: `mat_x_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 4,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Case-based Question (${qNum})`
+                });
+            }
+            // Section C: 5 x 2 = 10M (Q32 to Q36)
+            for (let i = 1; i <= 5; i++) {
+                const qNum = 31 + i;
+                qs.push({
+                    id: `mat_x_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 2,
+                    section: "Section C",
+                    sectionId: "sec_c",
+                    topic: `Very Short Answer (${qNum})`
+                });
+            }
+            // Section D: 5 x 3 = 15M (Q37 to Q41)
+            for (let i = 1; i <= 5; i++) {
+                const qNum = 36 + i;
+                qs.push({
+                    id: `mat_x_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 3,
+                    section: "Section D",
+                    sectionId: "sec_d",
+                    topic: `Short Answer (${qNum})`
+                });
+            }
+            // Section E: 3 x 5 = 15M (Q42 to Q44)
+            for (let i = 1; i <= 3; i++) {
+                const qNum = 41 + i;
+                qs.push({
+                    id: `mat_x_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 5,
+                    section: "Section E",
+                    sectionId: "sec_e",
+                    topic: `Long Answer (${qNum})`
+                });
+            }
+            return qs;
+        })()
+    },
+
+    // Grade 12 Revision Test 1 Blueprint (Mcq-1: 40x1=40 + Subjective Test 1: 5x2=10, 4x3=12, 2x4=8, 2x5=10 = 80 Marks Total)
+    grade12RevisionTest1Template: {
+        id: "g12-rev1-80",
+        name: "Grade 12 Revision Test 1 (80 Marks)",
+        examName: "Grade 12 Revision Test 1 Assessment 2026",
+        subject: "Physics",
+        maxMarks: 80,
+        duration: "3 Hours",
+        badge: "Revision 1 Blueprint",
+        generalInstructions: [
+            "This question paper consists of Mcq-1 (40 Marks) and Subjective Test 1 (40 Marks) carrying 80 Marks total.",
+            "Mcq-1: 40 questions × 1 mark = 40 Marks (Q1 to Q40).",
+            "Subjective Test 1 Section I: 5 questions × 2 marks = 10 Marks (Q41 to Q45).",
+            "Subjective Test 1 Section II: 4 questions × 3 marks = 12 Marks (Q46 to Q49).",
+            "Subjective Test 1 Section III: 2 questions × 4 marks = 8 Marks (Q50 to Q51).",
+            "Subjective Test 1 Section IV: 2 questions × 5 marks = 10 Marks (Q52 to Q53)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A - MCQ Test 1 (40 × 1 = 40 Marks)",
+                qStartNo: 1,
+                qEndNo: 40,
+                qCount: 40,
+                marksPerQ: 1,
+                maxMarks: 40,
+                secTotal: 40,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B - Subjective I (5 × 2 = 10 Marks)",
+                qStartNo: 41,
+                qEndNo: 45,
+                qCount: 5,
+                marksPerQ: 2,
+                maxMarks: 10,
+                secTotal: 10,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C - Subjective II (4 × 3 = 12 Marks)",
+                qStartNo: 46,
+                qEndNo: 49,
+                qCount: 4,
+                marksPerQ: 3,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_d",
+                letter: "D",
+                name: "Section D",
+                title: "Section D - Subjective III (2 × 4 = 8 Marks)",
+                qStartNo: 50,
+                qEndNo: 51,
+                qCount: 2,
+                marksPerQ: 4,
+                maxMarks: 8,
+                secTotal: 8,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_e",
+                letter: "E",
+                name: "Section E",
+                title: "Section E - Subjective IV (2 × 5 = 10 Marks)",
+                qStartNo: 52,
+                qEndNo: 53,
+                qCount: 2,
+                marksPerQ: 5,
+                maxMarks: 10,
+                secTotal: 10,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            // Section A: 40 MCQs (Q1 to Q40)
+            for (let i = 1; i <= 40; i++) {
+                qs.push({
+                    id: `g12_rev1_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `Objective MCQ ${i}`
+                });
+            }
+            // Section B: 5 x 2 = 10M (Q41 to Q45)
+            for (let i = 1; i <= 5; i++) {
+                const qNum = 40 + i;
+                qs.push({
+                    id: `g12_rev1_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 2,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Very Short Answer (${qNum})`
+                });
+            }
+            // Section C: 4 x 3 = 12M (Q46 to Q49)
+            for (let i = 1; i <= 4; i++) {
+                const qNum = 45 + i;
+                qs.push({
+                    id: `g12_rev1_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 3,
+                    section: "Section C",
+                    sectionId: "sec_c",
+                    topic: `Short Answer (${qNum})`
+                });
+            }
+            // Section D: 2 x 4 = 8M (Q50 to Q51)
+            for (let i = 1; i <= 2; i++) {
+                const qNum = 49 + i;
+                qs.push({
+                    id: `g12_rev1_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 4,
+                    section: "Section D",
+                    sectionId: "sec_d",
+                    topic: `Case-based / Analytical (${qNum})`
+                });
+            }
+            // Section E: 2 x 5 = 10M (Q52 to Q53)
+            for (let i = 1; i <= 2; i++) {
+                const qNum = 51 + i;
+                qs.push({
+                    id: `g12_rev1_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 5,
+                    section: "Section E",
+                    sectionId: "sec_e",
+                    topic: `Long Answer (${qNum})`
+                });
+            }
+            return qs;
+        })()
+    },
+
+    // Grade 10 Science Biology Blueprint (MCQ 1: 15x1=15 + Subjective 1: 4x2=8, 1x3=3, 1x4=4 = 30 Marks Total)
+    scienceGrade10BiologyTemplate: {
+        id: "bio-x-30",
+        name: "Grade 10 Biology (30 Marks)",
+        examName: "Grade 10 Science Biology Assessment 2026",
+        subject: "Biology",
+        maxMarks: 30,
+        duration: "1.5 Hours",
+        badge: "Official Blueprint",
+        generalInstructions: [
+            "This question paper consists of MCQ-1 (15 Marks) and Subjective-1 (15 Marks) carrying 30 Marks total.",
+            "MCQ 1: 15 questions × 1 mark = 15 Marks (Q1 to Q15).",
+            "Subjective 1 Section I: 4 questions × 2 marks = 8 Marks (Q16 to Q19).",
+            "Subjective 1 Section II: 1 question × 3 marks = 3 Marks (Q20).",
+            "Subjective 1 Section III: 1 question × 4 marks = 4 Marks (Q21)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A - MCQ 1 (15 × 1 = 15 Marks)",
+                qStartNo: 1,
+                qEndNo: 15,
+                qCount: 15,
+                marksPerQ: 1,
+                maxMarks: 15,
+                secTotal: 15,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B - Subjective I (4 × 2 = 8 Marks)",
+                qStartNo: 16,
+                qEndNo: 19,
+                qCount: 4,
+                marksPerQ: 2,
+                maxMarks: 8,
+                secTotal: 8,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C - Subjective II (1 × 3 = 3 Marks)",
+                qStartNo: 20,
+                qEndNo: 20,
+                qCount: 1,
+                marksPerQ: 3,
+                maxMarks: 3,
+                secTotal: 3,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_d",
+                letter: "D",
+                name: "Section D",
+                title: "Section D - Subjective III (1 × 4 = 4 Marks)",
+                qStartNo: 21,
+                qEndNo: 21,
+                qCount: 1,
+                marksPerQ: 4,
+                maxMarks: 4,
+                secTotal: 4,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            // Section A: 15 MCQs (Q1 to Q15)
+            for (let i = 1; i <= 15; i++) {
+                qs.push({
+                    id: `bio_x_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `Biology MCQ ${i}`
+                });
+            }
+            // Section B: 4 x 2 = 8M (Q16 to Q19)
+            for (let i = 1; i <= 4; i++) {
+                const qNum = 15 + i;
+                qs.push({
+                    id: `bio_x_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 2,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Short Answer (2 Marks)`
+                });
+            }
+            // Section C: 1 x 3 = 3M (Q20)
+            qs.push({
+                id: "bio_x_q20",
+                qNo: 20,
+                qNumber: "Q20",
+                label: "Q20",
+                maxMarks: 3,
+                section: "Section C",
+                sectionId: "sec_c",
+                topic: "Short Answer (3 Marks)"
+            });
+            // Section D: 1 x 4 = 4M (Q21)
+            qs.push({
+                id: "bio_x_q21",
+                qNo: 21,
+                qNumber: "Q21",
+                label: "Q21",
+                maxMarks: 4,
+                section: "Section D",
+                sectionId: "sec_d",
+                topic: "Case-based / Long Answer (4 Marks)"
+            });
+            return qs;
+        })()
+    },
+
+    // Grade 10 Science Chemistry Blueprint (MCQ Test 1: 13x1=13 + Subjective Test 1: 1x2=2 [choice], 2x3=6, 1x5=5 [choice] = 26 Marks Total)
+    scienceGrade10ChemistryTemplate: {
+        id: "che-x-26",
+        name: "Grade 10 Chemistry (26 Marks)",
+        examName: "Grade 10 Science Chemistry Assessment 2026",
+        subject: "Chemistry",
+        maxMarks: 26,
+        duration: "1.5 Hours",
+        badge: "Official Blueprint",
+        generalInstructions: [
+            "This question paper consists of MCQ Test 1 (13 Marks) and Subjective Test 1 (13 Marks) carrying 26 Marks total.",
+            "MCQ Test 1: 13 questions × 1 mark = 13 Marks (Q1 to Q13).",
+            "Subjective Test 1 Section I: 1 question × 2 marks = 2 Marks with internal choice (Q14).",
+            "Subjective Test 1 Section II: 2 questions × 3 marks = 6 Marks (Q15 & Q16).",
+            "Subjective Test 1 Section III: 1 question × 5 marks = 5 Marks with internal choice (Q17)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A - MCQ Test 1 (13 × 1 = 13 Marks)",
+                qStartNo: 1,
+                qEndNo: 13,
+                qCount: 13,
+                marksPerQ: 1,
+                maxMarks: 13,
+                secTotal: 13,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B - Subjective I (1 × 2 = 2 Marks with choice)",
+                qStartNo: 14,
+                qEndNo: 14,
+                qCount: 1,
+                marksPerQ: 2,
+                maxMarks: 2,
+                secTotal: 2,
+                hasChoice: true,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C - Subjective II (2 × 3 = 6 Marks)",
+                qStartNo: 15,
+                qEndNo: 16,
+                qCount: 2,
+                marksPerQ: 3,
+                maxMarks: 6,
+                secTotal: 6,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_d",
+                letter: "D",
+                name: "Section D",
+                title: "Section D - Subjective III (1 × 5 = 5 Marks with choice)",
+                qStartNo: 17,
+                qEndNo: 17,
+                qCount: 1,
+                marksPerQ: 5,
+                maxMarks: 5,
+                secTotal: 5,
+                hasChoice: true,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            // Section A: 13 MCQs (Q1 to Q13)
+            for (let i = 1; i <= 13; i++) {
+                qs.push({
+                    id: `che_x_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `Chemistry MCQ ${i}`
+                });
+            }
+            // Section B: Q14 (1 x 2 = 2M with internal choice)
+            qs.push({
+                id: "che_x_q14",
+                qNo: 14,
+                qNumber: "Q14",
+                label: "Q14",
+                maxMarks: 2,
+                section: "Section B",
+                sectionId: "sec_b",
+                topic: "Short Answer (2 Marks - With Internal Choice)",
+                isChoice: true,
+                choices: ["Question 14 (Option A)", "Question 14 (Option B)"]
+            });
+            // Section C: Q15 & Q16 (2 x 3 = 6M)
+            qs.push({
+                id: "che_x_q15",
+                qNo: 15,
+                qNumber: "Q15",
+                label: "Q15",
+                maxMarks: 3,
+                section: "Section C",
+                sectionId: "sec_c",
+                topic: "Short Answer (3 Marks)"
+            });
+            qs.push({
+                id: "che_x_q16",
+                qNo: 16,
+                qNumber: "Q16",
+                label: "Q16",
+                maxMarks: 3,
+                section: "Section C",
+                sectionId: "sec_c",
+                topic: "Short Answer (3 Marks)"
+            });
+            // Section D: Q17 (1 x 5 = 5M with internal choice)
+            qs.push({
+                id: "che_x_q17",
+                qNo: 17,
+                qNumber: "Q17",
+                label: "Q17",
+                maxMarks: 5,
+                section: "Section D",
+                sectionId: "sec_d",
+                topic: "Long Answer (5 Marks - With Internal Choice)",
+                isChoice: true,
+                choices: ["Question 17 (Option A)", "Question 17 (Option B)"]
+            });
+            return qs;
+        })()
+    },
+
     presetComments: [
         "Good presentation",
         "Step derivation complete",
