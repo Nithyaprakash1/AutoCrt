@@ -385,13 +385,18 @@ class DashboardManager {
                         </div>
 
                         <!-- Right: Bulk Actions Aligned Group -->
-                        <div class="dash-actions-group" style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                        <div class="dash-actions-group" style="display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap;">
                             <button type="button" class="btn-secondary" id="dash-btn-bulk-pdf" title="Bulk download selected or all PDFs" style="background: #FFFFFF; border: 1.5px solid #007AFF; color: #007AFF; font-size: 0.84rem; font-weight: 600; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
                                 <span class="btn-icon" style="display: flex; align-items: center;">${ic.pdf || '📄'}</span> Bulk Download PDFs <span id="dash-pdf-count-badge" style="background: rgba(0, 122, 255, 0.12); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">(${this.selectedIds.size > 0 ? this.selectedIds.size : 'All ' + this.filteredEvaluations.length})</span>
                             </button>
 
                             <button type="button" class="btn-secondary" id="dash-btn-bulk-excel" title="Bulk export spreadsheet" style="background: #FFFFFF; border: 1.5px solid #16A34A; color: #16A34A; font-size: 0.84rem; font-weight: 600; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
                                 <span class="btn-icon" style="display: flex; align-items: center;">${ic.csv || '📊'}</span> Bulk Export Excel
+                            </button>
+
+                            <button type="button" class="btn-secondary" id="dash-btn-bulk-delete" title="Delete selected papers to free storage space" style="background: #FFFFFF; border: 1.5px solid #DC2626; color: #DC2626; font-size: 0.84rem; font-weight: 600; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                <span>Bulk Delete</span> <span id="dash-delete-count-badge" style="background: rgba(220, 38, 38, 0.1); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">(${this.selectedIds.size})</span>
                             </button>
                         </div>
                     </div>
@@ -558,6 +563,24 @@ class DashboardManager {
         if (badge) {
             badge.textContent = `(${this.selectedIds.size > 0 ? this.selectedIds.size : 'All ' + this.filteredEvaluations.length})`;
         }
+        const delBadge = this.container.querySelector("#dash-delete-count-badge");
+        if (delBadge) {
+            delBadge.textContent = `(${this.selectedIds.size})`;
+        }
+        const delBtn = this.container.querySelector("#dash-btn-bulk-delete");
+        if (delBtn) {
+            if (this.selectedIds.size > 0) {
+                delBtn.style.background = "#DC2626";
+                delBtn.style.color = "#FFFFFF";
+                delBtn.style.borderColor = "#DC2626";
+                delBtn.style.boxShadow = "0 2px 8px rgba(220, 38, 38, 0.25)";
+            } else {
+                delBtn.style.background = "#FFFFFF";
+                delBtn.style.color = "#DC2626";
+                delBtn.style.borderColor = "#DC2626";
+                delBtn.style.boxShadow = "none";
+            }
+        }
         const selectAllBox = this.container.querySelector("#dash-select-all");
         if (selectAllBox) {
             const totalVis = this.filteredEvaluations.length;
@@ -623,6 +646,14 @@ class DashboardManager {
         if (toolbarBulkExcel) {
             toolbarBulkExcel.addEventListener("click", () => {
                 this.triggerExcelExport();
+            });
+        }
+
+        // Toolbar Bulk Delete Button
+        const toolbarBulkDelete = this.container.querySelector("#dash-btn-bulk-delete");
+        if (toolbarBulkDelete) {
+            toolbarBulkDelete.addEventListener("click", () => {
+                this.showBulkDeleteModal();
             });
         }
 
@@ -914,6 +945,151 @@ class DashboardManager {
                     errBox.style.display = "block";
                     errBox.textContent = `Error deleting paper: ${err.message || err}`;
                 }
+            }
+        });
+    }
+
+    showBulkDeleteModal() {
+        const targetIds = Array.from(this.selectedIds);
+        if (targetIds.length === 0) {
+            if (window.appInstance && window.appInstance.showToast) {
+                window.appInstance.showToast("Please select at least one paper using the checkboxes to delete.", "info");
+            } else {
+                alert("Please select at least one paper using the checkboxes to delete.");
+            }
+            return;
+        }
+
+        const selectedEvals = this.filteredEvaluations.filter(e => targetIds.includes(String(e.id)));
+        const count = selectedEvals.length;
+        const totalPages = selectedEvals.reduce((sum, e) => sum + (e.pageCount || (e.pages ? e.pages.length : (e.totalPages || 1))), 0);
+        const approxKB = totalPages * 350;
+        const spaceEstimate = approxKB >= 1024 ? `${(approxKB / 1024).toFixed(1)} MB` : `${approxKB} KB`;
+
+        const modalId = "dash-bulk-delete-modal-overlay";
+        const oldModal = document.getElementById(modalId);
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement("div");
+        modal.id = modalId;
+        modal.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: fadeInModal 0.2s ease-out;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: #FFFFFF; border-radius: 16px; max-width: 480px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.22); overflow: hidden; border: 1px solid #E2E8F0;">
+                <div style="padding: 26px; text-align: center;">
+                    <div style="width: 56px; height: 56px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
+                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                        </svg>
+                    </div>
+                    <h3 style="font-size: 1.25rem; font-weight: 700; color: #0F172A; margin: 0 0 8px;">Bulk Delete Answer Sheets</h3>
+                    <p style="font-size: 0.88rem; color: #64748B; margin: 0 0 18px; line-height: 1.45;">
+                        Are you sure you want to permanently delete <strong>${count} selected paper(s)</strong>? This will permanently release browser storage space and remove all associated scores and annotations.
+                    </p>
+
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 16px; text-align: left; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Selected Papers:</span>
+                            <span style="font-size: 0.85rem; font-weight: 700; color: #DC2626;">${count} Paper(s)</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Total Document Pages:</span>
+                            <span style="font-size: 0.85rem; font-weight: 600; color: #1E293B;">${totalPages} Pages</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="font-size: 0.8rem; color: #64748B;">Storage Space Saved:</span>
+                            <span style="font-size: 0.85rem; font-weight: 700; color: #16A34A;">~${spaceEstimate}</span>
+                        </div>
+                    </div>
+
+                    <div id="bulk-delete-progress-bar" style="display: none; margin-bottom: 16px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #64748B; margin-bottom: 4px;">
+                            <span id="bulk-delete-status-text">Deleting papers...</span>
+                            <span id="bulk-delete-pct-text">0%</span>
+                        </div>
+                        <div style="height: 6px; background: #E2E8F0; border-radius: 999px; overflow: hidden;">
+                            <div id="bulk-delete-track" style="height: 100%; width: 0%; background: #DC2626; transition: width 0.15s ease;"></div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" id="btn-cancel-bulk-delete" style="flex: 1; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: all 0.15s ease;">
+                            Cancel
+                        </button>
+                        <button type="button" id="btn-confirm-bulk-delete" style="flex: 1; height: 42px; border-radius: 10px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 600; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;">
+                            <span id="btn-bulk-delete-text">Delete ${count} Paper(s)</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const cancelBtn = modal.querySelector("#btn-cancel-bulk-delete");
+        const confirmBtn = modal.querySelector("#btn-confirm-bulk-delete");
+        const delText = modal.querySelector("#btn-bulk-delete-text");
+        const progressBox = modal.querySelector("#bulk-delete-progress-bar");
+        const statusText = modal.querySelector("#bulk-delete-status-text");
+        const pctText = modal.querySelector("#bulk-delete-pct-text");
+        const track = modal.querySelector("#bulk-delete-track");
+
+        cancelBtn.addEventListener("click", () => modal.remove());
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) modal.remove();
+        });
+
+        confirmBtn.addEventListener("click", async () => {
+            cancelBtn.disabled = true;
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = "0.75";
+            confirmBtn.style.cursor = "not-allowed";
+            progressBox.style.display = "block";
+
+            let deleted = 0;
+            for (let i = 0; i < targetIds.length; i++) {
+                const id = targetIds[i];
+                try {
+                    await window.appStorage.deleteEvaluation(id);
+                    deleted++;
+                } catch (e) {
+                    console.error("Bulk delete item error:", id, e);
+                }
+                const pct = Math.round(((i + 1) / targetIds.length) * 100);
+                track.style.width = `${pct}%`;
+                pctText.textContent = `${pct}%`;
+                statusText.textContent = `Deleted ${i + 1} of ${targetIds.length} papers...`;
+            }
+
+            this.selectedIds.clear();
+            delText.innerHTML = `✓ Done (${deleted} Deleted)`;
+            confirmBtn.style.background = "#16A34A";
+            await new Promise(r => setTimeout(r, 450));
+            modal.remove();
+
+            // Refresh UI
+            this.evaluations = await window.appStorage.getAllEvaluations();
+            this.applyFilters();
+            this.renderTableRows();
+            this.updateCountsInUI();
+
+            if (window.appInstance && window.appInstance.showToast) {
+                window.appInstance.showToast(`Deleted ${deleted} paper(s) to optimize space.`, "success");
             }
         });
     }

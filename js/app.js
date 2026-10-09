@@ -808,6 +808,10 @@ class AppController {
         if (btnUploaderPapers) {
             btnUploaderPapers.addEventListener("click", () => this.switchView("uploaded-papers"));
         }
+        const btnTeacherPapers = document.getElementById("side-nav-teacher-papers");
+        if (btnTeacherPapers) {
+            btnTeacherPapers.addEventListener("click", () => this.switchView("uploaded-papers"));
+        }
         const btnUploaderSettings = document.getElementById("side-nav-uploader-settings");
         if (btnUploaderSettings) {
             btnUploaderSettings.addEventListener("click", () => this.switchView("settings"));
