@@ -652,64 +652,29 @@ class UploadPortalManager {
         if (window.appStorage) {
             const savedCatalog = await window.appStorage.getSubjectCatalog();
             if (savedCatalog && Array.isArray(savedCatalog) && savedCatalog.length > 0) {
-                // Ensure Physics exists with its standard templates
-                let phySub = savedCatalog.find(s => s.id === "phy" || (s.name && s.name.toLowerCase().includes("physic")));
-                const defaultPhy = this.catalog.find(s => s.id === "phy");
-                if (!phySub) {
-                    if (defaultPhy) savedCatalog.unshift(defaultPhy);
-                } else if (defaultPhy && defaultPhy.templates) {
-                    // Ensure Grade 12 Physics Revision 1 template exists in Physics
-                    defaultPhy.templates.forEach(defTpl => {
-                        if (!phySub.templates) phySub.templates = [];
-                        const existingTpl = phySub.templates.find(t => t.id === defTpl.id || t.name === defTpl.name);
-                        if (!existingTpl) {
-                            phySub.templates.push(defTpl);
-                        }
-                    });
-                }
-
-                // Ensure Political Science exists with its official blueprint
-                const hasPol = savedCatalog.some(s => s.id === "pol" || (s.name && s.name.toLowerCase().includes("political")));
-                if (!hasPol) {
-                    const defaultPol = this.catalog.find(s => s.id === "pol");
-                    if (defaultPol) savedCatalog.push(defaultPol);
-                }
-
-                // Ensure Economics exists with its official blueprint
-                const hasEco = savedCatalog.some(s => s.id === "eco" || (s.name && s.name.toLowerCase().includes("economic")));
-                if (!hasEco) {
-                    const defaultEco = this.catalog.find(s => s.id === "eco");
-                    if (defaultEco) savedCatalog.push(defaultEco);
-                }
-
-                // Ensure History exists with its official blueprint
-                const hasHis = savedCatalog.some(s => s.id === "his" || (s.name && s.name.toLowerCase().includes("histor")));
-                if (!hasHis) {
-                    const defaultHis = this.catalog.find(s => s.id === "his");
-                    if (defaultHis) savedCatalog.push(defaultHis);
-                }
-
-                // Ensure Social Science exists with its official blueprint
-                const hasSoc = savedCatalog.some(s => s.id === "soc" || (s.name && s.name.toLowerCase().includes("social")));
-                if (!hasSoc) {
-                    const defaultSoc = this.catalog.find(s => s.id === "soc");
-                    if (defaultSoc) savedCatalog.push(defaultSoc);
-                }
-
-                // Ensure English exists with all its templates (including Grade XII English Revision)
-                let engSub = savedCatalog.find(s => s.id === "eng" || (s.name && s.name.toLowerCase().includes("english")));
-                const defaultEng = this.catalog.find(s => s.id === "eng");
-                if (!engSub) {
-                    if (defaultEng) savedCatalog.push(defaultEng);
-                } else if (defaultEng && defaultEng.templates) {
-                    defaultEng.templates.forEach(defTpl => {
-                        if (!engSub.templates) engSub.templates = [];
-                        const existingTpl = engSub.templates.find(t => t.id === defTpl.id || t.name === defTpl.name);
-                        if (!existingTpl) {
-                            engSub.templates.unshift(defTpl);
-                        }
-                    });
-                }
+                // Comprehensive Synchronization: Ensure all catalog subjects and their exam templates exist
+                this.catalog.forEach(defaultSub => {
+                    let existingSub = savedCatalog.find(s => s.id === defaultSub.id || (s.name && s.name.toLowerCase().trim() === defaultSub.name.toLowerCase().trim()));
+                    if (!existingSub) {
+                        savedCatalog.push(defaultSub);
+                    } else if (defaultSub.templates && Array.isArray(defaultSub.templates)) {
+                        if (!existingSub.templates) existingSub.templates = [];
+                        defaultSub.templates.forEach(defTpl => {
+                            const tplIndex = existingSub.templates.findIndex(t => t.id === defTpl.id || t.name === defTpl.name);
+                            if (tplIndex === -1) {
+                                existingSub.templates.push(defTpl);
+                            } else {
+                                // Keep blueprint sections and questions updated if existing is empty
+                                if ((!existingSub.templates[tplIndex].questions || existingSub.templates[tplIndex].questions.length === 0) && defTpl.questions && defTpl.questions.length > 0) {
+                                    existingSub.templates[tplIndex].questions = defTpl.questions;
+                                }
+                                if ((!existingSub.templates[tplIndex].sections || existingSub.templates[tplIndex].sections.length === 0) && defTpl.sections && defTpl.sections.length > 0) {
+                                    existingSub.templates[tplIndex].sections = defTpl.sections;
+                                }
+                            }
+                        });
+                    }
+                });
 
                 // Dynamically ensure all subjects have accurate badge labels
                 savedCatalog.forEach(sub => {
@@ -998,6 +963,7 @@ class UploadPortalManager {
                 <div class="templates-grid">
                     ${(this.selectedSubject.templates || []).map(tpl => {
                         let secSummary = [];
+                        let totalQuestionsCount = (tpl.questions && Array.isArray(tpl.questions)) ? tpl.questions.length : 0;
                         if (tpl.questions && tpl.questions.length > 8) {
                             const secMap = {};
                             tpl.questions.forEach(q => {
@@ -1007,8 +973,14 @@ class UploadPortalManager {
                                 secMap[secName].marks += (q.maxMarks || 0);
                             });
                             secSummary = Object.keys(secMap).map(s => `${s.replace('Section ', 'Sec ')}: ${secMap[s].count} Qs (${secMap[s].marks}M)`);
-                        } else if (tpl.questions) {
+                        } else if (tpl.questions && tpl.questions.length > 0) {
                             secSummary = tpl.questions.map(q => `${q.qNumber} (${q.maxMarks}m)`);
+                        } else if (tpl.sections && Array.isArray(tpl.sections) && tpl.sections.length > 0) {
+                            secSummary = tpl.sections.map(s => {
+                                const cnt = s.qCount || (s.qEndNo && s.qStartNo ? (s.qEndNo - s.qStartNo + 1) : 0);
+                                totalQuestionsCount += cnt;
+                                return `${s.name || s.letter}: ${cnt} Qs (${s.secTotal || s.maxMarks || 0}M)`;
+                            });
                         }
 
                         return `
@@ -1037,7 +1009,7 @@ class UploadPortalManager {
                                     </div>
                                     <div class="template-stat-item">
                                         <span class="stat-label">Questions</span>
-                                        <span class="stat-val">${tpl.questions ? tpl.questions.length : 0}</span>
+                                        <span class="stat-val">${totalQuestionsCount}</span>
                                     </div>
                                     <div class="template-stat-item">
                                         <span class="stat-label">Duration</span>
@@ -4326,7 +4298,32 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             this.updatePublishDialogProgress(i + 1, total, startPct, `Optimizing & saving paper for ${item.studentName}...`);
 
             // Build standardized question list based on selected template
-            const questions = (template.questions || []).map((q, idx) => {
+            let templateQs = (template.questions && template.questions.length > 0) ? template.questions : [];
+            if (templateQs.length === 0 && template.sections && Array.isArray(template.sections)) {
+                let syntheticQNo = 1;
+                template.sections.forEach(sec => {
+                    const start = sec.qStartNo || syntheticQNo;
+                    const end = sec.qEndNo || (start + (sec.qCount || 1) - 1);
+                    const marks = Number(sec.marksPerQ) || 1;
+                    const secName = sec.title || sec.name || `Section ${sec.letter || 'A'}`;
+                    const secId = sec.id || `sec_${(sec.letter || 'a').toLowerCase()}`;
+                    for (let qn = start; qn <= end; qn++) {
+                        templateQs.push({
+                            id: `q_${qn}`,
+                            qNo: qn,
+                            qNumber: `Q${qn}`,
+                            label: `Q${qn}`,
+                            section: secName,
+                            sectionId: secId,
+                            maxMarks: marks,
+                            isChoice: !!sec.hasChoice
+                        });
+                        syntheticQNo = Math.max(syntheticQNo, qn + 1);
+                    }
+                });
+            }
+
+            const questions = templateQs.map((q, idx) => {
                 const sName = q.section || (q.sectionName || "Section A");
                 let sId = q.sectionId;
                 const match = sName.match(/Section\s+([A-Za-z])/i);
