@@ -80,8 +80,8 @@
     <script src="js/icons.js"></script>
 
     <!-- App Stylesheets -->
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="css/workspace.css">
+    <link rel="stylesheet" href="css/style.css?v=2.3">
+    <link rel="stylesheet" href="css/workspace.css?v=2.3">
 </head>
 <body>
 
@@ -765,7 +765,7 @@
                 </button>
                 <button type="button" class="modal-tab-btn" data-tab="tab-settings-storage">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
-                    Cloud & Database
+                    My Storage & Cleanup
                 </button>
             </div>
 
@@ -817,45 +817,19 @@
                     </button>
                 </div>
 
-                <!-- Tab 3: Cloud & Database -->
+                <!-- Tab 3: My Storage & Cleanup -->
                 <div class="settings-tab-pane" id="tab-settings-storage" style="display: none;">
-                    <!-- 50 GB Quota Details Card -->
                     <div class="storage-quota-details-card" style="background: var(--bg-subtle); border: 1px solid var(--border-color); border-radius: 14px; padding: 16px; margin-bottom: 20px;">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                            <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">Institution Storage Quota</span>
-                            <span style="font-size: 0.85rem; font-weight: 600; color: #0071E3;" id="modal-storage-percent">0%</span>
+                            <span style="font-size: 0.88rem; font-weight: 600; color: var(--text-main);">My Storage Usage</span>
+                            <span style="font-size: 0.85rem; font-weight: 600; color: #0071E3;" id="modal-storage-percent">0 KB</span>
                         </div>
                         <div class="storage-bar-track" style="height: 8px; background: rgba(0,0,0,0.06); border-radius: 99px; overflow: hidden; margin-bottom: 10px;">
                             <div class="storage-bar-fill" id="modal-storage-bar" style="height: 100%; width: 0%; background: linear-gradient(90deg, #34C759, #0071E3); border-radius: 99px; transition: width 0.4s ease;"></div>
                         </div>
                         <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--text-muted);">
-                            <span>Used: <strong id="modal-storage-used" style="color: var(--text-main);">0.0 GB</strong></span>
-                            <span>Remaining: <strong id="modal-storage-remaining" style="color: var(--text-main);">50.0 GB</strong></span>
-                            <span>Cap: <strong style="color: var(--text-main);">50.0 GB Limit</strong></span>
-                        </div>
-                    </div>
-
-                    <div class="form-group" style="margin-bottom: 16px;">
-                        <label>Storage & Database Mode</label>
-                        <select id="settings-storage-mode" class="form-select">
-                            <option value="local">Local Offline Storage (IndexedDB)</option>
-                            <option value="firebase">Cloud Server & Realtime Sync</option>
-                        </select>
-                    </div>
-
-                    <div id="firebase-config-fields" style="display: none; border-top: 1px solid var(--border-color); padding-top: 16px; margin-top: 16px;">
-                        <h4 style="font-size: 0.95rem; margin-bottom: 10px; color: var(--text-main); font-weight: 400 !important;">Cloud Server Credentials</h4>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label>API Key</label>
-                            <input type="text" id="fb-cfg-api-key" class="form-input" placeholder="AIzaSy..." />
-                        </div>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label>Project ID</label>
-                            <input type="text" id="fb-cfg-project-id" class="form-input" placeholder="niprak-evaluation" />
-                        </div>
-                        <div class="form-group" style="margin-bottom: 10px;">
-                            <label>Storage Bucket</label>
-                            <input type="text" id="fb-cfg-storage-bucket" class="form-input" placeholder="niprak-evaluation.appspot.com" />
+                            <span>Used: <strong id="modal-storage-used" style="color: var(--text-main);">0 KB</strong></span>
+                            <span>Cleanup Ready: <strong id="modal-storage-remaining" style="color: #16A34A;">0 KB</strong></span>
                         </div>
                     </div>
                 </div>
@@ -877,21 +851,21 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
     <!-- Application Script Modules (Cache-busted for cross-device consistency) -->
-    <script src="js/firebase-config.js?v=2.2"></script>
-    <script src="js/mock-data.js?v=2.2"></script>
-    <script src="js/storage.js?v=2.2"></script>
-    <script src="js/canvas-engine.js?v=2.2"></script>
-    <script src="js/marking-panel.js?v=2.2"></script>
-    <script src="js/pdf-generator.js?v=2.2"></script>
-    <script src="js/bulk-report.js?v=2.2"></script>
-    <script src="js/dashboard.js?v=2.2"></script>
-    <script src="js/history.js?v=2.2"></script>
-    <script src="js/eval-form.js?v=2.2"></script>
-    <script src="js/upload-portal.js?v=2.2"></script>
-    <script src="js/classes-page.js?v=2.2"></script>
-    <script src="js/uploaded-papers-page.js?v=2.2"></script>
-    <script src="js/settings-page.js?v=2.2"></script>
-    <script src="js/user-management-page.js?v=2.2"></script>
-    <script src="js/app.js?v=2.2"></script>
+    <script src="js/firebase-config.js?v=2.4"></script>
+    <script src="js/mock-data.js?v=2.4"></script>
+    <script src="js/storage.js?v=2.4"></script>
+    <script src="js/canvas-engine.js?v=2.4"></script>
+    <script src="js/marking-panel.js?v=2.4"></script>
+    <script src="js/pdf-generator.js?v=2.4"></script>
+    <script src="js/bulk-report.js?v=2.4"></script>
+    <script src="js/dashboard.js?v=2.4"></script>
+    <script src="js/history.js?v=2.4"></script>
+    <script src="js/eval-form.js?v=2.4"></script>
+    <script src="js/upload-portal.js?v=2.4"></script>
+    <script src="js/classes-page.js?v=2.4"></script>
+    <script src="js/uploaded-papers-page.js?v=2.4"></script>
+    <script src="js/settings-page.js?v=2.4"></script>
+    <script src="js/user-management-page.js?v=2.4"></script>
+    <script src="js/app.js?v=2.4"></script>
 </body>
 </html>

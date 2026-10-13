@@ -5303,7 +5303,7 @@ body {
     flex-direction: column;
     gap: 22px;
     width: 100%;
-    max-width: 1160px;
+    max-width: 1280px;
     margin: 0 auto;
     padding-bottom: 40px;
 }
@@ -5311,14 +5311,29 @@ body {
 .uploaded-page-header {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    gap: 16px;
+    align-items: center;
+    gap: 20px;
     flex-wrap: wrap;
+}
+
+.uploaded-page-header .header-titles {
+    flex: 1;
+    min-width: 280px;
+}
+
+.uploaded-page-header .header-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
 }
 
 .btn-papers-primary {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     height: 38px;
     padding: 0 16px;
@@ -5328,9 +5343,19 @@ body {
     border-radius: var(--radius-sm);
     font-size: 0.84rem;
     font-weight: 400 !important;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+    vertical-align: middle;
     cursor: pointer;
     box-shadow: 0 2px 6px rgba(0, 113, 227, 0.2);
     transition: all 0.15s ease;
+}
+
+.btn-papers-primary svg,
+.btn-papers-secondary svg {
+    flex-shrink: 0;
+    display: block;
 }
 
 .btn-papers-primary:hover {
@@ -5341,6 +5366,7 @@ body {
 .btn-papers-secondary {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
     height: 38px;
     padding: 0 14px;
@@ -5350,6 +5376,10 @@ body {
     border-radius: var(--radius-sm);
     font-size: 0.84rem;
     font-weight: 400 !important;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+    vertical-align: middle;
     cursor: pointer;
     box-shadow: var(--shadow-sm);
     transition: all 0.15s ease;
@@ -5357,6 +5387,19 @@ body {
 
 .btn-papers-secondary:hover {
     background: rgba(0, 0, 0, 0.02);
+}
+
+.bulk-delete-count-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 20px;
+    padding: 0 7px;
+    border-radius: 10px;
+    font-size: 0.75rem;
+    line-height: 1;
+    background: rgba(220, 38, 38, 0.1);
+    color: #DC2626;
 }
 
 .papers-kpi-grid {
@@ -5484,6 +5527,9 @@ body {
 }
 
 .btn-reset-filters {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     height: 34px;
     padding: 0 12px;
     background: none;
@@ -5492,6 +5538,7 @@ body {
     color: var(--text-muted);
     font-size: 0.78rem;
     font-weight: 400 !important;
+    white-space: nowrap;
     cursor: pointer;
     transition: all 0.15s ease;
 }
@@ -5509,6 +5556,11 @@ body {
     overflow: hidden;
 }
 
+.papers-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
 .table-meta-header {
     padding: 14px 22px;
     border-bottom: 1px solid var(--border-color);
@@ -5524,7 +5576,7 @@ body {
 }
 
 .papers-data-table th {
-    padding: 12px 20px;
+    padding: 12px 14px;
     text-align: left;
     font-size: 0.74rem;
     font-weight: 400 !important;
@@ -5533,14 +5585,35 @@ body {
     letter-spacing: 0.04em;
     background: #fafafa;
     border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    vertical-align: middle;
 }
 
 .papers-data-table td {
-    padding: 14px 20px;
+    padding: 13px 14px;
     border-bottom: 1px solid rgba(0, 0, 0, 0.04);
     color: var(--text-main);
     font-weight: 400 !important;
     vertical-align: middle;
+}
+
+.papers-data-table th:first-child,
+.papers-data-table td:first-child {
+    padding-left: 18px;
+}
+
+.papers-data-table th:last-child,
+.papers-data-table td:last-child {
+    padding-right: 18px;
+}
+
+.papers-data-table td.cell-roll,
+.papers-data-table td.cell-class,
+.papers-data-table td.cell-pages,
+.papers-data-table td.cell-status,
+.papers-data-table td.cell-score,
+.papers-data-table td.cell-actions {
+    white-space: nowrap;
 }
 
 .papers-data-table tr:hover td {
@@ -5548,13 +5621,15 @@ body {
 }
 
 .badge-class-tag {
-    display: inline-block;
-    padding: 3px 8px;
+    display: inline-flex;
+    align-items: center;
+    padding: 3px 9px;
     background: rgba(0, 0, 0, 0.04);
     border-radius: var(--radius-pill);
     font-size: 0.76rem;
     color: var(--text-main);
     font-weight: 400 !important;
+    white-space: nowrap;
 }
 
 .exam-info-stack {
@@ -5585,16 +5660,37 @@ body {
     border-radius: var(--radius-pill);
     font-size: 0.76rem;
     font-weight: 400 !important;
+    white-space: nowrap;
+}
+
+.status-pill.status-completed {
+    background: rgba(52, 199, 89, 0.12);
+    color: #248a3d;
+}
+
+.status-pill.status-pending {
+    background: rgba(255, 149, 0, 0.12);
+    color: #d97706;
+}
+
+.status-pill .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    flex-shrink: 0;
 }
 
 .score-pill {
-    display: inline-block;
+    display: inline-flex;
+    align-items: center;
     padding: 2px 8px;
     border-radius: var(--radius-pill);
     background: rgba(52, 199, 89, 0.1);
     color: #248a3d;
     font-size: 0.8rem;
     font-weight: 400 !important;
+    white-space: nowrap;
 }
 
 .score-none {
@@ -5602,20 +5698,47 @@ body {
     font-size: 0.85rem;
 }
 
+.papers-data-table td.cell-actions {
+    text-align: right;
+    vertical-align: middle;
+    width: 240px;
+    min-width: 230px;
+}
+
+.paper-actions-group {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 6px;
+    flex-wrap: nowrap;
+    vertical-align: middle;
+}
+
 .btn-paper-action {
     display: inline-flex;
     align-items: center;
+    justify-content: center;
     gap: 5px;
-    height: 30px;
-    padding: 0 10px;
+    height: 32px;
+    padding: 0 11px;
     border: 1px solid var(--border-color);
     background: #fff;
+    color: var(--text-main);
     border-radius: var(--radius-sm);
-    font-size: 0.76rem;
+    font-size: 0.78rem;
     font-weight: 400 !important;
+    line-height: 1;
+    white-space: nowrap;
+    flex-shrink: 0;
+    vertical-align: middle;
     cursor: pointer;
-    transition: all 0.12s ease;
-    margin-left: 4px;
+    transition: all 0.15s ease;
+    margin: 0;
+}
+
+.btn-paper-action svg {
+    flex-shrink: 0;
+    display: block;
 }
 
 .btn-action-inspect:hover {
@@ -5634,14 +5757,17 @@ body {
     background: var(--primary-hover);
 }
 
-.btn-action-delete {
+.btn-paper-action.btn-action-delete {
+    width: 32px;
+    height: 32px;
+    padding: 0;
     color: #8e8e93;
 }
 
-.btn-action-delete:hover {
+.btn-paper-action.btn-action-delete:hover {
     color: #FF3B30;
     border-color: #FF3B30;
-    background: rgba(255, 59, 48, 0.05);
+    background: rgba(255, 59, 48, 0.06);
 }
 
 .empty-papers-state {
@@ -5656,6 +5782,9 @@ body {
 }
 
 .btn-empty-upload-shortcut {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     height: 36px;
     padding: 0 16px;
     background: var(--primary);
@@ -5674,7 +5803,9 @@ body {
     gap: 20px;
 }
 
-.page-thumb-card {
+.inspector-pages-grid .page-thumb-card {
+    width: 100%;
+    height: auto;
     background: #fff;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -5682,6 +5813,13 @@ body {
     box-shadow: var(--shadow-sm);
     display: flex;
     flex-direction: column;
+}
+
+.inspector-footer-actions {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
 }
 
 .thumb-header {

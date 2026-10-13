@@ -2986,44 +2986,36 @@ class AppController {
         const btnUploaderSettings = document.getElementById("side-nav-uploader-settings");
         if (btnUploaderSettings) btnUploaderSettings.addEventListener("click", openModal);
         const btnStorageBadge = document.getElementById("navbar-storage-quota");
-        if (btnStorageBadge) btnStorageBadge.addEventListener("click", () => this.switchView("settings"));
-        if (btnClose) btnClose.addEventListener("click", closeModal);
-        if (btnCancel) btnCancel.addEventListener("click", closeModal);
-
-        if (modeSelect && fbFields) {
-            modeSelect.addEventListener("change", () => {
-                fbFields.style.display = modeSelect.value === "firebase" ? "block" : "none";
+        if (btnStorageBadge) {
+            btnStorageBadge.addEventListener("click", () => {
+                if (this.settingsPageManager) {
+                    this.settingsPageManager.activeTab = "cloud";
+                }
+                this.switchView("settings");
             });
         }
+        if (btnClose) btnClose.addEventListener("click", closeModal);
+        if (btnCancel) btnCancel.addEventListener("click", closeModal);
 
         if (btnSave) {
             btnSave.addEventListener("click", async () => {
                 const teacherName = document.getElementById("settings-teacher-name")?.value.trim() || "";
                 const instName = document.getElementById("settings-inst-name")?.value.trim() || "";
-                const storageMode = modeSelect ? modeSelect.value : "local";
+                const existing = await window.appStorage.getSettings() || {};
 
                 const settings = {
+                    ...existing,
                     institution: {
                         name: instName,
-                        code: "",
+                        code: existing.institution?.code || "",
                         logo: "assets/school_logo.jpg",
                         fullLogo: "assets/school_fulllogo.jpg"
                     },
-                    teacher: { name: teacherName },
-                    storageMode: storageMode,
-                    firebaseConfig: {
-                        apiKey: document.getElementById("fb-cfg-api-key")?.value.trim() || "",
-                        projectId: document.getElementById("fb-cfg-project-id")?.value.trim() || "",
-                        storageBucket: document.getElementById("fb-cfg-storage-bucket")?.value.trim() || ""
-                    }
+                    teacher: { name: teacherName }
                 };
 
                 await window.appStorage.saveSettings(settings);
                 this.applySettingsToUI(settings);
-
-                if (settings.storageMode === "firebase" && window.firebaseManager) {
-                    await window.firebaseManager.init(settings.firebaseConfig);
-                }
 
                 closeModal();
                 this.showToast("Settings updated successfully!");
@@ -3109,25 +3101,28 @@ class AppController {
         try {
             const usage = await window.appStorage.getStorageUsage();
 
-            // 1. Top Navbar 50 GB Quota Badge
+            // 1. Top Navbar Quota Badge (shown only for Admin / Uploader)
             const valEl = document.getElementById("nav-storage-val");
             const barEl = document.getElementById("nav-storage-bar");
             const badgeEl = document.getElementById("navbar-storage-quota");
 
+            const formattedUsed = usage.formattedUsed || `${usage.usedGB} GB`;
+
             if (valEl) {
-                valEl.textContent = `${usage.usedGB} / ${usage.totalGB} GB`;
+                valEl.textContent = `${formattedUsed} / ${usage.totalGB} GB`;
             }
             if (barEl) {
-                barEl.style.width = `${Math.min(100, Math.max(1, usage.percentUsed))}%`;
+                barEl.style.width = `${Math.min(100, Math.max(2, usage.percentUsed || 0))}%`;
             }
             if (badgeEl) {
                 // Show ONLY to Admin and Uploader desks! Hide from Teacher Desk & Workspace
-                const isUploaderOrAdmin = this.activePortal === "uploader" || this.activePortal === "admin" || (this.currentUser && (this.currentUser.role === "admin" || this.currentUser.role === "uploader"));
+                const isTeacher = this.activePortal === "teacher" || (this.currentUser && this.currentUser.role === "evaluator");
+                const isUploaderOrAdmin = !isTeacher && (this.activePortal === "uploader" || this.activePortal === "admin" || (this.currentUser && (this.currentUser.role === "admin" || this.currentUser.role === "uploader")));
                 badgeEl.style.display = isUploaderOrAdmin ? "flex" : "none";
 
                 badgeEl.classList.toggle("near-limit", usage.isNearLimit && !usage.isExceeded);
                 badgeEl.classList.toggle("exceeded", usage.isExceeded);
-                badgeEl.title = `Institution Storage: ${usage.usedGB} GB of ${usage.totalGB} GB Used (${usage.percentUsed}%). Remaining: ${usage.remainingGB} GB. Click to manage.`;
+                badgeEl.title = `Storage Used: ${formattedUsed} (${usage.totalPapersCount || 0} papers, ${usage.totalPagesCount || 0} pages). Click to manage & clean storage.`;
             }
 
             // 2. Settings Modal Quota Fields (if visible)
@@ -3136,10 +3131,10 @@ class AppController {
             const modalUsed = document.getElementById("modal-storage-used");
             const modalRemaining = document.getElementById("modal-storage-remaining");
 
-            if (modalPercent) modalPercent.textContent = `${usage.percentUsed}%`;
-            if (modalBar) modalBar.style.width = `${Math.min(100, Math.max(1, usage.percentUsed))}%`;
-            if (modalUsed) modalUsed.textContent = `${usage.usedGB} GB`;
-            if (modalRemaining) modalRemaining.textContent = `${usage.remainingGB} GB`;
+            if (modalPercent) modalPercent.textContent = `${usage.userFormatted || formattedUsed}`;
+            if (modalBar) modalBar.style.width = `${Math.min(100, Math.max(2, usage.percentUsed || 0))}%`;
+            if (modalUsed) modalUsed.textContent = `${usage.userFormatted || formattedUsed}`;
+            if (modalRemaining) modalRemaining.textContent = `${usage.completedFormatted || "0 KB"} safe to clean`;
         } catch (e) {
             console.warn("Storage quota display update error:", e);
         }

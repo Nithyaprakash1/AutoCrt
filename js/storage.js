@@ -482,6 +482,8 @@ class StorageService {
                     maxMarks: e.maxMarks,
                     percentage: e.percentage,
                     status: e.status,
+                    pageCount: e.pageCount || (Array.isArray(e.pages) ? e.pages.length : (e.totalPages || 1)),
+                    fileSizeBytes: e.fileSizeBytes || 0,
                     pdfStorageUrl: e.pdfStorageUrl || null,
                     isUserUploaded: true,
                     isMock: false
@@ -675,8 +677,77 @@ class StorageService {
         return evalObj ? JSON.parse(JSON.stringify(evalObj)) : null;
     }
 
+    formatStorageSize(bytes) {
+        const b = Number(bytes) || 0;
+        if (b <= 0) return "0 KB";
+        if (b < 1024) return `${b} B`;
+        if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+        if (b < 1024 * 1024 * 1024) return `${(b / (1024 * 1024)).toFixed(2)} MB`;
+        return `${(b / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+    }
+
+    measurePaperBytesSync(ev) {
+        if (!ev) return 0;
+        let bytes = 0;
+        const cached = this.pdfCacheMap ? this.pdfCacheMap.get(String(ev.id)) : null;
+        const pdfStr = ev.pdfDataUrl || (cached && cached.pdfDataUrl) || null;
+        const pagesArr = (Array.isArray(ev.pages) && ev.pages.length > 0) ? ev.pages : (cached && Array.isArray(cached.pages) ? cached.pages : null);
+
+        if (typeof pdfStr === "string" && pdfStr.startsWith("data:")) {
+            const commaIdx = pdfStr.indexOf(",");
+            const base64Len = commaIdx >= 0 ? (pdfStr.length - commaIdx - 1) : pdfStr.length;
+            bytes += Math.round(base64Len * 0.75);
+        } else if (Array.isArray(pagesArr) && pagesArr.length > 0) {
+            for (const p of pagesArr) {
+                if (typeof p === "string" && p.startsWith("data:")) {
+                    const commaIdx = p.indexOf(",");
+                    const base64Len = commaIdx >= 0 ? (p.length - commaIdx - 1) : p.length;
+                    bytes += Math.round(base64Len * 0.75);
+                }
+            }
+        }
+
+        if (bytes === 0 && ev.rawFile && ev.rawFile.size) {
+            bytes = Number(ev.rawFile.size) || 0;
+        }
+        if (bytes === 0 && ev.fileSizeBytes && Number(ev.fileSizeBytes) > 0) {
+            bytes = Number(ev.fileSizeBytes);
+        }
+
+        // Add lightweight JSON metadata & annotations overhead
+        try {
+            const metaStr = JSON.stringify({
+                id: ev.id,
+                studentName: ev.studentName,
+                rollNo: ev.rollNo,
+                questions: ev.questions || [],
+                annotations: ev.annotations || []
+            });
+            bytes += metaStr.length;
+        } catch (e) {}
+
+        // Fallback if remote/cloud-only paper without local binary loaded yet
+        if (bytes < 4096) {
+            const pCount = ev.pageCount || (Array.isArray(pagesArr) ? pagesArr.length : (ev.totalPages || 1));
+            bytes += pCount * 165 * 1024; // ~165 KB per compressed page
+        }
+
+        return bytes;
+    }
+
     async saveEvaluation(evaluation) {
         if (!this.isReady) await this.readyPromise;
+
+        // Calculate and persist exact paper byte size & page count before stripping pages
+        if (!evaluation.pageCount) {
+            evaluation.pageCount = Array.isArray(evaluation.pages) && evaluation.pages.length > 0
+                ? evaluation.pages.length
+                : (evaluation.totalPages || 1);
+        }
+        const measuredBytes = this.measurePaperBytesSync(evaluation);
+        if (measuredBytes > 0) {
+            evaluation.fileSizeBytes = measuredBytes;
+        }
 
         // Save ONLY ONE format: if paper is a PDF, store only the single PDF document (no redundant rendered JPEG page copies)
         const isPdf = !!(evaluation.pdfDataUrl || (evaluation.pages && evaluation.pages.length === 1 && typeof evaluation.pages[0] === 'string' && evaluation.pages[0].startsWith('data:application/pdf')));
@@ -754,6 +825,8 @@ class StorageService {
                 maxMarks: e.maxMarks,
                 percentage: e.percentage,
                 status: e.status,
+                pageCount: e.pageCount || (Array.isArray(e.pages) ? e.pages.length : (e.totalPages || 1)),
+                fileSizeBytes: e.fileSizeBytes || 0,
                 pdfStorageUrl: e.pdfStorageUrl || null,
                 isUserUploaded: true,
                 isMock: false
@@ -864,7 +937,7 @@ class StorageService {
             });
         }
 
-        // Notify app to refresh 50 GB storage quota display if available
+        // Notify app to refresh storage display if available
         if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
             window.app.updateStorageQuotaDisplay();
         }
@@ -872,54 +945,126 @@ class StorageService {
         return true;
     }
 
-    // --- 50 GB Storage Quota Tracking & Estimation ---
+    // --- Role-Aware Accurate Storage Usage & Paper Size Calculator (KB / MB / GB) ---
     async getStorageUsage() {
-        let usedBytes = 0;
+        if (!this.isReady) await this.readyPromise;
 
-        // 1. Browser Storage Manager Estimate (IndexedDB + Cache Storage)
-        if (navigator.storage && navigator.storage.estimate) {
+        // Ensure we have current evaluations loaded from IndexedDB if memoryStore is empty
+        let allPapers = Array.isArray(this.memoryStore) && this.memoryStore.length > 0 ? [...this.memoryStore] : [];
+        if (allPapers.length === 0 && this.db) {
             try {
-                const est = await navigator.storage.estimate();
-                if (est && est.usage) {
-                    usedBytes = est.usage;
+                allPapers = await new Promise((resolve) => {
+                    const tx = this.db.transaction(["evaluations"], "readonly");
+                    const store = tx.objectStore("evaluations");
+                    const req = store.getAll();
+                    req.onsuccess = () => resolve(req.result || []);
+                    req.onerror = () => resolve([]);
+                });
+                if (this.deletedEvaluations && this.deletedEvaluations.size > 0) {
+                    allPapers = allPapers.filter(e => e && e.id && !this.deletedEvaluations.has(String(e.id)));
+                }
+                if (allPapers.length > 0) {
+                    this.memoryStore = [...allPapers];
                 }
             } catch (e) {}
         }
 
-        // 2. Sum data from memoryStore / evaluated papers (calculate approximate size)
-        let docBytes = 0;
-        const list = this.memoryStore || [];
-        for (const ev of list) {
-            if (ev.pdfDataUrl && typeof ev.pdfDataUrl === 'string') {
-                docBytes += Math.round(ev.pdfDataUrl.length * 0.75); // base64 payload to bytes
-            } else if (ev.pages && Array.isArray(ev.pages)) {
-                for (const p of ev.pages) {
-                    if (typeof p === 'string' && p.startsWith('data:')) {
-                        docBytes += Math.round(p.length * 0.75);
-                    }
-                }
-            }
-            if (!ev.pdfDataUrl && (!ev.pages || ev.pages.length === 0)) {
-                docBytes += (ev.pageCount || 4) * 350 * 1024; // ~350KB per student answer sheet
-            }
-        }
-        usedBytes = Math.max(usedBytes, docBytes);
+        // Filter papers for the active user (Teacher sees ONLY their own assigned papers; Uploader/Admin sees all)
+        const userPapers = this.filterEvaluationsForUser(allPapers);
 
-        const limitBytes = 50 * 1024 * 1024 * 1024; // 50 GB quota
-        const usedGB = (usedBytes / (1024 * 1024 * 1024)).toFixed(2);
+        let userUsedBytes = 0;
+        let completedBytes = 0;
+        let pendingBytes = 0;
+        let completedCount = 0;
+        let pendingCount = 0;
+        let totalPagesCount = 0;
+
+        const papersWithSize = [];
+
+        for (const ev of userPapers) {
+            if (!ev || !ev.id) continue;
+            // Warm pdfCacheMap from CacheStorage if not yet loaded and no fileSizeBytes cached
+            if (!ev.fileSizeBytes && !ev.pdfDataUrl && (!ev.pages || ev.pages.length === 0) && !this.pdfCacheMap.has(String(ev.id))) {
+                try {
+                    await this.getPdfCache(ev.id);
+                } catch (e) {}
+            }
+
+            const sizeBytes = this.measurePaperBytesSync(ev);
+            ev.fileSizeBytes = sizeBytes;
+            const pageCount = ev.pageCount || (Array.isArray(ev.pages) ? ev.pages.length : (ev.totalPages || 1));
+            totalPagesCount += pageCount;
+            userUsedBytes += sizeBytes;
+
+            const isComp = ev.status === "Completed" || ev.status === "Corrected" || ev.status === "Graded" || ev.status === "Evaluated";
+            if (isComp) {
+                completedBytes += sizeBytes;
+                completedCount++;
+            } else {
+                pendingBytes += sizeBytes;
+                pendingCount++;
+            }
+
+            papersWithSize.push({
+                id: ev.id,
+                studentName: ev.studentName || "Unnamed Student",
+                rollNo: ev.rollNo || "—",
+                className: ev.className || ev.class || "Class 12-A",
+                subject: ev.subject || "General",
+                examName: ev.examName || ev.templateName || "Examination",
+                status: isComp ? "Completed" : "Pending",
+                obtainedMarks: ev.obtainedMarks,
+                maxMarks: ev.maxMarks,
+                pageCount,
+                sizeBytes,
+                sizeFormatted: this.formatStorageSize(sizeBytes)
+            });
+        }
+
+        // Also compute total system bytes across all papers (for Admin / Uploader)
+        let systemUsedBytes = 0;
+        for (const ev of allPapers) {
+            if (!ev || !ev.id) continue;
+            systemUsedBytes += (ev.fileSizeBytes || this.measurePaperBytesSync(ev));
+        }
+
+        const user = this.getCurrentUser();
+        const activePortal = localStorage.getItem("niprak_active_portal") || localStorage.getItem("onespace_active_portal") || "evaluator";
+        const isTeacher = (user && user.role === "evaluator") || (!user && activePortal === "evaluator") || activePortal === "evaluator";
+
+        const effectiveUsedBytes = isTeacher ? userUsedBytes : systemUsedBytes;
+        const limitBytes = 50 * 1024 * 1024 * 1024; // 50 GB institution ceiling
+        const usedMB = parseFloat((effectiveUsedBytes / (1024 * 1024)).toFixed(2));
+        const usedGB = parseFloat((effectiveUsedBytes / (1024 * 1024 * 1024)).toFixed(3));
         const totalGB = 50;
-        const remainingGB = Math.max(0, 50 - parseFloat(usedGB)).toFixed(2);
-        const percentUsed = Math.min(100, parseFloat(((usedBytes / limitBytes) * 100).toFixed(1)));
+        const remainingGB = parseFloat(Math.max(0, totalGB - usedGB).toFixed(2));
+        const percentUsed = effectiveUsedBytes > 0
+            ? Math.min(100, Math.max(0.1, parseFloat(((effectiveUsedBytes / limitBytes) * 100).toFixed(2))))
+            : 0;
 
         return {
-            usedBytes,
+            isTeacher,
+            usedBytes: effectiveUsedBytes,
+            formattedUsed: this.formatStorageSize(effectiveUsedBytes),
+            userUsedBytes,
+            userFormatted: this.formatStorageSize(userUsedBytes),
+            completedBytes,
+            completedFormatted: this.formatStorageSize(completedBytes),
+            completedCount,
+            pendingBytes,
+            pendingFormatted: this.formatStorageSize(pendingBytes),
+            pendingCount,
+            totalPapersCount: papersWithSize.length,
+            totalPagesCount,
+            papersWithSize,
             limitBytes,
-            usedGB: parseFloat(usedGB),
+            usedMB,
+            usedGB,
             totalGB,
-            remainingGB: parseFloat(remainingGB),
+            remainingGB,
             percentUsed,
             isNearLimit: percentUsed >= 90,
-            isExceeded: usedBytes >= limitBytes
+            isExceeded: effectiveUsedBytes >= limitBytes
         };
     }
 

@@ -26,7 +26,13 @@ class UploadedPapersPageManager {
 
     async loadData() {
         if (window.appStorage) {
-            this.papers = await window.appStorage.getAllEvaluations();
+            const allPapers = await window.appStorage.getAllEvaluations();
+            this.papers = typeof window.appStorage.filterEvaluationsForUser === "function"
+                ? window.appStorage.filterEvaluationsForUser(allPapers)
+                : allPapers;
+            if (typeof window.appStorage.getStorageUsage === "function") {
+                await window.appStorage.getStorageUsage();
+            }
             const savedCatalog = await window.appStorage.getSubjectCatalog();
             if (savedCatalog) {
                 this.subjects = savedCatalog.map(s => s.name);
@@ -37,7 +43,7 @@ class UploadedPapersPageManager {
             const currentUser = window.appStorage.getCurrentUser();
             if (currentUser && currentUser.role === 'evaluator' && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0 && !currentUser.assignedSubjects.includes("All Subjects")) {
                 this.subjects = currentUser.assignedSubjects;
-                if (this.selectedSubject === "all") {
+                if (this.selectedSubject === "all" && currentUser.assignedSubjects.length === 1) {
                     this.selectedSubject = currentUser.assignedSubjects[0];
                 }
             }
@@ -95,6 +101,15 @@ class UploadedPapersPageManager {
         // Compute Metrics
         const totalPapers = this.papers.length;
         const totalPages = this.papers.reduce((sum, p) => sum + (p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1))), 0);
+        const totalBytes = this.papers.reduce((sum, p) => {
+            if (window.appStorage && typeof window.appStorage.measurePaperBytesSync === "function") {
+                return sum + window.appStorage.measurePaperBytesSync(p);
+            }
+            return sum + (p.fileSizeBytes || ((p.pageCount || 1) * 185 * 1024));
+        }, 0);
+        const formattedTotalStorage = (window.appStorage && typeof window.appStorage.formatStorageSize === "function")
+            ? window.appStorage.formatStorageSize(totalBytes)
+            : `${(totalBytes / (1024 * 1024)).toFixed(2)} MB`;
         const completedPapers = this.papers.filter(p => p.status === "Completed").length;
         const pendingPapers = totalPapers - completedPapers;
 
@@ -116,9 +131,10 @@ class UploadedPapersPageManager {
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             <span>Export Manifest</span>
                         </button>
-                        <button type="button" class="btn-papers-secondary" id="btn-papers-bulk-delete" title="Delete selected papers to free storage space" style="border-color: #DC2626; color: #DC2626; font-weight: 500;">
+                        <button type="button" class="btn-papers-secondary btn-papers-bulk-delete" id="btn-papers-bulk-delete" title="Delete selected papers to free storage space" style="border-color: #DC2626; color: #DC2626;">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                            <span>Bulk Delete</span> <span id="papers-bulk-delete-badge" style="background: rgba(220, 38, 38, 0.1); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">(${this.selectedIds.size})</span>
+                            <span>Bulk Delete</span>
+                            <span id="papers-bulk-delete-badge" class="bulk-delete-count-pill">(${this.selectedIds.size})</span>
                         </button>
                         <button type="button" class="btn-papers-primary" id="btn-goto-upload-desk">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -144,8 +160,8 @@ class UploadedPapersPageManager {
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
                         </div>
                         <div class="kpi-info">
-                            <span class="kpi-label">Total Document Pages</span>
-                            <span class="kpi-value">${totalPages} Pages</span>
+                            <span class="kpi-label">Pages & Storage Used</span>
+                            <span class="kpi-value">${totalPages} Pages <span style="font-size: 0.85rem; color: #0071E3; font-weight: 600;">(${formattedTotalStorage})</span></span>
                         </div>
                     </div>
 
@@ -230,16 +246,16 @@ class UploadedPapersPageManager {
                             <thead>
                                 <tr>
                                     <th style="width: 44px; text-align: center;">
-                                        <input type="checkbox" id="papers-select-all" title="Select All Papers" style="cursor: pointer; width: 16px; height: 16px;" />
+                                        <input type="checkbox" id="papers-select-all" title="Select All Papers" style="cursor: pointer; width: 16px; height: 16px; vertical-align: middle; margin: 0;" />
                                     </th>
-                                    <th style="width: 90px;">Roll No</th>
-                                    <th>Student Name</th>
-                                    <th style="width: 120px;">Class</th>
-                                    <th>Subject & Exam</th>
+                                    <th style="width: 85px;">Roll No</th>
+                                    <th style="min-width: 160px;">Student Name</th>
+                                    <th style="width: 115px;">Class</th>
+                                    <th style="min-width: 160px;">Subject & Exam</th>
                                     <th style="width: 110px;">Page Count</th>
-                                    <th style="width: 140px;">Evaluation Status</th>
+                                    <th style="width: 135px;">Evaluation Status</th>
                                     <th style="width: 90px;">Score</th>
-                                    <th style="width: 170px; text-align: right;">Actions</th>
+                                    <th style="width: 240px; min-width: 230px; text-align: right;">Actions</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -263,7 +279,7 @@ class UploadedPapersPageManager {
                                     return `
                                         <tr data-paper-id="${p.id}" class="${isChecked ? 'row-selected' : ''}" style="${isChecked ? 'background-color: rgba(220, 38, 38, 0.04);' : ''}">
                                             <td style="text-align: center;">
-                                                <input type="checkbox" class="papers-item-check" data-id="${p.id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;" />
+                                                <input type="checkbox" class="papers-item-check" data-id="${p.id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px; vertical-align: middle; margin: 0;" />
                                             </td>
                                             <td class="cell-roll">${p.rollNo || '—'}</td>
                                             <td class="cell-name">
@@ -296,18 +312,20 @@ class UploadedPapersPageManager {
                                             <td class="cell-score">
                                                 ${isComp ? `<span class="score-pill">${p.obtainedMarks} / ${p.maxMarks}</span>` : '<span class="score-none">—</span>'}
                                             </td>
-                                            <td class="cell-actions" style="text-align: right;">
-                                                <button type="button" class="btn-paper-action btn-action-inspect" data-paper-id="${p.id}" title="Inspect pages of this paper">
-                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                                    Inspect
-                                                </button>
-                                                <button type="button" class="btn-paper-action btn-action-eval" data-paper-id="${p.id}" title="Open evaluation workspace">
-                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                                                    Evaluate
-                                                </button>
-                                                <button type="button" class="btn-paper-action btn-action-delete" data-paper-id="${p.id}" title="Delete paper">
-                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                                </button>
+                                            <td class="cell-actions">
+                                                <div class="paper-actions-group">
+                                                    <button type="button" class="btn-paper-action btn-action-inspect" data-paper-id="${p.id}" title="Inspect pages of this paper">
+                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                                        <span>Inspect</span>
+                                                    </button>
+                                                    <button type="button" class="btn-paper-action btn-action-eval" data-paper-id="${p.id}" title="Open evaluation workspace">
+                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                                        <span>Evaluate</span>
+                                                    </button>
+                                                    <button type="button" class="btn-paper-action btn-action-delete" data-paper-id="${p.id}" title="Delete paper" aria-label="Delete paper">
+                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                                    </button>
+                                                </div>
                                             </td>
                                         </tr>
                                     `;
@@ -554,6 +572,13 @@ class UploadedPapersPageManager {
         const badge = this.container.querySelector("#papers-bulk-delete-badge");
         if (badge) {
             badge.textContent = `(${this.selectedIds.size})`;
+            if (this.selectedIds.size > 0) {
+                badge.style.background = "rgba(255, 255, 255, 0.22)";
+                badge.style.color = "#FFFFFF";
+            } else {
+                badge.style.background = "rgba(220, 38, 38, 0.1)";
+                badge.style.color = "#DC2626";
+            }
         }
         const delBtn = this.container.querySelector("#btn-papers-bulk-delete");
         if (delBtn) {
@@ -602,8 +627,15 @@ class UploadedPapersPageManager {
         const selectedPapers = this.papers.filter(p => targetIds.includes(String(p.id)));
         const count = selectedPapers.length;
         const totalPages = selectedPapers.reduce((sum, p) => sum + (p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1))), 0);
-        const approxKB = totalPages * 350;
-        const spaceEstimate = approxKB >= 1024 ? `${(approxKB / 1024).toFixed(1)} MB` : `${approxKB} KB`;
+        const totalBytes = selectedPapers.reduce((sum, p) => {
+            if (window.appStorage && typeof window.appStorage.measurePaperBytesSync === "function") {
+                return sum + window.appStorage.measurePaperBytesSync(p);
+            }
+            return sum + (p.fileSizeBytes || ((p.pageCount || 1) * 185 * 1024));
+        }, 0);
+        const spaceEstimate = (window.appStorage && typeof window.appStorage.formatStorageSize === "function")
+            ? window.appStorage.formatStorageSize(totalBytes)
+            : `${(totalBytes / (1024 * 1024)).toFixed(2)} MB`;
 
         const modalId = "papers-bulk-delete-modal-overlay";
         const oldModal = document.getElementById(modalId);
