@@ -231,8 +231,8 @@
                             </button>
                         </li>
                         <li class="sidebar-menu-item-wrap">
-                            <button type="button" class="sidebar-menu-item" data-view="admin-panel" id="side-nav-super-audit" title="Audit & Analytics Matrix">
-                                <span class="sidebar-menu-icon">
+                            <button type="button" class="sidebar-menu-item" data-view="super-admin" data-super-tab="analytics" id="side-nav-super-audit" title="Audit & Analytics Matrix">
+                                <span class="sidebar-menu-icon" style="color: #AF52DE;">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
                                 </span>
                                 <span class="sidebar-menu-label">Audit Matrix</span>
@@ -493,6 +493,11 @@
                 <!-- View 9: Super Admin Master Console (Secret Owner Console) -->
                 <section class="view-section" id="view-super-admin">
                     <div id="super-admin-container-root"></div>
+                </section>
+
+                <!-- View 10: Admin Panel (Audit & Analytics Matrix Desk) -->
+                <section class="view-section" id="view-admin-panel">
+                    <div id="admin-panel-container-root"></div>
                 </section>
             </main>
         </div>
@@ -922,6 +927,7 @@
     <script src="js/uploaded-papers-page.js?v=2.4"></script>
     <script src="js/settings-page.js?v=2.4"></script>
     <script src="js/user-management-page.js?v=2.4"></script>
+    <script src="js/admin-panel.js?v=2.4"></script>
     <script src="js/super-admin.js?v=2.4"></script>
     <script src="js/app.js?v=2.4"></script>
 </body>

@@ -1284,7 +1284,8 @@ class AppController {
         document.querySelectorAll(".sidebar-menu-item").forEach(btn => {
             btn.addEventListener("click", () => {
                 const targetView = btn.getAttribute("data-view") || "dashboard";
-                this.switchView(targetView);
+                const superTab = btn.getAttribute("data-super-tab");
+                this.switchView(targetView, superTab);
             });
         });
 
@@ -1332,7 +1333,7 @@ class AppController {
         }
     }
 
-    async switchView(viewName) {
+    async switchView(viewName, targetSubTab = null) {
         if (viewName !== "super-admin") {
             const isLocked = await this.enforceLicenseGate();
             if (isLocked) return;
@@ -1478,8 +1479,16 @@ class AppController {
             if (el) el.classList.add("active-view");
             const root = document.getElementById("super-admin-container-root");
             if (root && window.SuperAdminManager) {
-                this.superAdminManager = new SuperAdminManager(root);
-                await this.superAdminManager.init();
+                if (!this.superAdminManager) {
+                    this.superAdminManager = new SuperAdminManager(root, { initialTab: targetSubTab || "license" });
+                    await this.superAdminManager.init(targetSubTab);
+                } else {
+                    if (targetSubTab) {
+                        this.superAdminManager.switchTab(targetSubTab);
+                    } else {
+                        await this.superAdminManager.init();
+                    }
+                }
             }
         }
     }

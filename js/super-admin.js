@@ -11,7 +11,7 @@ class SuperAdminManager {
     constructor(container, options = {}) {
         this.container = container;
         this.options = options;
-        this.activeTab = "license"; // "license" | "storage" | "users" | "analytics"
+        this.activeTab = options.initialTab || "license"; // "license" | "storage" | "users" | "analytics"
         this.license = null;
         this.storageUsage = null;
         this.users = [];
@@ -21,11 +21,20 @@ class SuperAdminManager {
         this.userRoleFilter = "all";
         this.storageSearchQuery = "";
         this.storageFilterStatus = "all";
+        this.auditSearchQuery = "";
+        this.auditSelectedClass = "all";
         this.revealedPasswords = new Set();
         this.editingUser = null;
     }
 
-    async init() {
+    switchTab(tabName) {
+        if (!tabName) return;
+        this.activeTab = tabName;
+        this.render();
+    }
+
+    async init(targetTab = null) {
+        if (targetTab) this.activeTab = targetTab;
         await this.loadData();
         this.render();
     }
@@ -811,47 +820,319 @@ class SuperAdminManager {
     // ==========================================
 
     renderAnalyticsTab() {
-        const completedCount = this.papers.filter(p => p.status === "Completed").length;
-        const passRate = this.papers.length > 0 ? Math.round((completedCount / this.papers.length) * 100) : 0;
+        const subjectsData = this.computeSubjectStats();
+        const studentMatrix = this.computeStudentMatrix();
+        const filteredMatrix = this.filterAuditMatrix(studentMatrix);
+        const classStats = this.computeClassStats(studentMatrix);
+
+        const totalPapers = this.papers.length;
+        const completedPapers = this.papers.filter(p => p.status === "Completed" || (p.obtainedMarks != null && p.obtainedMarks > 0)).length;
+        const pendingPapers = Math.max(0, totalPapers - completedPapers);
+        const passRate = totalPapers > 0 ? Math.round((completedPapers / totalPapers) * 100) : 100;
+        const totalPages = this.papers.reduce((sum, p) => sum + (p.pageCount || (p.pages ? p.pages.length : 1)), 0);
+        const totalFaculty = this.users.filter(u => u.role === "evaluator").length;
+
+        // Extract unique class list for filter
+        const classSet = new Set(["all"]);
+        studentMatrix.forEach(s => { if (s.class) classSet.add(s.class); });
+        const classOptions = Array.from(classSet);
 
         return `
             <div class="super-pane-container">
+                <!-- Top Header & Action Controls -->
                 <div class="super-card">
                     <div class="super-card-header">
                         <div>
-                            <h3 class="super-card-title">Institutional Evaluation Analytics</h3>
-                            <p class="super-card-sub">Global completion rates, faculty turnaround statistics, and exam performance matrix.</p>
+                            <div class="super-royal-badge" style="margin-bottom: 6px;">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                                EXAM AUDIT & FACULTY TRACKER
+                            </div>
+                            <h3 class="super-card-title">Subject &amp; Faculty Evaluation Audit Matrix</h3>
+                            <p class="super-card-sub">Real-time correction progress tracker, student cumulative score matrix, and class-wise performance analytics.</p>
                         </div>
-                        <div>
-                            <button type="button" id="btn-goto-admin-audit" class="btn-super-secondary">
-                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                                <span>Open Full Admin Desk</span>
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <button type="button" id="btn-audit-print-report" class="btn-super-secondary">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                                <span>Print Summary Report</span>
+                            </button>
+                            <button type="button" id="btn-audit-export-excel" class="btn-super-primary" style="background: #16A34A;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                                <span>Export Excel Matrix</span>
+                            </button>
+                            <button type="button" id="btn-open-standalone-admin" class="btn-super-secondary" style="color: #AF52DE;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                                <span>Admin Desk</span>
                             </button>
                         </div>
                     </div>
 
+                    <!-- High-level Audit Overview KPIs -->
                     <div class="super-analytics-grid">
                         <div class="analytics-card">
-                            <span class="analytics-label">Overall Completion Rate</span>
-                            <span class="analytics-val" style="color: #16A34A;">${passRate}%</span>
+                            <span class="analytics-label">Total Ingested Papers</span>
+                            <span class="analytics-val" style="color: #0F172A;">${totalPapers}</span>
+                            <span class="analytics-sub">Across all student submissions</span>
+                        </div>
+                        <div class="analytics-card">
+                            <span class="analytics-label">Corrected Papers</span>
+                            <span class="analytics-val" style="color: #16A34A;">${completedPapers}</span>
                             <div class="analytics-bar-track">
                                 <div class="analytics-bar-fill" style="width: ${passRate}%;"></div>
                             </div>
                         </div>
                         <div class="analytics-card">
-                            <span class="analytics-label">Total Ingested Pages</span>
-                            <span class="analytics-val" style="color: #0071E3;">${this.papers.reduce((sum, p) => sum + (p.pageCount || (p.pages ? p.pages.length : 1)), 0)}</span>
-                            <span class="analytics-sub">Across all classes</span>
+                            <span class="analytics-label">Pending Evaluation</span>
+                            <span class="analytics-val" style="color: #F59E0B;">${pendingPapers}</span>
+                            <span class="analytics-sub">${totalPapers > 0 ? Math.round((pendingPapers / totalPapers) * 100) : 0}% of total papers</span>
                         </div>
                         <div class="analytics-card">
-                            <span class="analytics-label">Active Evaluator Faculty</span>
-                            <span class="analytics-val" style="color: #AF52DE;">${this.users.filter(u => u.role === "evaluator").length} Teachers</span>
-                            <span class="analytics-sub">Assigned to exam papers</span>
+                            <span class="analytics-label">Ingested Pages</span>
+                            <span class="analytics-val" style="color: #0071E3;">${totalPages} Pages</span>
+                            <span class="analytics-sub">Active faculty: ${totalFaculty} Teachers</span>
                         </div>
                     </div>
                 </div>
+
+                <!-- Section 1: Subject & Faculty Evaluation Audit Cards -->
+                <div class="super-card" style="margin-top: 24px;">
+                    <div class="super-card-header">
+                        <div>
+                            <h3 class="super-card-title">Subject &amp; Faculty Correction Tracker</h3>
+                            <p class="super-card-sub">Papers uploaded vs graded by subject teacher.</p>
+                        </div>
+                        <span class="super-tab-chip chip-blue">${subjectsData.length} Subjects</span>
+                    </div>
+
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 18px;">
+                        ${subjectsData.length === 0 ? `
+                            <div style="grid-column: 1/-1; padding: 24px; text-align: center; color: #94A3B8;">
+                                No subject evaluations recorded yet. Upload student papers on the Exam Upload Desk.
+                            </div>
+                        ` : subjectsData.map(sub => `
+                            <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 16px; padding: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                    <span style="font-size: 0.75rem; font-weight: 600; text-transform: uppercase; padding: 3px 10px; border-radius: 99px; background: rgba(0, 113, 227, 0.1); color: #0071E3;">${sub.code}</span>
+                                    <span style="font-size: 0.82rem; font-weight: 600; color: ${sub.pct === 100 ? '#16A34A' : '#D97706'};">${sub.pct}% Graded</span>
+                                </div>
+                                <h4 style="font-size: 1.05rem; font-weight: 600; color: #0F172A; margin: 0 0 2px;">${sub.name}</h4>
+                                <p style="font-size: 0.82rem; color: #64748B; margin: 0 0 14px;">Evaluator: <strong>${sub.teacher}</strong></p>
+
+                                <div class="analytics-bar-track" style="margin-bottom: 12px; height: 8px;">
+                                    <div class="analytics-bar-fill" style="width: ${sub.pct}%; background: ${sub.pct === 100 ? '#16A34A' : '#0071E3'};"></div>
+                                </div>
+
+                                <div style="display: flex; justify-content: space-between; font-size: 0.8rem; color: #475569;">
+                                    <span>Uploaded: <strong>${sub.uploaded}</strong></span>
+                                    <span>Graded: <strong style="color: #16A34A;">${sub.corrected}</strong></span>
+                                    <span>Pending: <strong style="color: #F59E0B;">${sub.pending}</strong></span>
+                                </div>
+                            </div>
+                        `).join("")}
+                    </div>
+                </div>
+
+                <!-- Section 2: Student Score Matrix Table -->
+                <div class="super-card" style="margin-top: 24px;">
+                    <div class="super-card-header">
+                        <div>
+                            <h3 class="super-card-title">Student Cumulative Score Matrix</h3>
+                            <p class="super-card-sub">Multi-subject marksheet records, awarded scores, and percentage breakdown.</p>
+                        </div>
+                    </div>
+
+                    <div class="storage-filter-row">
+                        <div class="search-box-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="super-audit-search-input" class="search-input" placeholder="Search student name or roll number..." value="${this.auditSearchQuery}" />
+                        </div>
+                        <select id="super-audit-class-filter" class="super-select">
+                            ${classOptions.map(cls => `
+                                <option value="${cls}" ${this.auditSelectedClass === cls ? 'selected' : ''}>${cls === 'all' ? 'All Classes' : cls}</option>
+                            `).join("")}
+                        </select>
+                    </div>
+
+                    <div class="table-scroll-wrapper">
+                        <table class="super-data-table">
+                            <thead>
+                                <tr>
+                                    <th>Roll No</th>
+                                    <th>Student Name</th>
+                                    <th>Class</th>
+                                    <th>Subject</th>
+                                    <th style="text-align: center;">Score</th>
+                                    <th style="text-align: center;">Percentage</th>
+                                    <th style="text-align: center;">Grade</th>
+                                    <th style="text-align: center;">Status</th>
+                                    <th style="text-align: center;">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${filteredMatrix.length === 0 ? `
+                                    <tr>
+                                        <td colspan="9" style="text-align: center; padding: 40px; color: #94A3B8;">
+                                            No student records found matching the filter criteria.
+                                        </td>
+                                    </tr>
+                                ` : filteredMatrix.map(row => `
+                                    <tr>
+                                        <td style="font-weight: 600; color: #0F172A;">${row.rollNo}</td>
+                                        <td style="font-weight: 500; color: #0F172A;">${row.studentName}</td>
+                                        <td><span class="pages-badge">${row.class}</span></td>
+                                        <td>${row.subject}</td>
+                                        <td style="text-align: center; font-weight: 600; color: #0071E3;">${row.totalObtained} / ${row.totalMax}</td>
+                                        <td style="text-align: center; font-weight: 600;">${row.percentage}%</td>
+                                        <td style="text-align: center;">
+                                            <span style="display: inline-block; padding: 2px 8px; border-radius: 6px; font-weight: 600; font-size: 0.78rem; background: rgba(34, 197, 94, 0.12); color: #16A34A;">${row.grade}</span>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <span class="eval-status-badge ${row.status === 'Completed' ? 'status-completed' : 'status-pending'}">
+                                                ${row.status === 'Completed' ? '✓ Graded' : '◐ Pending'}
+                                            </span>
+                                        </td>
+                                        <td style="text-align: center;">
+                                            <button type="button" class="btn-row-action btn-inspect-audit-paper" data-id="${row.id}" title="Inspect / Evaluate Paper">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                <span>Inspect</span>
+                                            </button>
+                                        </td>
+                                    </tr>
+                                `).join("")}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Section 3: Class Summary Cards -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-top: 24px;">
+                    ${classStats.map(cs => `
+                        <div class="super-card" style="margin-bottom: 0;">
+                            <span class="kpi-label">${cs.className} Summary</span>
+                            <div style="font-size: 1.6rem; font-weight: 600; color: #0F172A; margin: 8px 0 4px;">${cs.avgPct}% Class Average</div>
+                            <div style="display: flex; justify-content: space-between; font-size: 0.84rem; color: #64748B;">
+                                <span>Total Students: <strong>${cs.count}</strong></span>
+                                <span>Pass Rate: <strong style="color: #16A34A;">${cs.passRate}%</strong></span>
+                            </div>
+                        </div>
+                    `).join("")}
+                </div>
             </div>
         `;
+    }
+
+    computeSubjectStats() {
+        const subjectMap = new Map();
+        this.papers.forEach(p => {
+            const subject = p.subject || "General";
+            if (!subjectMap.has(subject)) {
+                subjectMap.set(subject, { uploaded: 0, corrected: 0 });
+            }
+            const entry = subjectMap.get(subject);
+            entry.uploaded++;
+            if (p.status === "Completed" || (p.obtainedMarks != null && p.obtainedMarks > 0)) {
+                entry.corrected++;
+            }
+        });
+
+        if (subjectMap.size === 0) return [];
+
+        return Array.from(subjectMap.entries()).map(([subject, stats]) => {
+            const { uploaded, corrected } = stats;
+            const pending = Math.max(0, uploaded - corrected);
+            const pct = uploaded > 0 ? Math.round((corrected / uploaded) * 100) : 100;
+            const subjectPapers = this.papers.filter(p => (p.subject || "General") === subject);
+            const latestTeacher = subjectPapers.find(p => p.teacherName)?.teacherName || "Assigned Faculty";
+            return {
+                code: subject.substring(0, 4).toUpperCase(),
+                name: subject,
+                teacher: latestTeacher,
+                uploaded,
+                corrected,
+                pending,
+                pct
+            };
+        });
+    }
+
+    computeStudentMatrix() {
+        return this.papers.map(p => {
+            const maxMarks = p.maxMarks || p.totalMarks || 100;
+            const obtained = p.obtainedMarks != null ? p.obtainedMarks : (p.score != null ? p.score : 0);
+            const pct = maxMarks > 0 ? Math.round((obtained / maxMarks) * 100) : 0;
+            let grade = "A+";
+            if (pct < 33) grade = "F";
+            else if (pct < 50) grade = "C";
+            else if (pct < 70) grade = "B";
+            else if (pct < 85) grade = "A";
+
+            return {
+                id: p.id,
+                rollNo: p.rollNo || (p.studentId ? String(p.studentId).slice(-4) : "—"),
+                studentName: p.studentName || "Student",
+                class: p.class || p.className || "Class 12",
+                subject: p.subject || "General",
+                totalObtained: obtained,
+                totalMax: maxMarks,
+                percentage: pct,
+                grade: grade,
+                status: p.status || (obtained > 0 ? "Completed" : "Pending")
+            };
+        });
+    }
+
+    filterAuditMatrix(matrix) {
+        return matrix.filter(row => {
+            const matchesQuery = !this.auditSearchQuery ||
+                (row.studentName && row.studentName.toLowerCase().includes(this.auditSearchQuery)) ||
+                (row.rollNo && row.rollNo.toLowerCase().includes(this.auditSearchQuery)) ||
+                (row.subject && row.subject.toLowerCase().includes(this.auditSearchQuery));
+
+            const matchesClass = this.auditSelectedClass === "all" || row.class === this.auditSelectedClass;
+
+            return matchesQuery && matchesClass;
+        });
+    }
+
+    computeClassStats(matrix) {
+        if (!matrix || matrix.length === 0) {
+            return [
+                { className: "All Classes", count: 0, avgPct: 0, passRate: 100 }
+            ];
+        }
+
+        const classMap = new Map();
+        matrix.forEach(m => {
+            const cls = m.class || "General";
+            if (!classMap.has(cls)) classMap.set(cls, []);
+            classMap.get(cls).push(m);
+        });
+
+        return Array.from(classMap.entries()).map(([cls, list]) => {
+            const avg = list.length > 0 ? Math.round(list.reduce((sum, s) => sum + s.percentage, 0) / list.length) : 0;
+            const passed = list.filter(s => s.percentage >= 33).length;
+            const passRate = list.length > 0 ? Math.round((passed / list.length) * 100) : 100;
+            return {
+                className: cls,
+                count: list.length,
+                avgPct: avg,
+                passRate: passRate
+            };
+        });
+    }
+
+    exportAuditExcel(matrix) {
+        let csv = "data:text/csv;charset=utf-8,";
+        csv += "Roll No,Student Name,Class,Subject,Obtained Marks,Max Marks,Percentage,Grade,Status\n";
+        matrix.forEach(row => {
+            csv += `"${row.rollNo}","${row.studentName}","${row.class}","${row.subject}","${row.totalObtained}","${row.totalMax}","${row.percentage}%","${row.grade}","${row.status}"\n`;
+        });
+        const encoded = encodeURI(csv);
+        const a = document.createElement("a");
+        a.setAttribute("href", encoded);
+        a.setAttribute("download", `Student_Master_Score_Matrix_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
     }
 
     // ==========================================
@@ -1189,14 +1470,58 @@ class SuperAdminManager {
             });
         });
 
-        const btnGotoAudit = this.container.querySelector("#btn-goto-admin-audit");
-        if (btnGotoAudit) {
-            btnGotoAudit.addEventListener("click", () => {
-                if (window.app && typeof window.app.switchView === "function") {
-                    window.app.switchView("admin-panel");
+        // Tab 4: Audit Matrix controls
+        const auditSearchInp = this.container.querySelector("#super-audit-search-input");
+        if (auditSearchInp) {
+            auditSearchInp.addEventListener("input", (e) => {
+                this.auditSearchQuery = e.target.value.toLowerCase().trim();
+                this.render();
+            });
+        }
+
+        const auditClassSelect = this.container.querySelector("#super-audit-class-filter");
+        if (auditClassSelect) {
+            auditClassSelect.addEventListener("change", (e) => {
+                this.auditSelectedClass = e.target.value;
+                this.render();
+            });
+        }
+
+        const btnAuditPrint = this.container.querySelector("#btn-audit-print-report");
+        if (btnAuditPrint) {
+            btnAuditPrint.addEventListener("click", () => window.print());
+        }
+
+        const btnAuditExcel = this.container.querySelector("#btn-audit-export-excel");
+        if (btnAuditExcel) {
+            btnAuditExcel.addEventListener("click", () => {
+                const matrix = this.computeStudentMatrix();
+                const filtered = this.filterAuditMatrix(matrix);
+                this.exportAuditExcel(filtered);
+            });
+        }
+
+        const btnOpenStandaloneAdmin = this.container.querySelector("#btn-open-standalone-admin");
+        if (btnOpenStandaloneAdmin) {
+            btnOpenStandaloneAdmin.addEventListener("click", () => {
+                if (window.app && typeof window.app.setPortal === "function") {
+                    window.app.setPortal("admin", true);
+                } else {
+                    window.location.href = "admin.html";
                 }
             });
         }
+
+        const inspectAuditBtns = this.container.querySelectorAll(".btn-inspect-audit-paper");
+        inspectAuditBtns.forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const id = btn.getAttribute("data-id");
+                const paper = this.papers.find(p => String(p.id) === id);
+                if (paper && window.app && typeof window.app.openWorkspace === "function") {
+                    window.app.openWorkspace(paper);
+                }
+            });
+        });
     }
 
     // ==========================================

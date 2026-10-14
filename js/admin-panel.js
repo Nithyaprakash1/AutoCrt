@@ -60,7 +60,7 @@ class AdminPanelManager {
                         <h1 style="font-size: 1.8rem; font-weight: 400; color: var(--text-main); margin-top: 4px;">Master Admin & Evaluation Audit Desk</h1>
                         <p style="font-size: 0.92rem; color: var(--text-muted); margin-top: 2px;">Track teacher correction progress, view multi-subject student scorecards, and export class reports.</p>
                     </div>
-
+                    <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
                         <button type="button" class="btn-mgmt-secondary" id="btn-admin-clean-data" style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 12px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #DC2626; font-size: 0.88rem; cursor: pointer;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                             Clean Up Data
