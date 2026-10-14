@@ -529,8 +529,8 @@ class StorageService {
             return list;
         }
 
-        // Admin or Uploader role accesses all evaluations
-        if (user.role === 'admin' || user.role === 'uploader') {
+        // Admin, Uploader, or Super Admin role accesses all evaluations
+        if (user.role === 'admin' || user.role === 'uploader' || user.role === 'super_admin') {
             return list;
         }
 
@@ -1368,20 +1368,49 @@ class StorageService {
 
     async getUsersList() {
         await this.readyPromise;
+        let users = [];
         if (window.firebaseManager && window.firebaseManager.isConnected) {
             try {
                 const fbUsers = await window.firebaseManager.getUsersList();
-                if (fbUsers && Array.isArray(fbUsers)) return fbUsers;
+                if (fbUsers && Array.isArray(fbUsers)) users = fbUsers;
             } catch (e) {}
         }
 
-        try {
-            const raw = localStorage.getItem("niprak_users") || localStorage.getItem("onespace_users");
-            if (raw) return JSON.parse(raw);
-        } catch (e) {
-            console.error("Error loading users", e);
+        if (users.length === 0) {
+            try {
+                const raw = localStorage.getItem("niprak_users") || localStorage.getItem("onespace_users");
+                if (raw) users = JSON.parse(raw);
+            } catch (e) {
+                console.error("Error loading users", e);
+            }
         }
-        return [];
+
+        // Ensure Super Admin account (iamnithyaprakash@gmail.com) always exists
+        const superAdminEmail = "iamnithyaprakash@gmail.com";
+        const hasSuperAdmin = users.some(u => u && (u.email === superAdminEmail || u.username === "iamnithyaprakash"));
+        if (!hasSuperAdmin) {
+            const superAdminObj = {
+                id: "usr_super_admin",
+                uid: "usr_super_admin",
+                name: "Nithya Prakash (Super Admin)",
+                username: "iamnithyaprakash",
+                email: superAdminEmail,
+                password: superAdminEmail,
+                role: "super_admin",
+                roleLabel: "Super Admin (Owner)",
+                status: "active",
+                assignedSubjects: ["All Subjects"],
+                assignedClasses: ["All Classes"],
+                createdAt: new Date().toISOString()
+            };
+            users.unshift(superAdminObj);
+            try {
+                const uStr = JSON.stringify(users);
+                localStorage.setItem("niprak_users", uStr);
+                localStorage.setItem("onespace_users", uStr);
+            } catch (e) {}
+        }
+        return users;
     }
 
     async saveUsersList(users) {
@@ -1400,6 +1429,167 @@ class StorageService {
         }
         return users;
     }
+
+    // --- Platform License & Subscription Locking Engine ---
+
+    async getLicenseConfig() {
+        await this.readyPromise;
+        // Default 4 months active period starting from now
+        const now = new Date();
+        const fourMonthsAhead = new Date(now.getTime() + (120 * 24 * 60 * 60 * 1000));
+
+        const defaultLicense = {
+            status: "active", // "active" | "locked" | "expired"
+            isManuallyLocked: false,
+            activatedAt: now.toISOString(),
+            expiresAt: fourMonthsAhead.toISOString(),
+            planPeriod: "4_months", // "1_month" | "3_months" | "4_months" | "6_months" | "1_year" | "custom"
+            planDurationDays: 120,
+            institutionName: "Adwaith Thought Academy",
+            contactEmail: "iamnithyaprakash@gmail.com",
+            contactPhone: "+91 98765 43210",
+            paymentQrUrl: "", // Custom QR image data URL or image path
+            bankDetails: {
+                accountName: "Nithya Prakash",
+                accountNumber: "50100234567890",
+                ifscCode: "HDFC0001234",
+                bankName: "HDFC Bank",
+                upiId: "iamnithyaprakash@okhdfcbank"
+            },
+            lockoutMessage: "Your institutional subscription license for Niprak OSM has expired or access has been temporarily restricted. To renew or reactivate full access for 3 or 4 months, please scan the UPI QR code below or transfer to our bank account and contact Mr. Nithya Prakash."
+        };
+
+        if (window.firebaseManager && window.firebaseManager.isConnected && typeof window.firebaseManager.getLicenseConfig === "function") {
+            try {
+                const fbLic = await window.firebaseManager.getLicenseConfig();
+                if (fbLic) return { ...defaultLicense, ...fbLic };
+            } catch (e) {}
+        }
+
+        try {
+            const raw = localStorage.getItem("niprak_license_config") || localStorage.getItem("onespace_license_config");
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                return { ...defaultLicense, ...parsed };
+            }
+        } catch (e) {}
+
+        await this.saveLicenseConfig(defaultLicense);
+        return defaultLicense;
+    }
+
+    async saveLicenseConfig(license) {
+        await this.readyPromise;
+        try {
+            const str = JSON.stringify(license);
+            localStorage.setItem("niprak_license_config", str);
+            localStorage.setItem("onespace_license_config", str);
+        } catch (e) {
+            console.error("Error saving license config", e);
+        }
+        if (window.firebaseManager && window.firebaseManager.isConnected && typeof window.firebaseManager.saveLicenseConfig === "function") {
+            try {
+                await window.firebaseManager.saveLicenseConfig(license);
+            } catch (e) {}
+        }
+        return license;
+    }
+
+    async isPlatformLocked() {
+        const license = await this.getLicenseConfig();
+        const user = this.getCurrentUser();
+
+        // Super Admin (Owner) is NEVER locked out under any circumstance!
+        if (user && (user.role === "super_admin" || (user.email && user.email.toLowerCase() === "iamnithyaprakash@gmail.com"))) {
+            return { locked: false, reason: null, license };
+        }
+
+        // 1. Check manual kill switch
+        if (license.isManuallyLocked === true) {
+            return { locked: true, reason: "manual", license };
+        }
+
+        // 2. Check expiration timestamp
+        if (license.expiresAt) {
+            const expiryTime = new Date(license.expiresAt).getTime();
+            if (Date.now() > expiryTime) {
+                return { locked: true, reason: "expired", license };
+            }
+        }
+
+        return { locked: false, reason: null, license };
+    }
+
+    // --- Master Storage Deep Cleanup Operations ---
+
+    async cleanStoragePapers(paperIds) {
+        if (!Array.isArray(paperIds) || paperIds.length === 0) return 0;
+        await this.readyPromise;
+        let cleanedCount = 0;
+        for (const id of paperIds) {
+            try {
+                await this.deleteEvaluation(id);
+                cleanedCount++;
+            } catch (err) {
+                console.warn(`Error purging paper ${id}:`, err);
+            }
+        }
+        return cleanedCount;
+    }
+
+    async clearAppCaches() {
+        let freedKeys = 0;
+        try {
+            if ('caches' in window) {
+                for (const cName of ["niprak-pdf-cache-v1", "onespace-pdf-cache-v1"]) {
+                    try {
+                        const cache = await caches.open(cName);
+                        const keys = await cache.keys();
+                        for (const req of keys) {
+                            await cache.delete(req);
+                            freedKeys++;
+                        }
+                    } catch (e) {}
+                }
+            }
+        } catch (e) {}
+        return freedKeys;
+    }
+
+    async exportDatabaseBackup() {
+        const evaluations = await this.getAllEvaluations();
+        const users = await this.getUsersList();
+        const settings = await this.getSettings();
+        const catalog = await this.getSubjectCatalog();
+        const classes = await this.getClassesList();
+        const license = await this.getLicenseConfig();
+
+        const backupData = {
+            version: "2.4",
+            exportDate: new Date().toISOString(),
+            institution: settings.institution?.name || "Adwaith Thought Academy",
+            license,
+            evaluations,
+            users,
+            settings,
+            catalog,
+            classes
+        };
+
+        const jsonStr = JSON.stringify(backupData, null, 2);
+        const blob = new Blob([jsonStr], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        const dateStr = new Date().toISOString().split("T")[0];
+        a.download = `Niprak_OSM_Master_Backup_${dateStr}.json`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+        return true;
+    }
 }
 
 window.appStorage = new StorageService();
+

@@ -198,6 +198,57 @@
 
             <!-- Sidebar Navigation Menu Items -->
             <nav class="sidebar-nav">
+                <!-- Super Admin Navigation (Shown only when activePortal === 'super_admin') -->
+                <div class="sidebar-nav-group" id="sidebar-super-admin-nav" style="display: none;">
+                    <div class="sidebar-group-title" style="color: #AF52DE; display: flex; align-items: center; gap: 6px;">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2.5"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        SUPER ADMIN DESK
+                    </div>
+                    <ul class="sidebar-menu-list">
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item active" data-view="super-admin" id="side-nav-super-admin" title="Super Admin Master Console">
+                                <span class="sidebar-menu-icon" style="color: #AF52DE;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Master Console</span>
+                                <span class="sidebar-menu-badge" style="background: rgba(175, 82, 222, 0.15); color: #AF52DE;">Owner</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="uploaded-papers" id="side-nav-super-papers" title="Uploaded Papers & Ingested Pages">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Uploaded Papers</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="user-management" id="side-nav-super-users" title="User Management & Subject Allotment">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">User Management</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="admin-panel" id="side-nav-super-audit" title="Audit & Analytics Matrix">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Audit Matrix</span>
+                            </button>
+                        </li>
+                        <li class="sidebar-menu-item-wrap">
+                            <button type="button" class="sidebar-menu-item" data-view="settings" id="side-nav-super-settings" title="Settings">
+                                <span class="sidebar-menu-icon">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+                                </span>
+                                <span class="sidebar-menu-label">Settings</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
                 <!-- Uploader Desk Navigation (Shown when activePortal === 'uploader') -->
                 <div class="sidebar-nav-group" id="sidebar-uploader-nav" style="display: none;">
                     <div class="sidebar-group-title">UPLOADER DESK</div>
@@ -437,6 +488,11 @@
                 <!-- View 8: User Management Desk -->
                 <section class="view-section" id="view-user-management">
                     <div id="user-management-container-root"></div>
+                </section>
+
+                <!-- View 9: Super Admin Master Console (Secret Owner Console) -->
+                <section class="view-section" id="view-super-admin">
+                    <div id="super-admin-container-root"></div>
                 </section>
             </main>
         </div>
@@ -866,6 +922,7 @@
     <script src="js/uploaded-papers-page.js?v=2.4"></script>
     <script src="js/settings-page.js?v=2.4"></script>
     <script src="js/user-management-page.js?v=2.4"></script>
+    <script src="js/super-admin.js?v=2.4"></script>
     <script src="js/app.js?v=2.4"></script>
 </body>
 </html>
