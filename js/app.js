@@ -54,6 +54,8 @@ class AppController {
         this.bindKeyboardShortcuts();
         this.bindSettingsModal();
         this.updateStorageQuotaDisplay();
+        this.initLoginSlideshow();
+        this.initIOSInteractions();
 
         // Respect page data-default-portal attribute if set (uploader.html vs teacher.html)
         const pageDefaultPortal = document.body.getAttribute("data-default-portal");
@@ -95,16 +97,143 @@ class AppController {
         }
     }
 
-    // --- Dual Portal Management ---
+    // --- Dual Portal Management & iOS Transitions ---
+
+    preloadLoginImages() {
+        const urls = [
+            "https://nithyaprakash1.github.io/ATA.github.io/asset/infra/Infra5.png",
+            "https://nithyaprakash1.github.io/ATA.github.io/asset/infra/Infra9.png",
+            "https://nithyaprakash1.github.io/ATA.github.io/asset/infra/infra12.png",
+            "https://nithyaprakash1.github.io/ATA.github.io/asset/infra/Infra4.png"
+        ];
+        urls.forEach(u => {
+            const img = new Image();
+            img.src = u;
+        });
+    }
+
+    initLoginSlideshow() {
+        this.preloadLoginImages();
+        const slideshow = document.getElementById("login-slideshow");
+        if (!slideshow) return;
+        const slides = slideshow.querySelectorAll(".login-slide-item");
+        const dots = slideshow.querySelectorAll(".slide-dot");
+        if (!slides.length) return;
+
+        let currentIndex = 0;
+        const totalSlides = slides.length;
+        let slideTimer = null;
+
+        const showSlide = (index) => {
+            slides.forEach((s, i) => {
+                s.classList.toggle("active", i === index);
+            });
+            dots.forEach((d, i) => {
+                d.classList.toggle("active", i === index);
+            });
+            currentIndex = index;
+        };
+
+        const nextSlide = () => {
+            const next = (currentIndex + 1) % totalSlides;
+            showSlide(next);
+        };
+
+        const startTimer = () => {
+            if (slideTimer) clearInterval(slideTimer);
+            slideTimer = setInterval(nextSlide, 5500);
+        };
+
+        dots.forEach(dot => {
+            dot.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const idx = parseInt(dot.getAttribute("data-index"), 10);
+                if (!isNaN(idx)) {
+                    showSlide(idx);
+                    startTimer();
+                }
+            });
+        });
+
+        startTimer();
+        this._loginSlideTimer = slideTimer;
+    }
+
+    initIOSInteractions() {
+        // Global iOS tactile ripple on interactive actions
+        document.addEventListener("pointerdown", (e) => {
+            const target = e.target.closest(
+                ".btn-portal-enter, .login-tab-btn, .sidebar-menu-item, .nav-link, .btn, .btn-primary, .btn-super-primary, .btn-super-secondary, .hud-btn, .btn-tool, .action-btn-circle, .slide-dot, .btn-action-view"
+            );
+            if (!target) return;
+
+            target.classList.add("ios-tap-active");
+            const removePress = () => {
+                target.classList.remove("ios-tap-active");
+                window.removeEventListener("pointerup", removePress);
+                window.removeEventListener("pointercancel", removePress);
+            };
+            window.addEventListener("pointerup", removePress);
+            window.addEventListener("pointercancel", removePress);
+
+            // Spawn tactile iOS ripple bubble
+            const rect = target.getBoundingClientRect();
+            const size = Math.max(rect.width, rect.height) * 1.6;
+            const ripple = document.createElement("span");
+            ripple.className = "ios-ripple-bubble";
+
+            const isDarkTarget = target.classList.contains("btn-portal-enter") || target.classList.contains("btn-primary") || target.classList.contains("btn-super-primary");
+            if (!isDarkTarget) {
+                ripple.classList.add("ios-ripple-dark");
+            }
+
+            ripple.style.width = `${size}px`;
+            ripple.style.height = `${size}px`;
+            ripple.style.left = `${e.clientX - rect.left}px`;
+            ripple.style.top = `${e.clientY - rect.top}px`;
+
+            target.classList.add("ios-ripple-target");
+            target.appendChild(ripple);
+
+            ripple.addEventListener("animationend", () => {
+                ripple.remove();
+            });
+        });
+    }
+
+    triggerIOSLoginBurst(clickX, clickY) {
+        const burst = document.createElement("div");
+        burst.className = "ios-login-screen-burst";
+        if (clickX && clickY) {
+            burst.style.setProperty("--burst-x", `${clickX}px`);
+            burst.style.setProperty("--burst-y", `${clickY}px`);
+        }
+        document.body.appendChild(burst);
+        setTimeout(() => burst.remove(), 850);
+
+        const overlay = document.getElementById("portal-login-screen");
+        if (overlay) {
+            overlay.classList.add("ios-login-dismissing");
+        }
+    }
 
     showPortalLoginScreen() {
         const overlay = document.getElementById("portal-login-screen");
-        if (overlay) overlay.style.display = "flex";
+        if (overlay) {
+            overlay.classList.remove("ios-login-dismissing");
+            overlay.style.display = "flex";
+        }
     }
 
     hidePortalLoginScreen() {
         const overlay = document.getElementById("portal-login-screen");
-        if (overlay) overlay.style.display = "none";
+        if (overlay) {
+            overlay.classList.add("ios-login-dismissing");
+            setTimeout(() => {
+                overlay.style.display = "none";
+                overlay.classList.remove("ios-login-dismissing");
+            }, 450);
+        }
     }
 
     // --- Platform License Subscription Gatekeeper ---
@@ -962,6 +1091,7 @@ class AppController {
                             createdAt: new Date().toISOString()
                         };
                     }
+                    this.triggerIOSLoginBurst(e.clientX, e.clientY);
                     window.appStorage.setCurrentUser(superAdmin);
                     this.applySettingsToUI();
                     this.showToast("⚡ Welcome back, Super Admin (Owner)!", "success");
@@ -1112,6 +1242,7 @@ class AppController {
                 else if (activeRole === "uploader") destinationPortal = "uploader";
                 else destinationPortal = "evaluator";
 
+                this.triggerIOSLoginBurst(e.clientX, e.clientY);
                 this.showToast(`Authenticated as ${userAccount.name} (${activeRole.toUpperCase()})`);
                 this.setPortal(destinationPortal, true);
             });
@@ -1385,15 +1516,24 @@ class AppController {
             btn.classList.toggle("active", btn.getAttribute("data-view") === viewName);
         });
 
+        // Determine navigation direction (iOS UINavigationController style)
+        const isBackward = (viewName === "dashboard" || this._isNavigatingBack);
+        const navClass = isBackward ? "ios-nav-backward" : "ios-nav-forward";
+
         // Hide all views
         document.querySelectorAll(".view-section").forEach(sec => {
-            sec.classList.remove("active-view");
+            sec.classList.remove("active-view", "ios-nav-forward", "ios-nav-backward");
         });
+
+        const activateSection = (id) => {
+            const el = document.getElementById(id);
+            if (el) el.classList.add("active-view", navClass);
+            return el;
+        };
 
         // Show target view & mount manager
         if (viewName === "upload-portal") {
-            const el = document.getElementById("view-upload-portal");
-            if (el) el.classList.add("active-view");
+            activateSection("view-upload-portal");
             const root = document.getElementById("upload-portal-container-root");
             this.uploadPortalManager = new UploadPortalManager(root, {
                 onOpenWorkspace: (ev) => this.openWorkspace(ev),
@@ -1401,8 +1541,7 @@ class AppController {
             });
             await this.uploadPortalManager.init();
         } else if (viewName === "dashboard") {
-            const el = document.getElementById("view-dashboard");
-            if (el) el.classList.add("active-view");
+            activateSection("view-dashboard");
             const root = document.getElementById("dashboard-container-root");
             this.dashboardManager = new DashboardManager(root, {
                 onStartNew: () => this.switchView("new-eval"),
@@ -1413,15 +1552,13 @@ class AppController {
             });
             await this.dashboardManager.init();
         } else if (viewName === "new-eval") {
-            const el = document.getElementById("view-new-eval");
-            if (el) el.classList.add("active-view");
+            activateSection("view-new-eval");
             const root = document.getElementById("eval-form-container-root");
             this.evaluationForm = new EvaluationForm(root, {
                 onStartCorrection: (ev) => this.openWorkspace(ev)
             });
         } else if (viewName === "history") {
-            const el = document.getElementById("view-history");
-            if (el) el.classList.add("active-view");
+            activateSection("view-history");
             const root = document.getElementById("history-container-root");
             this.historyManager = new EvaluationHistoryManager(root, {
                 onOpenEvaluation: (ev) => this.openWorkspace(ev),
@@ -1429,54 +1566,47 @@ class AppController {
             });
             await this.historyManager.init();
         } else if (viewName === "bulk-report") {
-            const el = document.getElementById("view-bulk-report");
-            if (el) el.classList.add("active-view");
+            activateSection("view-bulk-report");
             const root = document.getElementById("bulk-report-container-root");
             this.bulkReportManager = new BulkReportManager(root);
             await this.bulkReportManager.init();
         } else if (viewName === "classes") {
-            const el = document.getElementById("view-classes");
-            if (el) el.classList.add("active-view");
+            activateSection("view-classes");
             const root = document.getElementById("classes-container-root");
             if (root && window.ClassesPageManager) {
                 this.classesPageManager = new ClassesPageManager(root);
                 await this.classesPageManager.init();
             }
         } else if (viewName === "uploaded-papers") {
-            const el = document.getElementById("view-uploaded-papers");
-            if (el) el.classList.add("active-view");
+            activateSection("view-uploaded-papers");
             const root = document.getElementById("uploaded-papers-container-root");
             if (root && window.UploadedPapersPageManager) {
                 this.uploadedPapersPageManager = new UploadedPapersPageManager(root);
                 await this.uploadedPapersPageManager.init();
             }
         } else if (viewName === "settings") {
-            const el = document.getElementById("view-settings");
-            if (el) el.classList.add("active-view");
+            activateSection("view-settings");
             const root = document.getElementById("settings-container-root");
             if (root && window.SettingsPageManager) {
                 this.settingsPageManager = new SettingsPageManager(root);
                 await this.settingsPageManager.init();
             }
         } else if (viewName === "user-management") {
-            const el = document.getElementById("view-user-management");
-            if (el) el.classList.add("active-view");
+            activateSection("view-user-management");
             const root = document.getElementById("user-management-container-root");
             if (root && window.UserManagementPageManager) {
                 this.userManagementPageManager = new UserManagementPageManager(root);
                 await this.userManagementPageManager.init();
             }
         } else if (viewName === "admin-panel") {
-            const el = document.getElementById("view-admin-panel");
-            if (el) el.classList.add("active-view");
+            activateSection("view-admin-panel");
             const root = document.getElementById("admin-panel-container-root");
             if (root && window.AdminPanelManager) {
                 this.adminPanelManager = new AdminPanelManager(root);
                 await this.adminPanelManager.init();
             }
         } else if (viewName === "super-admin") {
-            const el = document.getElementById("view-super-admin");
-            if (el) el.classList.add("active-view");
+            activateSection("view-super-admin");
             const root = document.getElementById("super-admin-container-root");
             if (root && window.SuperAdminManager) {
                 if (!this.superAdminManager) {

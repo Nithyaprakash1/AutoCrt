@@ -104,7 +104,22 @@
 
     <!-- Clean Portal Login Gateway (Apple Cupertino Style) -->
     <div class="portal-login-overlay" id="portal-login-screen" style="display: none;">
-        <div class="portal-login-container" style="max-width: 540px;">
+        <!-- Campus Infra Background Slideshow (Apple Style Ambient Background) -->
+        <div class="login-slideshow-container" id="login-slideshow">
+            <div class="login-slide-item active" style="background-image: url('https://nithyaprakash1.github.io/ATA.github.io/asset/infra/Infra5.png');"></div>
+            <div class="login-slide-item" style="background-image: url('https://nithyaprakash1.github.io/ATA.github.io/asset/infra/Infra9.png');"></div>
+            <div class="login-slide-item" style="background-image: url('https://nithyaprakash1.github.io/ATA.github.io/asset/infra/infra12.png');"></div>
+            <div class="login-slide-item" style="background-image: url('https://nithyaprakash1.github.io/ATA.github.io/asset/infra/Infra4.png');"></div>
+            <div class="login-slideshow-vignette"></div>
+            <div class="login-slideshow-indicators" id="login-slideshow-indicators">
+                <button type="button" class="slide-dot active" data-index="0" aria-label="Campus Infra 1"></button>
+                <button type="button" class="slide-dot" data-index="1" aria-label="Campus Infra 2"></button>
+                <button type="button" class="slide-dot" data-index="2" aria-label="Campus Infra 3"></button>
+                <button type="button" class="slide-dot" data-index="3" aria-label="Campus Infra 4"></button>
+            </div>
+        </div>
+
+        <div class="portal-login-container" style="max-width: 540px; position: relative; z-index: 10;">
             <div class="portal-login-brand">
                 <div class="portal-brand-logos-row">
                     <img src="assets/fulllogo.png" alt="Niprak OSM" class="portal-app-logo" />

@@ -1397,14 +1397,88 @@ body {
     position: fixed;
     inset: 0;
     z-index: 1000;
-    background: rgba(242, 242, 247, 0.88);
-    backdrop-filter: blur(32px);
-    -webkit-backdrop-filter: blur(32px);
+    background: #0b1120;
     display: flex;
     align-items: center;
     justify-content: center;
     padding: 24px;
     overflow-y: auto;
+    transition: opacity 0.45s cubic-bezier(0.32, 0.72, 0, 1), transform 0.45s cubic-bezier(0.32, 0.72, 0, 1), filter 0.45s ease;
+}
+
+.portal-login-overlay.ios-login-dismissing {
+    opacity: 0 !important;
+    transform: scale(1.06) !important;
+    filter: blur(14px) !important;
+    pointer-events: none !important;
+}
+
+/* Campus Infrastructure Background Slideshow */
+.login-slideshow-container {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    z-index: 1;
+    pointer-events: none;
+}
+
+.login-slide-item {
+    position: absolute;
+    inset: 0;
+    background-size: cover;
+    background-position: center center;
+    background-repeat: no-repeat;
+    opacity: 0;
+    transform: scale(1.06);
+    transition: opacity 1.6s cubic-bezier(0.4, 0, 0.2, 1), transform 6.5s cubic-bezier(0.25, 1, 0.5, 1);
+    will-change: opacity, transform;
+}
+
+.login-slide-item.active {
+    opacity: 1;
+    transform: scale(1.0);
+}
+
+.login-slideshow-vignette {
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, rgba(15, 23, 42, 0.45) 0%, rgba(11, 17, 32, 0.78) 100%);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    z-index: 2;
+}
+
+.login-slideshow-indicators {
+    position: absolute;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    z-index: 5;
+    pointer-events: auto;
+}
+
+.login-slideshow-indicators .slide-dot {
+    width: 22px;
+    height: 4px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.35);
+    border: none;
+    cursor: pointer;
+    transition: all 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    padding: 0;
+}
+
+.login-slideshow-indicators .slide-dot:hover {
+    background: rgba(255, 255, 255, 0.65);
+}
+
+.login-slideshow-indicators .slide-dot.active {
+    width: 44px;
+    background: #ffffff;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.85);
 }
 
 .portal-login-container {
@@ -1412,12 +1486,29 @@ body {
     width: 100%;
     margin: auto;
     text-align: center;
-    animation: portalFadeIn 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    z-index: 10;
+    animation: portalFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes portalFadeIn {
     from { opacity: 0; transform: scale(0.97) translateY(10px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+/* Glassmorphic Auth Card */
+.portal-login-overlay .portal-role-card {
+    background: rgba(255, 255, 255, 0.92) !important;
+    backdrop-filter: blur(36px) saturate(190%) !important;
+    -webkit-backdrop-filter: blur(36px) saturate(190%) !important;
+    border: 1px solid rgba(255, 255, 255, 0.7) !important;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.3) !important;
+}
+
+[data-theme="dark"] .portal-login-overlay .portal-role-card {
+    background: rgba(28, 28, 30, 0.88) !important;
+    border-color: rgba(255, 255, 255, 0.14) !important;
+    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6) !important;
 }
 
 .portal-login-brand {
@@ -1440,7 +1531,8 @@ body {
     font-size: 2.1rem;
     font-weight: 400;
     letter-spacing: -0.03em;
-    color: var(--text-main);
+    color: #ffffff;
+    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1461,8 +1553,126 @@ body {
 
 .portal-brand-sub {
     font-size: 1.05rem;
-    color: var(--text-muted);
+    color: rgba(255, 255, 255, 0.9);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+    font-weight: 500;
     margin-top: 6px;
+}
+
+.portal-login-footer span {
+    color: rgba(255, 255, 255, 0.78);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
+    font-weight: 500;
+}
+
+/* ==========================================================================
+   iOS Tactile Ripple & Spring Physics Animations
+   ========================================================================== */
+
+.ios-ripple-target {
+    position: relative !important;
+    overflow: hidden !important;
+}
+
+.ios-ripple-bubble {
+    position: absolute;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.12) 60%, transparent 100%);
+    pointer-events: none;
+    transform: translate(-50%, -50%) scale(0);
+    animation: iosRippleExpand 0.62s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    z-index: 99;
+}
+
+.ios-ripple-dark {
+    background: radial-gradient(circle, rgba(0, 0, 0, 0.18) 0%, rgba(0, 0, 0, 0.05) 60%, transparent 100%) !important;
+}
+
+@keyframes iosRippleExpand {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0.9;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(3.2);
+        opacity: 0;
+    }
+}
+
+/* iOS Login Ripple Burst Overlay */
+.ios-login-screen-burst {
+    position: fixed;
+    inset: 0;
+    z-index: 999999;
+    pointer-events: none;
+    overflow: hidden;
+}
+
+.ios-login-screen-burst::after {
+    content: '';
+    position: absolute;
+    left: var(--burst-x, 50%);
+    top: var(--burst-y, 50%);
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    background: radial-gradient(circle, rgba(255, 255, 255, 0.95) 0%, rgba(120, 119, 198, 0.6) 40%, rgba(0, 113, 227, 0.3) 70%, transparent 100%);
+    animation: iosBurstExpand 0.72s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes iosBurstExpand {
+    0% {
+        transform: translate(-50%, -50%) scale(0);
+        opacity: 0.95;
+    }
+    60% {
+        opacity: 0.75;
+    }
+    100% {
+        transform: translate(-50%, -50%) scale(90);
+        opacity: 0;
+    }
+}
+
+/* iOS Tactile Click Feedback */
+.ios-tap-active {
+    transform: scale(0.965) !important;
+    transition: transform 0.12s cubic-bezier(0.2, 0.8, 0.2, 1) !important;
+}
+
+/* ==========================================================================
+   iOS UINavigationController-style Page Transitions
+   ========================================================================== */
+
+.view-section.ios-nav-forward {
+    animation: iosNavSlideInForward 0.38s cubic-bezier(0.32, 0.72, 0, 1) both !important;
+}
+
+.view-section.ios-nav-backward {
+    animation: iosNavSlideInBackward 0.38s cubic-bezier(0.32, 0.72, 0, 1) both !important;
+}
+
+@keyframes iosNavSlideInForward {
+    0% {
+        opacity: 0;
+        transform: translate3d(42px, 0, 0);
+    }
+    100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0);
+    }
+}
+
+@keyframes iosNavSlideInBackward {
+    0% {
+        opacity: 0;
+        transform: translate3d(-42px, 0, 0) scale(0.985);
+    }
+    100% {
+        opacity: 1;
+        transform: translate3d(0, 0, 0) scale(1);
+    }
 }
 
 .portal-cards-row {
