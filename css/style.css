@@ -1396,13 +1396,17 @@ body {
 .portal-login-overlay {
     position: fixed;
     inset: 0;
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
     z-index: 1000;
     background: #0b1120;
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 24px;
-    overflow-y: auto;
+    padding: 12px 16px;
+    box-sizing: border-box;
+    overflow: hidden !important;
     transition: opacity 0.45s cubic-bezier(0.32, 0.72, 0, 1), transform 0.45s cubic-bezier(0.32, 0.72, 0, 1), filter 0.45s ease;
 }
 
@@ -1442,7 +1446,7 @@ body {
 .login-slideshow-vignette {
     position: absolute;
     inset: 0;
-    background: radial-gradient(circle at center, rgba(15, 23, 42, 0.45) 0%, rgba(11, 17, 32, 0.78) 100%);
+    background: radial-gradient(circle at center, rgba(15, 23, 42, 0.45) 0%, rgba(11, 17, 32, 0.82) 100%);
     backdrop-filter: blur(6px);
     -webkit-backdrop-filter: blur(6px);
     z-index: 2;
@@ -1450,19 +1454,19 @@ body {
 
 .login-slideshow-indicators {
     position: absolute;
-    bottom: 24px;
+    bottom: 8px;
     left: 50%;
     transform: translateX(-50%);
     display: flex;
     align-items: center;
-    gap: 8px;
+    gap: 6px;
     z-index: 5;
     pointer-events: auto;
 }
 
 .login-slideshow-indicators .slide-dot {
-    width: 22px;
-    height: 4px;
+    width: 18px;
+    height: 3px;
     border-radius: 999px;
     background: rgba(255, 255, 255, 0.35);
     border: none;
@@ -1476,93 +1480,270 @@ body {
 }
 
 .login-slideshow-indicators .slide-dot.active {
-    width: 44px;
+    width: 32px;
     background: #ffffff;
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.85);
+    box-shadow: 0 0 10px rgba(255, 255, 255, 0.85);
 }
 
 .portal-login-container {
-    max-width: 940px;
+    max-width: 480px;
     width: 100%;
     margin: auto;
     text-align: center;
     position: relative;
     z-index: 10;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    box-sizing: border-box;
     animation: portalFadeIn 0.45s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 @keyframes portalFadeIn {
-    from { opacity: 0; transform: scale(0.97) translateY(10px); }
+    from { opacity: 0; transform: scale(0.97) translateY(8px); }
     to { opacity: 1; transform: scale(1) translateY(0); }
 }
 
-/* Glassmorphic Auth Card */
+.portal-login-brand {
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+.portal-brand-logos-row {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    padding: 4px 14px;
+    background: rgba(255, 255, 255, 0.82);
+    backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.55);
+    border-radius: var(--radius-pill);
+    margin-bottom: 6px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.portal-app-logo {
+    height: 26px;
+    width: auto;
+    max-width: 130px;
+    object-fit: contain;
+}
+
+.portal-logo-divider {
+    width: 1px;
+    height: 18px;
+    background: rgba(0, 0, 0, 0.15);
+}
+
+.portal-school-logo {
+    height: 24px;
+    width: auto;
+    max-width: 120px;
+    object-fit: contain;
+}
+
+.portal-brand-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: #ffffff;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    margin: 0;
+    line-height: 1.2;
+}
+
+.brand-badge-large {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 2px 7px;
+    border-radius: var(--radius-pill);
+    background: rgba(0, 113, 227, 0.2);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+}
+
+.portal-brand-sub {
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.88);
+    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.55);
+    font-weight: 500;
+    margin: 2px 0 0;
+    line-height: 1.2;
+}
+
+/* Glassmorphic Auth Card (Compact Fit to Screen) */
 .portal-login-overlay .portal-role-card {
     background: rgba(255, 255, 255, 0.92) !important;
     backdrop-filter: blur(36px) saturate(190%) !important;
     -webkit-backdrop-filter: blur(36px) saturate(190%) !important;
     border: 1px solid rgba(255, 255, 255, 0.7) !important;
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.3) !important;
+    border-radius: 18px !important;
+    padding: 16px 20px !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.3) !important;
+    width: 100%;
+    box-sizing: border-box;
+    text-align: left;
 }
 
 [data-theme="dark"] .portal-login-overlay .portal-role-card {
     background: rgba(28, 28, 30, 0.88) !important;
     border-color: rgba(255, 255, 255, 0.14) !important;
-    box-shadow: 0 24px 70px rgba(0, 0, 0, 0.6) !important;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6) !important;
 }
 
-.portal-login-brand {
-    margin-bottom: 32px;
-}
-
-.brand-icon-large {
-    width: 58px;
-    height: 58px;
-    border-radius: 18px;
-    background: linear-gradient(135deg, #34C759, #248A3D);
+.portal-card-header-row {
     display: flex;
+    justify-content: space-between;
     align-items: center;
-    justify-content: center;
-    margin: 0 auto 16px;
-    box-shadow: 0 10px 24px rgba(52, 199, 89, 0.3);
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 6px;
 }
 
-.portal-brand-title {
-    font-size: 2.1rem;
-    font-weight: 400;
-    letter-spacing: -0.03em;
-    color: #ffffff;
-    text-shadow: 0 2px 14px rgba(0, 0, 0, 0.55);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
+.portal-card-title-text {
+    font-size: 0.88rem;
+    font-weight: 600;
+    color: var(--text-main);
 }
 
-.brand-badge-large {
-    font-size: 0.85rem;
-    font-weight: 400;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    padding: 4px 10px;
-    border-radius: var(--radius-pill);
-    background: var(--primary-light);
-    color: var(--primary-active);
-    border: 1px solid var(--primary-border);
+.portal-toggle-mode-btn {
+    background: none;
+    border: none;
+    color: #0071E3;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
 }
 
-.portal-brand-sub {
-    font-size: 1.05rem;
-    color: rgba(255, 255, 255, 0.9);
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+.portal-input-group {
+    margin-bottom: 8px;
+}
+
+.portal-input-group.portal-pass-group {
+    margin-bottom: 12px;
+}
+
+.portal-field-label {
+    display: block;
+    font-size: 0.72rem;
     font-weight: 500;
-    margin-top: 6px;
+    color: var(--text-muted);
+    margin-bottom: 2px;
+}
+
+.portal-tabs-wrapper {
+    display: flex;
+    gap: 4px;
+    background: var(--bg-subtle);
+    padding: 3px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color);
+}
+
+.portal-tabs-wrapper .login-tab-btn {
+    flex: 1;
+    height: 30px;
+    border: none;
+    border-radius: 7px;
+    font-size: 0.76rem;
+    font-weight: 500;
+    cursor: pointer;
+    background: transparent;
+    color: var(--text-muted);
+    transition: all 0.15s ease;
+}
+
+.portal-tabs-wrapper .login-tab-btn.active {
+    background: var(--bg-card);
+    color: var(--text-main);
+    box-shadow: var(--shadow-xs);
+}
+
+.portal-text-input {
+    width: 100%;
+    height: 35px;
+    padding: 0 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    font-size: 0.84rem;
+    background: var(--bg-subtle);
+    color: var(--text-main);
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.portal-text-input:focus {
+    border-color: #0071E3;
+    box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.15);
+}
+
+.portal-pass-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2px;
+}
+
+.portal-forgot-pass-btn {
+    background: none;
+    border: none;
+    color: #0071E3;
+    font-size: 0.72rem;
+    font-weight: 500;
+    cursor: pointer;
+    padding: 0;
+}
+
+.btn-portal-enter {
+    height: 40px !important;
+    border-radius: 11px !important;
+    font-size: 0.88rem !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 4px 14px rgba(175, 82, 222, 0.3);
+}
+
+.portal-login-footer {
+    margin-top: 8px;
+    text-align: center;
 }
 
 .portal-login-footer span {
-    color: rgba(255, 255, 255, 0.78);
-    text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
-    font-weight: 500;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.75);
+    text-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+}
+
+/* Responsiveness for small height displays (netbooks, landscape mobile) */
+@media (max-height: 640px) {
+    .portal-login-brand .portal-brand-logos-row {
+        padding: 2px 10px;
+        margin-bottom: 3px;
+    }
+    .portal-app-logo { height: 22px !important; }
+    .portal-school-logo { height: 20px !important; }
+    .portal-brand-title { font-size: 1.1rem !important; }
+    .portal-brand-sub { display: none; }
+    .portal-login-overlay .portal-role-card { padding: 12px 16px !important; }
+    .portal-input-group { margin-bottom: 5px !important; }
+    .portal-input-group.portal-pass-group { margin-bottom: 8px !important; }
+    .portal-text-input { height: 32px !important; }
+    .btn-portal-enter { height: 36px !important; }
+    .login-slideshow-indicators { display: none; }
 }
 
 /* ==========================================================================

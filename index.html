@@ -119,7 +119,7 @@
             </div>
         </div>
 
-        <div class="portal-login-container" style="max-width: 540px; position: relative; z-index: 10;">
+        <div class="portal-login-container" style="max-width: 480px; width: 100%; position: relative; z-index: 10;">
             <div class="portal-login-brand">
                 <div class="portal-brand-logos-row">
                     <img src="assets/fulllogo.png" alt="Niprak OSM" class="portal-app-logo" />
@@ -130,47 +130,47 @@
                 <p class="portal-brand-sub">Physics Digital Examination Platform</p>
             </div>
 
-            <!-- Single Unified Portal Authentication Card -->
-            <div class="portal-role-card" style="padding: 28px; border-radius: 24px; box-shadow: var(--shadow-md);">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; border-bottom: 1px solid var(--border-color); padding-bottom: 12px;">
-                    <span style="font-size: 0.95rem; font-weight: 600; color: var(--text-main);" id="auth-mode-title">Account Sign In</span>
-                    <button type="button" id="btn-toggle-auth-mode" style="background: none; border: none; color: #0071E3; font-size: 0.82rem; font-weight: 600; cursor: pointer;">+ Create Account</button>
+            <!-- Single Unified Portal Authentication Card (Compact Fit-to-Screen) -->
+            <div class="portal-role-card">
+                <div class="portal-card-header-row">
+                    <span class="portal-card-title-text" id="auth-mode-title">Account Sign In</span>
+                    <button type="button" id="btn-toggle-auth-mode" class="portal-toggle-mode-btn">+ Create Account</button>
                 </div>
 
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 6px;">Select Role / Portal Destination</label>
-                    <div style="display: flex; gap: 6px; background: var(--bg-subtle); padding: 4px; border-radius: 12px; border: 1px solid var(--border-color);">
-                        <button type="button" id="tab-login-admin" class="login-tab-btn active" style="flex: 1; height: 36px; border: none; border-radius: 9px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: var(--bg-card); color: var(--text-main); box-shadow: var(--shadow-xs);">Admin Panel</button>
-                        <button type="button" id="tab-login-uploader" class="login-tab-btn" style="flex: 1; height: 36px; border: none; border-radius: 9px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: transparent; color: var(--text-muted);">Upload Desk</button>
-                        <button type="button" id="tab-login-evaluator" class="login-tab-btn" style="flex: 1; height: 36px; border: none; border-radius: 9px; font-size: 0.8rem; font-weight: 500; cursor: pointer; background: transparent; color: var(--text-muted);">Teacher Desk</button>
+                <div class="portal-input-group">
+                    <label class="portal-field-label">Select Role / Portal Destination</label>
+                    <div class="portal-tabs-wrapper">
+                        <button type="button" id="tab-login-admin" class="login-tab-btn active">Admin Panel</button>
+                        <button type="button" id="tab-login-uploader" class="login-tab-btn">Upload Desk</button>
+                        <button type="button" id="tab-login-evaluator" class="login-tab-btn">Teacher Desk</button>
                     </div>
                 </div>
 
-                <div id="field-create-name" style="display: none; margin-bottom: 16px;">
-                    <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">Full Name</label>
-                    <input type="text" id="demo-login-name" value="" placeholder="Enter your full name" style="width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 0.9rem; background: var(--bg-subtle); color: var(--text-main);" />
+                <div id="field-create-name" class="portal-input-group" style="display: none;">
+                    <label class="portal-field-label">Full Name</label>
+                    <input type="text" id="demo-login-name" value="" placeholder="Enter your full name" class="portal-text-input" />
                 </div>
 
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 4px;">User Email</label>
-                    <input type="email" id="demo-login-email" value="" placeholder="Enter your email" style="width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 0.9rem; background: var(--bg-subtle); color: var(--text-main);" />
+                <div class="portal-input-group">
+                    <label class="portal-field-label">User Email</label>
+                    <input type="email" id="demo-login-email" value="" placeholder="Enter your email" class="portal-text-input" />
                 </div>
 
-                <div style="margin-bottom: 24px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
-                        <label style="display: block; font-size: 0.78rem; color: var(--text-muted); margin-bottom: 0;">Password</label>
-                        <button type="button" id="btn-forgot-password" style="background: none; border: none; color: #0071E3; font-size: 0.78rem; font-weight: 500; cursor: pointer; padding: 0; transition: color 0.15s ease;">Forgot Password?</button>
+                <div class="portal-input-group portal-pass-group">
+                    <div class="portal-pass-header-row">
+                        <label class="portal-field-label" style="margin-bottom: 0;">Password</label>
+                        <button type="button" id="btn-forgot-password" class="portal-forgot-pass-btn">Forgot Password?</button>
                     </div>
-                    <input type="password" id="demo-login-password" value="" placeholder="Enter your password" style="width: 100%; height: 42px; padding: 0 14px; border: 1px solid var(--border-color); border-radius: 12px; font-size: 0.9rem; background: var(--bg-subtle); color: var(--text-main);" />
+                    <input type="password" id="demo-login-password" value="" placeholder="Enter your password" class="portal-text-input" />
                 </div>
 
-                <a href="javascript:void(0)" class="btn-portal-enter btn-enter-purple" id="btn-login-as-uploader" style="height: 48px; border-radius: 14px; font-size: 0.95rem; background: linear-gradient(135deg, #AF52DE, #5856D6); color: white; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 600; text-decoration: none; transition: transform 0.15s ease, box-shadow 0.15s ease;">
+                <a href="javascript:void(0)" class="btn-portal-enter btn-enter-purple" id="btn-login-as-uploader">
                     Access Admin Panel
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                 </a>
             </div>
 
-            <div class="portal-login-footer" style="margin-top: 24px;">
+            <div class="portal-login-footer">
                 <span>Niprak OSM Platform • Co-Branded with Adwaith Thought Academy</span>
             </div>
         </div>
