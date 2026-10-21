@@ -13,6 +13,7 @@ class ClassesPageManager {
         this.currentRoster = [];
         this.searchQuery = "";
         this.isAddStudentOpen = false;
+        this.selectedClassIds = new Set();
     }
 
     async init() {
@@ -83,22 +84,44 @@ class ClassesPageManager {
                     </div>
                 </div>
 
-                <!-- Class Selection Cards Grid -->
+                <!-- Class Selection Cards Grid with Bulk Selection Toolbar -->
                 <div class="classes-cards-section">
-                    <div class="section-label-row">
-                        <span class="section-heading">Active Classes (${this.classes.length})</span>
-                        <span class="section-subtext">Click any class card to view and manage enrolled student rosters</span>
+                    <div class="section-label-row" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <span class="section-heading">Active Classes (${this.classes.length})</span>
+                            <span class="section-subtext">Click any class card to view enrolled roster or select checkboxes for bulk operations</span>
+                        </div>
+                        <div class="classes-bulk-toolbar" style="display: flex; align-items: center; gap: 14px;">
+                            <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer;">
+                                <input type="checkbox" id="classes-select-all" style="cursor: pointer; width: 16px; height: 16px;" ${this.classes.length > 0 && this.selectedClassIds.size === this.classes.length ? 'checked' : ''} />
+                                Select All
+                            </label>
+                            <button type="button" class="btn-classes-bulk-delete" id="btn-classes-bulk-delete" style="display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 8px; font-size: 0.84rem; font-weight: 600; border: 1.5px solid #DC2626; background: ${this.selectedClassIds.size > 0 ? '#DC2626' : '#FFFFFF'}; color: ${this.selectedClassIds.size > 0 ? '#FFFFFF' : '#DC2626'}; cursor: pointer; transition: all 0.15s ease;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                <span>Bulk Delete Classes</span>
+                                <span id="classes-bulk-count-badge">(${this.selectedClassIds.size})</span>
+                            </button>
+                        </div>
                     </div>
 
                     <div class="classes-cards-grid">
                         ${this.classes.map(cls => {
                             const isSelected = cls.id === this.activeClassId;
+                            const isChecked = this.selectedClassIds.has(cls.id);
                             const count = isSelected ? this.currentRoster.length : (cls.studentCount !== undefined ? cls.studentCount : 0);
                             return `
-                                <div class="class-card ${isSelected ? 'selected' : ''}" data-class-id="${cls.id}">
+                                <div class="class-card ${isSelected ? 'selected' : ''}" data-class-id="${cls.id}" style="${isChecked ? 'border-color: #DC2626; background: rgba(220, 38, 38, 0.03);' : ''}">
                                     <div class="class-card-top">
-                                        <div class="class-card-badge">Section ${cls.section || 'A'}</div>
-                                        <div class="class-status-dot ${isSelected ? 'active' : ''}"></div>
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <input type="checkbox" class="class-card-checkbox" data-class-id="${cls.id}" ${isChecked ? 'checked' : ''} title="Select class for bulk action" style="cursor: pointer; width: 16px; height: 16px;" />
+                                            <div class="class-card-badge">Section ${cls.section || 'A'}</div>
+                                        </div>
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <button type="button" class="btn-delete-single-class" data-class-id="${cls.id}" title="Delete class" style="background: none; border: none; color: #94A3B8; cursor: pointer; padding: 4px; border-radius: 6px; display: inline-flex; align-items: center; transition: color 0.15s;">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                            </button>
+                                            <div class="class-status-dot ${isSelected ? 'active' : ''}"></div>
+                                        </div>
                                     </div>
                                     <h3 class="class-card-title">${cls.name || cls.label}</h3>
                                     <div class="class-card-meta">
@@ -267,10 +290,67 @@ class ClassesPageManager {
     }
 
     bindEvents() {
+        // Select All Classes Checkbox
+        const selectAllClasses = this.container.querySelector("#classes-select-all");
+        if (selectAllClasses) {
+            selectAllClasses.addEventListener("change", (e) => {
+                if (e.target.checked) {
+                    this.classes.forEach(c => this.selectedClassIds.add(c.id));
+                } else {
+                    this.selectedClassIds.clear();
+                }
+                this.render();
+            });
+        }
+
+        // Individual Class Checkboxes
+        this.container.querySelectorAll(".class-card-checkbox").forEach(cb => {
+            cb.addEventListener("click", (e) => {
+                e.stopPropagation();
+            });
+            cb.addEventListener("change", (e) => {
+                const id = cb.getAttribute("data-class-id");
+                if (e.target.checked) {
+                    this.selectedClassIds.add(id);
+                } else {
+                    this.selectedClassIds.delete(id);
+                }
+                this.updateClassSelectionBadge();
+                const card = cb.closest(".class-card");
+                if (card) {
+                    card.style.borderColor = e.target.checked ? "#DC2626" : "";
+                    card.style.background = e.target.checked ? "rgba(220, 38, 38, 0.03)" : "";
+                }
+            });
+        });
+
+        // Single Class Delete Button
+        this.container.querySelectorAll(".btn-delete-single-class").forEach(btn => {
+            btn.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                const id = btn.getAttribute("data-class-id");
+                await this.deleteClassesByIds([id]);
+            });
+        });
+
+        // Bulk Delete Classes Button
+        const btnBulkDeleteClasses = this.container.querySelector("#btn-classes-bulk-delete");
+        if (btnBulkDeleteClasses) {
+            btnBulkDeleteClasses.addEventListener("click", async () => {
+                const ids = Array.from(this.selectedClassIds);
+                if (ids.length === 0) {
+                    if (window.app) window.app.showToast("Please select at least one class to delete.", "info");
+                    else alert("Please select at least one class to delete.");
+                    return;
+                }
+                await this.deleteClassesByIds(ids);
+            });
+        }
+
         // Class card selection
         this.container.querySelectorAll(".class-card[data-class-id]").forEach(card => {
             card.addEventListener("click", async (e) => {
-                if (e.target.closest(".btn-card-upload-shortcut")) return;
+                if (e.target.closest(".btn-card-upload-shortcut") || e.target.closest(".class-card-checkbox") || e.target.closest(".btn-delete-single-class")) return;
                 const id = card.getAttribute("data-class-id");
                 if (id !== this.activeClassId) {
                     this.activeClassId = id;
@@ -567,6 +647,57 @@ class ClassesPageManager {
             console.error("Error reading import file:", err);
             alert("Failed to parse file. Please verify CSV formatting.");
         }
+    }
+
+    updateClassSelectionBadge() {
+        const badge = this.container.querySelector("#classes-bulk-count-badge");
+        if (badge) badge.textContent = `(${this.selectedClassIds.size})`;
+        const btn = this.container.querySelector("#btn-classes-bulk-delete");
+        if (btn) {
+            if (this.selectedClassIds.size > 0) {
+                btn.style.background = "#DC2626";
+                btn.style.color = "#FFFFFF";
+            } else {
+                btn.style.background = "#FFFFFF";
+                btn.style.color = "#DC2626";
+            }
+        }
+        const selectAll = this.container.querySelector("#classes-select-all");
+        if (selectAll) {
+            selectAll.checked = (this.classes.length > 0 && this.selectedClassIds.size === this.classes.length);
+        }
+    }
+
+    async deleteClassesByIds(idsToDelete) {
+        if (!idsToDelete || idsToDelete.length === 0) return;
+        const targets = this.classes.filter(c => idsToDelete.includes(c.id));
+        const names = targets.map(c => c.name || c.label).join(", ");
+        const confirmMsg = idsToDelete.length === 1
+            ? `Are you sure you want to delete class "${targets[0]?.name || targets[0]?.label}" and all its student records?`
+            : `Are you sure you want to delete ${idsToDelete.length} selected classes (${names}) and all their student records?`;
+        if (!confirm(confirmMsg)) return;
+
+        this.classes = this.classes.filter(c => !idsToDelete.includes(c.id));
+        if (window.appStorage) {
+            await window.appStorage.saveClassesList(this.classes);
+            for (const id of idsToDelete) {
+                try {
+                    localStorage.removeItem(`niprak_roster_${id}`);
+                    localStorage.removeItem(`onespace_roster_${id}`);
+                } catch (e) {}
+            }
+        }
+        if (idsToDelete.includes(this.activeClassId)) {
+            this.activeClassId = this.classes.length > 0 ? this.classes[0].id : null;
+            if (this.activeClassId && window.appStorage) {
+                this.currentRoster = await window.appStorage.getClassRoster(this.activeClassId);
+            } else {
+                this.currentRoster = [];
+            }
+        }
+        idsToDelete.forEach(id => this.selectedClassIds.delete(id));
+        if (window.app) window.app.showToast(`Deleted ${idsToDelete.length} class(es) successfully.`);
+        this.render();
     }
 }
 

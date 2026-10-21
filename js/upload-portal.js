@@ -22,6 +22,12 @@ class UploadPortalManager {
         this.fileQueue = []; // Array of { file, studentName, rollNo, pages: [], isProcessing: false, isReady: false }
         this.existingPapers = []; // Papers already uploaded for this Subject + Template + Class
 
+        // Bulk Selection Sets for Uploader Deletion
+        this.selectedSubjectIds = new Set();
+        this.selectedTemplateIds = new Set();
+        this.selectedClassIds = new Set();
+        this.selectedExistingPaperIds = new Set();
+
         // Predefined Subjects with Templates
         this.catalog = [
             {
@@ -884,21 +890,36 @@ class UploadPortalManager {
                         <h3 class="step-title">Select Subject</h3>
                         <p class="step-desc">Pick an active subject to browse its exam templates, or click <strong>+ Create Subject</strong> to add a new subject.</p>
                     </div>
-                    <button type="button" class="btn-primary btn-create-subject-trigger" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; font-weight: 600; border-radius: 10px; cursor: pointer; background: #0071E3; color: #fff; border: none; box-shadow: 0 4px 12px rgba(0, 113, 227, 0.25); font-size: 14px;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        + Create Subject
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer;">
+                            <input type="checkbox" id="subjects-select-all" style="cursor: pointer; width: 16px; height: 16px;" ${this.catalog.length > 0 && this.selectedSubjectIds.size === this.catalog.length ? 'checked' : ''} />
+                            Select All
+                        </label>
+                        <button type="button" class="btn-bulk-delete-subjects" id="btn-bulk-delete-subjects" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; font-weight: 600; border-radius: 10px; cursor: pointer; border: 1.5px solid #DC2626; background: ${this.selectedSubjectIds.size > 0 ? '#DC2626' : '#FFFFFF'}; color: ${this.selectedSubjectIds.size > 0 ? '#FFFFFF' : '#DC2626'}; font-size: 14px; transition: all 0.15s ease;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            <span>Bulk Delete Subjects</span>
+                            <span id="subjects-bulk-count-badge">(${this.selectedSubjectIds.size})</span>
+                        </button>
+                        <button type="button" class="btn-primary btn-create-subject-trigger" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; font-weight: 600; border-radius: 10px; cursor: pointer; background: #0071E3; color: #fff; border: none; box-shadow: 0 4px 12px rgba(0, 113, 227, 0.25); font-size: 14px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            + Create Subject
+                        </button>
+                    </div>
                 </div>
 
                 <div class="subjects-grid">
                     ${this.catalog.map(sub => {
                         const tplCount = (sub.templates && Array.isArray(sub.templates)) ? sub.templates.length : 0;
                         const badgeText = tplCount === 1 ? '1 Template' : `${tplCount} Templates`;
+                        const isChecked = this.selectedSubjectIds.has(sub.id);
                         return `
-                        <div class="subject-card ${this.selectedSubject && this.selectedSubject.id === sub.id ? 'selected' : ''}" data-subject-id="${sub.id}">
+                        <div class="subject-card ${this.selectedSubject && this.selectedSubject.id === sub.id ? 'selected' : ''}" data-subject-id="${sub.id}" style="${isChecked ? 'border-color: #DC2626; background: rgba(220, 38, 38, 0.03);' : ''}">
                             <div class="subject-card-top">
-                                <div class="subject-icon-box" style="background: ${this.getSubjectColor(sub)}15;">
-                                    ${this.getSubjectIcon(sub)}
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="checkbox" class="subject-card-check" data-subject-id="${sub.id}" ${isChecked ? 'checked' : ''} title="Select subject for bulk action" style="cursor: pointer; width: 18px; height: 18px;" />
+                                    <div class="subject-icon-box" style="background: ${this.getSubjectColor(sub)}15;">
+                                        ${this.getSubjectIcon(sub)}
+                                    </div>
                                 </div>
                                 <span class="subject-count-badge">${badgeText}</span>
                                 <div class="subject-header-actions" style="margin-left: auto; display: flex; gap: 4px;">
@@ -954,10 +975,21 @@ class UploadPortalManager {
                             <p class="step-desc">Select a template to upload data for, or click <strong>+ Create Template</strong> to build a new blueprint.</p>
                         </div>
                     </div>
-                    <button type="button" class="btn-primary btn-create-template-trigger" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; font-weight: 600; border-radius: 10px; cursor: pointer; background: #0071E3; color: #fff; border: none; box-shadow: 0 4px 12px rgba(0, 113, 227, 0.25); font-size: 14px;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                        + Create Template
-                    </button>
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer;">
+                            <input type="checkbox" id="templates-select-all" style="cursor: pointer; width: 16px; height: 16px;" ${(this.selectedSubject.templates || []).length > 0 && this.selectedTemplateIds.size === (this.selectedSubject.templates || []).length ? 'checked' : ''} />
+                            Select All
+                        </label>
+                        <button type="button" class="btn-bulk-delete-templates" id="btn-bulk-delete-templates" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; font-weight: 600; border-radius: 10px; cursor: pointer; border: 1.5px solid #DC2626; background: ${this.selectedTemplateIds.size > 0 ? '#DC2626' : '#FFFFFF'}; color: ${this.selectedTemplateIds.size > 0 ? '#FFFFFF' : '#DC2626'}; font-size: 14px; transition: all 0.15s ease;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            <span>Bulk Delete Templates</span>
+                            <span id="templates-bulk-count-badge">(${this.selectedTemplateIds.size})</span>
+                        </button>
+                        <button type="button" class="btn-primary btn-create-template-trigger" style="display: inline-flex; align-items: center; gap: 8px; padding: 10px 18px; font-weight: 600; border-radius: 10px; cursor: pointer; background: #0071E3; color: #fff; border: none; box-shadow: 0 4px 12px rgba(0, 113, 227, 0.25); font-size: 14px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            + Create Template
+                        </button>
+                    </div>
                 </div>
 
                 <div class="templates-grid">
@@ -983,10 +1015,14 @@ class UploadPortalManager {
                             });
                         }
 
+                        const isChecked = this.selectedTemplateIds.has(tpl.id);
                         return `
-                            <div class="template-card ${this.selectedTemplate && this.selectedTemplate.id === tpl.id ? 'selected' : ''}" data-template-id="${tpl.id}">
+                            <div class="template-card ${this.selectedTemplate && this.selectedTemplate.id === tpl.id ? 'selected' : ''}" data-template-id="${tpl.id}" style="${isChecked ? 'border-color: #DC2626; background: rgba(220, 38, 38, 0.03);' : ''}">
                                 <div class="template-card-header">
-                                    <span class="template-badge">${tpl.badge || 'Standard'}</span>
+                                    <div style="display: flex; align-items: center; gap: 8px;">
+                                        <input type="checkbox" class="template-card-check" data-template-id="${tpl.id}" ${isChecked ? 'checked' : ''} title="Select template for bulk action" style="cursor: pointer; width: 16px; height: 16px;" />
+                                        <span class="template-badge">${tpl.badge || 'Standard'}</span>
+                                    </div>
                                     <div class="template-header-actions" style="display: flex; align-items: center; gap: 6px;">
                                         <button type="button" class="btn-card-action btn-edit-template" data-template-id="${tpl.id}" title="Edit Exam Template Structure">
                                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
@@ -1053,34 +1089,56 @@ class UploadPortalManager {
 
         return `
             <div class="step-view-block animate-fade-in">
-                <div class="step-nav-bar">
-                    <button type="button" class="btn-step-back" id="btn-back-to-step2">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
-                        Back to Templates
-                    </button>
-                    <div class="step-header-intro" style="margin-bottom: 0;">
-                        <span class="step-badge">Step 3 of 4</span>
-                        <h3 class="step-title">Select Class & Section</h3>
-                        <p class="step-desc">Choose the class that completed the <span class="text-highlight">${this.selectedTemplate.name}</span> (${this.selectedSubject.name}).</p>
+                <div class="step-nav-bar" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
+                    <div style="display: flex; align-items: center; gap: 14px;">
+                        <button type="button" class="btn-step-back" id="btn-back-to-step2">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                            Back to Templates
+                        </button>
+                        <div class="step-header-intro" style="margin-bottom: 0;">
+                            <span class="step-badge">Step 3 of 4</span>
+                            <h3 class="step-title">Select Class & Section</h3>
+                            <p class="step-desc">Choose the class that completed the <span class="text-highlight">${this.selectedTemplate.name}</span> (${this.selectedSubject.name}).</p>
+                        </div>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                        <label style="display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; font-weight: 600; color: #475569; cursor: pointer;">
+                            <input type="checkbox" id="classes-step3-select-all" style="cursor: pointer; width: 16px; height: 16px;" ${this.classes.length > 0 && this.selectedClassIds.size === this.classes.length ? 'checked' : ''} />
+                            Select All
+                        </label>
+                        <button type="button" class="btn-bulk-delete-classes-step3" id="btn-bulk-delete-classes-step3" style="display: inline-flex; align-items: center; gap: 6px; padding: 10px 16px; font-weight: 600; border-radius: 10px; cursor: pointer; border: 1.5px solid #DC2626; background: ${this.selectedClassIds.size > 0 ? '#DC2626' : '#FFFFFF'}; color: ${this.selectedClassIds.size > 0 ? '#FFFFFF' : '#DC2626'}; font-size: 14px; transition: all 0.15s ease;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            <span>Bulk Delete Classes</span>
+                            <span id="classes-step3-bulk-count-badge">(${this.selectedClassIds.size})</span>
+                        </button>
                     </div>
                 </div>
 
                 <div class="classes-grid">
-                    ${this.classes.map(cls => `
-                        <div class="class-card ${this.selectedClass && this.selectedClass.id === cls.id ? 'selected' : ''}" data-class-id="${cls.id}">
+                    ${this.classes.map(cls => {
+                        const isChecked = this.selectedClassIds.has(cls.id);
+                        return `
+                        <div class="class-card ${this.selectedClass && this.selectedClass.id === cls.id ? 'selected' : ''}" data-class-id="${cls.id}" style="${isChecked ? 'border-color: #DC2626; background: rgba(220, 38, 38, 0.03);' : ''}">
+                            <div style="display: flex; justify-content: space-between; align-items: center; width: 100%; margin-bottom: 6px;">
+                                <input type="checkbox" class="class-step3-card-check" data-class-id="${cls.id}" ${isChecked ? 'checked' : ''} title="Select class for bulk action" style="cursor: pointer; width: 16px; height: 16px;" />
+                                <button type="button" class="btn-delete-single-class-step3" data-class-id="${cls.id}" title="Delete class" style="background: none; border: none; color: #94A3B8; cursor: pointer; padding: 3px; border-radius: 4px; display: inline-flex; align-items: center;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                </button>
+                            </div>
                             <div class="class-card-icon">
                                 <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
                             </div>
                             <div class="class-card-content">
                                 <h4 class="class-title">${cls.label}</h4>
-                                <span class="class-count">${cls.studentsCount}</span>
+                                <span class="class-count">${cls.studentsCount || (cls.studentCount ? cls.studentCount + ' Enrolled' : '25 Enrolled')}</span>
                             </div>
                             <button type="button" class="btn-select-class">
                                 Proceed to Upload
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
                             </button>
                         </div>
-                    `).join('')}
+                    `;
+                    }).join('')}
 
                     <!-- Add New Class Card -->
                     <div class="card-add-entity" id="btn-add-class-card" title="Add New Class">
@@ -1464,10 +1522,17 @@ class UploadPortalManager {
                             </h4>
                             <span class="existing-badge" id="existing-count-badge">Loading papers...</span>
                         </div>
-                        <button type="button" class="btn-clean-unwanted-data" id="btn-portal-clean-data" title="Clean up unwanted test/demo data and Dharnish records" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #DC2626; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; cursor: pointer;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                            Clean Up Unwanted Data
-                        </button>
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <button type="button" class="btn-existing-bulk-delete" id="btn-existing-bulk-delete" title="Bulk delete selected papers" style="display: inline-flex; align-items: center; gap: 6px; background: ${this.selectedExistingPaperIds.size > 0 ? '#DC2626' : '#FFFFFF'}; border: 1.5px solid #DC2626; color: ${this.selectedExistingPaperIds.size > 0 ? '#FFFFFF' : '#DC2626'}; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                <span>Bulk Delete Papers</span>
+                                <span id="existing-bulk-count">(${this.selectedExistingPaperIds.size})</span>
+                            </button>
+                            <button type="button" class="btn-clean-unwanted-data" id="btn-portal-clean-data" title="Clean up unwanted test/demo data and Dharnish records" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #DC2626; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; cursor: pointer;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                Clean Up Unwanted Data
+                            </button>
+                        </div>
                     </div>
                     <div id="existing-papers-tbody-wrap"></div>
                 </div>
@@ -3139,10 +3204,80 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
     bindCurrentStepEvents() {
         if (this.currentStep === 1) {
+            // Select All Subjects Checkbox
+            const selAllSub = this.container.querySelector("#subjects-select-all");
+            if (selAllSub) {
+                selAllSub.addEventListener("change", (e) => {
+                    if (e.target.checked) {
+                        this.catalog.forEach(s => this.selectedSubjectIds.add(s.id));
+                    } else {
+                        this.selectedSubjectIds.clear();
+                    }
+                    this.updateStepView();
+                });
+            }
+
+            // Subject Checkboxes
+            this.container.querySelectorAll(".subject-card-check").forEach(cb => {
+                cb.addEventListener("click", (e) => e.stopPropagation());
+                cb.addEventListener("change", (e) => {
+                    const id = cb.getAttribute("data-subject-id");
+                    if (e.target.checked) {
+                        this.selectedSubjectIds.add(id);
+                    } else {
+                        this.selectedSubjectIds.delete(id);
+                    }
+                    const badge = this.container.querySelector("#subjects-bulk-count-badge");
+                    if (badge) badge.textContent = `(${this.selectedSubjectIds.size})`;
+                    const btn = this.container.querySelector("#btn-bulk-delete-subjects");
+                    if (btn) {
+                        btn.style.background = this.selectedSubjectIds.size > 0 ? "#DC2626" : "#FFFFFF";
+                        btn.style.color = this.selectedSubjectIds.size > 0 ? "#FFFFFF" : "#DC2626";
+                    }
+                    const card = cb.closest(".subject-card");
+                    if (card) {
+                        card.style.borderColor = e.target.checked ? "#DC2626" : "";
+                        card.style.background = e.target.checked ? "rgba(220, 38, 38, 0.03)" : "";
+                    }
+                    if (selAllSub) selAllSub.checked = (this.catalog.length > 0 && this.selectedSubjectIds.size === this.catalog.length);
+                });
+            });
+
+            // Bulk Delete Subjects
+            const btnBulkDeleteSubjects = this.container.querySelector("#btn-bulk-delete-subjects");
+            if (btnBulkDeleteSubjects) {
+                btnBulkDeleteSubjects.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const ids = Array.from(this.selectedSubjectIds);
+                    if (ids.length === 0) {
+                        if (window.app) window.app.showToast("Please select at least one subject to delete.", "info");
+                        else alert("Please select at least one subject to delete.");
+                        return;
+                    }
+
+                    this.openCustomDeleteModal(
+                        "Bulk Delete Subjects",
+                        `Are you sure you want to delete ${ids.length} selected subjects and all their blueprints?`,
+                        async () => {
+                            this.catalog = this.catalog.filter(s => !ids.includes(s.id));
+                            if (window.appStorage) {
+                                await window.appStorage.saveSubjectCatalog(this.catalog);
+                            }
+                            if (this.selectedSubject && ids.includes(this.selectedSubject.id)) {
+                                this.selectedSubject = null;
+                            }
+                            this.selectedSubjectIds.clear();
+                            if (window.app) window.app.showToast(`Deleted ${ids.length} subjects successfully.`);
+                            this.updateStepView();
+                        }
+                    );
+                });
+            }
+
             // Subject card selection
             this.container.querySelectorAll(".subject-card").forEach(card => {
                 card.addEventListener("click", (e) => {
-                    if (e.target.closest(".btn-card-action")) return;
+                    if (e.target.closest(".btn-card-action") || e.target.closest(".subject-card-check")) return;
                     const subId = card.getAttribute("data-subject-id");
                     this.selectedSubject = this.catalog.find(s => s.id === subId) || null;
                     this.selectedTemplate = null;
@@ -3203,10 +3338,85 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 this.updateStepView();
             });
 
+            // Select All Templates Checkbox
+            const selAllTpl = this.container.querySelector("#templates-select-all");
+            if (selAllTpl) {
+                selAllTpl.addEventListener("change", (e) => {
+                    const tpls = this.selectedSubject?.templates || [];
+                    if (e.target.checked) {
+                        tpls.forEach(t => this.selectedTemplateIds.add(t.id));
+                    } else {
+                        this.selectedTemplateIds.clear();
+                    }
+                    this.updateStepView();
+                });
+            }
+
+            // Template Checkboxes
+            this.container.querySelectorAll(".template-card-check").forEach(cb => {
+                cb.addEventListener("click", (e) => e.stopPropagation());
+                cb.addEventListener("change", (e) => {
+                    const id = cb.getAttribute("data-template-id");
+                    if (e.target.checked) {
+                        this.selectedTemplateIds.add(id);
+                    } else {
+                        this.selectedTemplateIds.delete(id);
+                    }
+                    const badge = this.container.querySelector("#templates-bulk-count-badge");
+                    if (badge) badge.textContent = `(${this.selectedTemplateIds.size})`;
+                    const btn = this.container.querySelector("#btn-bulk-delete-templates");
+                    if (btn) {
+                        btn.style.background = this.selectedTemplateIds.size > 0 ? "#DC2626" : "#FFFFFF";
+                        btn.style.color = this.selectedTemplateIds.size > 0 ? "#FFFFFF" : "#DC2626";
+                    }
+                    const card = cb.closest(".template-card");
+                    if (card) {
+                        card.style.borderColor = e.target.checked ? "#DC2626" : "";
+                        card.style.background = e.target.checked ? "rgba(220, 38, 38, 0.03)" : "";
+                    }
+                    const tpls = this.selectedSubject?.templates || [];
+                    if (selAllTpl) selAllTpl.checked = (tpls.length > 0 && this.selectedTemplateIds.size === tpls.length);
+                });
+            });
+
+            // Bulk Delete Templates
+            const btnBulkDeleteTemplates = this.container.querySelector("#btn-bulk-delete-templates");
+            if (btnBulkDeleteTemplates) {
+                btnBulkDeleteTemplates.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const ids = Array.from(this.selectedTemplateIds);
+                    if (ids.length === 0) {
+                        if (window.app) window.app.showToast("Please select at least one template to delete.", "info");
+                        else alert("Please select at least one template to delete.");
+                        return;
+                    }
+
+                    this.openCustomDeleteModal(
+                        "Bulk Delete Templates",
+                        `Are you sure you want to delete ${ids.length} selected template(s) from ${this.selectedSubject?.name || 'this subject'}?`,
+                        async () => {
+                            if (this.selectedSubject) {
+                                this.selectedSubject.templates = (this.selectedSubject.templates || []).filter(t => !ids.includes(t.id));
+                                this.selectedSubject.badge = this.selectedSubject.templates.length === 1 ? "1 Template" : `${this.selectedSubject.templates.length} Templates`;
+                                if (window.appStorage) {
+                                    await window.appStorage.saveSubjectCatalog(this.catalog);
+                                }
+                            }
+                            if (this.selectedTemplate && ids.includes(this.selectedTemplate.id)) {
+                                this.selectedTemplate = null;
+                            }
+                            this.selectedTemplateIds.clear();
+                            if (window.app) window.app.showToast(`Deleted ${ids.length} templates successfully.`);
+                            this.updateStepView();
+                        }
+                    );
+                });
+            }
+
             // Template card selection
             this.container.querySelectorAll(".template-card").forEach(card => {
                 card.addEventListener("click", (e) => {
-                    if (e.target.closest(".btn-card-action")) return; // Don't trigger select when clicking edit/delete
+                    if (e.target.closest(".btn-card-action") || e.target.closest(".template-card-check")) return;
                     const tplId = card.getAttribute("data-template-id");
                     this.selectedTemplate = this.selectedSubject?.templates.find(t => t.id === tplId) || null;
                     this.selectedClass = null;
@@ -3287,9 +3497,114 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 this.updateStepView();
             });
 
+            // Select All Classes Checkbox in Step 3
+            const selAllCls = this.container.querySelector("#classes-step3-select-all");
+            if (selAllCls) {
+                selAllCls.addEventListener("change", (e) => {
+                    if (e.target.checked) {
+                        this.classes.forEach(c => this.selectedClassIds.add(c.id));
+                    } else {
+                        this.selectedClassIds.clear();
+                    }
+                    this.updateStepView();
+                });
+            }
+
+            // Class Checkboxes in Step 3
+            this.container.querySelectorAll(".class-step3-card-check").forEach(cb => {
+                cb.addEventListener("click", (e) => e.stopPropagation());
+                cb.addEventListener("change", (e) => {
+                    const id = cb.getAttribute("data-class-id");
+                    if (e.target.checked) {
+                        this.selectedClassIds.add(id);
+                    } else {
+                        this.selectedClassIds.delete(id);
+                    }
+                    const badge = this.container.querySelector("#classes-step3-bulk-count-badge");
+                    if (badge) badge.textContent = `(${this.selectedClassIds.size})`;
+                    const btn = this.container.querySelector("#btn-bulk-delete-classes-step3");
+                    if (btn) {
+                        btn.style.background = this.selectedClassIds.size > 0 ? "#DC2626" : "#FFFFFF";
+                        btn.style.color = this.selectedClassIds.size > 0 ? "#FFFFFF" : "#DC2626";
+                    }
+                    const card = cb.closest(".class-card");
+                    if (card) {
+                        card.style.borderColor = e.target.checked ? "#DC2626" : "";
+                        card.style.background = e.target.checked ? "rgba(220, 38, 38, 0.03)" : "";
+                    }
+                    if (selAllCls) selAllCls.checked = (this.classes.length > 0 && this.selectedClassIds.size === this.classes.length);
+                });
+            });
+
+            // Single Delete Class in Step 3
+            this.container.querySelectorAll(".btn-delete-single-class-step3").forEach(btn => {
+                btn.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const clsId = btn.getAttribute("data-class-id");
+                    const target = this.classes.find(c => c.id === clsId);
+                    const name = target ? (target.label || target.name) : "this class";
+
+                    this.openCustomDeleteModal(
+                        "Delete Class",
+                        `Are you sure you want to delete ${name}? All student rosters for this class will also be cleared.`,
+                        async () => {
+                            this.classes = this.classes.filter(c => c.id !== clsId);
+                            if (window.appStorage) {
+                                await window.appStorage.saveClassesList(this.classes);
+                                try {
+                                    localStorage.removeItem(`niprak_roster_${clsId}`);
+                                } catch (e) {}
+                            }
+                            if (this.selectedClass && this.selectedClass.id === clsId) {
+                                this.selectedClass = null;
+                            }
+                            if (window.app) window.app.showToast(`Deleted class ${name}.`);
+                            this.updateStepView();
+                        }
+                    );
+                });
+            });
+
+            // Bulk Delete Classes in Step 3
+            const btnBulkDeleteClassesStep3 = this.container.querySelector("#btn-bulk-delete-classes-step3");
+            if (btnBulkDeleteClassesStep3) {
+                btnBulkDeleteClassesStep3.addEventListener("click", (e) => {
+                    e.stopPropagation();
+                    const ids = Array.from(this.selectedClassIds);
+                    if (ids.length === 0) {
+                        if (window.app) window.app.showToast("Please select at least one class to delete.", "info");
+                        else alert("Please select at least one class to delete.");
+                        return;
+                    }
+
+                    this.openCustomDeleteModal(
+                        "Bulk Delete Classes",
+                        `Are you sure you want to delete ${ids.length} selected classes and all their enrolled rosters?`,
+                        async () => {
+                            this.classes = this.classes.filter(c => !ids.includes(c.id));
+                            if (window.appStorage) {
+                                await window.appStorage.saveClassesList(this.classes);
+                                for (const id of ids) {
+                                    try {
+                                        localStorage.removeItem(`niprak_roster_${id}`);
+                                    } catch (e) {}
+                                }
+                            }
+                            if (this.selectedClass && ids.includes(this.selectedClass.id)) {
+                                this.selectedClass = null;
+                            }
+                            this.selectedClassIds.clear();
+                            if (window.app) window.app.showToast(`Deleted ${ids.length} classes successfully.`);
+                            this.updateStepView();
+                        }
+                    );
+                });
+            }
+
             // Class selection
             this.container.querySelectorAll(".class-card").forEach(card => {
-                card.addEventListener("click", async () => {
+                card.addEventListener("click", async (e) => {
+                    if (e.target.closest(".class-step3-card-check") || e.target.closest(".btn-delete-single-class-step3")) return;
                     const clsId = card.getAttribute("data-class-id");
                     this.selectedClass = this.classes.find(c => c.id === clsId) || null;
                     this.currentStep = 4;
@@ -4472,6 +4787,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 <table class="papers-table">
                     <thead>
                         <tr>
+                            <th style="width: 44px; text-align: center;">
+                                <input type="checkbox" id="existing-papers-select-all" style="cursor: pointer; width: 16px; height: 16px;" ${matches.length > 0 && this.selectedExistingPaperIds.size === matches.length ? 'checked' : ''} />
+                            </th>
                             <th>Roll</th>
                             <th>Student Name</th>
                             <th>Pages</th>
@@ -4481,8 +4799,13 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                         </tr>
                     </thead>
                     <tbody>
-                        ${matches.map(p => `
-                            <tr>
+                        ${matches.map(p => {
+                            const isChecked = this.selectedExistingPaperIds.has(String(p.id));
+                            return `
+                            <tr style="${isChecked ? 'background-color: rgba(220, 38, 38, 0.04);' : ''}">
+                                <td style="text-align: center;">
+                                    <input type="checkbox" class="existing-paper-row-check" data-id="${p.id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;" />
+                                </td>
                                 <td class="roll-cell">${p.rollNo}</td>
                                 <td class="student-cell"><span class="student-name-text">${p.studentName}</span></td>
                                 <td>${p.pageCount || p.pages?.length || 1} Pages</td>
@@ -4503,11 +4826,91 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                                     </button>
                                 </td>
                             </tr>
-                        `).join('')}
+                        `;
+                        }).join('')}
                     </tbody>
                 </table>
             </div>
         `;
+
+        const updateExistingBadge = () => {
+            const countEl = this.container.querySelector("#existing-bulk-count");
+            if (countEl) countEl.textContent = `(${this.selectedExistingPaperIds.size})`;
+            const bulkBtn = this.container.querySelector("#btn-existing-bulk-delete");
+            if (bulkBtn) {
+                if (this.selectedExistingPaperIds.size > 0) {
+                    bulkBtn.style.background = "#DC2626";
+                    bulkBtn.style.color = "#FFFFFF";
+                } else {
+                    bulkBtn.style.background = "#FFFFFF";
+                    bulkBtn.style.color = "#DC2626";
+                }
+            }
+            const selAll = wrap.querySelector("#existing-papers-select-all");
+            if (selAll) selAll.checked = (matches.length > 0 && this.selectedExistingPaperIds.size === matches.length);
+        };
+        updateExistingBadge();
+
+        const selectAllExisting = wrap.querySelector("#existing-papers-select-all");
+        if (selectAllExisting) {
+            selectAllExisting.addEventListener("change", (e) => {
+                if (e.target.checked) {
+                    matches.forEach(p => this.selectedExistingPaperIds.add(String(p.id)));
+                } else {
+                    this.selectedExistingPaperIds.clear();
+                }
+                this.loadExistingClassPapers();
+            });
+        }
+
+        wrap.querySelectorAll(".existing-paper-row-check").forEach(cb => {
+            cb.addEventListener("change", (e) => {
+                const id = String(cb.getAttribute("data-id"));
+                if (e.target.checked) {
+                    this.selectedExistingPaperIds.add(id);
+                } else {
+                    this.selectedExistingPaperIds.delete(id);
+                }
+                updateExistingBadge();
+                const tr = cb.closest("tr");
+                if (tr) tr.style.backgroundColor = e.target.checked ? "rgba(220, 38, 38, 0.04)" : "";
+            });
+        });
+
+        const btnBulkDeleteExisting = this.container.querySelector("#btn-existing-bulk-delete");
+        if (btnBulkDeleteExisting) {
+            btnBulkDeleteExisting.onclick = async () => {
+                const ids = Array.from(this.selectedExistingPaperIds);
+                if (ids.length === 0) {
+                    if (window.app) window.app.showToast("Please select at least one paper using the checkboxes to delete.", "info");
+                    else alert("Please select at least one paper using the checkboxes to delete.");
+                    return;
+                }
+
+                this.openCustomDeleteModal(
+                    "Bulk Delete Papers",
+                    `Are you sure you want to permanently delete ${ids.length} selected paper(s)? This will free up storage immediately.`,
+                    async () => {
+                        try {
+                            for (const id of ids) {
+                                if (window.appStorage) {
+                                    await window.appStorage.deleteEvaluation(id);
+                                }
+                            }
+                            this.selectedExistingPaperIds.clear();
+                            await this.loadExistingClassPapers();
+                            if (window.app && window.app.showToast) {
+                                window.app.showToast(`Deleted ${ids.length} paper(s) successfully.`);
+                            }
+                        } catch (err) {
+                            console.error("Error bulk deleting papers:", err);
+                            alert("Failed to delete some papers: " + err.message);
+                            await this.loadExistingClassPapers();
+                        }
+                    }
+                );
+            };
+        }
 
         wrap.querySelectorAll(".btn-portal-open-ws").forEach(btn => {
             btn.addEventListener("click", async () => {

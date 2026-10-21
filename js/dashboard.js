@@ -238,6 +238,40 @@ class DashboardManager {
         const displayName = this.teacherName || "Teacher";
         const displaySubject = (this.teacherSubject && this.teacherSubject !== 'all') ? this.teacherSubject : 'Evaluation';
 
+        // Compute Class & Template Batches for Teacher Desk
+        const batchMap = new Map();
+        subjectEvals.forEach(e => {
+            const cls = e.className || e.class || e.classLabel || "Class 12-A";
+            const tpl = e.templateName || e.examName || "Mid-Term Exam";
+            const sub = e.subject || displaySubject;
+            const batchKey = `${cls}:::${tpl}`;
+            if (!batchMap.has(batchKey)) {
+                batchMap.set(batchKey, {
+                    key: batchKey,
+                    className: cls,
+                    templateName: tpl,
+                    subject: sub,
+                    papers: [],
+                    total: 0,
+                    corrected: 0,
+                    uncorrected: 0,
+                    maxMarks: e.maxMarks || 70,
+                    firstPendingPaper: null
+                });
+            }
+            const b = batchMap.get(batchKey);
+            b.papers.push(e);
+            b.total++;
+            const isCorr = this.isPaperCorrected(e);
+            if (isCorr) {
+                b.corrected++;
+            } else {
+                b.uncorrected++;
+                if (!b.firstPendingPaper) b.firstPendingPaper = e;
+            }
+        });
+        this.batches = Array.from(batchMap.values());
+
         this.container.innerHTML = `
             <div class="dashboard-page">
                 <!-- Welcome Banner with Dynamic Greeting, Subject Title & Quick Export Actions -->
@@ -312,6 +346,79 @@ class DashboardManager {
                             <span class="kpi-value">${avgScorePct}%</span>
                             <span class="kpi-title">AVG PERFORMANCE</span>
                         </div>
+                    </div>
+                </div>
+
+                <!-- Class & Exam Template Batches Section for Teachers (Class - Template Cards) -->
+                <div class="teacher-batches-section" id="teacher-batches-section">
+                    <div class="teacher-batches-header">
+                        <div class="teacher-batches-title-col">
+                            <h3 class="teacher-batches-title">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                                Class & Exam Blueprint Batches
+                                <span class="teacher-batches-count-pill">${this.batches.length} ${this.batches.length === 1 ? 'Batch' : 'Batches'}</span>
+                            </h3>
+                            <p class="teacher-batches-desc">Streamlined cards organized by Class & Template. Select a card to view its student roster or click Start Marking to evaluate directly.</p>
+                        </div>
+                        ${this.selectedClassFilter !== "all" ? `
+                            <button type="button" class="btn-clear-batch-filter" id="btn-clear-batch-filter" title="Clear filter and view all classes">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <span>Reset Filter (${this.selectedClassFilter})</span>
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    <div class="teacher-batches-grid">
+                        ${this.batches.length === 0 ? `
+                            <div class="teacher-batches-empty">
+                                <p>No exam batches currently allotted for ${displaySubject}. Upload papers to populate class-template cards.</p>
+                            </div>
+                        ` : this.batches.map(b => {
+                            const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
+                            const isCompleted = b.uncorrected === 0 && b.total > 0;
+                            const isSelected = (this.selectedClassFilter === b.className);
+                            return `
+                                <div class="teacher-batch-card ${isSelected ? 'active' : ''}" data-class="${b.className}" data-template="${b.templateName}">
+                                    <div class="batch-card-top-row">
+                                        <div style="display: flex; align-items: center; gap: 6px;">
+                                            <span class="batch-class-badge">${b.className}</span>
+                                            <span class="batch-subject-tag">${b.subject}</span>
+                                        </div>
+                                        <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
+                                            ${isCompleted ? '✓ All Graded' : `${b.uncorrected} Pending`}
+                                        </span>
+                                    </div>
+
+                                    <h4 class="batch-card-name" title="${b.templateName}">${b.templateName}</h4>
+
+                                    <div class="batch-card-meta-row">
+                                        <span>Max Marks: <strong>${b.maxMarks}M</strong></span>
+                                        <span>Roster: <strong>${b.total} Papers</strong></span>
+                                    </div>
+
+                                    <div class="batch-progress-wrapper">
+                                        <div class="batch-progress-labels">
+                                            <span class="progress-ratio">${b.corrected} / ${b.total} Evaluated</span>
+                                            <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'}; font-weight: 700;">${pct}%</span>
+                                        </div>
+                                        <div class="batch-progress-bar">
+                                            <div class="batch-progress-fill" style="width: ${pct}%; background: ${pct === 100 ? '#16A34A' : 'linear-gradient(90deg, #0071E3, #38BDF8)'};"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="batch-actions-row">
+                                        <button type="button" class="btn-batch-view" data-class="${b.className}" data-template="${b.templateName}" title="Filter papers table to ${b.className}">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                            View Papers (${b.total})
+                                        </button>
+                                        <button type="button" class="btn-batch-start" data-class="${b.className}" data-template="${b.templateName}" title="Start correcting papers in this batch">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                            ${isCompleted ? 'Review' : 'Start Marking'}
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join('')}
                     </div>
                 </div>
 
@@ -601,6 +708,76 @@ class DashboardManager {
     }
 
     bindEvents() {
+        // Teacher Batch Cards Interactions
+        this.container.querySelectorAll(".teacher-batch-card").forEach(card => {
+            card.addEventListener("click", (e) => {
+                if (e.target.closest("button")) return;
+                const cls = card.getAttribute("data-class");
+                if (cls) {
+                    this.selectedClassFilter = (this.selectedClassFilter === cls) ? "all" : cls;
+                    this.applyFilters();
+                    this.renderTableRows();
+                    this.updateCountsInUI();
+                    this.container.querySelectorAll(".teacher-batch-card").forEach(c => {
+                        c.classList.toggle("active", c.getAttribute("data-class") === this.selectedClassFilter);
+                    });
+                    const clsSelect = this.container.querySelector("#dash-filter-class");
+                    if (clsSelect) clsSelect.value = this.selectedClassFilter;
+                }
+            });
+        });
+
+        this.container.querySelectorAll(".btn-batch-view").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const cls = btn.getAttribute("data-class");
+                this.selectedClassFilter = cls;
+                this.applyFilters();
+                this.renderTableRows();
+                this.updateCountsInUI();
+                this.container.querySelectorAll(".teacher-batch-card").forEach(c => {
+                    c.classList.toggle("active", c.getAttribute("data-class") === this.selectedClassFilter);
+                });
+                const clsSelect = this.container.querySelector("#dash-filter-class");
+                if (clsSelect) clsSelect.value = this.selectedClassFilter;
+                const tableSec = this.container.querySelector(".dashboard-main-section");
+                if (tableSec) tableSec.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+        });
+
+        this.container.querySelectorAll(".btn-batch-start").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const cls = btn.getAttribute("data-class");
+                const tpl = btn.getAttribute("data-template");
+                const batch = (this.batches || []).find(b => b.className === cls && b.templateName === tpl);
+                if (batch) {
+                    const targetPaper = batch.firstPendingPaper || (batch.papers && batch.papers[0]);
+                    if (targetPaper && this.options.onOpenEvaluation) {
+                        this.options.onOpenEvaluation(targetPaper);
+                    } else if (targetPaper && window.app) {
+                        window.app.openWorkspace(targetPaper);
+                    } else if (window.app) {
+                        window.app.showToast("No papers found in this batch.", "warning");
+                    }
+                }
+            });
+        });
+
+        const btnClearBatch = this.container.querySelector("#btn-clear-batch-filter");
+        if (btnClearBatch) {
+            btnClearBatch.addEventListener("click", () => {
+                this.selectedClassFilter = "all";
+                this.applyFilters();
+                this.renderTableRows();
+                this.updateCountsInUI();
+                this.container.querySelectorAll(".teacher-batch-card").forEach(c => c.classList.remove("active"));
+                const clsSelect = this.container.querySelector("#dash-filter-class");
+                if (clsSelect) clsSelect.value = "all";
+                btnClearBatch.remove();
+            });
+        }
+
         // Start Correction Queue button (Banner)
         const startBtn = this.container.querySelector("#dash-btn-start-correction");
         if (startBtn) {

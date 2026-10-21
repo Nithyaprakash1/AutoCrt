@@ -10537,3 +10537,251 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
         padding: 24px 18px;
     }
 }
+
+/* ==========================================================================
+   Teacher Desk: Class & Template Exam Batches Cards Section
+   ========================================================================== */
+.teacher-batches-section {
+    margin-bottom: 26px;
+    background: #FFFFFF;
+    border: 1px solid #E2E8F0;
+    border-radius: 18px;
+    padding: 22px 24px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.teacher-batches-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.teacher-batches-title-col {
+    flex: 1;
+    min-width: 260px;
+}
+
+.teacher-batches-title {
+    font-size: 1.18rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin: 0 0 4px 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.teacher-batches-desc {
+    font-size: 0.85rem;
+    color: #64748B;
+    margin: 0;
+}
+
+.teacher-batches-count-pill {
+    background: rgba(0, 113, 227, 0.1);
+    color: #0071E3;
+    font-size: 0.76rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 20px;
+}
+
+.btn-clear-batch-filter {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    background: #F1F5F9;
+    border: 1px solid #CBD5E1;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #334155;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-clear-batch-filter:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+
+.teacher-batches-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(295px, 1fr));
+    gap: 16px;
+}
+
+.teacher-batches-empty {
+    padding: 28px;
+    text-align: center;
+    color: #94A3B8;
+    background: #F8FAFC;
+    border-radius: 12px;
+    border: 1px dashed #CBD5E1;
+    grid-column: 1 / -1;
+    font-size: 0.9rem;
+}
+
+.teacher-batch-card {
+    background: #F8FAFC;
+    border: 1.5px solid #E2E8F0;
+    border-radius: 14px;
+    padding: 16px 18px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    cursor: pointer;
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+}
+
+.teacher-batch-card:hover {
+    transform: translateY(-2px);
+    border-color: #0071E3;
+    background: #FFFFFF;
+    box-shadow: 0 8px 24px rgba(0, 113, 227, 0.08);
+}
+
+.teacher-batch-card.active {
+    border-color: #0071E3;
+    background: #FFFFFF;
+    box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.22), 0 8px 24px rgba(0, 113, 227, 0.1);
+}
+
+.batch-card-top-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+    gap: 8px;
+}
+
+.batch-class-badge {
+    background: #0071E3;
+    color: #FFFFFF;
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    letter-spacing: 0.02em;
+}
+
+.batch-subject-tag {
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: #64748B;
+    background: #EDF2F7;
+    padding: 3px 8px;
+    border-radius: 6px;
+}
+
+.batch-status-pill {
+    font-size: 0.74rem;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+
+.batch-status-pill.status-all-done {
+    background: rgba(22, 163, 74, 0.1);
+    color: #16A34A;
+}
+
+.batch-status-pill.status-has-pending {
+    background: rgba(217, 119, 6, 0.1);
+    color: #D97706;
+}
+
+.batch-card-name {
+    font-size: 1.02rem;
+    font-weight: 700;
+    color: #0F172A;
+    margin: 0 0 8px 0;
+    line-height: 1.35;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.batch-card-meta-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 0.8rem;
+    color: #64748B;
+    margin-bottom: 12px;
+}
+
+.batch-progress-wrapper {
+    margin-bottom: 14px;
+}
+
+.batch-progress-labels {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    margin-bottom: 6px;
+    color: #64748B;
+}
+
+.batch-progress-bar {
+    height: 7px;
+    background: #E2E8F0;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.batch-progress-fill {
+    height: 100%;
+    border-radius: 10px;
+    transition: width 0.4s ease;
+}
+
+.batch-actions-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: auto;
+}
+
+.btn-batch-view,
+.btn-batch-start {
+    font-size: 0.82rem;
+    font-weight: 600;
+    border-radius: 8px;
+    padding: 7px 12px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+}
+
+.btn-batch-view {
+    background: #EDF2F7;
+    color: #334155;
+    flex: 1;
+}
+
+.btn-batch-view:hover {
+    background: #E2E8F0;
+    color: #0F172A;
+}
+
+.btn-batch-start {
+    background: #0071E3;
+    color: #FFFFFF;
+    flex: 1.2;
+}
+
+.btn-batch-start:hover {
+    background: #005BB5;
+}
+
