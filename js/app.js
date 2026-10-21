@@ -1642,13 +1642,7 @@ class AppController {
 
         const qTopicEl = document.getElementById("hud-active-q-topic");
         if (qTopicEl) {
-            if (q.topic) {
-                qTopicEl.textContent = q.topic;
-                qTopicEl.title = q.topic;
-                qTopicEl.style.display = "inline-block";
-            } else {
-                qTopicEl.style.display = "none";
-            }
+            qTopicEl.style.display = "none";
         }
 
         if (this.markingPanel) {
@@ -1825,13 +1819,23 @@ class AppController {
                 if (hasScoreAnnotations) {
                     const clamped = Math.min(q.maxMarks, Math.max(0, annTotal));
                     if (q.awardedMarks !== clamped || q.status === "unmarked") {
+                        const status = clamped === 0 ? "wrong" : (clamped === q.maxMarks ? "correct" : "partial");
                         if (this.markingPanel) {
-                            this.markingPanel.assignQuestionMarkDirect(idx, clamped, clamped === 0 ? "wrong" : (clamped === q.maxMarks ? "correct" : "partial"));
+                            this.markingPanel.assignQuestionMarkDirect(idx, clamped, status);
                         } else {
                             q.awardedMarks = clamped;
-                            if (clamped === q.maxMarks) q.status = "correct";
-                            else if (clamped === 0) q.status = "wrong";
-                            else q.status = "partial";
+                            q.status = status;
+                        }
+                        updated = true;
+                    }
+                } else {
+                    // Score annotations were deleted or removed from the paper: remove from the side where marks are entered!
+                    if (q.awardedMarks > 0 || q.status === "correct" || q.status === "partial") {
+                        if (this.markingPanel) {
+                            this.markingPanel.assignQuestionMarkDirect(idx, 0, "unmarked");
+                        } else {
+                            q.awardedMarks = 0;
+                            q.status = "unmarked";
                         }
                         updated = true;
                     }
@@ -1869,6 +1873,8 @@ class AppController {
         if (updated && this.markingPanel) {
             const activeQ = this.markingPanel.getActiveQuestion();
             if (activeQ) this.updateTopHud(activeQ);
+            this.updatePageTotalDisplay();
+            this.renderScorecardTable();
         }
     }
 

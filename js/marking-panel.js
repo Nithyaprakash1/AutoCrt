@@ -324,9 +324,7 @@ class MarkingPanel {
                     </div>
 
                     <!-- Active Question Topic Banner -->
-                    <div class="active-q-topic-banner" id="active-q-topic-banner" style="${activeQ && activeQ.topic ? 'display: block;' : 'display: none;'} padding: 7px 12px; background: #F1F5F9; border-radius: 6px; font-size: 0.82rem; font-weight: 600; color: #1E293B; margin-bottom: 10px; border-left: 3px solid #007AFF;">
-                        ${activeQ && activeQ.topic ? activeQ.topic : ''}
-                    </div>
+                    <div class="active-q-topic-banner" id="active-q-topic-banner" style="display: none;"></div>
 
                     <!-- Choice / OR Question Selector (if applicable) -->
                     <div class="choice-selector-box" id="choice-selector-wrap" style="${activeQ && activeQ.isChoice ? 'display: block;' : 'display: none;'}">
@@ -455,11 +453,11 @@ class MarkingPanel {
         if (secBadge) secBadge.textContent = q.section || "Section";
         if (totalPill) totalPill.textContent = `Total: ${q.awardedMarks}/${q.maxMarks}M`;
 
-        // Update Top Workspace Bar active chip (e.g. "Section A - Q1: Unseen Passage (12M)")
+        // Update Top Workspace Bar active chip (e.g. "Section A - Q1")
         const topSecChip = document.getElementById("ws-active-sec-q-chip");
         if (topSecChip) {
             const secName = q.section || "Section A";
-            topSecChip.textContent = `${secName} - Q${q.qNo}${q.topic ? `: ${q.topic}` : ''}`;
+            topSecChip.textContent = `${secName} - Q${q.qNo}`;
         }
 
         // Active Section Ceiling & Question Max Ceiling Strip
@@ -478,12 +476,7 @@ class MarkingPanel {
         }
 
         if (topicBanner) {
-            if (q.topic) {
-                topicBanner.textContent = q.topic;
-                topicBanner.style.display = "block";
-            } else {
-                topicBanner.style.display = "none";
-            }
+            topicBanner.style.display = "none";
         }
 
         // Dynamically rebuild Quick Numbers keypad for question ceiling (up to 7M, 12M, 15M)
@@ -569,27 +562,11 @@ class MarkingPanel {
             ? this.questions 
             : this.questions.filter(q => q.sectionId === this.selectedSectionFilter || q.section === this.selectedSectionFilter);
 
-        // Group by section for clean organization
-        let currentSectionId = null;
         let html = "";
 
         visibleQuestions.forEach(q => {
             const actualIdx = this.questions.indexOf(q);
             const isActive = actualIdx === this.activeQuestionIndex;
-
-            // Render section header when section changes
-            if (q.sectionId !== currentSectionId) {
-                currentSectionId = q.sectionId;
-                const sec = this.sections.find(s => s.id === q.sectionId) || { name: q.section || "Section", title: q.section || "Section" };
-                const secTotal = this.getSectionTotals().find(s => s.id === q.sectionId);
-                const displayTitle = sec.title || sec.name;
-                html += `
-                    <div class="q-list-section-header">
-                        <span class="q-list-sec-title">${displayTitle}</span>
-                        <span class="q-list-sec-score">${secTotal ? `${secTotal.obtainedMarks}/${secTotal.maxMarks} Marks` : ''}</span>
-                    </div>
-                `;
-            }
 
             // Sub-question mini chips if question has sub-parts
             let subqChips = "";
@@ -616,12 +593,11 @@ class MarkingPanel {
                             <span class="q-badge">Q${q.qNo}</span>
                             ${choiceTag}
                         </div>
-                        ${q.topic ? `<span class="q-topic-subtitle" style="display: block; font-size: 0.72rem; color: #64748B; font-weight: 500; margin-top: 2px; max-width: 175px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${q.topic}">${q.topic}</span>` : ''}
                     </div>
                     <div class="q-inputs-col">
                         <div class="score-input-group">
                             <input type="number" step="0.5" min="0" max="${q.maxMarks}" 
-                                class="q-score-input" value="${q.awardedMarks}" data-index="${actualIdx}" />
+                                class="q-score-input" value="${q.awardedMarks !== undefined ? q.awardedMarks : 0}" data-index="${actualIdx}" />
                             <span class="q-score-divider">/</span>
                             <input type="number" step="0.5" min="1" 
                                 class="q-max-input" value="${q.maxMarks}" data-index="${actualIdx}" title="Max Marks" />
