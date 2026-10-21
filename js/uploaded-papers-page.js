@@ -1,7 +1,8 @@
 /**
  * Niprak Digital Correction - Uploaded Papers & Pages Repository Manager
  * Full-page archive of all uploaded exam papers, multi-page answer sheets,
- * multi-dimensional filtering, page count metrics, and page inspection lightbox.
+ * organized into Class - Template cards, batch metrics, bulk deletion,
+ * and page inspection lightbox.
  */
 
 class UploadedPapersPageManager {
@@ -14,6 +15,8 @@ class UploadedPapersPageManager {
         this.selectedSubject = "all";
         this.selectedClass = "all";
         this.selectedStatus = "all";
+        this.selectedBatchKey = "all";
+        this.viewMode = "cards"; // "cards" or "table"
         this.searchQuery = "";
         this.inspectingPaper = null;
         this.selectedIds = new Set();
@@ -62,11 +65,84 @@ class UploadedPapersPageManager {
         }
     }
 
+    computeBatches() {
+        const batchMap = new Map();
+        this.papers.forEach(p => {
+            const cls = p.className || p.class || "Class 12-A";
+            const tpl = p.templateName || p.examName || "Exam Blueprint";
+            const sub = p.subject || "General";
+            const batchKey = `${cls}:::${tpl}`;
+            if (!batchMap.has(batchKey)) {
+                batchMap.set(batchKey, {
+                    key: batchKey,
+                    className: cls,
+                    templateName: tpl,
+                    subject: sub,
+                    papers: [],
+                    total: 0,
+                    completed: 0,
+                    pending: 0,
+                    totalPages: 0,
+                    totalBytes: 0,
+                    maxMarks: p.maxMarks || 20
+                });
+            }
+            const b = batchMap.get(batchKey);
+            b.papers.push(p);
+            b.total++;
+            if (p.status === "Completed") {
+                b.completed++;
+            } else {
+                b.pending++;
+            }
+            const pg = p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1));
+            b.totalPages += pg;
+            if (window.appStorage && typeof window.appStorage.measurePaperBytesSync === "function") {
+                b.totalBytes += window.appStorage.measurePaperBytesSync(p);
+            } else {
+                b.totalBytes += (p.fileSizeBytes || (pg * 185 * 1024));
+            }
+        });
+        return Array.from(batchMap.values());
+    }
+
+    getFilteredBatches() {
+        const batches = this.computeBatches();
+        return batches.filter(b => {
+            if (this.selectedSubject !== "all" && b.subject !== this.selectedSubject) return false;
+            if (this.selectedClass !== "all") {
+                const clsMatch = b.className === this.selectedClass || b.className.includes(this.selectedClass);
+                if (!clsMatch) return false;
+            }
+            if (this.selectedStatus !== "all") {
+                if (this.selectedStatus === "Completed" && b.pending > 0) return false;
+                if (this.selectedStatus === "Pending" && b.pending === 0) return false;
+            }
+            if (this.searchQuery) {
+                const q = this.searchQuery.toLowerCase();
+                const matchCls = b.className.toLowerCase().includes(q);
+                const matchTpl = b.templateName.toLowerCase().includes(q);
+                const matchSub = b.subject.toLowerCase().includes(q);
+                const matchStudent = b.papers.some(p =>
+                    (p.studentName && p.studentName.toLowerCase().includes(q)) ||
+                    (p.rollNo && p.rollNo.toLowerCase().includes(q))
+                );
+                if (!matchCls && !matchTpl && !matchSub && !matchStudent) return false;
+            }
+            return true;
+        });
+    }
+
     getFilteredPapers() {
         return this.papers.filter(p => {
+            const pCls = p.className || p.class || "Class 12-A";
+            const pTpl = p.templateName || p.examName || "Exam Blueprint";
+            const pKey = `${pCls}:::${pTpl}`;
+
+            if (this.selectedBatchKey !== "all" && pKey !== this.selectedBatchKey) return false;
             if (this.selectedSubject !== "all" && p.subject !== this.selectedSubject) return false;
             if (this.selectedClass !== "all") {
-                const clsMatch = p.className === this.selectedClass || (p.className && p.className.includes(this.selectedClass));
+                const clsMatch = pCls === this.selectedClass || pCls.includes(this.selectedClass);
                 if (!clsMatch) return false;
             }
             if (this.selectedStatus !== "all") {
@@ -77,28 +153,39 @@ class UploadedPapersPageManager {
                 const q = this.searchQuery.toLowerCase();
                 const matchName = p.studentName && p.studentName.toLowerCase().includes(q);
                 const matchRoll = p.rollNo && p.rollNo.toLowerCase().includes(q);
-                const matchId = p.id && p.id.toLowerCase().includes(q);
-                if (!matchName && !matchRoll && !matchId) return false;
+                const matchId = p.id && String(p.id).toLowerCase().includes(q);
+                const matchTpl = pTpl.toLowerCase().includes(q);
+                if (!matchName && !matchRoll && !matchId && !matchTpl) return false;
             }
             return true;
         });
     }
 
+    formatBytes(bytes) {
+        if (window.appStorage && typeof window.appStorage.formatStorageSize === "function") {
+            return window.appStorage.formatStorageSize(bytes);
+        }
+        if (!bytes || bytes <= 0) return "0 MB";
+        const mb = bytes / (1024 * 1024);
+        return `${mb.toFixed(1)} MB`;
+    }
+
     render() {
         if (!this.container) return;
 
-        // Apply filters
-        const filtered = this.getFilteredPapers();
+        const allBatches = this.computeBatches();
+        const filteredBatches = this.getFilteredBatches();
+        const filteredPapers = this.getFilteredPapers();
 
-        // Clean up selectedIds no longer present
-        const visibleIdSet = new Set(filtered.map(p => String(p.id)));
+        // Clean up selectedIds no longer visible
+        const visibleIdSet = new Set(filteredPapers.map(p => String(p.id)));
         const newSelected = new Set();
         this.selectedIds.forEach(id => {
             if (visibleIdSet.has(id)) newSelected.add(id);
         });
         this.selectedIds = newSelected;
 
-        // Compute Metrics
+        // Metrics calculations
         const totalPapers = this.papers.length;
         const totalPages = this.papers.reduce((sum, p) => sum + (p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1))), 0);
         const totalBytes = this.papers.reduce((sum, p) => {
@@ -107,99 +194,117 @@ class UploadedPapersPageManager {
             }
             return sum + (p.fileSizeBytes || ((p.pageCount || 1) * 185 * 1024));
         }, 0);
-        const formattedTotalStorage = (window.appStorage && typeof window.appStorage.formatStorageSize === "function")
-            ? window.appStorage.formatStorageSize(totalBytes)
-            : `${(totalBytes / (1024 * 1024)).toFixed(2)} MB`;
+        const formattedTotalStorage = this.formatBytes(totalBytes);
         const completedPapers = this.papers.filter(p => p.status === "Completed").length;
         const pendingPapers = totalPapers - completedPapers;
 
+        // Current active batch info if drill-down selected
+        let activeBatchObj = null;
+        if (this.selectedBatchKey !== "all") {
+            activeBatchObj = allBatches.find(b => b.key === this.selectedBatchKey);
+        }
+
         this.container.innerHTML = `
             <div class="uploaded-papers-layout">
-                <!-- Top Header Banner -->
+                <!-- Top Compact Header Banner -->
                 <div class="uploaded-page-header">
                     <div class="header-titles">
                         <div class="header-tag-pill">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                            Repository & Dispatch
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            Repository & Archive
                         </div>
-                        <h1 class="page-title">Uploaded Papers & Ingested Pages</h1>
-                        <p class="page-subtitle">Central archive of all ingested multi-page answer scripts, allocation status, page verification, and evaluation readiness.</p>
+                        <h1 class="page-title">Uploaded Papers & Batches</h1>
+                        <p class="page-subtitle">Organized by Class - Template cards with live storage metrics, page inspection, and bulk delete.</p>
                     </div>
 
                     <div class="header-actions">
                         <button type="button" class="btn-papers-secondary" id="btn-export-papers-manifest" title="Download CSV manifest of all uploaded papers">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                            <span>Export Manifest</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                            <span>Manifest</span>
                         </button>
                         <button type="button" class="btn-papers-secondary btn-papers-bulk-delete" id="btn-papers-bulk-delete" title="Delete selected papers to free storage space" style="border-color: #DC2626; color: #DC2626;">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                             <span>Bulk Delete</span>
                             <span id="papers-bulk-delete-badge" class="bulk-delete-count-pill">(${this.selectedIds.size})</span>
                         </button>
                         <button type="button" class="btn-papers-primary" id="btn-goto-upload-desk">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                            <span>+ Ingest More Papers</span>
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                            <span>+ Ingest Papers</span>
                         </button>
                     </div>
                 </div>
 
-                <!-- KPI Overview Grid -->
+                <!-- KPI Overview Grid (Compact Cupertino Fit-to-Screen) -->
                 <div class="papers-kpi-grid">
                     <div class="papers-kpi-card">
-                        <div class="kpi-icon-wrap icon-blue">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        <div class="kpi-icon-wrap icon-purple">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2.2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
                         </div>
                         <div class="kpi-info">
-                            <span class="kpi-label">Total Ingested Papers</span>
+                            <span class="kpi-label">Class - Template Batches</span>
+                            <span class="kpi-value">${allBatches.length} <small style="font-size: 0.72rem; color: #64748B; font-weight: normal;">Batches</small></span>
+                        </div>
+                    </div>
+
+                    <div class="papers-kpi-card">
+                        <div class="kpi-icon-wrap icon-blue">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        </div>
+                        <div class="kpi-info">
+                            <span class="kpi-label">Total Uploaded Papers</span>
                             <span class="kpi-value">${totalPapers}</span>
                         </div>
                     </div>
 
                     <div class="papers-kpi-card">
-                        <div class="kpi-icon-wrap icon-purple">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/><line x1="8" y1="14" x2="12" y2="14"/></svg>
+                        <div class="kpi-icon-wrap icon-green">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                         </div>
                         <div class="kpi-info">
-                            <span class="kpi-label">Pages & Storage Used</span>
-                            <span class="kpi-value">${totalPages} Pages <span style="font-size: 0.85rem; color: #0071E3; font-weight: 600;">(${formattedTotalStorage})</span></span>
+                            <span class="kpi-label">Evaluated / Pending</span>
+                            <span class="kpi-value">${completedPapers} <span style="font-size: 0.8rem; color: #F59E0B; font-weight: 600;">/ ${pendingPapers}</span></span>
                         </div>
                     </div>
 
                     <div class="papers-kpi-card">
                         <div class="kpi-icon-wrap icon-orange">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                         </div>
                         <div class="kpi-info">
-                            <span class="kpi-label">Pending Correction</span>
-                            <span class="kpi-value">${pendingPapers}</span>
-                        </div>
-                    </div>
-
-                    <div class="papers-kpi-card">
-                        <div class="kpi-icon-wrap icon-green">
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-                        </div>
-                        <div class="kpi-info">
-                            <span class="kpi-label">Evaluated Papers</span>
-                            <span class="kpi-value">${completedPapers}</span>
+                            <span class="kpi-label">Pages & Storage Size</span>
+                            <span class="kpi-value">${totalPages} <small style="font-size: 0.76rem; color: #0071E3; font-weight: 600;">(${formattedTotalStorage})</small></span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Filter & Search Controls Bar -->
+                <!-- Filter Controls & View Switcher Bar -->
                 <div class="papers-filter-card">
                     <div class="filter-controls-row">
+                        <!-- View Mode Switcher -->
+                        <div class="papers-view-switcher">
+                            <button type="button" class="btn-view-toggle ${this.viewMode === 'cards' ? 'active' : ''}" id="btn-toggle-view-cards" title="Switch to Class - Template Batch Cards">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                                <span>Batch Cards (${filteredBatches.length})</span>
+                            </button>
+                            <button type="button" class="btn-view-toggle ${this.viewMode === 'table' ? 'active' : ''}" id="btn-toggle-view-table" title="Switch to All Papers Data Table">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+                                <span>All Papers Table (${filteredPapers.length})</span>
+                            </button>
+                        </div>
+
+                        <!-- Search Bar -->
                         <div class="search-field-wrap">
-                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input type="text" id="input-papers-search" placeholder="Search by student name, roll number, or paper ID..." value="${this.searchQuery}" />
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="input-papers-search" placeholder="Search class, template, student, or roll..." value="${this.searchQuery}" />
                             ${this.searchQuery ? `<button type="button" class="btn-clear-papers-search" id="btn-clear-papers-search">×</button>` : ''}
                         </div>
 
+                        <!-- Filter Dropdowns -->
                         <div class="filter-dropdown-group">
                             <div class="filter-select-item">
                                 <label>Subject:</label>
                                 <select id="select-papers-subject" class="form-select-sm">
-                                    <option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All Subjects</option>
+                                    <option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All</option>
                                     ${this.subjects.map(s => `
                                         <option value="${s}" ${this.selectedSubject === s ? 'selected' : ''}>${s}</option>
                                     `).join('')}
@@ -209,7 +314,7 @@ class UploadedPapersPageManager {
                             <div class="filter-select-item">
                                 <label>Class:</label>
                                 <select id="select-papers-class" class="form-select-sm">
-                                    <option value="all" ${this.selectedClass === 'all' ? 'selected' : ''}>All Classes</option>
+                                    <option value="all" ${this.selectedClass === 'all' ? 'selected' : ''}>All</option>
                                     ${this.classes.map(c => `
                                         <option value="${c.name}" ${this.selectedClass === c.name ? 'selected' : ''}>${c.name}</option>
                                     `).join('')}
@@ -219,121 +324,223 @@ class UploadedPapersPageManager {
                             <div class="filter-select-item">
                                 <label>Status:</label>
                                 <select id="select-papers-status" class="form-select-sm">
-                                    <option value="all" ${this.selectedStatus === 'all' ? 'selected' : ''}>All Statuses</option>
+                                    <option value="all" ${this.selectedStatus === 'all' ? 'selected' : ''}>All</option>
                                     <option value="Pending" ${this.selectedStatus === 'Pending' ? 'selected' : ''}>Pending</option>
                                     <option value="Completed" ${this.selectedStatus === 'Completed' ? 'selected' : ''}>Evaluated</option>
                                 </select>
                             </div>
 
-                            ${(this.selectedSubject !== "all" || this.selectedClass !== "all" || this.selectedStatus !== "all" || this.searchQuery) ? `
+                            ${(this.selectedSubject !== "all" || this.selectedClass !== "all" || this.selectedStatus !== "all" || this.searchQuery || this.selectedBatchKey !== "all") ? `
                                 <button type="button" class="btn-reset-filters" id="btn-reset-papers-filters" title="Reset all active filters">
-                                    Reset Filters
+                                    Reset
                                 </button>
                             ` : ''}
                         </div>
                     </div>
                 </div>
 
-                <!-- Papers Data Table Card -->
-                <div class="papers-table-card">
-                    <div class="table-meta-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                        <span class="table-results-label">Showing <b>${filtered.length}</b> of ${totalPapers} uploaded papers</span>
-                        ${this.selectedIds.size > 0 ? `<span style="font-size: 0.82rem; font-weight: 600; color: #DC2626;">${this.selectedIds.size} paper(s) selected for bulk delete</span>` : ''}
-                    </div>
+                <!-- Main Content Display -->
+                ${this.viewMode === 'cards' && this.selectedBatchKey === 'all' ? `
+                    <!-- Class - Template Cards Grid View -->
+                    <div class="uploaded-batches-section">
+                        <div class="uploaded-batches-header">
+                            <div class="uploaded-batches-title-col">
+                                <h3 class="uploaded-batches-title">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                                    Class - Template Batch Cards
+                                    <span class="uploaded-batches-count-pill">${filteredBatches.length} ${filteredBatches.length === 1 ? 'Batch' : 'Batches'}</span>
+                                </h3>
+                                <p class="uploaded-batches-desc">Answer scripts grouped by Class and Blueprint Template. Select a card to view papers or delete in batch.</p>
+                            </div>
+                        </div>
 
-                    <div class="papers-table-wrapper">
-                        <table class="papers-data-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 44px; text-align: center;">
-                                        <input type="checkbox" id="papers-select-all" title="Select All Papers" style="cursor: pointer; width: 16px; height: 16px; vertical-align: middle; margin: 0;" />
-                                    </th>
-                                    <th style="width: 85px;">Roll No</th>
-                                    <th style="min-width: 160px;">Student Name</th>
-                                    <th style="width: 115px;">Class</th>
-                                    <th style="min-width: 160px;">Subject & Exam</th>
-                                    <th style="width: 110px;">Page Count</th>
-                                    <th style="width: 135px;">Evaluation Status</th>
-                                    <th style="width: 90px;">Score</th>
-                                    <th style="width: 240px; min-width: 230px; text-align: right;">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${filtered.length === 0 ? `
-                                    <tr>
-                                        <td colspan="9" class="papers-empty-cell">
-                                            <div class="empty-papers-state">
-                                                <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                                <span>No papers match the current filters.</span>
-                                                <button type="button" class="btn-empty-upload-shortcut" id="btn-empty-upload-shortcut">
-                                                    Upload New Papers
-                                                </button>
+                        <div class="uploaded-batches-grid">
+                            ${filteredBatches.length === 0 ? `
+                                <div class="uploaded-batches-empty">
+                                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                                    <p>No uploaded paper batches match the current filter criteria.</p>
+                                    <button type="button" class="btn-papers-primary" id="btn-batch-empty-upload">
+                                        + Ingest Papers
+                                    </button>
+                                </div>
+                            ` : filteredBatches.map(b => {
+                                const pct = b.total > 0 ? Math.round((b.completed / b.total) * 100) : 0;
+                                const isCompleted = b.pending === 0 && b.total > 0;
+                                const formattedStorage = this.formatBytes(b.totalBytes);
+
+                                return `
+                                    <div class="uploaded-batch-card" data-batch-key="${b.key}">
+                                        <div class="batch-card-top-row">
+                                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                                <span class="batch-class-badge">${b.className}</span>
+                                                <span class="batch-subject-tag">${b.subject}</span>
                                             </div>
-                                        </td>
+                                            <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
+                                                ${isCompleted ? '✓ All Graded' : `${b.pending} Pending`}
+                                            </span>
+                                        </div>
+
+                                        <h4 class="batch-card-name" title="${b.templateName}">${b.templateName}</h4>
+
+                                        <div class="batch-card-meta-row">
+                                            <span><strong>${b.total}</strong> Papers</span>
+                                            <span><strong>${b.totalPages}</strong> Pages</span>
+                                            <span><strong style="color: #0071E3;">${formattedStorage}</strong></span>
+                                        </div>
+
+                                        <div class="batch-progress-wrapper">
+                                            <div class="batch-progress-labels">
+                                                <span class="progress-ratio">${b.completed} / ${b.total} Evaluated</span>
+                                                <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'}; font-weight: 700;">${pct}%</span>
+                                            </div>
+                                            <div class="batch-progress-bar">
+                                                <div class="batch-progress-fill" style="width: ${pct}%; background: ${pct === 100 ? '#16A34A' : 'linear-gradient(90deg, #0071E3, #38BDF8)'};"></div>
+                                            </div>
+                                        </div>
+
+                                        <div class="batch-actions-row">
+                                            <button type="button" class="btn-batch-view" data-batch-key="${b.key}" title="View and manage individual papers in ${b.className}">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                                <span>View Papers (${b.total})</span>
+                                            </button>
+                                            <button type="button" class="btn-batch-inspect" data-batch-key="${b.key}" title="Inspect pages of this batch">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                                <span>Inspect</span>
+                                            </button>
+                                            <button type="button" class="btn-batch-delete" data-batch-key="${b.key}" title="Delete all papers in this batch (${b.total} papers)">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                ` : `
+                    <!-- Active Batch Drilldown Alert Header (if filtered to one batch) -->
+                    ${activeBatchObj ? `
+                        <div class="active-batch-banner">
+                            <div class="active-batch-left">
+                                <button type="button" class="btn-batch-back" id="btn-back-to-all-batches" title="Back to all batch cards">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                                    <span>All Cards</span>
+                                </button>
+                                <div class="active-batch-titles">
+                                    <span class="active-batch-badge">${activeBatchObj.className}</span>
+                                    <h3 class="active-batch-name">${activeBatchObj.templateName} (${activeBatchObj.subject})</h3>
+                                    <span class="active-batch-meta">${activeBatchObj.total} Papers • ${activeBatchObj.totalPages} Pages • ${this.formatBytes(activeBatchObj.totalBytes)}</span>
+                                </div>
+                            </div>
+                            <div class="active-batch-right">
+                                <button type="button" class="btn-papers-secondary btn-batch-delete-active" data-batch-key="${activeBatchObj.key}" title="Delete this whole batch" style="color: #DC2626; border-color: #DC2626;">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                    <span>Delete Batch</span>
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Papers Data Table Card -->
+                    <div class="papers-table-card">
+                        <div class="table-meta-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                            <span class="table-results-label">Showing <b>${filteredPapers.length}</b> of ${totalPapers} uploaded papers</span>
+                            ${this.selectedIds.size > 0 ? `<span style="font-size: 0.8rem; font-weight: 600; color: #DC2626;">${this.selectedIds.size} paper(s) selected for bulk delete</span>` : ''}
+                        </div>
+
+                        <div class="papers-table-wrapper">
+                            <table class="papers-data-table">
+                                <thead>
+                                    <tr>
+                                        <th style="width: 40px; text-align: center;">
+                                            <input type="checkbox" id="papers-select-all" title="Select All Papers" style="cursor: pointer; width: 15px; height: 15px; vertical-align: middle; margin: 0;" />
+                                        </th>
+                                        <th style="width: 80px;">Roll No</th>
+                                        <th style="min-width: 150px;">Student Name</th>
+                                        <th style="width: 110px;">Class</th>
+                                        <th style="min-width: 150px;">Subject & Exam</th>
+                                        <th style="width: 100px;">Pages</th>
+                                        <th style="width: 120px;">Status</th>
+                                        <th style="width: 85px;">Score</th>
+                                        <th style="width: 200px; text-align: right;">Actions</th>
                                     </tr>
-                                ` : filtered.map(p => {
-                                    const pageCount = p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1));
-                                    const isComp = p.status === "Completed";
-                                    const initials = (p.studentName || "ST").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
-                                    const isChecked = this.selectedIds.has(String(p.id));
-                                    return `
-                                        <tr data-paper-id="${p.id}" class="${isChecked ? 'row-selected' : ''}" style="${isChecked ? 'background-color: rgba(220, 38, 38, 0.04);' : ''}">
-                                            <td style="text-align: center;">
-                                                <input type="checkbox" class="papers-item-check" data-id="${p.id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px; vertical-align: middle; margin: 0;" />
-                                            </td>
-                                            <td class="cell-roll">${p.rollNo || '—'}</td>
-                                            <td class="cell-name">
-                                                <div class="student-name-chip">
-                                                    <span class="avatar-circle">${initials}</span>
-                                                    <span class="name-text">${p.studentName || 'Unnamed Student'}</span>
-                                                </div>
-                                            </td>
-                                            <td class="cell-class">
-                                                <span class="badge-class-tag">${p.className || p.class || 'Class 12-A'}</span>
-                                            </td>
-                                            <td class="cell-exam">
-                                                <div class="exam-info-stack">
-                                                    <span class="exam-subject-text">${p.subject || 'General'}</span>
-                                                    <span class="exam-name-text">${p.examName || p.templateName || 'Mid-Term Exam'}</span>
-                                                </div>
-                                            </td>
-                                            <td class="cell-pages">
-                                                <span class="badge-page-count">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/></svg>
-                                                    ${pageCount} ${pageCount === 1 ? 'Page' : 'Pages'}
-                                                </span>
-                                            </td>
-                                            <td class="cell-status">
-                                                <span class="status-pill ${isComp ? 'status-completed' : 'status-pending'}">
-                                                    <span class="status-dot"></span>
-                                                    ${isComp ? 'Evaluated' : 'Pending'}
-                                                </span>
-                                            </td>
-                                            <td class="cell-score">
-                                                ${isComp ? `<span class="score-pill">${p.obtainedMarks} / ${p.maxMarks}</span>` : '<span class="score-none">—</span>'}
-                                            </td>
-                                            <td class="cell-actions">
-                                                <div class="paper-actions-group">
-                                                    <button type="button" class="btn-paper-action btn-action-inspect" data-paper-id="${p.id}" title="Inspect pages of this paper">
-                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                                        <span>Inspect</span>
-                                                    </button>
-                                                    <button type="button" class="btn-paper-action btn-action-eval" data-paper-id="${p.id}" title="Open evaluation workspace">
-                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                                                        <span>Evaluate</span>
-                                                    </button>
-                                                    <button type="button" class="btn-paper-action btn-action-delete" data-paper-id="${p.id}" title="Delete paper" aria-label="Delete paper">
-                                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                </thead>
+                                <tbody>
+                                    ${filteredPapers.length === 0 ? `
+                                        <tr>
+                                            <td colspan="9" class="papers-empty-cell">
+                                                <div class="empty-papers-state">
+                                                    <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                                    <span>No papers match the current filters.</span>
+                                                    <button type="button" class="btn-empty-upload-shortcut" id="btn-empty-upload-shortcut">
+                                                        Upload New Papers
                                                     </button>
                                                 </div>
                                             </td>
                                         </tr>
-                                    `;
-                                }).join('')}
-                            </tbody>
-                        </table>
+                                    ` : filteredPapers.map(p => {
+                                        const pageCount = p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1));
+                                        const isComp = p.status === "Completed";
+                                        const initials = (p.studentName || "ST").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
+                                        const isChecked = this.selectedIds.has(String(p.id));
+                                        return `
+                                            <tr data-paper-id="${p.id}" class="${isChecked ? 'row-selected' : ''}" style="${isChecked ? 'background-color: rgba(220, 38, 38, 0.04);' : ''}">
+                                                <td style="text-align: center;">
+                                                    <input type="checkbox" class="papers-item-check" data-id="${p.id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; width: 15px; height: 15px; vertical-align: middle; margin: 0;" />
+                                                </td>
+                                                <td class="cell-roll">${p.rollNo || '—'}</td>
+                                                <td class="cell-name">
+                                                    <div class="student-name-chip">
+                                                        <span class="avatar-circle">${initials}</span>
+                                                        <span class="name-text">${p.studentName || 'Unnamed Student'}</span>
+                                                    </div>
+                                                </td>
+                                                <td class="cell-class">
+                                                    <span class="badge-class-tag">${p.className || p.class || 'Class 12-A'}</span>
+                                                </td>
+                                                <td class="cell-exam">
+                                                    <div class="exam-info-stack">
+                                                        <span class="exam-subject-text">${p.subject || 'General'}</span>
+                                                        <span class="exam-name-text">${p.examName || p.templateName || 'Mid-Term Exam'}</span>
+                                                    </div>
+                                                </td>
+                                                <td class="cell-pages">
+                                                    <span class="badge-page-count">
+                                                        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="2" width="16" height="20" rx="2"/><line x1="8" y1="6" x2="16" y2="6"/><line x1="8" y1="10" x2="16" y2="10"/></svg>
+                                                        ${pageCount} ${pageCount === 1 ? 'Page' : 'Pages'}
+                                                    </span>
+                                                </td>
+                                                <td class="cell-status">
+                                                    <span class="status-pill ${isComp ? 'status-completed' : 'status-pending'}">
+                                                        <span class="status-dot"></span>
+                                                        ${isComp ? 'Evaluated' : 'Pending'}
+                                                    </span>
+                                                </td>
+                                                <td class="cell-score">
+                                                    ${isComp ? `<span class="score-pill">${p.obtainedMarks} / ${p.maxMarks}</span>` : '<span class="score-none">—</span>'}
+                                                </td>
+                                                <td class="cell-actions">
+                                                    <div class="paper-actions-group">
+                                                        <button type="button" class="btn-paper-action btn-action-inspect" data-paper-id="${p.id}" title="Inspect pages of this paper">
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                                                            <span>Inspect</span>
+                                                        </button>
+                                                        <button type="button" class="btn-paper-action btn-action-eval" data-paper-id="${p.id}" title="Open evaluation workspace">
+                                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                                            <span>Evaluate</span>
+                                                        </button>
+                                                        <button type="button" class="btn-paper-action btn-action-delete" data-paper-id="${p.id}" title="Delete paper" aria-label="Delete paper">
+                                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </div>
+                `}
             </div>
 
             <!-- Page Inspector Lightbox Modal Backdrop -->
@@ -347,7 +554,7 @@ class UploadedPapersPageManager {
                         <button type="button" class="btn-modal-close" id="btn-close-inspector">×</button>
                     </div>
 
-                    <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding: 20px;">
+                    <div class="modal-body" style="max-height: 70vh; overflow-y: auto; padding: 16px;">
                         <div class="inspector-pages-grid" id="inspector-pages-grid">
                             <!-- Page Thumbnails injected dynamically -->
                         </div>
@@ -358,8 +565,8 @@ class UploadedPapersPageManager {
                         <div class="inspector-footer-actions">
                             <button type="button" class="btn-secondary" id="btn-dismiss-inspector">Close</button>
                             <button type="button" class="btn-primary" id="btn-launch-eval-from-inspector">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                                Open in Evaluator
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                                Open Evaluator
                             </button>
                         </div>
                     </div>
@@ -371,6 +578,24 @@ class UploadedPapersPageManager {
     }
 
     bindEvents() {
+        // View Mode Switcher
+        const btnToggleCards = this.container.querySelector("#btn-toggle-view-cards");
+        if (btnToggleCards) {
+            btnToggleCards.addEventListener("click", () => {
+                this.viewMode = "cards";
+                this.selectedBatchKey = "all";
+                this.render();
+            });
+        }
+        const btnToggleTable = this.container.querySelector("#btn-toggle-view-table");
+        if (btnToggleTable) {
+            btnToggleTable.addEventListener("click", () => {
+                this.viewMode = "table";
+                this.selectedBatchKey = "all";
+                this.render();
+            });
+        }
+
         // Search Input
         const inputSearch = this.container.querySelector("#input-papers-search");
         if (inputSearch) {
@@ -426,6 +651,7 @@ class UploadedPapersPageManager {
                 this.selectedSubject = "all";
                 this.selectedClass = "all";
                 this.selectedStatus = "all";
+                this.selectedBatchKey = "all";
                 this.searchQuery = "";
                 this.render();
             });
@@ -444,6 +670,12 @@ class UploadedPapersPageManager {
                 if (window.app) window.app.switchView("upload-portal");
             });
         }
+        const btnBatchEmptyUpload = this.container.querySelector("#btn-batch-empty-upload");
+        if (btnBatchEmptyUpload) {
+            btnBatchEmptyUpload.addEventListener("click", () => {
+                if (window.app) window.app.switchView("upload-portal");
+            });
+        }
 
         // Export Manifest
         const btnExport = this.container.querySelector("#btn-export-papers-manifest");
@@ -458,6 +690,61 @@ class UploadedPapersPageManager {
         if (btnBulkDel) {
             btnBulkDel.addEventListener("click", () => {
                 this.showBulkDeleteModal();
+            });
+        }
+
+        // Batch Card: View Papers
+        this.container.querySelectorAll(".btn-batch-view").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const key = btn.getAttribute("data-batch-key");
+                this.selectedBatchKey = key;
+                this.render();
+            });
+        });
+
+        // Batch Card: Inspect Sample
+        this.container.querySelectorAll(".btn-batch-inspect").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const key = btn.getAttribute("data-batch-key");
+                const batches = this.computeBatches();
+                const targetBatch = batches.find(b => b.key === key);
+                if (targetBatch && targetBatch.papers.length > 0) {
+                    this.openInspector(targetBatch.papers[0]);
+                }
+            });
+        });
+
+        // Batch Card: Delete Entire Batch
+        this.container.querySelectorAll(".btn-batch-delete, .btn-batch-delete-active").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const key = btn.getAttribute("data-batch-key");
+                const batches = this.computeBatches();
+                const targetBatch = batches.find(b => b.key === key);
+                if (targetBatch) {
+                    this.showBatchDeleteModal(targetBatch);
+                }
+            });
+        });
+
+        // Entire Batch Card Click (defaults to View Papers)
+        this.container.querySelectorAll(".uploaded-batch-card").forEach(card => {
+            card.addEventListener("click", (e) => {
+                if (e.target.closest("button")) return; // handled by button
+                const key = card.getAttribute("data-batch-key");
+                this.selectedBatchKey = key;
+                this.render();
+            });
+        });
+
+        // Back to All Batches Button
+        const btnBackBatches = this.container.querySelector("#btn-back-to-all-batches");
+        if (btnBackBatches) {
+            btnBackBatches.addEventListener("click", () => {
+                this.selectedBatchKey = "all";
+                this.render();
             });
         }
 
@@ -518,7 +805,7 @@ class UploadedPapersPageManager {
             });
         });
 
-        // Action: Delete Paper
+        // Action: Delete Single Paper
         this.container.querySelectorAll(".btn-action-delete").forEach(btn => {
             btn.addEventListener("click", async () => {
                 const id = btn.getAttribute("data-paper-id");
@@ -531,7 +818,9 @@ class UploadedPapersPageManager {
                     }
                     this.selectedIds.delete(String(id));
                     this.papers = this.papers.filter(p => String(p.id) !== String(id));
-                    if (window.app) window.app.showToast(`Deleted paper for ${target.studentName}.`);
+                    if (window.app && window.app.showToast) {
+                        window.app.showToast(`Deleted paper for ${target.studentName}.`, "info");
+                    }
                     await this.loadData();
                     this.render();
                 }
@@ -613,6 +902,143 @@ class UploadedPapersPageManager {
         }
     }
 
+    showBatchDeleteModal(batch) {
+        if (!batch || !batch.papers || batch.papers.length === 0) return;
+        const count = batch.papers.length;
+        const totalPages = batch.totalPages;
+        const spaceEstimate = this.formatBytes(batch.totalBytes);
+
+        const modalId = "batch-delete-modal-overlay";
+        const oldModal = document.getElementById(modalId);
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement("div");
+        modal.id = modalId;
+        modal.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: fadeInModal 0.2s ease-out;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: #FFFFFF; border-radius: 16px; max-width: 480px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.22); overflow: hidden; border: 1px solid #E2E8F0;">
+                <div style="padding: 24px; text-align: center;">
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
+                            <line x1="10" y1="11" x2="10" y2="17"/>
+                            <line x1="14" y1="11" x2="14" y2="17"/>
+                        </svg>
+                    </div>
+                    <h3 style="font-size: 1.2rem; font-weight: 700; color: #0F172A; margin: 0 0 6px;">Delete Batch</h3>
+                    <p style="font-size: 0.85rem; color: #64748B; margin: 0 0 16px; line-height: 1.45;">
+                        Are you sure you want to permanently delete all papers in <strong style="color: #0F172A;">${batch.className} – ${batch.templateName}</strong>?
+                    </p>
+
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; text-align: left; margin-bottom: 18px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-size: 0.78rem; color: #64748B;">Target Class & Exam:</span>
+                            <span style="font-size: 0.82rem; font-weight: 700; color: #0071E3;">${batch.className} (${batch.subject})</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-size: 0.78rem; color: #64748B;">Total Batch Papers:</span>
+                            <span style="font-size: 0.82rem; font-weight: 700; color: #DC2626;">${count} Paper(s)</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-size: 0.78rem; color: #64748B;">Document Pages:</span>
+                            <span style="font-size: 0.82rem; font-weight: 600; color: #1E293B;">${totalPages} Pages</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between;">
+                            <span style="font-size: 0.78rem; color: #64748B;">Storage Reclaimed:</span>
+                            <span style="font-size: 0.82rem; font-weight: 700; color: #16A34A;">~${spaceEstimate}</span>
+                        </div>
+                    </div>
+
+                    <div id="batch-delete-progress-bar" style="display: none; margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #64748B; margin-bottom: 4px;">
+                            <span id="batch-delete-status-text">Deleting batch papers...</span>
+                            <span id="batch-delete-pct-text">0%</span>
+                        </div>
+                        <div style="height: 6px; background: #E2E8F0; border-radius: 999px; overflow: hidden;">
+                            <div id="batch-delete-track" style="height: 100%; width: 0%; background: #DC2626; transition: width 0.15s ease;"></div>
+                        </div>
+                    </div>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" id="btn-cancel-batch-del" style="flex: 1; height: 38px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+                            Cancel
+                        </button>
+                        <button type="button" id="btn-confirm-batch-del" style="flex: 1.2; height: 38px; border-radius: 8px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                            <span id="btn-batch-del-text">Delete Batch (${count})</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const cancelBtn = modal.querySelector("#btn-cancel-batch-del");
+        const confirmBtn = modal.querySelector("#btn-confirm-batch-del");
+        const delText = modal.querySelector("#btn-batch-del-text");
+        const progressBox = modal.querySelector("#batch-delete-progress-bar");
+        const statusText = modal.querySelector("#batch-delete-status-text");
+        const pctText = modal.querySelector("#batch-delete-pct-text");
+        const track = modal.querySelector("#batch-delete-track");
+
+        cancelBtn.addEventListener("click", () => modal.remove());
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) modal.remove();
+        });
+
+        confirmBtn.addEventListener("click", async () => {
+            cancelBtn.disabled = true;
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = "0.75";
+            confirmBtn.style.cursor = "not-allowed";
+            progressBox.style.display = "block";
+
+            let deleted = 0;
+            for (let i = 0; i < batch.papers.length; i++) {
+                const p = batch.papers[i];
+                try {
+                    await window.appStorage.deleteEvaluation(p.id);
+                    deleted++;
+                } catch (e) {
+                    console.error("Batch delete error on paper:", p.id, e);
+                }
+                const pct = Math.round(((i + 1) / batch.papers.length) * 100);
+                track.style.width = `${pct}%`;
+                pctText.textContent = `${pct}%`;
+                statusText.textContent = `Deleted ${i + 1} of ${batch.papers.length} papers...`;
+            }
+
+            delText.innerHTML = `✓ Done (${deleted} Deleted)`;
+            confirmBtn.style.background = "#16A34A";
+            await new Promise(r => setTimeout(r, 400));
+            modal.remove();
+
+            if (this.selectedBatchKey === batch.key) {
+                this.selectedBatchKey = "all";
+            }
+            await this.loadData();
+            this.render();
+
+            if (window.app && window.app.showToast) {
+                window.app.showToast(`Deleted batch ${batch.className} (${deleted} papers). Storage freed: ~${spaceEstimate}!`, "success");
+            }
+        });
+    }
+
     showBulkDeleteModal() {
         const targetIds = Array.from(this.selectedIds);
         if (targetIds.length === 0) {
@@ -633,9 +1059,7 @@ class UploadedPapersPageManager {
             }
             return sum + (p.fileSizeBytes || ((p.pageCount || 1) * 185 * 1024));
         }, 0);
-        const spaceEstimate = (window.appStorage && typeof window.appStorage.formatStorageSize === "function")
-            ? window.appStorage.formatStorageSize(totalBytes)
-            : `${(totalBytes / (1024 * 1024)).toFixed(2)} MB`;
+        const spaceEstimate = this.formatBytes(totalBytes);
 
         const modalId = "papers-bulk-delete-modal-overlay";
         const oldModal = document.getElementById(modalId);
@@ -659,37 +1083,37 @@ class UploadedPapersPageManager {
 
         modal.innerHTML = `
             <div style="background: #FFFFFF; border-radius: 16px; max-width: 480px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.22); overflow: hidden; border: 1px solid #E2E8F0;">
-                <div style="padding: 26px; text-align: center;">
-                    <div style="width: 56px; height: 56px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
-                        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <div style="padding: 24px; text-align: center;">
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: #FEE2E2; color: #DC2626; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px;">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
                             <polyline points="3 6 5 6 21 6"/>
                             <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
                             <line x1="10" y1="11" x2="10" y2="17"/>
                             <line x1="14" y1="11" x2="14" y2="17"/>
                         </svg>
                     </div>
-                    <h3 style="font-size: 1.25rem; font-weight: 700; color: #0F172A; margin: 0 0 8px;">Delete Uploaded Papers</h3>
-                    <p style="font-size: 0.88rem; color: #64748B; margin: 0 0 18px; line-height: 1.45;">
-                        Are you sure you want to permanently delete <strong>${count} selected uploaded paper(s)</strong>? This will remove all associated document scans and free browser storage.
+                    <h3 style="font-size: 1.2rem; font-weight: 700; color: #0F172A; margin: 0 0 6px;">Delete Selected Papers</h3>
+                    <p style="font-size: 0.85rem; color: #64748B; margin: 0 0 16px; line-height: 1.45;">
+                        Are you sure you want to permanently delete <strong>${count} selected uploaded paper(s)</strong>? This will remove all document scans and free browser storage.
                     </p>
 
-                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 14px 16px; text-align: left; margin-bottom: 20px;">
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                            <span style="font-size: 0.8rem; color: #64748B;">Selected Papers:</span>
-                            <span style="font-size: 0.85rem; font-weight: 700; color: #DC2626;">${count} Paper(s)</span>
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; text-align: left; margin-bottom: 18px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-size: 0.78rem; color: #64748B;">Selected Papers:</span>
+                            <span style="font-size: 0.82rem; font-weight: 700; color: #DC2626;">${count} Paper(s)</span>
                         </div>
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
-                            <span style="font-size: 0.8rem; color: #64748B;">Total Document Pages:</span>
-                            <span style="font-size: 0.85rem; font-weight: 600; color: #1E293B;">${totalPages} Pages</span>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
+                            <span style="font-size: 0.78rem; color: #64748B;">Total Document Pages:</span>
+                            <span style="font-size: 0.82rem; font-weight: 600; color: #1E293B;">${totalPages} Pages</span>
                         </div>
                         <div style="display: flex; justify-content: space-between;">
-                            <span style="font-size: 0.8rem; color: #64748B;">Estimated Space Freed:</span>
-                            <span style="font-size: 0.85rem; font-weight: 700; color: #16A34A;">~${spaceEstimate}</span>
+                            <span style="font-size: 0.78rem; color: #64748B;">Estimated Space Freed:</span>
+                            <span style="font-size: 0.82rem; font-weight: 700; color: #16A34A;">~${spaceEstimate}</span>
                         </div>
                     </div>
 
-                    <div id="papers-bulk-delete-progress-bar" style="display: none; margin-bottom: 16px;">
-                        <div style="display: flex; justify-content: space-between; font-size: 0.78rem; color: #64748B; margin-bottom: 4px;">
+                    <div id="papers-bulk-delete-progress-bar" style="display: none; margin-bottom: 14px;">
+                        <div style="display: flex; justify-content: space-between; font-size: 0.75rem; color: #64748B; margin-bottom: 4px;">
                             <span id="papers-bulk-delete-status-text">Deleting papers...</span>
                             <span id="papers-bulk-delete-pct-text">0%</span>
                         </div>
@@ -699,10 +1123,10 @@ class UploadedPapersPageManager {
                     </div>
 
                     <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                        <button type="button" id="btn-cancel-papers-bulk-del" style="flex: 1; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: all 0.15s ease;">
+                        <button type="button" id="btn-cancel-papers-bulk-del" style="flex: 1; height: 38px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
                             Cancel
                         </button>
-                        <button type="button" id="btn-confirm-papers-bulk-del" style="flex: 1; height: 42px; border-radius: 10px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 600; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;">
+                        <button type="button" id="btn-confirm-papers-bulk-del" style="flex: 1; height: 38px; border-radius: 8px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
                             <span id="btn-papers-bulk-del-text">Delete ${count} Paper(s)</span>
                         </button>
                     </div>
@@ -750,7 +1174,7 @@ class UploadedPapersPageManager {
             this.selectedIds.clear();
             delText.innerHTML = `✓ Done (${deleted} Deleted)`;
             confirmBtn.style.background = "#16A34A";
-            await new Promise(r => setTimeout(r, 450));
+            await new Promise(r => setTimeout(r, 400));
             modal.remove();
 
             await this.loadData();
@@ -773,7 +1197,7 @@ class UploadedPapersPageManager {
         if (!modal || !grid) return;
 
         title.textContent = `${paper.studentName || 'Student'} – Roll ${paper.rollNo || 'N/A'}`;
-        subtitle.textContent = `${paper.className || 'Class 12-A'} • ${paper.subject || 'Subject'} (${paper.examName || 'Exam'})`;
+        subtitle.textContent = `${paper.className || 'Class 12-A'} • ${paper.subject || 'Subject'} (${paper.examName || paper.templateName || 'Exam'})`;
 
         let pages = paper.pages || (paper.pdfDataUrl ? [paper.pdfDataUrl] : []);
 
@@ -828,7 +1252,9 @@ class UploadedPapersPageManager {
         link.click();
         document.body.removeChild(link);
 
-        if (window.app) window.app.showToast("Uploaded papers manifest downloaded!");
+        if (window.app && window.app.showToast) {
+            window.app.showToast("Uploaded papers manifest downloaded!", "success");
+        }
     }
 }
 
