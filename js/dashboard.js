@@ -92,6 +92,10 @@ class DashboardManager {
     }
 
     destroyCharts() {
+        if (this._chartsResizeObserver) {
+            this._chartsResizeObserver.disconnect();
+            this._chartsResizeObserver = null;
+        }
         Object.keys(this.charts).forEach(key => {
             if (this.charts[key] && typeof this.charts[key].destroy === "function") {
                 this.charts[key].destroy();
@@ -454,15 +458,15 @@ class DashboardManager {
                 <!-- Batch Navigation Header Banner -->
                 <div class="batch-detail-header-banner" style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color: #FFFFFF; border-radius: 14px; padding: 20px 24px; margin-bottom: 22px; box-shadow: 0 4px 18px rgba(0,0,0,0.08); display: flex; flex-direction: column; gap: 14px;">
                     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-                        <button type="button" class="btn-back-to-batches" id="btn-back-to-batches" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); color: #FFFFFF; border-radius: 999px; padding: 7px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s ease;">
+                        <button type="button" class="btn-back-to-batches" id="btn-back-to-batches" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); color: #FFFFFF; border-radius: 999px; padding: 7px 16px; font-size: 0.82rem; font-weight: 400 !important; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s ease;">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                             <span>Back to All Batches</span>
                         </button>
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            <span style="font-size: 0.78rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; background: ${batchIsDone ? 'rgba(52, 199, 89, 0.2)' : 'rgba(0, 122, 255, 0.2)'}; color: ${batchIsDone ? '#34C759' : '#60A5FA'}; border: 1px solid ${batchIsDone ? 'rgba(52, 199, 89, 0.4)' : 'rgba(96, 165, 250, 0.4)'};">
+                            <span style="font-size: 0.78rem; font-weight: 400 !important; padding: 4px 12px; border-radius: 999px; background: ${batchIsDone ? 'rgba(52, 199, 89, 0.2)' : 'rgba(0, 122, 255, 0.2)'}; color: ${batchIsDone ? '#34C759' : '#60A5FA'}; border: 1px solid ${batchIsDone ? 'rgba(52, 199, 89, 0.4)' : 'rgba(96, 165, 250, 0.4)'};">
                                 ${batchIsDone ? '✓ All Papers Evaluated' : `${currentBatch.uncorrected} Pending Evaluation`}
                             </span>
-                            <button type="button" class="btn-primary" id="btn-batch-start-marking" style="padding: 7px 16px; font-size: 0.82rem; border-radius: 999px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                            <button type="button" class="btn-primary" id="btn-batch-start-marking" style="padding: 7px 16px; font-size: 0.82rem; border-radius: 999px; font-weight: 400 !important; display: inline-flex; align-items: center; gap: 6px;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                                 ${currentBatch.uncorrected === 0 ? 'Review Papers' : 'Start Marking'}
                             </button>
@@ -472,16 +476,16 @@ class DashboardManager {
                     <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px;">
                         <div>
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
-                                <span style="background: #0071E3; color: #FFFFFF; font-size: 0.74rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; text-transform: uppercase;">${currentBatch.className}</span>
-                                <span style="background: rgba(255,255,255,0.12); color: #E2E8F0; font-size: 0.74rem; font-weight: 600; padding: 3px 9px; border-radius: 6px;">${currentBatch.subject}</span>
-                                <span style="color: #94A3B8; font-size: 0.8rem;">Max Marks: <strong style="color: #FFFFFF;">${currentBatch.maxMarks}M</strong></span>
+                                <span style="background: #0071E3; color: #FFFFFF; font-size: 0.74rem; font-weight: 400 !important; padding: 3px 9px; border-radius: 6px; text-transform: uppercase;">${currentBatch.className}</span>
+                                <span style="background: rgba(255,255,255,0.12); color: #E2E8F0; font-size: 0.74rem; font-weight: 400 !important; padding: 3px 9px; border-radius: 6px;">${currentBatch.subject}</span>
+                                <span style="color: #94A3B8; font-size: 0.8rem;">Max Marks: <span style="color: #FFFFFF;">${currentBatch.maxMarks}M</span></span>
                             </div>
-                            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0; color: #FFFFFF;">${currentBatch.templateName}</h2>
+                            <h2 style="font-size: 1.25rem; font-weight: 400 !important; margin: 0; color: #FFFFFF;">${currentBatch.templateName}</h2>
                         </div>
                         <div style="min-width: 200px;">
                             <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 5px; color: #CBD5E1;">
                                 <span>Batch Progress</span>
-                                <strong>${currentBatch.corrected} / ${currentBatch.total} Evaluated (${batchPct}%)</strong>
+                                <span>${currentBatch.corrected} / ${currentBatch.total} Evaluated (${batchPct}%)</span>
                             </div>
                             <div style="height: 7px; background: rgba(255,255,255,0.15); border-radius: 999px; overflow: hidden;">
                                 <div style="width: ${batchPct}%; height: 100%; background: ${batchIsDone ? '#10B981' : 'linear-gradient(90deg, #38BDF8, #818CF8)'}; border-radius: 999px;"></div>
@@ -533,29 +537,29 @@ class DashboardManager {
                     <!-- Comprehensive Filter and Control Bar -->
                     <div class="dash-filters-toolbar" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: #FFFFFF; padding: 12px 16px; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
                         <div class="dash-filters-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 260px;">
-                            <select id="dash-filter-status" class="form-select-sm" title="Filter by paper status" style="font-size: 0.85rem; font-weight: 600; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; cursor: pointer; min-width: 160px;">
+                            <select id="dash-filter-status" class="form-select-sm" title="Filter by paper status" style="font-size: 0.85rem; font-weight: 400 !important; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; cursor: pointer; min-width: 160px;">
                                 <option value="all" ${this.activeTab === 'all' ? 'selected' : ''}>All Papers (${currentBatch.total})</option>
                                 <option value="uncorrected" ${this.activeTab === 'uncorrected' ? 'selected' : ''}>Uncorrected (${currentBatch.uncorrected})</option>
                                 <option value="corrected" ${this.activeTab === 'corrected' ? 'selected' : ''}>Corrected (${currentBatch.corrected})</option>
                             </select>
 
                             <div style="position: relative; flex: 1; min-width: 200px;">
-                                <input type="text" id="dash-search-input" class="form-input form-input-sm" value="${this.searchQuery}" placeholder="🔍 Search student or roll no in this batch..." style="width: 100%; height: 38px; padding: 0 12px; font-size: 0.85rem; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF;" />
+                                <input type="text" id="dash-search-input" class="form-input form-input-sm" value="${this.searchQuery}" placeholder="🔍 Search student or roll no in this batch..." style="width: 100%; height: 38px; padding: 0 12px; font-size: 0.85rem; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; font-weight: 400 !important;" />
                             </div>
                         </div>
 
                         <div class="dash-actions-group" style="display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap;">
-                            <button type="button" class="btn-secondary" id="dash-btn-bulk-pdf" title="Bulk download selected or all PDFs" style="background: #FFFFFF; border: 1.5px solid #007AFF; color: #007AFF; font-size: 0.84rem; font-weight: 600; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
-                                <span class="btn-icon" style="display: flex; align-items: center;">${ic.pdf || '📄'}</span> Bulk Download PDFs <span id="dash-pdf-count-badge" style="background: rgba(0, 122, 255, 0.12); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">(${this.selectedIds.size > 0 ? this.selectedIds.size : 'All ' + this.filteredEvaluations.length})</span>
+                            <button type="button" class="btn-secondary" id="dash-btn-bulk-pdf" title="Bulk download selected or all PDFs" style="background: #FFFFFF; border: 1.5px solid #007AFF; color: #007AFF; font-size: 0.84rem; font-weight: 400 !important; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
+                                <span class="btn-icon" style="display: flex; align-items: center;">${ic.pdf || '📄'}</span> Bulk Download PDFs <span id="dash-pdf-count-badge" style="background: rgba(0, 122, 255, 0.12); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 400 !important;">(${this.selectedIds.size > 0 ? this.selectedIds.size : 'All ' + this.filteredEvaluations.length})</span>
                             </button>
 
-                            <button type="button" class="btn-secondary" id="dash-btn-bulk-excel" title="Bulk export spreadsheet" style="background: #FFFFFF; border: 1.5px solid #16A34A; color: #16A34A; font-size: 0.84rem; font-weight: 600; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
+                            <button type="button" class="btn-secondary" id="dash-btn-bulk-excel" title="Bulk export spreadsheet" style="background: #FFFFFF; border: 1.5px solid #16A34A; color: #16A34A; font-size: 0.84rem; font-weight: 400 !important; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
                                 <span class="btn-icon" style="display: flex; align-items: center;">${ic.csv || '📊'}</span> Bulk Export Excel
                             </button>
 
-                            <button type="button" class="btn-secondary" id="dash-btn-bulk-delete" title="Delete selected papers to free storage space" style="background: #FFFFFF; border: 1.5px solid #DC2626; color: #DC2626; font-size: 0.84rem; font-weight: 600; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
+                            <button type="button" class="btn-secondary" id="dash-btn-bulk-delete" title="Delete selected papers to free storage space" style="background: #FFFFFF; border: 1.5px solid #DC2626; color: #DC2626; font-size: 0.84rem; font-weight: 400 !important; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
                                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                                <span>Bulk Delete</span> <span id="dash-delete-count-badge" style="background: rgba(220, 38, 38, 0.1); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">(${this.selectedIds.size})</span>
+                                <span>Bulk Delete</span> <span id="dash-delete-count-badge" style="background: rgba(220, 38, 38, 0.1); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 400 !important;">(${this.selectedIds.size})</span>
                             </button>
                         </div>
                     </div>
@@ -1642,12 +1646,30 @@ class DashboardManager {
                             grid: { color: "rgba(0, 0, 0, 0.05)" }
                         },
                         x: {
-                            ticks: { font: { family: "-apple-system, system-ui", size: 10, weight: "600" } },
+                            ticks: { font: { family: "-apple-system, system-ui", size: 10, weight: "400" } },
                             grid: { display: false }
                         }
                     }
                 }
             });
+        }
+
+        // Attach dynamic ResizeObserver to automatically resize charts when sidebar menu expands or collapses
+        const chartsGrid = document.querySelector(".analytics-charts-grid");
+        if (chartsGrid && window.ResizeObserver) {
+            if (this._chartsResizeObserver) {
+                this._chartsResizeObserver.disconnect();
+            }
+            this._chartsResizeObserver = new ResizeObserver(() => {
+                requestAnimationFrame(() => {
+                    Object.values(this.charts).forEach(c => {
+                        if (c && typeof c.resize === "function") {
+                            c.resize();
+                        }
+                    });
+                });
+            });
+            this._chartsResizeObserver.observe(chartsGrid);
         }
     }
 }

@@ -523,48 +523,86 @@ body {
 /* Analytics Charts Section */
 .analytics-charts-grid {
     display: grid;
-    grid-template-columns: 1.4fr 1fr 1fr;
-    gap: 16px;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
     margin-bottom: 24px;
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
 }
 
 .chart-card {
     background-color: var(--bg-card);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    padding: 20px;
+    border-radius: var(--radius-lg, 14px);
+    padding: 16px 18px;
     box-shadow: var(--shadow-sm);
     display: flex;
     flex-direction: column;
+    min-width: 0;
+    max-width: 100%;
+    box-sizing: border-box;
+    overflow: hidden;
 }
 
 .chart-header {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    margin-bottom: 14px;
+    margin-bottom: 12px;
+    min-width: 0;
 }
 
 .chart-title {
-    font-size: 0.95rem;
-    font-weight: 400;
+    font-size: 0.92rem;
+    font-weight: 400 !important;
     color: var(--text-main);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .chart-badge {
-    font-size: 0.72rem;
-    font-weight: 400;
+    font-size: 0.7rem;
+    font-weight: 400 !important;
     color: var(--text-muted);
     background-color: var(--bg-subtle);
-    padding: 3px 8px;
+    padding: 2px 7px;
     border-radius: var(--radius-pill);
+    white-space: nowrap;
+    flex-shrink: 0;
 }
 
 .chart-body {
     flex: 1;
     position: relative;
-    min-height: 190px;
-    max-height: 220px;
+    min-height: 175px;
+    max-height: 200px;
+    min-width: 0;
+    width: 100%;
+    overflow: hidden;
+}
+
+.chart-body canvas {
+    max-width: 100% !important;
+    width: 100% !important;
+    display: block;
+}
+
+@media (max-width: 1180px) {
+    .analytics-charts-grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        gap: 12px;
+    }
+}
+
+@media (max-width: 1360px) {
+    .app-sidebar:not(.collapsed) ~ .app-main-viewport .analytics-charts-grid,
+    .app-sidebar:not(.collapsed) + .app-main-viewport .analytics-charts-grid {
+        grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+        gap: 12px;
+    }
 }
 
 /* Recent papers section */

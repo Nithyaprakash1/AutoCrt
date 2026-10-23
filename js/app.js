@@ -1285,6 +1285,15 @@ class AppController {
             const nowCollapsed = sidebar.classList.toggle("collapsed");
             localStorage.setItem("niprak_sidebar_collapsed", nowCollapsed ? "true" : "false");
             localStorage.setItem("onespace_sidebar_collapsed", nowCollapsed ? "true" : "false");
+            window.dispatchEvent(new Event("resize"));
+            setTimeout(() => {
+                window.dispatchEvent(new Event("resize"));
+                if (window.app && window.app.dashboardManager && window.app.dashboardManager.charts) {
+                    Object.values(window.app.dashboardManager.charts).forEach(c => {
+                        if (c && typeof c.resize === "function") c.resize();
+                    });
+                }
+            }, 300);
         };
 
         const btnCollapse = document.getElementById("btn-sidebar-collapse");
