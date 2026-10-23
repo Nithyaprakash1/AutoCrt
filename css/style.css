@@ -6034,7 +6034,7 @@ body {
 
 .uploaded-page-header .page-title {
     font-size: 1.25rem;
-    font-weight: 700;
+    font-weight: 400 !important;
     color: var(--text-main);
     letter-spacing: -0.01em;
     margin: 2px 0;
@@ -6043,6 +6043,7 @@ body {
 .uploaded-page-header .page-subtitle {
     font-size: 0.8rem;
     color: var(--text-muted);
+    font-weight: 400 !important;
     margin: 0;
 }
 
@@ -6067,7 +6068,7 @@ body {
     border: none;
     border-radius: 8px;
     font-size: 0.8rem;
-    font-weight: 600 !important;
+    font-weight: 400 !important;
     line-height: 1;
     white-space: nowrap;
     flex-shrink: 0;
@@ -6100,7 +6101,7 @@ body {
     border: 1px solid var(--border-color);
     border-radius: 8px;
     font-size: 0.8rem;
-    font-weight: 600 !important;
+    font-weight: 400 !important;
     line-height: 1;
     white-space: nowrap;
     flex-shrink: 0;
@@ -6125,7 +6126,7 @@ body {
     line-height: 1;
     background: rgba(220, 38, 38, 0.1);
     color: #DC2626;
-    font-weight: 700;
+    font-weight: 400 !important;
 }
 
 .papers-kpi-grid {
@@ -6170,7 +6171,7 @@ body {
 .papers-kpi-card .kpi-label {
     font-size: 0.67rem;
     color: var(--text-muted);
-    font-weight: 600 !important;
+    font-weight: 400 !important;
     text-transform: uppercase;
     letter-spacing: 0.03em;
     white-space: nowrap;
@@ -6181,7 +6182,7 @@ body {
 .papers-kpi-card .kpi-value {
     font-size: 1.15rem;
     color: var(--text-main);
-    font-weight: 700 !important;
+    font-weight: 400 !important;
     letter-spacing: -0.02em;
     line-height: 1.2;
 }
@@ -6223,7 +6224,7 @@ body {
     background: transparent;
     color: #64748B;
     font-size: 0.77rem;
-    font-weight: 600;
+    font-weight: 400 !important;
     cursor: pointer;
     transition: all 0.15s ease;
     white-space: nowrap;
@@ -6238,7 +6239,7 @@ body {
     background: #FFFFFF;
     color: #0071E3;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-    font-weight: 700;
+    font-weight: 400 !important;
 }
 
 .search-field-wrap {
@@ -6280,7 +6281,7 @@ body {
 .filter-select-item label {
     font-size: 0.73rem;
     color: var(--text-muted);
-    font-weight: 600 !important;
+    font-weight: 400 !important;
 }
 
 .form-select-sm {
@@ -6292,7 +6293,7 @@ body {
     padding: 0 6px;
     color: var(--text-main);
     outline: none;
-    font-weight: 500;
+    font-weight: 400 !important;
 }
 
 .btn-reset-filters {
@@ -6306,7 +6307,7 @@ body {
     border-radius: 6px;
     color: var(--text-muted);
     font-size: 0.75rem;
-    font-weight: 600;
+    font-weight: 400 !important;
     white-space: nowrap;
     cursor: pointer;
     transition: all 0.15s ease;
@@ -6344,7 +6345,7 @@ body {
     align-items: center;
     gap: 8px;
     font-size: 0.95rem;
-    font-weight: 700;
+    font-weight: 400 !important;
     color: #0F172A;
     margin: 0;
 }
@@ -6353,7 +6354,7 @@ body {
     background: #EEF2FF;
     color: #4F46E5;
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 400 !important;
     padding: 2px 7px;
     border-radius: 10px;
 }
@@ -6361,6 +6362,7 @@ body {
 .uploaded-batches-desc {
     font-size: 0.76rem;
     color: #64748B;
+    font-weight: 400 !important;
     margin: 0;
 }
 
@@ -6383,18 +6385,19 @@ body {
     align-items: center;
     gap: 10px;
     font-size: 0.85rem;
+    font-weight: 400 !important;
 }
 
 .uploaded-batch-card {
     background: #FFFFFF;
-    border: 1.5px solid #E2E8F0;
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 13px 15px;
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
     position: relative;
 }
@@ -6402,7 +6405,7 @@ body {
 .uploaded-batch-card:hover {
     border-color: #0071E3;
     transform: translateY(-2px);
-    box-shadow: 0 6px 18px rgba(0, 113, 227, 0.08);
+    box-shadow: 0 8px 24px rgba(0, 113, 227, 0.08);
 }
 
 .uploaded-batch-card .batch-card-top-row {
@@ -6415,10 +6418,10 @@ body {
 
 .uploaded-batch-card .batch-card-name {
     font-size: 0.94rem;
-    font-weight: 700;
-    color: #0F172A;
+    font-weight: 400 !important;
+    color: var(--text-main);
     margin: 0 0 6px 0;
-    line-height: 1.3;
+    line-height: 1.35;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -6430,6 +6433,7 @@ body {
     gap: 10px;
     font-size: 0.76rem;
     color: #64748B;
+    font-weight: 400 !important;
     margin-bottom: 10px;
 }
 
@@ -6443,6 +6447,7 @@ body {
     font-size: 0.74rem;
     margin-bottom: 4px;
     color: #64748B;
+    font-weight: 400 !important;
 }
 
 .uploaded-batch-card .batch-progress-bar {
@@ -6465,7 +6470,7 @@ body {
     background: #EDF2F7;
     color: #1E293B;
     font-size: 0.76rem;
-    font-weight: 600;
+    font-weight: 400 !important;
     border-radius: 6px;
     border: none;
     cursor: pointer;
@@ -6487,7 +6492,7 @@ body {
     background: #F1F5F9;
     color: #475569;
     font-size: 0.76rem;
-    font-weight: 600;
+    font-weight: 400 !important;
     border-radius: 6px;
     border: none;
     cursor: pointer;
@@ -6557,7 +6562,7 @@ body {
     border-radius: 6px;
     color: #334155;
     font-size: 0.76rem;
-    font-weight: 600;
+    font-weight: 400 !important;
     cursor: pointer;
     transition: all 0.15s ease;
 }
@@ -6571,14 +6576,14 @@ body {
     background: #0071E3;
     color: #FFFFFF;
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 400 !important;
     padding: 2px 7px;
     border-radius: 5px;
 }
 
 .active-batch-name {
     font-size: 0.88rem;
-    font-weight: 700;
+    font-weight: 400 !important;
     color: #1E3A8A;
     margin: 0;
 }
@@ -6586,6 +6591,7 @@ body {
 .active-batch-meta {
     font-size: 0.75rem;
     color: #64748B;
+    font-weight: 400 !important;
 }
 
 /* Papers Data Table Card (Compact Fit-to-Screen) */
@@ -6608,6 +6614,7 @@ body {
     border-bottom: 1px solid var(--border-color);
     font-size: 0.78rem;
     color: var(--text-muted);
+    font-weight: 400 !important;
 }
 
 .papers-data-table {
@@ -6620,7 +6627,7 @@ body {
     padding: 8px 10px;
     text-align: left;
     font-size: 0.7rem;
-    font-weight: 600 !important;
+    font-weight: 400 !important;
     color: var(--text-muted);
     text-transform: uppercase;
     letter-spacing: 0.04em;
@@ -6634,6 +6641,7 @@ body {
     padding: 7px 10px;
     border-bottom: 1px solid rgba(0, 0, 0, 0.04);
     color: var(--text-main);
+    font-weight: 400 !important;
     vertical-align: middle;
 }
 
@@ -6766,7 +6774,7 @@ body {
     color: var(--text-main);
     border-radius: 6px;
     font-size: 0.75rem;
-    font-weight: 600 !important;
+    font-weight: 400 !important;
     line-height: 1;
     white-space: nowrap;
     flex-shrink: 0;
@@ -11313,7 +11321,7 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     background: #0071E3;
     color: #FFFFFF;
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 400 !important;
     padding: 2px 7px;
     border-radius: 5px;
     letter-spacing: 0.02em;
@@ -11321,7 +11329,7 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
 
 .batch-subject-tag {
     font-size: 0.72rem;
-    font-weight: 600;
+    font-weight: 400 !important;
     color: #64748B;
     background: #EDF2F7;
     padding: 2px 7px;
@@ -11330,7 +11338,7 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
 
 .batch-status-pill {
     font-size: 0.72rem;
-    font-weight: 700;
+    font-weight: 400 !important;
     padding: 2px 8px;
     border-radius: 10px;
     white-space: nowrap;
@@ -11348,7 +11356,7 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
 
 .batch-card-name {
     font-size: 0.94rem;
-    font-weight: 700;
+    font-weight: 400 !important;
     color: #0F172A;
     margin: 0 0 6px 0;
     line-height: 1.35;
@@ -11363,6 +11371,7 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     gap: 10px;
     font-size: 0.76rem;
     color: #64748B;
+    font-weight: 400 !important;
     margin-bottom: 10px;
 }
 
@@ -11376,6 +11385,7 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     font-size: 0.74rem;
     margin-bottom: 4px;
     color: #64748B;
+    font-weight: 400 !important;
 }
 
 .batch-progress-bar {
@@ -11401,7 +11411,7 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
 .btn-batch-view,
 .btn-batch-start {
     font-size: 0.76rem;
-    font-weight: 600;
+    font-weight: 400 !important;
     border-radius: 6px;
     padding: 6px 10px;
     border: none;

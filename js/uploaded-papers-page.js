@@ -238,17 +238,17 @@ class UploadedPapersPageManager {
                 <div class="papers-kpi-grid">
                     <div class="papers-kpi-card">
                         <div class="kpi-icon-wrap icon-purple">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2.2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
                         </div>
                         <div class="kpi-info">
                             <span class="kpi-label">Class - Template Batches</span>
-                            <span class="kpi-value">${allBatches.length} <small style="font-size: 0.72rem; color: #64748B; font-weight: normal;">Batches</small></span>
+                            <span class="kpi-value">${allBatches.length} <small style="font-size: 0.72rem; color: #64748B;">Batches</small></span>
                         </div>
                     </div>
 
                     <div class="papers-kpi-card">
                         <div class="kpi-icon-wrap icon-blue">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                         </div>
                         <div class="kpi-info">
                             <span class="kpi-label">Total Uploaded Papers</span>
@@ -258,21 +258,21 @@ class UploadedPapersPageManager {
 
                     <div class="papers-kpi-card">
                         <div class="kpi-icon-wrap icon-green">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2.2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                         </div>
                         <div class="kpi-info">
                             <span class="kpi-label">Evaluated / Pending</span>
-                            <span class="kpi-value">${completedPapers} <span style="font-size: 0.8rem; color: #F59E0B; font-weight: 600;">/ ${pendingPapers}</span></span>
+                            <span class="kpi-value">${completedPapers} <span style="font-size: 0.8rem; color: #F59E0B;">/ ${pendingPapers}</span></span>
                         </div>
                     </div>
 
                     <div class="papers-kpi-card">
                         <div class="kpi-icon-wrap icon-orange">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2.2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                         </div>
                         <div class="kpi-info">
                             <span class="kpi-label">Pages & Storage Size</span>
-                            <span class="kpi-value">${totalPages} <small style="font-size: 0.76rem; color: #0071E3; font-weight: 600;">(${formattedTotalStorage})</small></span>
+                            <span class="kpi-value">${totalPages} <small style="font-size: 0.76rem; color: #0071E3;">(${formattedTotalStorage})</small></span>
                         </div>
                     </div>
                 </div>
@@ -383,15 +383,17 @@ class UploadedPapersPageManager {
                                         <h4 class="batch-card-name" title="${b.templateName}">${b.templateName}</h4>
 
                                         <div class="batch-card-meta-row">
-                                            <span><strong>${b.total}</strong> Papers</span>
-                                            <span><strong>${b.totalPages}</strong> Pages</span>
-                                            <span><strong style="color: #0071E3;">${formattedStorage}</strong></span>
+                                            <span>${b.total} Papers</span>
+                                            <span style="color: #CBD5E1;">•</span>
+                                            <span>${b.totalPages} Pages</span>
+                                            <span style="color: #CBD5E1;">•</span>
+                                            <span style="color: #0071E3;">${formattedStorage}</span>
                                         </div>
 
                                         <div class="batch-progress-wrapper">
                                             <div class="batch-progress-labels">
                                                 <span class="progress-ratio">${b.completed} / ${b.total} Evaluated</span>
-                                                <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'}; font-weight: 700;">${pct}%</span>
+                                                <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'};">${pct}%</span>
                                             </div>
                                             <div class="batch-progress-bar">
                                                 <div class="batch-progress-fill" style="width: ${pct}%; background: ${pct === 100 ? '#16A34A' : 'linear-gradient(90deg, #0071E3, #38BDF8)'};"></div>
@@ -443,8 +445,8 @@ class UploadedPapersPageManager {
                     <!-- Papers Data Table Card -->
                     <div class="papers-table-card">
                         <div class="table-meta-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                            <span class="table-results-label">Showing <b>${filteredPapers.length}</b> of ${totalPapers} uploaded papers</span>
-                            ${this.selectedIds.size > 0 ? `<span style="font-size: 0.8rem; font-weight: 600; color: #DC2626;">${this.selectedIds.size} paper(s) selected for bulk delete</span>` : ''}
+                            <span class="table-results-label">Showing ${filteredPapers.length} of ${totalPapers} uploaded papers</span>
+                            ${this.selectedIds.size > 0 ? `<span style="font-size: 0.8rem; color: #DC2626;">${this.selectedIds.size} paper(s) selected for bulk delete</span>` : ''}
                         </div>
 
                         <div class="papers-table-wrapper">
@@ -939,27 +941,27 @@ class UploadedPapersPageManager {
                             <line x1="14" y1="11" x2="14" y2="17"/>
                         </svg>
                     </div>
-                    <h3 style="font-size: 1.2rem; font-weight: 700; color: #0F172A; margin: 0 0 6px;">Delete Batch</h3>
+                    <h3 style="font-size: 1.2rem; font-weight: 400 !important; color: #0F172A; margin: 0 0 6px;">Delete Batch</h3>
                     <p style="font-size: 0.85rem; color: #64748B; margin: 0 0 16px; line-height: 1.45;">
-                        Are you sure you want to permanently delete all papers in <strong style="color: #0F172A;">${batch.className} – ${batch.templateName}</strong>?
+                        Are you sure you want to permanently delete all papers in <span style="color: #0F172A;">${batch.className} – ${batch.templateName}</span>?
                     </p>
 
                     <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; text-align: left; margin-bottom: 18px;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                             <span style="font-size: 0.78rem; color: #64748B;">Target Class & Exam:</span>
-                            <span style="font-size: 0.82rem; font-weight: 700; color: #0071E3;">${batch.className} (${batch.subject})</span>
+                            <span style="font-size: 0.82rem; color: #0071E3;">${batch.className} (${batch.subject})</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                             <span style="font-size: 0.78rem; color: #64748B;">Total Batch Papers:</span>
-                            <span style="font-size: 0.82rem; font-weight: 700; color: #DC2626;">${count} Paper(s)</span>
+                            <span style="font-size: 0.82rem; color: #DC2626;">${count} Paper(s)</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                             <span style="font-size: 0.78rem; color: #64748B;">Document Pages:</span>
-                            <span style="font-size: 0.82rem; font-weight: 600; color: #1E293B;">${totalPages} Pages</span>
+                            <span style="font-size: 0.82rem; color: #1E293B;">${totalPages} Pages</span>
                         </div>
                         <div style="display: flex; justify-content: space-between;">
                             <span style="font-size: 0.78rem; color: #64748B;">Storage Reclaimed:</span>
-                            <span style="font-size: 0.82rem; font-weight: 700; color: #16A34A;">~${spaceEstimate}</span>
+                            <span style="font-size: 0.82rem; color: #16A34A;">~${spaceEstimate}</span>
                         </div>
                     </div>
 
@@ -974,10 +976,10 @@ class UploadedPapersPageManager {
                     </div>
 
                     <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                        <button type="button" id="btn-cancel-batch-del" style="flex: 1; height: 38px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+                        <button type="button" id="btn-cancel-batch-del" style="flex: 1; height: 38px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 400 !important; font-size: 0.85rem; cursor: pointer;">
                             Cancel
                         </button>
-                        <button type="button" id="btn-confirm-batch-del" style="flex: 1.2; height: 38px; border-radius: 8px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                        <button type="button" id="btn-confirm-batch-del" style="flex: 1.2; height: 38px; border-radius: 8px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 400 !important; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
                             <span id="btn-batch-del-text">Delete Batch (${count})</span>
                         </button>
                     </div>
@@ -1092,23 +1094,23 @@ class UploadedPapersPageManager {
                             <line x1="14" y1="11" x2="14" y2="17"/>
                         </svg>
                     </div>
-                    <h3 style="font-size: 1.2rem; font-weight: 700; color: #0F172A; margin: 0 0 6px;">Delete Selected Papers</h3>
+                    <h3 style="font-size: 1.2rem; font-weight: 400 !important; color: #0F172A; margin: 0 0 6px;">Delete Selected Papers</h3>
                     <p style="font-size: 0.85rem; color: #64748B; margin: 0 0 16px; line-height: 1.45;">
-                        Are you sure you want to permanently delete <strong>${count} selected uploaded paper(s)</strong>? This will remove all document scans and free browser storage.
+                        Are you sure you want to permanently delete <span style="color: #0F172A;">${count} selected uploaded paper(s)</span>? This will remove all document scans and free browser storage.
                     </p>
 
                     <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px 14px; text-align: left; margin-bottom: 18px;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                             <span style="font-size: 0.78rem; color: #64748B;">Selected Papers:</span>
-                            <span style="font-size: 0.82rem; font-weight: 700; color: #DC2626;">${count} Paper(s)</span>
+                            <span style="font-size: 0.82rem; color: #DC2626;">${count} Paper(s)</span>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-bottom: 5px;">
                             <span style="font-size: 0.78rem; color: #64748B;">Total Document Pages:</span>
-                            <span style="font-size: 0.82rem; font-weight: 600; color: #1E293B;">${totalPages} Pages</span>
+                            <span style="font-size: 0.82rem; color: #1E293B;">${totalPages} Pages</span>
                         </div>
                         <div style="display: flex; justify-content: space-between;">
                             <span style="font-size: 0.78rem; color: #64748B;">Estimated Space Freed:</span>
-                            <span style="font-size: 0.82rem; font-weight: 700; color: #16A34A;">~${spaceEstimate}</span>
+                            <span style="font-size: 0.82rem; color: #16A34A;">~${spaceEstimate}</span>
                         </div>
                     </div>
 
@@ -1123,10 +1125,10 @@ class UploadedPapersPageManager {
                     </div>
 
                     <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                        <button type="button" id="btn-cancel-papers-bulk-del" style="flex: 1; height: 38px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.85rem; cursor: pointer;">
+                        <button type="button" id="btn-cancel-papers-bulk-del" style="flex: 1; height: 38px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 400 !important; font-size: 0.85rem; cursor: pointer;">
                             Cancel
                         </button>
-                        <button type="button" id="btn-confirm-papers-bulk-del" style="flex: 1; height: 38px; border-radius: 8px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 600; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
+                        <button type="button" id="btn-confirm-papers-bulk-del" style="flex: 1; height: 38px; border-radius: 8px; border: none; background: #DC2626; color: #FFFFFF; font-weight: 400 !important; font-size: 0.85rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px;">
                             <span id="btn-papers-bulk-del-text">Delete ${count} Paper(s)</span>
                         </button>
                     </div>
