@@ -1464,6 +1464,127 @@ class AppController {
         }
     }
 
+    renderViewSkeleton(viewName, container) {
+        if (!container) return;
+
+        // Common Header Shimmer
+        const headerSkeleton = `
+            <div class="skeleton-page-header">
+                <div style="display: flex; flex-direction: column; gap: 8px;">
+                    <div class="skeleton-shimmer skeleton-bone" style="width: 180px; height: 26px;"></div>
+                    <div class="skeleton-shimmer skeleton-bone" style="width: 240px; height: 13px;"></div>
+                </div>
+                <div style="display: flex; gap: 8px;">
+                    <div class="skeleton-shimmer skeleton-btn" style="width: 110px; height: 33px;"></div>
+                </div>
+            </div>
+        `;
+
+        // 4 KPI Cards Shimmer
+        const kpisSkeleton = `
+            <div class="skeleton-kpi-grid">
+                ${[1, 2, 3, 4].map(() => `
+                    <div class="skeleton-kpi-box">
+                        <div class="skeleton-shimmer skeleton-avatar" style="width: 36px; height: 36px;"></div>
+                        <div style="display: flex; flex-direction: column; gap: 6px; flex: 1;">
+                            <div class="skeleton-shimmer skeleton-bone" style="width: 60px; height: 11px;"></div>
+                            <div class="skeleton-shimmer skeleton-bone" style="width: 90px; height: 20px;"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        // 6 Batch Cards Shimmer
+        const cardsSkeleton = `
+            <div class="skeleton-cards-grid">
+                ${[1, 2, 3, 4, 5, 6].map(() => `
+                    <div class="skeleton-batch-card">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <div style="display: flex; gap: 6px;">
+                                <div class="skeleton-shimmer skeleton-chip" style="width: 64px; height: 20px;"></div>
+                                <div class="skeleton-shimmer skeleton-chip" style="width: 50px; height: 20px;"></div>
+                            </div>
+                            <div class="skeleton-shimmer skeleton-chip" style="width: 60px; height: 20px;"></div>
+                        </div>
+                        <div class="skeleton-shimmer skeleton-bone" style="width: 75%; height: 18px; margin-bottom: 8px;"></div>
+                        <div class="skeleton-shimmer skeleton-bone" style="width: 55%; height: 12px; margin-bottom: 14px;"></div>
+                        <div class="skeleton-shimmer skeleton-bone" style="width: 100%; height: 6px; border-radius: 4px; margin-bottom: 14px;"></div>
+                        <div style="display: flex; gap: 6px; margin-top: auto;">
+                            <div class="skeleton-shimmer skeleton-btn" style="flex: 1; height: 30px;"></div>
+                            <div class="skeleton-shimmer skeleton-btn" style="width: 30px; height: 30px;"></div>
+                        </div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+
+        // Table Rows Shimmer
+        const tableSkeleton = `
+            <div class="skeleton-table-card">
+                <div style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between;">
+                    <div class="skeleton-shimmer skeleton-bone" style="width: 140px; height: 16px;"></div>
+                    <div class="skeleton-shimmer skeleton-bone" style="width: 80px; height: 16px;"></div>
+                </div>
+                <div style="padding: 12px 16px;">
+                    ${[1, 2, 3, 4, 5, 6, 7].map(() => `
+                        <div style="display: flex; align-items: center; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(0,0,0,0.04);">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="skeleton-shimmer skeleton-avatar" style="width: 24px; height: 24px;"></div>
+                                <div class="skeleton-shimmer skeleton-bone" style="width: 120px; height: 14px;"></div>
+                            </div>
+                            <div class="skeleton-shimmer skeleton-bone" style="width: 70px; height: 14px;"></div>
+                            <div class="skeleton-shimmer skeleton-chip" style="width: 65px; height: 20px;"></div>
+                            <div class="skeleton-shimmer skeleton-bone" style="width: 50px; height: 14px;"></div>
+                            <div class="skeleton-shimmer skeleton-btn" style="width: 60px; height: 26px;"></div>
+                        </div>
+                    `).join('')}
+                </div>
+            </div>
+        `;
+
+        // Form & Upload Shimmer
+        const formSkeleton = `
+            <div class="skeleton-table-card" style="padding: 24px; display: flex; flex-direction: column; gap: 18px;">
+                <div style="display: flex; gap: 12px;">
+                    <div class="skeleton-shimmer skeleton-chip" style="width: 90px; height: 28px;"></div>
+                    <div class="skeleton-shimmer skeleton-chip" style="width: 90px; height: 28px;"></div>
+                    <div class="skeleton-shimmer skeleton-chip" style="width: 90px; height: 28px;"></div>
+                </div>
+                <div class="skeleton-shimmer skeleton-bone" style="width: 100%; height: 160px; border-radius: 12px;"></div>
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <div class="skeleton-shimmer skeleton-btn" style="width: 90px; height: 34px;"></div>
+                    <div class="skeleton-shimmer skeleton-btn" style="width: 130px; height: 34px;"></div>
+                </div>
+            </div>
+        `;
+
+        if (viewName === "dashboard" || viewName === "uploaded-papers" || viewName === "classes") {
+            container.innerHTML = `
+                <div class="skeleton-page-wrap">
+                    ${headerSkeleton}
+                    ${kpisSkeleton}
+                    ${cardsSkeleton}
+                </div>
+            `;
+        } else if (viewName === "upload-portal" || viewName === "new-eval" || viewName === "settings") {
+            container.innerHTML = `
+                <div class="skeleton-page-wrap">
+                    ${headerSkeleton}
+                    ${formSkeleton}
+                </div>
+            `;
+        } else {
+            container.innerHTML = `
+                <div class="skeleton-page-wrap">
+                    ${headerSkeleton}
+                    ${kpisSkeleton}
+                    ${tableSkeleton}
+                </div>
+            `;
+        }
+    }
+
     async switchView(viewName, targetSubTab = null) {
         if (viewName !== "super-admin") {
             const isLocked = await this.enforceLicenseGate();
@@ -1532,17 +1653,36 @@ class AppController {
         };
 
         // Show target view & mount manager
+        const rootIdMap = {
+            "upload-portal": "upload-portal-container-root",
+            "dashboard": "dashboard-container-root",
+            "new-eval": "eval-form-container-root",
+            "history": "history-container-root",
+            "bulk-report": "bulk-report-container-root",
+            "classes": "classes-container-root",
+            "uploaded-papers": "uploaded-papers-container-root",
+            "settings": "settings-container-root",
+            "user-management": "user-management-container-root",
+            "admin-panel": "admin-panel-container-root",
+            "super-admin": "super-admin-container-root"
+        };
+        const rootId = rootIdMap[viewName];
+        const root = rootId ? document.getElementById(rootId) : null;
+        if (root) {
+            this.renderViewSkeleton(viewName, root);
+        }
+
+        const minSkeletonDelay = () => new Promise(r => setTimeout(r, 220));
+
         if (viewName === "upload-portal") {
             activateSection("view-upload-portal");
-            const root = document.getElementById("upload-portal-container-root");
             this.uploadPortalManager = new UploadPortalManager(root, {
                 onOpenWorkspace: (ev) => this.openWorkspace(ev),
                 onSwitchToEvaluator: () => this.setPortal("evaluator", true)
             });
-            await this.uploadPortalManager.init();
+            await Promise.all([this.uploadPortalManager.init(), minSkeletonDelay()]);
         } else if (viewName === "dashboard") {
             activateSection("view-dashboard");
-            const root = document.getElementById("dashboard-container-root");
             this.dashboardManager = new DashboardManager(root, {
                 onStartNew: () => this.switchView("new-eval"),
                 onOpenEvaluation: (ev) => this.openWorkspace(ev),
@@ -1550,73 +1690,65 @@ class AppController {
                 onBulkDownloadPDF: (evals) => this.downloadBulkPDFs(evals),
                 onExportExcel: (evals) => this.exportEvaluationsAsExcel(evals)
             });
-            await this.dashboardManager.init();
+            await Promise.all([this.dashboardManager.init(), minSkeletonDelay()]);
         } else if (viewName === "new-eval") {
             activateSection("view-new-eval");
-            const root = document.getElementById("eval-form-container-root");
+            await minSkeletonDelay();
             this.evaluationForm = new EvaluationForm(root, {
                 onStartCorrection: (ev) => this.openWorkspace(ev)
             });
         } else if (viewName === "history") {
             activateSection("view-history");
-            const root = document.getElementById("history-container-root");
             this.historyManager = new EvaluationHistoryManager(root, {
                 onOpenEvaluation: (ev) => this.openWorkspace(ev),
                 onDownloadPDF: (ev) => this.downloadEvaluationPDF(ev)
             });
-            await this.historyManager.init();
+            await Promise.all([this.historyManager.init(), minSkeletonDelay()]);
         } else if (viewName === "bulk-report") {
             activateSection("view-bulk-report");
-            const root = document.getElementById("bulk-report-container-root");
             this.bulkReportManager = new BulkReportManager(root);
-            await this.bulkReportManager.init();
+            await Promise.all([this.bulkReportManager.init(), minSkeletonDelay()]);
         } else if (viewName === "classes") {
             activateSection("view-classes");
-            const root = document.getElementById("classes-container-root");
             if (root && window.ClassesPageManager) {
                 this.classesPageManager = new ClassesPageManager(root);
-                await this.classesPageManager.init();
+                await Promise.all([this.classesPageManager.init(), minSkeletonDelay()]);
             }
         } else if (viewName === "uploaded-papers") {
             activateSection("view-uploaded-papers");
-            const root = document.getElementById("uploaded-papers-container-root");
             if (root && window.UploadedPapersPageManager) {
                 this.uploadedPapersPageManager = new UploadedPapersPageManager(root);
-                await this.uploadedPapersPageManager.init();
+                await Promise.all([this.uploadedPapersPageManager.init(), minSkeletonDelay()]);
             }
         } else if (viewName === "settings") {
             activateSection("view-settings");
-            const root = document.getElementById("settings-container-root");
             if (root && window.SettingsPageManager) {
                 this.settingsPageManager = new SettingsPageManager(root);
-                await this.settingsPageManager.init();
+                await Promise.all([this.settingsPageManager.init(), minSkeletonDelay()]);
             }
         } else if (viewName === "user-management") {
             activateSection("view-user-management");
-            const root = document.getElementById("user-management-container-root");
             if (root && window.UserManagementPageManager) {
                 this.userManagementPageManager = new UserManagementPageManager(root);
-                await this.userManagementPageManager.init();
+                await Promise.all([this.userManagementPageManager.init(), minSkeletonDelay()]);
             }
         } else if (viewName === "admin-panel") {
             activateSection("view-admin-panel");
-            const root = document.getElementById("admin-panel-container-root");
             if (root && window.AdminPanelManager) {
                 this.adminPanelManager = new AdminPanelManager(root);
-                await this.adminPanelManager.init();
+                await Promise.all([this.adminPanelManager.init(), minSkeletonDelay()]);
             }
         } else if (viewName === "super-admin") {
             activateSection("view-super-admin");
-            const root = document.getElementById("super-admin-container-root");
             if (root && window.SuperAdminManager) {
                 if (!this.superAdminManager) {
                     this.superAdminManager = new SuperAdminManager(root, { initialTab: targetSubTab || "license" });
-                    await this.superAdminManager.init(targetSubTab);
+                    await Promise.all([this.superAdminManager.init(targetSubTab), minSkeletonDelay()]);
                 } else {
                     if (targetSubTab) {
                         this.superAdminManager.switchTab(targetSubTab);
                     } else {
-                        await this.superAdminManager.init();
+                        await Promise.all([this.superAdminManager.init(), minSkeletonDelay()]);
                     }
                 }
             }

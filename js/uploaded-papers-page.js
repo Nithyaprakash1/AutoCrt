@@ -209,23 +209,13 @@ class UploadedPapersPageManager {
                 <!-- Top Compact Header Banner -->
                 <div class="uploaded-page-header">
                     <div class="header-titles">
-                        <div class="header-tag-pill">
-                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                            Repository & Archive
-                        </div>
-                        <h1 class="page-title">Uploaded Papers & Batches</h1>
-                        <p class="page-subtitle">Organized by Class - Template cards with live storage metrics, page inspection, and bulk delete.</p>
+                        <h1 class="page-title">Uploaded Papers</h1>
                     </div>
 
                     <div class="header-actions">
                         <button type="button" class="btn-papers-secondary" id="btn-export-papers-manifest" title="Download CSV manifest of all uploaded papers">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             <span>Manifest</span>
-                        </button>
-                        <button type="button" class="btn-papers-secondary btn-papers-bulk-delete" id="btn-papers-bulk-delete" title="Delete selected papers to free storage space" style="border-color: #DC2626; color: #DC2626;">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                            <span>Bulk Delete</span>
-                            <span id="papers-bulk-delete-badge" class="bulk-delete-count-pill">(${this.selectedIds.size})</span>
                         </button>
                         <button type="button" class="btn-papers-primary" id="btn-goto-upload-desk">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
@@ -241,8 +231,8 @@ class UploadedPapersPageManager {
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
                         </div>
                         <div class="kpi-info">
-                            <span class="kpi-label">Class - Template Batches</span>
-                            <span class="kpi-value">${allBatches.length} <small style="font-size: 0.72rem; color: #64748B;">Batches</small></span>
+                            <span class="kpi-label">Batches</span>
+                            <span class="kpi-value">${allBatches.length}</span>
                         </div>
                     </div>
 
@@ -251,7 +241,7 @@ class UploadedPapersPageManager {
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                         </div>
                         <div class="kpi-info">
-                            <span class="kpi-label">Total Uploaded Papers</span>
+                            <span class="kpi-label">Total Papers</span>
                             <span class="kpi-value">${totalPapers}</span>
                         </div>
                     </div>
@@ -261,8 +251,8 @@ class UploadedPapersPageManager {
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
                         </div>
                         <div class="kpi-info">
-                            <span class="kpi-label">Evaluated / Pending</span>
-                            <span class="kpi-value">${completedPapers} <span style="font-size: 0.8rem; color: #F59E0B;">/ ${pendingPapers}</span></span>
+                            <span class="kpi-label">Evaluated</span>
+                            <span class="kpi-value">${completedPapers} <span style="font-size: 0.8rem; color: #F59E0B;">/ ${totalPapers}</span></span>
                         </div>
                     </div>
 
@@ -271,52 +261,40 @@ class UploadedPapersPageManager {
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#FF9500" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
                         </div>
                         <div class="kpi-info">
-                            <span class="kpi-label">Pages & Storage Size</span>
-                            <span class="kpi-value">${totalPages} <small style="font-size: 0.76rem; color: #0071E3;">(${formattedTotalStorage})</small></span>
+                            <span class="kpi-label">Storage</span>
+                            <span class="kpi-value">${formattedTotalStorage}</span>
                         </div>
                     </div>
                 </div>
 
-                <!-- Filter Controls & View Switcher Bar -->
+                <!-- Filter Controls Bar -->
                 <div class="papers-filter-card">
                     <div class="filter-controls-row">
-                        <!-- View Mode Switcher -->
-                        <div class="papers-view-switcher">
-                            <button type="button" class="btn-view-toggle ${this.viewMode === 'cards' ? 'active' : ''}" id="btn-toggle-view-cards" title="Switch to Class - Template Batch Cards">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-                                <span>Batch Cards (${filteredBatches.length})</span>
-                            </button>
-                            <button type="button" class="btn-view-toggle ${this.viewMode === 'table' ? 'active' : ''}" id="btn-toggle-view-table" title="Switch to All Papers Data Table">
-                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-                                <span>All Papers Table (${filteredPapers.length})</span>
-                            </button>
-                        </div>
-
                         <!-- Search Bar -->
                         <div class="search-field-wrap">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                            <input type="text" id="input-papers-search" placeholder="Search class, template, student, or roll..." value="${this.searchQuery}" />
+                            <input type="text" id="input-papers-search" placeholder="Search class, template, student..." value="${this.searchQuery}" />
                             ${this.searchQuery ? `<button type="button" class="btn-clear-papers-search" id="btn-clear-papers-search">×</button>` : ''}
                         </div>
 
                         <!-- Filter Dropdowns -->
                         <div class="filter-dropdown-group">
                             <div class="filter-select-item">
-                                <label>Subject:</label>
-                                <select id="select-papers-subject" class="form-select-sm">
-                                    <option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All</option>
-                                    ${this.subjects.map(s => `
-                                        <option value="${s}" ${this.selectedSubject === s ? 'selected' : ''}>${s}</option>
-                                    `).join('')}
-                                </select>
-                            </div>
-
-                            <div class="filter-select-item">
                                 <label>Class:</label>
                                 <select id="select-papers-class" class="form-select-sm">
                                     <option value="all" ${this.selectedClass === 'all' ? 'selected' : ''}>All</option>
                                     ${this.classes.map(c => `
                                         <option value="${c.name}" ${this.selectedClass === c.name ? 'selected' : ''}>${c.name}</option>
+                                    `).join('')}
+                                </select>
+                            </div>
+
+                            <div class="filter-select-item">
+                                <label>Subject:</label>
+                                <select id="select-papers-subject" class="form-select-sm">
+                                    <option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All</option>
+                                    ${this.subjects.map(s => `
+                                        <option value="${s}" ${this.selectedSubject === s ? 'selected' : ''}>${s}</option>
                                     `).join('')}
                                 </select>
                             </div>
@@ -347,10 +325,9 @@ class UploadedPapersPageManager {
                             <div class="uploaded-batches-title-col">
                                 <h3 class="uploaded-batches-title">
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-                                    Class - Template Batch Cards
+                                    Exam Batches
                                     <span class="uploaded-batches-count-pill">${filteredBatches.length} ${filteredBatches.length === 1 ? 'Batch' : 'Batches'}</span>
                                 </h3>
-                                <p class="uploaded-batches-desc">Answer scripts grouped by Class and Blueprint Template. Select a card to view papers or delete in batch.</p>
                             </div>
                         </div>
 
@@ -376,7 +353,7 @@ class UploadedPapersPageManager {
                                                 <span class="batch-subject-tag">${b.subject}</span>
                                             </div>
                                             <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
-                                                ${isCompleted ? '✓ All Graded' : `${b.pending} Pending`}
+                                                ${isCompleted ? '✓ Graded' : `${b.pending} Pending`}
                                             </span>
                                         </div>
 
@@ -384,15 +361,15 @@ class UploadedPapersPageManager {
 
                                         <div class="batch-card-meta-row">
                                             <span>${b.total} Papers</span>
-                                            <span style="color: #CBD5E1;">•</span>
+                                            <span>•</span>
                                             <span>${b.totalPages} Pages</span>
-                                            <span style="color: #CBD5E1;">•</span>
+                                            <span>•</span>
                                             <span style="color: #0071E3;">${formattedStorage}</span>
                                         </div>
 
                                         <div class="batch-progress-wrapper">
                                             <div class="batch-progress-labels">
-                                                <span class="progress-ratio">${b.completed} / ${b.total} Evaluated</span>
+                                                <span class="progress-ratio">${b.completed} / ${b.total} Graded</span>
                                                 <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'};">${pct}%</span>
                                             </div>
                                             <div class="batch-progress-bar">
@@ -401,15 +378,11 @@ class UploadedPapersPageManager {
                                         </div>
 
                                         <div class="batch-actions-row">
-                                            <button type="button" class="btn-batch-view" data-batch-key="${b.key}" title="View and manage individual papers in ${b.className}">
+                                            <button type="button" class="btn-batch-view" data-batch-key="${b.key}" title="View papers in this batch">
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                                 <span>View Papers (${b.total})</span>
                                             </button>
-                                            <button type="button" class="btn-batch-inspect" data-batch-key="${b.key}" title="Inspect pages of this batch">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                                                <span>Inspect</span>
-                                            </button>
-                                            <button type="button" class="btn-batch-delete" data-batch-key="${b.key}" title="Delete all papers in this batch (${b.total} papers)">
+                                            <button type="button" class="btn-batch-delete" data-batch-key="${b.key}" title="Delete Batch">
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                                             </button>
                                         </div>
@@ -423,9 +396,9 @@ class UploadedPapersPageManager {
                     ${activeBatchObj ? `
                         <div class="active-batch-banner">
                             <div class="active-batch-left">
-                                <button type="button" class="btn-batch-back" id="btn-back-to-all-batches" title="Back to all batch cards">
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="15 18 9 12 15 6"/></svg>
-                                    <span>All Cards</span>
+                                <button type="button" class="btn-batch-back" id="btn-back-to-all-batches" title="Back to all batches">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>
+                                    <span>All Batches</span>
                                 </button>
                                 <div class="active-batch-titles">
                                     <span class="active-batch-badge">${activeBatchObj.className}</span>
@@ -433,7 +406,13 @@ class UploadedPapersPageManager {
                                     <span class="active-batch-meta">${activeBatchObj.total} Papers • ${activeBatchObj.totalPages} Pages • ${this.formatBytes(activeBatchObj.totalBytes)}</span>
                                 </div>
                             </div>
-                            <div class="active-batch-right">
+                            <div class="active-batch-right" style="display: flex; gap: 8px; align-items: center;">
+                                ${this.selectedIds.size > 0 ? `
+                                    <button type="button" class="btn-papers-secondary btn-papers-bulk-delete" id="btn-papers-bulk-delete" title="Delete selected papers" style="color: #DC2626; border-color: #DC2626;">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                        <span>Delete Selected (${this.selectedIds.size})</span>
+                                    </button>
+                                ` : ''}
                                 <button type="button" class="btn-papers-secondary btn-batch-delete-active" data-batch-key="${activeBatchObj.key}" title="Delete this whole batch" style="color: #DC2626; border-color: #DC2626;">
                                     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                     <span>Delete Batch</span>
@@ -446,7 +425,7 @@ class UploadedPapersPageManager {
                     <div class="papers-table-card">
                         <div class="table-meta-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
                             <span class="table-results-label">Showing ${filteredPapers.length} of ${totalPapers} uploaded papers</span>
-                            ${this.selectedIds.size > 0 ? `<span style="font-size: 0.8rem; color: #DC2626;">${this.selectedIds.size} paper(s) selected for bulk delete</span>` : ''}
+                            ${this.selectedIds.size > 0 ? `<span style="font-size: 0.8rem; color: #DC2626;">${this.selectedIds.size} paper(s) selected</span>` : ''}
                         </div>
 
                         <div class="papers-table-wrapper">

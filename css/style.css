@@ -7898,7 +7898,7 @@ body {
 .user-empty-state .empty-title {
     display: block !important;
     font-size: 1.18rem !important;
-    font-weight: 600 !important;
+    font-weight: 400 !important;
     color: var(--text-main, #1E293B) !important;
     margin: 0 0 8px 0 !important;
     text-align: center !important;
@@ -9718,6 +9718,82 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
 .skeleton-table-row td {
     padding: 14px 12px;
     vertical-align: middle;
+}
+
+/* Skeleton Full-Page Transitions & Layouts */
+.skeleton-page-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    width: 100%;
+    max-width: 1360px;
+    margin: 0 auto;
+    padding-bottom: 24px;
+    animation: fadeIn 0.2s ease-out;
+}
+
+.skeleton-page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 4px 0;
+}
+
+.skeleton-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+}
+
+.skeleton-kpi-box {
+    background: var(--bg-surface, #FFFFFF);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 14px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.skeleton-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(285px, 1fr));
+    gap: 12px;
+}
+
+.skeleton-batch-card {
+    background: #FFFFFF;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 13px 15px;
+    display: flex;
+    flex-direction: column;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    min-height: 160px;
+}
+
+.skeleton-table-card {
+    background: var(--bg-surface, #FFFFFF);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+    overflow: hidden;
+}
+
+@media (max-width: 900px) {
+    .skeleton-kpi-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 580px) {
+    .skeleton-kpi-grid {
+        grid-template-columns: 1fr;
+    }
+    .skeleton-cards-grid {
+        grid-template-columns: 1fr;
+    }
 }
 
 /* ==========================================================================
