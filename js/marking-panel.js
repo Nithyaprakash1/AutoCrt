@@ -506,7 +506,12 @@ class MarkingPanel {
             grid.querySelectorAll(".quick-num-btn").forEach(btn => {
                 btn.addEventListener("click", () => {
                     const val = Number(btn.getAttribute("data-val"));
-                    this.assignCurrentQuestionMark(val);
+                    const curQ = this.getActiveQuestion();
+                    if (curQ && curQ.status !== "unmarked" && Number(curQ.awardedMarks) === val) {
+                        this.clearQuestionMark(this.activeQuestionIndex);
+                    } else {
+                        this.assignCurrentQuestionMark(val);
+                    }
                 });
             });
         }
@@ -685,7 +690,12 @@ class MarkingPanel {
         this.container.querySelectorAll(".quick-num-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 const val = Number(btn.getAttribute("data-val"));
-                this.assignCurrentQuestionMark(val);
+                const curQ = this.getActiveQuestion();
+                if (curQ && curQ.status !== "unmarked" && Number(curQ.awardedMarks) === val) {
+                    this.clearQuestionMark(this.activeQuestionIndex);
+                } else {
+                    this.assignCurrentQuestionMark(val);
+                }
             });
         });
 
@@ -838,6 +848,16 @@ class MarkingPanel {
                     } else if (action === "wrong") {
                         this.assignQuestionMarkDirect(idx, 0, "wrong");
                     } else if (action === "clear") {
+                        this.clearQuestionMark(idx);
+                    }
+                }
+            });
+
+            listContainer.addEventListener("input", (e) => {
+                if (e.target.classList.contains("q-score-input")) {
+                    const idx = Number(e.target.getAttribute("data-index"));
+                    const rawVal = e.target.value.trim();
+                    if (rawVal === "" || rawVal === null) {
                         this.clearQuestionMark(idx);
                     }
                 }
@@ -1065,15 +1085,17 @@ class MarkingPanel {
             q.subQuestions.forEach(sq => { sq.awardedMarks = 0; sq.status = "unmarked"; });
         }
 
-        if (this.options.onQuestionMarkCleared) {
-            this.options.onQuestionMarkCleared(q, index);
-        }
+        // Recalculate totals immediately so obtainedMarksTotal is fresh
+        this.recalculate();
 
         if (index === this.activeQuestionIndex) {
             this.renderActiveQuestionDetail();
         }
         this.renderQuestionsList();
-        this.recalculate();
+
+        if (this.options.onQuestionMarkCleared) {
+            this.options.onQuestionMarkCleared(q, index);
+        }
     }
 
     resetAllQuestions() {

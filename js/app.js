@@ -2070,10 +2070,14 @@ class AppController {
             this.activeEvaluation.grade = pct >= 90 ? "A+" : pct >= 75 ? "A" : pct >= 60 ? "B" : pct >= 40 ? "C" : "F";
         }
 
-        // Update live score badge in top bar
+        // Update live score badge in top bar and side panel
         const topScoreEl = document.getElementById("ws-live-score-val");
         if (topScoreEl) {
             topScoreEl.textContent = `${totalObtained} / ${maxMarks}`;
+        }
+        const obtEl = document.getElementById("score-obtained-val");
+        if (obtEl) {
+            obtEl.textContent = totalObtained;
         }
 
         const activeQ = this.markingPanel ? this.markingPanel.getActiveQuestion() : null;
@@ -2298,9 +2302,24 @@ class AppController {
                     this.canvasEngine.removeAnnotationsForQuestion(q.qNo);
                     this.updatePageTotalDisplay();
                 }
+                const summary = this.markingPanel?.recalculate ? this.markingPanel.recalculate() : null;
+                const totalObtained = summary ? summary.obtainedMarks : (this.markingPanel?.obtainedMarksTotal || 0);
+                const maxMarks = summary ? summary.maxMarks : (this.markingPanel?.maxMarksTotal || 20);
+
+                if (this.activeEvaluation) {
+                    this.activeEvaluation.obtainedMarks = totalObtained;
+                    const pct = maxMarks > 0 ? Math.round((totalObtained / maxMarks) * 100) : 0;
+                    this.activeEvaluation.percentage = pct;
+                    this.activeEvaluation.grade = pct >= 90 ? "A+" : pct >= 75 ? "A" : pct >= 60 ? "B" : pct >= 40 ? "C" : "F";
+                }
+
                 const topScoreEl = document.getElementById("ws-live-score-val");
-                if (topScoreEl && this.markingPanel) {
-                    topScoreEl.textContent = `${this.markingPanel.obtainedMarksTotal} / ${this.markingPanel.maxMarksTotal}`;
+                if (topScoreEl) {
+                    topScoreEl.textContent = `${totalObtained} / ${maxMarks}`;
+                }
+                const obtEl = document.getElementById("score-obtained-val");
+                if (obtEl) {
+                    obtEl.textContent = totalObtained;
                 }
                 this.updateTopHud(q);
                 this.renderScorecardTable();
@@ -2322,26 +2341,25 @@ class AppController {
                 if (topScoreEl) {
                     topScoreEl.textContent = `${scoreSummary.obtainedMarks} / ${scoreSummary.maxMarks}`;
                 }
+                const obtEl = document.getElementById("score-obtained-val");
+                if (obtEl) {
+                    obtEl.textContent = scoreSummary.obtainedMarks;
+                }
+
+                // Check and clean up companion margin marks for all questions that became unmarked
+                if (this.canvasEngine && this.markingPanel?.questions) {
+                    this.markingPanel.questions.forEach(ques => {
+                        if (ques.status === "unmarked" || ques.status === "pending") {
+                            const qAnns = this.canvasEngine.getAnnotationsForQuestion(ques.qNo);
+                            const hasMargin = qAnns.some(a => a.type === "margin_mark" || a.type === "left_mark");
+                            if (hasMargin) {
+                                this.canvasEngine.removeAnnotationsForQuestion(ques.qNo);
+                            }
+                        }
+                    });
+                }
 
                 const activeQ = this.markingPanel?.getActiveQuestion();
-                if (activeQ && this.canvasEngine) {
-                    let existingMarginMark = null;
-                    for (const p of this.canvasEngine.pages) {
-                        existingMarginMark = (p.annotations || []).find(a =>
-                            (a.type === "margin_mark" || a.type === "left_mark") &&
-                            this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(activeQ.qNo)
-                        );
-                        if (existingMarginMark) break;
-                    }
-                    if (existingMarginMark) {
-                        if (activeQ.status === "unmarked" || activeQ.status === "pending") {
-                            this.canvasEngine.removeAnnotationsForQuestion(activeQ.qNo);
-                        } else if (existingMarginMark.marks !== activeQ.awardedMarks) {
-                            existingMarginMark.marks = activeQ.awardedMarks;
-                            this.canvasEngine.renderOverlay();
-                        }
-                    }
-                }
                 if (activeQ) this.updateTopHud(activeQ);
 
                 this.updatePageTotalDisplay();
@@ -2786,6 +2804,14 @@ class AppController {
 
         const customInpEl = document.getElementById("hud-custom-score-inp");
         if (customInpEl) {
+            customInpEl.addEventListener("input", (e) => {
+                if (e.target.value.trim() === "") {
+                    const activeIdx = this.markingPanel?.activeQuestionIndex;
+                    if (typeof activeIdx === "number" && activeIdx >= 0) {
+                        this.markingPanel?.clearQuestionMark(activeIdx);
+                    }
+                }
+            });
             customInpEl.addEventListener("keydown", (e) => {
                 if (e.key === "Enter") {
                     e.preventDefault();

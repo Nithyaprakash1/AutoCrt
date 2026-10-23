@@ -749,7 +749,7 @@ class CanvasEngine {
                 const markW = ((scoreText.length * 8 + 14) * scale) / w;
                 const markH = (21 * scale) / h;
                 const leftGap = (10 * scale) / w;
-                const markX = leftGap + markW / 2;
+                const markX = (ann.x !== undefined && ann.x !== null) ? ann.x : (leftGap + markW / 2);
                 minX = markX - markW / 2;
                 maxX = markX + markW / 2;
                 minY = ann.y - markH / 2;
@@ -948,6 +948,30 @@ class CanvasEngine {
                         }
                     });
                 });
+            } else {
+                // Some ticks remain: calculate and update margin mark with new sum
+                let remainingSum = 0;
+                this.pages.forEach(p => {
+                    (p.annotations || []).forEach(a => {
+                        if (!toDelete.includes(a) && (a.type === "tick" || a.type === "marks")) {
+                            if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
+                                const raw = a.marks !== undefined && a.marks !== null ? String(a.marks) : String(a.text || "");
+                                const v = parseFloat(raw.replace(/^\+/, "").trim());
+                                if (!isNaN(v)) remainingSum = Math.round((remainingSum + v) * 10) / 10;
+                            }
+                        }
+                    });
+                });
+                this.pages.forEach(p => {
+                    (p.annotations || []).forEach(a => {
+                        if (!toDelete.includes(a) && (a.type === "margin_mark" || a.type === "left_mark")) {
+                            if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
+                                a.marks = remainingSum;
+                                a.text = `${remainingSum}M`;
+                            }
+                        }
+                    });
+                });
             }
         });
 
@@ -1117,7 +1141,8 @@ class CanvasEngine {
 
         // Check if this is a score-related annotation with a question number
         const isScoreType = ann.type === "tick" || ann.type === "marks" || ann.type === "margin_mark" || ann.type === "left_mark" || ann.type === "wrong";
-        const qKey = (isScoreType && (ann.qNo || ann.qLabel)) ? this.normalizeQKey(ann.qNo || ann.qLabel) : null;
+        const rawQ = ann.qNo || ann.qLabel || (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo()?.qNo : null);
+        const qKey = (isScoreType && rawQ) ? this.normalizeQKey(rawQ) : null;
 
         const toDelete = [ann];
 
@@ -1136,11 +1161,15 @@ class CanvasEngine {
             // A tick or mark stamp was deleted.
             // Check if any other mark stamps remain for this question across all pages
             let otherMarksCount = 0;
+            let remainingSum = 0;
             this.pages.forEach(p => {
                 (p.annotations || []).forEach(a => {
                     if (a !== ann && (a.type === "tick" || a.type === "marks" || a.type === "wrong")) {
                         if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
                             otherMarksCount++;
+                            const raw = a.marks !== undefined && a.marks !== null ? String(a.marks) : String(a.text || "");
+                            const v = parseFloat(raw.replace(/^\+/, "").trim());
+                            if (!isNaN(v)) remainingSum = Math.round((remainingSum + v) * 10) / 10;
                         }
                     }
                 });
@@ -1153,6 +1182,18 @@ class CanvasEngine {
                         if (a !== ann && (a.type === "margin_mark" || a.type === "left_mark")) {
                             if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
                                 if (!toDelete.includes(a)) toDelete.push(a);
+                            }
+                        }
+                    });
+                });
+            } else {
+                // Other marks still remain: update any companion margin mark to reflect the new remainingSum
+                this.pages.forEach(p => {
+                    (p.annotations || []).forEach(a => {
+                        if (a !== ann && (a.type === "margin_mark" || a.type === "left_mark")) {
+                            if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
+                                a.marks = remainingSum;
+                                a.text = `${remainingSum}M`;
                             }
                         }
                     });
@@ -1240,6 +1281,7 @@ class CanvasEngine {
             const hit = this.hitTestAnnotation(normPos);
 
             if (this.currentTool === "eraser") {
+                this.isErasing = true;
                 this.handleEraser(normPos);
                 return;
             }
@@ -1295,6 +1337,13 @@ class CanvasEngine {
                 y: Math.max(0, Math.min(1, pos.y / (page.origHeight * this.zoom)))
             };
             this.currentCursorNormPos = { ...normPos };
+
+            // Eraser Drag Support
+            if (this.currentTool === "eraser" && this.isErasing) {
+                e.preventDefault();
+                this.handleEraser(normPos);
+                return;
+            }
 
             // 0. Marquee Selection Dragging
             if (this.isMarqueeSelecting && this.marqueeStartPixel && this.marqueeBoxEl) {
@@ -1406,6 +1455,7 @@ class CanvasEngine {
         };
 
         const onUp = (e) => {
+            this.isErasing = false;
             if (this.isMarqueeSelecting) {
                 this.isMarqueeSelecting = false;
                 if (this.marqueeBoxEl) {
@@ -1879,6 +1929,11 @@ class CanvasEngine {
             stamp.marks = isNaN(val) ? 1 : val;
         } else if (type === "wrong") {
             stamp.marks = 0;
+            stamp.text = "0";
+        } else if (type === "tick") {
+            const val = parseFloat(String(this.activeMarksValue || "+1").replace(/^\+/, "").trim());
+            stamp.marks = isNaN(val) ? 1 : val;
+            stamp.text = `+${stamp.marks}`;
         }
 
         this.addAnnotation(stamp);
@@ -1934,9 +1989,9 @@ class CanvasEngine {
             return;
         }
 
-        // Fallback radius search for small strokes or points
+        // Fallback radius search for small strokes, stamps, or points
         let hitIdx = -1;
-        let minDist = 0.06;
+        let minDist = 0.08;
 
         page.annotations.forEach((ann, i) => {
             const dist = Math.hypot(ann.x - pos.x, ann.y - pos.y);
@@ -1972,7 +2027,7 @@ class CanvasEngine {
                 page.redoStack.push(record);
             }
             const ann = record.item;
-            const isScoreType = ann && (ann.type === "tick" || ann.type === "marks" || ann.type === "wrong");
+            const isScoreType = ann && (ann.type === "tick" || ann.type === "marks" || ann.type === "wrong" || ann.type === "margin_mark" || ann.type === "left_mark");
             if (isScoreType && (ann.qNo || ann.qLabel)) {
                 const qKey = this.normalizeQKey(ann.qNo || ann.qLabel);
                 let remainingTicks = 0;
@@ -1983,7 +2038,7 @@ class CanvasEngine {
                         }
                     });
                 });
-                if (remainingTicks === 0) {
+                if (remainingTicks === 0 || ann.type === "margin_mark" || ann.type === "left_mark") {
                     this.pages.forEach(p => {
                         p.annotations = (p.annotations || []).filter(a =>
                             !(a.type === "margin_mark" || a.type === "left_mark") ||
@@ -2180,11 +2235,17 @@ class CanvasEngine {
         let committedVal = null;
         let ticksSum = 0;
         let hasTicks = false;
+        let hasWrong = false;
 
         this.pages.forEach(page => {
             (page.annotations || []).forEach(a => {
                 const qKey = this.normalizeQKey(a.qNo || a.qLabel);
                 if (qKey !== targetKey) return;
+
+                if (a.type === "wrong") {
+                    hasWrong = true;
+                    return;
+                }
 
                 const rawVal = a.marks !== undefined && a.marks !== null ? String(a.marks) : String(a.text || "");
                 const val = parseFloat(rawVal.replace(/^\+/, "").trim());
@@ -2199,7 +2260,16 @@ class CanvasEngine {
             });
         });
 
-        const finalVal = hasTicks ? ticksSum : ((committedVal !== null && committedVal !== undefined) ? committedVal : 0);
+        // If ticks exist, ticksSum is the absolute live source of truth.
+        // Never resurrect old marks from a lingering margin mark if ticks were deleted!
+        let finalVal = 0;
+        if (hasTicks) {
+            finalVal = ticksSum;
+        } else if (committedVal !== null && committedVal !== undefined && !hasWrong) {
+            finalVal = committedVal;
+        } else {
+            finalVal = 0;
+        }
         return Math.round(finalVal * 10) / 10;
     }
 
