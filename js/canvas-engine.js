@@ -915,9 +915,47 @@ class CanvasEngine {
         if (!page || !this.selectedAnnotations || this.selectedAnnotations.length === 0) return;
 
         const toDelete = [...this.selectedAnnotations];
+        const affectedQKeys = new Set();
+
         toDelete.forEach(ann => {
-            const idx = page.annotations.indexOf(ann);
-            if (idx >= 0) page.annotations.splice(idx, 1);
+            const isScoreType = ann.type === "tick" || ann.type === "marks" || ann.type === "margin_mark" || ann.type === "left_mark" || ann.type === "wrong";
+            if (isScoreType && (ann.qNo || ann.qLabel)) {
+                affectedQKeys.add(this.normalizeQKey(ann.qNo || ann.qLabel));
+            }
+        });
+
+        // For any affected questions, clean up companion annotations if all ticks/marks or margin marks are being deleted
+        affectedQKeys.forEach(qKey => {
+            let remainingTicksCount = 0;
+            this.pages.forEach(p => {
+                (p.annotations || []).forEach(a => {
+                    if (!toDelete.includes(a) && (a.type === "tick" || a.type === "marks" || a.type === "wrong")) {
+                        if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
+                            remainingTicksCount++;
+                        }
+                    }
+                });
+            });
+
+            if (remainingTicksCount === 0) {
+                // Remove any margin marks for this question
+                this.pages.forEach(p => {
+                    (p.annotations || []).forEach(a => {
+                        if (!toDelete.includes(a) && (a.type === "margin_mark" || a.type === "left_mark")) {
+                            if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
+                                toDelete.push(a);
+                            }
+                        }
+                    });
+                });
+            }
+        });
+
+        toDelete.forEach(ann => {
+            this.pages.forEach(p => {
+                const idx = (p.annotations || []).indexOf(ann);
+                if (idx >= 0) p.annotations.splice(idx, 1);
+            });
         });
 
         page.undoStack.push({ action: "delete_batch", items: toDelete });
@@ -1075,17 +1113,73 @@ class CanvasEngine {
 
     deleteAnnotation(ann) {
         const page = this.pages[this.currentPageIndex];
-        if (!page) return;
+        if (!page || !ann) return;
 
-        const idx = page.annotations.indexOf(ann);
-        if (idx >= 0) {
-            page.annotations.splice(idx, 1);
-            page.undoStack.push({ action: "delete", item: ann });
-            page.redoStack = [];
-            this.deselectAnnotation();
-            this.renderOverlay();
-            this.notifyChange();
+        // Check if this is a score-related annotation with a question number
+        const isScoreType = ann.type === "tick" || ann.type === "marks" || ann.type === "margin_mark" || ann.type === "left_mark" || ann.type === "wrong";
+        const qKey = (isScoreType && (ann.qNo || ann.qLabel)) ? this.normalizeQKey(ann.qNo || ann.qLabel) : null;
+
+        const toDelete = [ann];
+
+        // If it's a margin mark, deleting it means clearing this question's marks from the paper
+        if (qKey && (ann.type === "margin_mark" || ann.type === "left_mark")) {
+            this.pages.forEach(p => {
+                (p.annotations || []).forEach(a => {
+                    if (a !== ann && (a.type === "tick" || a.type === "marks" || a.type === "wrong" || a.type === "margin_mark" || a.type === "left_mark")) {
+                        if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
+                            if (!toDelete.includes(a)) toDelete.push(a);
+                        }
+                    }
+                });
+            });
+        } else if (qKey && (ann.type === "tick" || ann.type === "marks" || ann.type === "wrong")) {
+            // A tick or mark stamp was deleted.
+            // Check if any other mark stamps remain for this question across all pages
+            let otherMarksCount = 0;
+            this.pages.forEach(p => {
+                (p.annotations || []).forEach(a => {
+                    if (a !== ann && (a.type === "tick" || a.type === "marks" || a.type === "wrong")) {
+                        if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
+                            otherMarksCount++;
+                        }
+                    }
+                });
+            });
+
+            // If no other marks remain for this question, also clean up any margin mark for this question
+            if (otherMarksCount === 0) {
+                this.pages.forEach(p => {
+                    (p.annotations || []).forEach(a => {
+                        if (a !== ann && (a.type === "margin_mark" || a.type === "left_mark")) {
+                            if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
+                                if (!toDelete.includes(a)) toDelete.push(a);
+                            }
+                        }
+                    });
+                });
+            }
         }
+
+        // Remove all items in toDelete from their respective pages
+        toDelete.forEach(item => {
+            this.pages.forEach(p => {
+                const i = (p.annotations || []).indexOf(item);
+                if (i >= 0) {
+                    p.annotations.splice(i, 1);
+                }
+            });
+        });
+
+        if (toDelete.length === 1) {
+            page.undoStack.push({ action: "delete", item: toDelete[0] });
+        } else {
+            page.undoStack.push({ action: "delete_batch", items: toDelete });
+        }
+        page.redoStack = [];
+
+        this.deselectAnnotation();
+        this.renderOverlay();
+        this.notifyChange();
     }
 
     // --- Events & Drawing ---
@@ -1836,16 +1930,8 @@ class CanvasEngine {
         // Use accurate bounding box hit testing for any annotation type (margin mark, tick, text, shape, etc.)
         const hit = this.hitTestAnnotation(pos);
         if (hit) {
-            const hitIdx = page.annotations.indexOf(hit);
-            if (hitIdx >= 0) {
-                const removed = page.annotations.splice(hitIdx, 1)[0];
-                page.undoStack.push({ action: "delete", item: removed });
-                page.redoStack = [];
-                this.deselectAnnotation();
-                this.renderOverlay();
-                this.notifyChange();
-                return;
-            }
+            this.deleteAnnotation(hit);
+            return;
         }
 
         // Fallback radius search for small strokes or points
@@ -1860,13 +1946,8 @@ class CanvasEngine {
             }
         });
 
-        if (hitIdx >= 0) {
-            const removed = page.annotations.splice(hitIdx, 1)[0];
-            page.undoStack.push({ action: "delete", item: removed });
-            page.redoStack = [];
-            this.deselectAnnotation();
-            this.renderOverlay();
-            this.notifyChange();
+        if (hitIdx >= 0 && page.annotations[hitIdx]) {
+            this.deleteAnnotation(page.annotations[hitIdx]);
         }
     }
 
@@ -1889,6 +1970,27 @@ class CanvasEngine {
             if (idx >= 0) {
                 page.annotations.splice(idx, 1);
                 page.redoStack.push(record);
+            }
+            const ann = record.item;
+            const isScoreType = ann && (ann.type === "tick" || ann.type === "marks" || ann.type === "wrong");
+            if (isScoreType && (ann.qNo || ann.qLabel)) {
+                const qKey = this.normalizeQKey(ann.qNo || ann.qLabel);
+                let remainingTicks = 0;
+                this.pages.forEach(p => {
+                    (p.annotations || []).forEach(a => {
+                        if (a !== ann && (a.type === "tick" || a.type === "marks" || a.type === "wrong")) {
+                            if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) remainingTicks++;
+                        }
+                    });
+                });
+                if (remainingTicks === 0) {
+                    this.pages.forEach(p => {
+                        p.annotations = (p.annotations || []).filter(a =>
+                            !(a.type === "margin_mark" || a.type === "left_mark") ||
+                            this.normalizeQKey(a.qNo || a.qLabel) !== qKey
+                        );
+                    });
+                }
             }
         } else if (record.action === "delete") {
             page.annotations.push(record.item);
@@ -2045,8 +2147,6 @@ class CanvasEngine {
         const result = [];
         this.pages.forEach(page => {
             (page.annotations || []).forEach(a => {
-                // "wrong" (X mark) is purely a visual mistake/step-zero indicator, not score-bearing
-                if (a.type === "wrong") return;
                 if (this.normalizeQKey(a.qNo || a.qLabel) === targetKey) {
                     result.push(a);
                 }
@@ -2079,6 +2179,7 @@ class CanvasEngine {
         const targetKey = this.normalizeQKey(targetQNo);
         let committedVal = null;
         let ticksSum = 0;
+        let hasTicks = false;
 
         this.pages.forEach(page => {
             (page.annotations || []).forEach(a => {
@@ -2093,11 +2194,12 @@ class CanvasEngine {
                     committedVal = val;
                 } else if (a.type === "tick" || a.type === "marks") {
                     ticksSum = Math.round((ticksSum + val) * 10) / 10;
+                    hasTicks = true;
                 }
             });
         });
 
-        const finalVal = (ticksSum > 0) ? ticksSum : ((committedVal !== null && committedVal !== undefined) ? committedVal : 0);
+        const finalVal = hasTicks ? ticksSum : ((committedVal !== null && committedVal !== undefined) ? committedVal : 0);
         return Math.round(finalVal * 10) / 10;
     }
 

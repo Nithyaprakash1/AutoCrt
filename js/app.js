@@ -1776,10 +1776,18 @@ class AppController {
         const choiceBadge = document.getElementById("hud-choice-badge");
         const customInp = document.getElementById("hud-custom-score-inp");
 
+        const isUnmarked = !q || q.status === "unmarked" || q.status === "pending";
         if (qLabelEl) qLabelEl.textContent = `Q${q.qNo}`;
         if (qMaxEl) qMaxEl.textContent = `/ ${q.maxMarks} Marks`;
         if (secBadge) secBadge.textContent = q.section || "Section A";
-        if (qTotalBadge) qTotalBadge.textContent = `Q Total: ${q.awardedMarks}/${q.maxMarks}M`;
+        if (qTotalBadge) {
+            qTotalBadge.textContent = isUnmarked ? `Q Total: —/${q.maxMarks}M` : `Q Total: ${q.awardedMarks}/${q.maxMarks}M`;
+            if (isUnmarked) {
+                qTotalBadge.style.color = "var(--text-muted, #86868b)";
+            } else {
+                qTotalBadge.style.color = "";
+            }
+        }
 
         const qTopicEl = document.getElementById("hud-active-q-topic");
         if (qTopicEl) {
@@ -1803,14 +1811,17 @@ class AppController {
             }
         }
 
-        if (customInp) customInp.value = q.awardedMarks !== undefined ? q.awardedMarks : 0;
+        if (customInp) {
+            customInp.value = isUnmarked ? "" : (q.awardedMarks !== undefined ? q.awardedMarks : "");
+            customInp.placeholder = "—";
+        }
 
         // Dynamically rebuild hud-number-marks-row tailored to active question ceiling (e.g. 7M, 12M, 15M)
         const hudNumRow = document.querySelector(".hud-number-marks-row");
         if (hudNumRow) {
             const numbers = this.markingPanel?.generateQuickNumbers ? this.markingPanel.generateQuickNumbers(q.maxMarks) : [0, 0.5, 1, 1.5, 2];
             hudNumRow.innerHTML = numbers.map(n => `
-                <button type="button" class="hud-mark-btn ${n % 1 !== 0 ? 'hud-half-btn' : ''} ${Number(q.awardedMarks) === n ? 'active' : ''}" data-mark="${n}">${n}</button>
+                <button type="button" class="hud-mark-btn ${n % 1 !== 0 ? 'hud-half-btn' : ''} ${(!isUnmarked && Number(q.awardedMarks) === n) ? 'active' : ''}" data-mark="${n}">${n}</button>
             `).join("");
 
             hudNumRow.querySelectorAll(".hud-mark-btn").forEach(btn => {
@@ -1955,17 +1966,19 @@ class AppController {
                 const annTotal = this.canvasEngine.getQuestionTotalFromAnnotations(q.qNo);
                 const annList = this.canvasEngine.getAnnotationsForQuestion(q.qNo);
                 const hasMarginMark = annList.some(a => a.type === "margin_mark" || a.type === "left_mark");
-                const hasScoreAnnotations = hasMarginMark || (annList.length > 0 && annTotal > 0);
+                const hasWrongMark = annList.some(a => a.type === "wrong");
+                const hasTicksOrMarks = annList.some(a => a.type === "tick" || a.type === "marks");
+                const hasScoreAnnotations = hasMarginMark || hasWrongMark || (hasTicksOrMarks && annTotal > 0);
 
-                if (hasScoreAnnotations) {
+                if (hasScoreAnnotations && (annTotal > 0 || hasMarginMark || hasWrongMark)) {
                     const clamped = Math.min(q.maxMarks, Math.max(0, annTotal));
-                    if (q.awardedMarks !== clamped || q.status === "unmarked") {
-                        const status = clamped === 0 ? "wrong" : (clamped === q.maxMarks ? "correct" : "partial");
+                    const targetStatus = hasWrongMark && clamped === 0 ? "wrong" : (clamped === 0 ? (q.status === "wrong" ? "wrong" : "unmarked") : (clamped >= q.maxMarks ? "correct" : "partial"));
+                    if (q.awardedMarks !== clamped || q.status !== targetStatus) {
                         if (this.markingPanel) {
-                            this.markingPanel.assignQuestionMarkDirect(idx, clamped, status);
+                            this.markingPanel.assignQuestionMarkDirect(idx, clamped, targetStatus);
                         } else {
                             q.awardedMarks = clamped;
-                            q.status = status;
+                            q.status = targetStatus;
                         }
                         updated = true;
                     }
@@ -1973,7 +1986,7 @@ class AppController {
                     // Score annotations were deleted or removed from the paper: remove from the side where marks are entered!
                     if (q.awardedMarks > 0 || q.status === "correct" || q.status === "partial" || q.status === "wrong") {
                         if (this.markingPanel) {
-                            this.markingPanel.assignQuestionMarkDirect(idx, 0, "unmarked");
+                            this.markingPanel.clearQuestionMark(idx);
                         } else {
                             q.awardedMarks = 0;
                             q.status = "unmarked";
@@ -1988,10 +2001,15 @@ class AppController {
         let totalObtained = 0;
         let maxMarks = this.activeEvaluation?.maxMarks || 20;
 
-        if (this.markingPanel && this.markingPanel.obtainedMarksTotal !== undefined && this.markingPanel.obtainedMarksTotal !== null) {
-            totalObtained = this.markingPanel.obtainedMarksTotal;
+        if (this.markingPanel && typeof this.markingPanel.recalculate === "function") {
+            const summary = this.markingPanel.recalculate();
+            totalObtained = summary.obtainedMarks;
+            maxMarks = summary.maxMarks;
         } else if (questions && questions.length > 0) {
-            totalObtained = questions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
+            totalObtained = questions.reduce((sum, q) => {
+                if (q.status === "unmarked" || q.status === "pending") return sum;
+                return sum + (Number(q.awardedMarks) || 0);
+            }, 0);
         } else {
             totalObtained = this.canvasEngine.getPaperTotalMarks();
         }
@@ -2011,12 +2029,10 @@ class AppController {
             topScoreEl.textContent = `${totalObtained} / ${maxMarks}`;
         }
 
-        if (updated && this.markingPanel) {
-            const activeQ = this.markingPanel.getActiveQuestion();
-            if (activeQ) this.updateTopHud(activeQ);
-            this.updatePageTotalDisplay();
-            this.renderScorecardTable();
-        }
+        const activeQ = this.markingPanel ? this.markingPanel.getActiveQuestion() : null;
+        if (activeQ) this.updateTopHud(activeQ);
+        this.updatePageTotalDisplay();
+        this.renderScorecardTable();
     }
 
     async openWorkspace(evaluation) {
@@ -2174,6 +2190,10 @@ class AppController {
                     this.canvasEngine.removeAnnotationsForQuestion(q.qNo);
                     this.updatePageTotalDisplay();
                 }
+                const topScoreEl = document.getElementById("ws-live-score-val");
+                if (topScoreEl && this.markingPanel) {
+                    topScoreEl.textContent = `${this.markingPanel.obtainedMarksTotal} / ${this.markingPanel.maxMarksTotal}`;
+                }
                 this.updateTopHud(q);
                 this.renderScorecardTable();
                 this.hasUnsavedChanges = true;
@@ -2205,9 +2225,13 @@ class AppController {
                         );
                         if (existingMarginMark) break;
                     }
-                    if (existingMarginMark && existingMarginMark.marks !== activeQ.awardedMarks) {
-                        existingMarginMark.marks = activeQ.awardedMarks;
-                        this.canvasEngine.renderOverlay();
+                    if (existingMarginMark) {
+                        if (activeQ.status === "unmarked" || activeQ.status === "pending") {
+                            this.canvasEngine.removeAnnotationsForQuestion(activeQ.qNo);
+                        } else if (existingMarginMark.marks !== activeQ.awardedMarks) {
+                            existingMarginMark.marks = activeQ.awardedMarks;
+                            this.canvasEngine.renderOverlay();
+                        }
                     }
                 }
                 if (activeQ) this.updateTopHud(activeQ);
@@ -2631,7 +2655,16 @@ class AppController {
         const applyCustom = () => {
             const inp = document.getElementById("hud-custom-score-inp");
             if (!inp) return;
-            const val = Math.max(0, Number(inp.value) || 0);
+            const raw = (inp.value || "").trim();
+            const activeIdx = this.markingPanel?.activeQuestionIndex;
+            if (raw === "") {
+                if (typeof activeIdx === "number" && activeIdx >= 0) {
+                    this.markingPanel?.clearQuestionMark(activeIdx);
+                }
+                return;
+            }
+            const val = Math.max(0, Number(raw));
+            if (isNaN(val)) return;
             this.markingPanel?.setActiveQuestionMark(val);
             if (this.canvasEngine) {
                 this.canvasEngine.setMarksValue(`+${val}`);
@@ -2733,6 +2766,17 @@ class AppController {
                     } else if (this.canvasEngine.selectedAnnotation) {
                         e.preventDefault();
                         this.canvasEngine.deleteAnnotation(this.canvasEngine.selectedAnnotation);
+                        return;
+                    }
+                }
+                // If no canvas annotation was selected, clear active question's mark from side and canvas
+                const activeIdx = this.markingPanel?.activeQuestionIndex;
+                if (typeof activeIdx === "number" && activeIdx >= 0 && this.markingPanel) {
+                    const activeQ = this.markingPanel.getActiveQuestion();
+                    if (activeQ && (activeQ.status !== "unmarked" || activeQ.awardedMarks > 0)) {
+                        e.preventDefault();
+                        this.markingPanel.clearQuestionMark(activeIdx);
+                        this.showToast(`Cleared mark for Q${activeQ.qNo}. You can re-enter mark.`);
                         return;
                     }
                 }
