@@ -1830,7 +1830,7 @@ class AppController {
                     }
                 } else {
                     // Score annotations were deleted or removed from the paper: remove from the side where marks are entered!
-                    if (q.awardedMarks > 0 || q.status === "correct" || q.status === "partial") {
+                    if (q.awardedMarks > 0 || q.status === "correct" || q.status === "partial" || q.status === "wrong") {
                         if (this.markingPanel) {
                             this.markingPanel.assignQuestionMarkDirect(idx, 0, "unmarked");
                         } else {
@@ -2027,6 +2027,16 @@ class AppController {
             },
             onAwardZeroMarks: (q) => {
                 this.awardZeroMarks(q);
+            },
+            onQuestionMarkCleared: (q) => {
+                if (this.canvasEngine) {
+                    this.canvasEngine.removeAnnotationsForQuestion(q.qNo);
+                    this.updatePageTotalDisplay();
+                }
+                this.updateTopHud(q);
+                this.renderScorecardTable();
+                this.hasUnsavedChanges = true;
+                this.setAutosaveBadge("saving");
             },
             onScoreChange: (scoreSummary) => {
                 this.activeEvaluation.obtainedMarks = scoreSummary.obtainedMarks;
@@ -2367,6 +2377,17 @@ class AppController {
             btnPdf.addEventListener("click", async () => {
                 await this.saveActiveEvaluation(false);
                 await this.downloadEvaluationPDF(this.activeEvaluation);
+            });
+        }
+
+        // Reset Current Paper
+        const btnResetPaper = document.getElementById("ws-btn-reset-paper");
+        if (btnResetPaper) {
+            btnResetPaper.addEventListener("click", () => {
+                if (!this.activeEvaluation) return;
+                this.showResetPaperDialog(async () => {
+                    await this.resetActivePaperFully();
+                });
             });
         }
 
@@ -3374,6 +3395,132 @@ class AppController {
                 delText.textContent = "Delete Paper";
             }
         });
+    }
+
+    showResetPaperDialog(onConfirm) {
+        if (!this.activeEvaluation) return;
+        const ev = this.activeEvaluation;
+        const modal = document.createElement("div");
+        modal.className = "confirm-modal-backdrop";
+        modal.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.65);
+            backdrop-filter: blur(4px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: fadeInModal 0.2s ease-out;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: #FFFFFF; border-radius: 16px; max-width: 440px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.22); overflow: hidden; border: 1px solid #E2E8F0;">
+                <div style="padding: 24px; text-align: center;">
+                    <div style="width: 52px; height: 52px; border-radius: 50%; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+                            <path d="M3 3v5h5"/>
+                        </svg>
+                    </div>
+                    <h3 style="font-size: 1.2rem; font-weight: 700; color: #0F172A; margin: 0 0 8px;">Reset Paper Evaluation?</h3>
+                    <p style="font-size: 0.88rem; color: #64748B; margin: 0 0 18px; line-height: 1.45;">
+                        Are you sure you want to reset this paper? All annotations, marks, and feedback on <strong>${ev.studentName || "this paper"}</strong> will be cleared and reset to fresh Pending state.
+                    </p>
+
+                    <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                        <button type="button" id="ws-btn-cancel-reset" style="flex: 1; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: all 0.15s ease;">
+                            Cancel
+                        </button>
+                        <button type="button" id="ws-btn-confirm-reset" style="flex: 1; height: 42px; border-radius: 10px; border: none; background: #D97706; color: #FFFFFF; font-weight: 600; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;">
+                            <span id="ws-btn-reset-text">Reset Paper</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        const cancelBtn = modal.querySelector("#ws-btn-cancel-reset");
+        const confirmBtn = modal.querySelector("#ws-btn-confirm-reset");
+        const resetText = modal.querySelector("#ws-btn-reset-text");
+
+        cancelBtn.addEventListener("click", () => modal.remove());
+        modal.addEventListener("click", (e) => {
+            if (e.target === modal) modal.remove();
+        });
+
+        confirmBtn.addEventListener("click", async () => {
+            cancelBtn.disabled = true;
+            confirmBtn.disabled = true;
+            confirmBtn.style.opacity = "0.75";
+            confirmBtn.style.cursor = "not-allowed";
+            resetText.innerHTML = `<span style="display: inline-block; width: 15px; height: 15px; border: 2px solid #FFFFFF; border-top-color: transparent; border-radius: 50%; animation: spinLoading 0.7s linear infinite; margin-right: 6px; vertical-align: middle;"></span> Resetting...`;
+
+            try {
+                if (onConfirm) await onConfirm();
+                resetText.innerHTML = `✓ Reset Complete`;
+                confirmBtn.style.background = "#16A34A";
+                await new Promise(r => setTimeout(r, 400));
+                modal.remove();
+            } catch (err) {
+                console.error("Reset error:", err);
+                cancelBtn.disabled = false;
+                confirmBtn.disabled = false;
+                confirmBtn.style.opacity = "1";
+                confirmBtn.style.cursor = "pointer";
+                resetText.textContent = "Reset Paper";
+            }
+        });
+    }
+
+    async resetActivePaperFully() {
+        if (!this.activeEvaluation) return;
+
+        // 1. Wipe annotations from canvas engine
+        if (this.canvasEngine) {
+            this.canvasEngine.clearAllAnnotations();
+        }
+
+        // 2. Wipe questions & marks in marking panel
+        if (this.markingPanel) {
+            this.markingPanel.resetAllQuestions();
+        }
+
+        // 3. Reset evaluation model
+        this.activeEvaluation.obtainedMarks = 0;
+        this.activeEvaluation.percentage = 0;
+        this.activeEvaluation.grade = "--";
+        this.activeEvaluation.status = "Pending";
+        this.activeEvaluation.feedback = "";
+        this.activeEvaluation.correctCount = 0;
+        this.activeEvaluation.wrongCount = 0;
+        this.activeEvaluation.annotations = [];
+        if (this.activeEvaluation.questions) {
+            this.activeEvaluation.questions.forEach(q => {
+                q.awardedMarks = 0;
+                q.status = "unmarked";
+            });
+        }
+
+        // 4. Update UI displays
+        const topScoreEl = document.getElementById("ws-live-score-val");
+        if (topScoreEl) {
+            topScoreEl.textContent = `0 / ${this.activeEvaluation.maxMarks || 20}`;
+        }
+        const activeQ = this.markingPanel?.getActiveQuestion();
+        if (activeQ) this.updateTopHud(activeQ);
+
+        this.updatePageTotalDisplay();
+        this.renderScorecardTable();
+
+        // 5. Save reset state to storage
+        this.hasUnsavedChanges = true;
+        this.setAutosaveBadge("saving");
+        await this.saveActiveEvaluation(true);
+        this.showToast("Paper has been completely reset to initial state.", "info");
     }
 
     // --- Settings Modal & Firebase Bridge ---

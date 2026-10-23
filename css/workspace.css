@@ -368,6 +368,54 @@ p, span, div, strong, b, th, td, label, a,
     border-color: #217346;
 }
 
+.btn-ws-reset {
+    background-color: #FFFBEB;
+    border: 1px solid #FCD34D;
+    color: #B45309;
+    height: 30px;
+    padding: 0 9px;
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.btn-ws-reset:hover {
+    background-color: #FEF3C7;
+    border-color: #F59E0B;
+    color: #92400E;
+}
+
+.btn-ws-delete {
+    background-color: #FEF2F2;
+    border: 1px solid #FECACA;
+    color: #DC2626;
+    height: 30px;
+    padding: 0 9px;
+    border-radius: var(--radius-md);
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+    flex-shrink: 0;
+    transition: all 0.15s ease;
+}
+
+.btn-ws-delete:hover {
+    background-color: #FEE2E2;
+    border-color: #F87171;
+    color: #B91C1C;
+}
+
 /* ==========================================================================
    Workspace Main Split Body
    ========================================================================== */
@@ -1004,6 +1052,18 @@ p, span, div, strong, b, th, td, label, a,
     background-color: #EF4444;
     color: #FFFFFF;
     border-color: #DC2626;
+}
+
+.q-mini-btn.btn-mini-clear {
+    color: #DC2626;
+    border-color: rgba(220, 38, 38, 0.2);
+    background-color: #FFF5F5;
+}
+
+.q-mini-btn.btn-mini-clear:hover {
+    background-color: #FEE2E2;
+    border-color: #DC2626;
+    color: #B91C1C;
 }
 
 /* Preset comments */

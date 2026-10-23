@@ -2101,6 +2101,43 @@ class CanvasEngine {
         return Math.round(finalVal * 10) / 10;
     }
 
+    removeAnnotationsForQuestion(targetQNo) {
+        if (!targetQNo) return;
+        const targetKey = this.normalizeQKey(targetQNo);
+        let removedAny = false;
+
+        this.pages.forEach(page => {
+            if (!page.annotations) return;
+            const remaining = [];
+            page.annotations.forEach(a => {
+                const qKey = this.normalizeQKey(a.qNo || a.qLabel);
+                if (qKey === targetKey) {
+                    removedAny = true;
+                } else {
+                    remaining.push(a);
+                }
+            });
+            page.annotations = remaining;
+        });
+
+        if (removedAny) {
+            this.deselectAnnotation();
+            this.renderOverlay();
+            this.notifyChange();
+        }
+    }
+
+    clearAllAnnotations() {
+        this.pages.forEach(page => {
+            page.annotations = [];
+            page.undoStack = [];
+            page.redoStack = [];
+        });
+        this.deselectAnnotation();
+        this.renderOverlay();
+        this.notifyChange();
+    }
+
     // --- Rendering ---
 
     renderAll() {

@@ -353,7 +353,7 @@ class MarkingPanel {
                         </button>
                     </div>
 
-                    <!-- Primary Actions: Full Mark / Zero -->
+                    <!-- Primary Actions: Full Mark / Zero / Clear -->
                     <div class="quick-mark-actions">
                         <button type="button" class="quick-action-btn btn-quick-correct" id="btn-quick-tick" title="Mark Full Marks [F]">
                             <span class="btn-icon">
@@ -364,6 +364,11 @@ class MarkingPanel {
                             <span class="btn-icon">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </span> Zero (0)
+                        </button>
+                        <button type="button" class="quick-action-btn btn-quick-clear" id="btn-quick-clear" title="Clear / Delete mark for this question" style="background: rgba(220, 38, 38, 0.08); border-color: rgba(220, 38, 38, 0.25); color: #DC2626;">
+                            <span class="btn-icon">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                            </span> Clear
                         </button>
                     </div>
 
@@ -611,6 +616,9 @@ class MarkingPanel {
                         <button type="button" class="q-mini-btn btn-mini-wrong ${q.status === 'wrong' ? 'active' : ''}" data-action="wrong" data-index="${actualIdx}" title="Zero Mark">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
+                        <button type="button" class="q-mini-btn btn-mini-clear" data-action="clear" data-index="${actualIdx}" title="Clear / Delete Mark" style="color: #DC2626;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                        </button>
                     </div>
                 </div>
             `;
@@ -698,6 +706,13 @@ class MarkingPanel {
         if (btnCross) {
             btnCross.addEventListener("click", () => {
                 this.assignCurrentQuestionMark(0, "wrong");
+            });
+        }
+
+        const btnClear = this.container.querySelector("#btn-quick-clear");
+        if (btnClear) {
+            btnClear.addEventListener("click", () => {
+                this.clearQuestionMark(this.activeQuestionIndex);
             });
         }
 
@@ -805,6 +820,8 @@ class MarkingPanel {
                         }
                     } else if (action === "wrong") {
                         this.assignQuestionMarkDirect(idx, 0, "wrong");
+                    } else if (action === "clear") {
+                        this.clearQuestionMark(idx);
                     }
                 }
             });
@@ -1001,6 +1018,45 @@ class MarkingPanel {
         if (index === this.activeQuestionIndex) {
             this.renderActiveQuestionDetail();
         }
+        this.renderQuestionsList();
+        this.recalculate();
+    }
+
+    clearQuestionMark(index) {
+        const q = this.questions[index];
+        if (!q) return;
+
+        q.awardedMarks = 0;
+        q.status = "unmarked";
+
+        if (q.hasSubQuestions && q.subQuestions && q.subQuestions.length > 0) {
+            q.subQuestions.forEach(sq => { sq.awardedMarks = 0; });
+        }
+
+        if (this.options.onQuestionMarkCleared) {
+            this.options.onQuestionMarkCleared(q, index);
+        }
+
+        if (index === this.activeQuestionIndex) {
+            this.renderActiveQuestionDetail();
+        }
+        this.renderQuestionsList();
+        this.recalculate();
+    }
+
+    resetAllQuestions() {
+        this.questions.forEach(q => {
+            q.awardedMarks = 0;
+            q.status = "unmarked";
+            if (q.hasSubQuestions && q.subQuestions) {
+                q.subQuestions.forEach(sq => { sq.awardedMarks = 0; });
+            }
+        });
+        this.overallFeedback = "";
+        const fbEl = this.container ? this.container.querySelector("#marking-overall-feedback") : null;
+        if (fbEl) fbEl.value = "";
+        this.activeQuestionIndex = 0;
+        this.renderActiveQuestionDetail();
         this.renderQuestionsList();
         this.recalculate();
     }
