@@ -1368,6 +1368,23 @@ class UploadPortalManager {
 
                 <!-- PDF Dropzone Card -->
                 <div class="upload-dropzone-card">
+                    <!-- Prominent Live Upload Progress Bar (High-Visibility Top Anchor) -->
+                    <div class="uploading-live-progress-card" id="uploading-live-progress-card" style="display: none;">
+                        <div class="upload-live-top-row">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <div class="upload-live-pulse-spinner"></div>
+                                <div>
+                                    <strong id="upload-live-title" style="font-size: 0.95rem; color: #007AFF;">Uploading & Ingesting Files...</strong>
+                                    <p id="upload-live-sub" style="margin: 2px 0 0; font-size: 0.8rem; color: #64748B;">Please wait while files are being read and compressed. Double-upload is disabled.</p>
+                                </div>
+                            </div>
+                            <span id="upload-live-pct" style="font-size: 1.15rem; font-weight: 700; color: #007AFF;">0%</span>
+                        </div>
+                        <div class="upload-live-track">
+                            <div class="upload-live-bar" id="upload-live-bar" style="width: 0%;"></div>
+                        </div>
+                    </div>
+
                     <div class="pdf-dropzone" id="portal-pdf-dropzone">
                         <input type="file" id="portal-pdf-file-input" accept="application/pdf, .pdf, image/png, image/jpeg, image/jpg, image/webp, image/*" multiple style="display:none;" />
                         <input type="file" id="inp-single-student-pdf-file" accept="application/pdf, .pdf, image/png, image/jpeg, image/jpg, image/webp, image/*" style="display:none;" />
@@ -3901,11 +3918,13 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
         this.isUploading = true;
 
-        // Lock dropzone, file inputs, and browse buttons to prevent double-upload
+        // Lock dropzone, file inputs, browse buttons, sample button, and publish button to prevent double-upload
         const dropzone = this.container.querySelector("#portal-pdf-dropzone");
         const fileInput = this.container.querySelector("#portal-pdf-file-input");
         const browseBtn = this.container.querySelector("#btn-portal-browse-pdf");
         const singleFileInp = this.container.querySelector("#inp-single-student-pdf-file");
+        const sampleBtn = this.container.querySelector("#btn-load-sample-student-pdf");
+        const publishBtn = this.container.querySelector("#btn-publish-batch");
 
         if (dropzone) {
             dropzone.style.pointerEvents = "none";
@@ -3914,8 +3933,24 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         if (fileInput) fileInput.disabled = true;
         if (singleFileInp) singleFileInp.disabled = true;
         if (browseBtn) browseBtn.disabled = true;
+        if (sampleBtn) sampleBtn.disabled = true;
+        if (publishBtn) publishBtn.disabled = true;
 
-        // Immediately show and initialize batch progress banner
+        // Immediately show and initialize prominent live progress card above dropzone
+        const liveCard = this.container.querySelector("#uploading-live-progress-card");
+        if (liveCard) {
+            liveCard.style.display = "block";
+            const liveTitle = liveCard.querySelector("#upload-live-title");
+            if (liveTitle) liveTitle.textContent = `Validating & Ingesting ${files.length} answer sheet(s)...`;
+            const liveSub = liveCard.querySelector("#upload-live-sub");
+            if (liveSub) liveSub.textContent = `Please wait, reading files and extracting pages. Double-upload is disabled.`;
+            const livePct = liveCard.querySelector("#upload-live-pct");
+            if (livePct) livePct.textContent = "5%";
+            const liveBar = liveCard.querySelector("#upload-live-bar");
+            if (liveBar) liveBar.style.width = "5%";
+        }
+
+        // Also initialize queue banner
         const banner = this.container.querySelector("#batch-upload-progress-banner");
         if (banner) {
             banner.style.display = "block";
@@ -4032,7 +4067,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         } finally {
             this.isUploading = false;
 
-            // Re-enable dropzone, inputs, and clear file input value so user can upload next batch
+            // Re-enable dropzone, inputs, browse button, sample button, and publish button
             if (dropzone) {
                 dropzone.style.pointerEvents = "";
                 dropzone.style.opacity = "";
@@ -4046,6 +4081,8 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 singleFileInp.value = "";
             }
             if (browseBtn) browseBtn.disabled = false;
+            if (sampleBtn) sampleBtn.disabled = false;
+            if (publishBtn) publishBtn.disabled = false;
 
             this.refreshQueueUI();
             this.updateBatchProgress();
@@ -4053,28 +4090,51 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
     }
 
     updateBatchProgress() {
+        const liveCard = this.container.querySelector("#uploading-live-progress-card");
         const banner = this.container.querySelector("#batch-upload-progress-banner");
-        if (!banner) return;
 
         const processingItems = this.fileQueue.filter(i => i.isProcessing);
         if (processingItems.length === 0) {
-            banner.style.display = "none";
+            if (banner) banner.style.display = "none";
+            if (liveCard) {
+                const livePct = liveCard.querySelector("#upload-live-pct");
+                const liveBar = liveCard.querySelector("#upload-live-bar");
+                const liveTitle = liveCard.querySelector("#upload-live-title");
+                if (livePct) livePct.textContent = "100%";
+                if (liveBar) liveBar.style.width = "100%";
+                if (liveTitle) liveTitle.textContent = "✓ Ingestion Complete!";
+                setTimeout(() => {
+                    if (!this.isUploading && liveCard) liveCard.style.display = "none";
+                }, 1200);
+            }
             return;
         }
 
-        banner.style.display = "block";
         const totalItems = this.fileQueue.length;
         const totalProgressSum = this.fileQueue.reduce((sum, item) => sum + (item.progressPercent !== undefined ? item.progressPercent : (item.isReady ? 100 : 0)), 0);
-        const overallPct = Math.round(totalProgressSum / totalItems);
+        const overallPct = Math.max(5, Math.min(100, Math.round(totalProgressSum / Math.max(1, totalItems))));
 
-        const titleEl = this.container.querySelector("#batch-progress-title");
-        if (titleEl) titleEl.textContent = `Processing & Ingesting ${totalItems} Answer Sheet PDF${totalItems > 1 ? 's' : ''}... (${totalItems - processingItems.length} of ${totalItems} Complete)`;
+        const titleText = `Processing & Ingesting ${totalItems} Answer Sheet PDF${totalItems > 1 ? 's' : ''}... (${totalItems - processingItems.length} of ${totalItems} Complete)`;
 
-        const pctEl = this.container.querySelector("#batch-progress-pct");
-        if (pctEl) pctEl.textContent = `${overallPct}%`;
+        if (liveCard) {
+            liveCard.style.display = "block";
+            const liveTitle = liveCard.querySelector("#upload-live-title");
+            if (liveTitle) liveTitle.textContent = titleText;
+            const livePct = liveCard.querySelector("#upload-live-pct");
+            if (livePct) livePct.textContent = `${overallPct}%`;
+            const liveBar = liveCard.querySelector("#upload-live-bar");
+            if (liveBar) liveBar.style.width = `${overallPct}%`;
+        }
 
-        const fillEl = this.container.querySelector("#batch-progress-fill");
-        if (fillEl) fillEl.style.width = `${overallPct}%`;
+        if (banner) {
+            banner.style.display = "block";
+            const titleEl = this.container.querySelector("#batch-progress-title");
+            if (titleEl) titleEl.textContent = titleText;
+            const pctEl = this.container.querySelector("#batch-progress-pct");
+            if (pctEl) pctEl.textContent = `${overallPct}%`;
+            const fillEl = this.container.querySelector("#batch-progress-fill");
+            if (fillEl) fillEl.style.width = `${overallPct}%`;
+        }
     }
 
     updateQueueItemProgress(queueItem, idx) {
@@ -4581,6 +4641,13 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
     // --- Publish to Storage & Evaluator Desk ---
     async publishQueueToStorage() {
+        if (this.isPublishing) {
+            if (window.app && window.app.showToast) {
+                window.app.showToast("Publishing is already in progress. Please wait.", "warning");
+            }
+            return;
+        }
+
         const readyItems = (this.fileQueue || []).filter(item => item.isReady);
 
         if (readyItems.length === 0) {
@@ -4588,170 +4655,195 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             return;
         }
 
-        // Check 50.0 GB Institution Storage Quota Limit
-        if (window.appStorage && typeof window.appStorage.getStorageUsage === "function") {
-            const storageInfo = await window.appStorage.getStorageUsage();
-            if (storageInfo.isExceeded) {
-                alert(`⚠️ 50.0 GB Institution Storage Quota Reached!\n\nCurrently used: ${storageInfo.usedGB} GB of 50.0 GB limit (${storageInfo.percentUsed}%).\n\nPlease delete older evaluated batches or completed examination papers from the Dashboard or Uploaded Papers Repository to free up storage space before uploading new answer scripts.`);
-                return;
-            }
+        this.isPublishing = true;
+        const publishBtn = this.container.querySelector("#btn-publish-batch");
+        const origPublishBtnHtml = publishBtn ? publishBtn.innerHTML : "";
+        if (publishBtn) {
+            publishBtn.disabled = true;
+            publishBtn.style.opacity = "0.75";
+            publishBtn.style.cursor = "not-allowed";
+            const textSpan = publishBtn.querySelector("#btn-publish-batch-text");
+            if (textSpan) textSpan.textContent = `Publishing Papers (0%)... Please wait`;
         }
 
-        // Show the loading dialog with real-time feedback
-        this.showPublishLoadingDialog(readyItems.length);
-
-        const subject = this.selectedSubject || (this.catalog && this.catalog[0]) || { name: "Physics" };
-        const template = this.selectedTemplate || (subject.templates ? subject.templates[0] : null) || { name: "Physics Board Paper (33 Qs / 70 Marks)", maxMarks: 70, id: "phy-cbse-70" };
-        const cls = this.selectedClass || (this.classes && this.classes[0]) || { name: "Class 12", section: "A", label: "Class 12-A" };
-
-        let publishedCount = 0;
-        const total = readyItems.length;
-
-        for (let i = 0; i < total; i++) {
-            const item = readyItems[i];
-            const startPct = Math.round((i / total) * 90);
-            this.updatePublishDialogProgress(i + 1, total, startPct, `Optimizing & saving paper for ${item.studentName}...`);
-
-            // Build standardized question list based on selected template
-            let templateQs = (template.questions && template.questions.length > 0) ? template.questions : [];
-            if (templateQs.length === 0 && template.sections && Array.isArray(template.sections)) {
-                let syntheticQNo = 1;
-                template.sections.forEach(sec => {
-                    const start = sec.qStartNo || syntheticQNo;
-                    const end = sec.qEndNo || (start + (sec.qCount || 1) - 1);
-                    const marks = Number(sec.marksPerQ) || 1;
-                    const secName = sec.title || sec.name || `Section ${sec.letter || 'A'}`;
-                    const secId = sec.id || `sec_${(sec.letter || 'a').toLowerCase()}`;
-                    for (let qn = start; qn <= end; qn++) {
-                        templateQs.push({
-                            id: `q_${qn}`,
-                            qNo: qn,
-                            qNumber: `Q${qn}`,
-                            label: `Q${qn}`,
-                            section: secName,
-                            sectionId: secId,
-                            maxMarks: marks,
-                            isChoice: !!sec.hasChoice
-                        });
-                        syntheticQNo = Math.max(syntheticQNo, qn + 1);
-                    }
-                });
-            }
-
-            const questions = templateQs.map((q, idx) => {
-                const sName = q.section || (q.sectionName || "Section A");
-                let sId = q.sectionId;
-                const match = sName.match(/Section\s+([A-Za-z])/i);
-                if (match) {
-                    sId = `sec_${match[1].toLowerCase()}`;
-                } else if (!sId) {
-                    sId = "sec_a";
+        try {
+            // Check 50.0 GB Institution Storage Quota Limit
+            if (window.appStorage && typeof window.appStorage.getStorageUsage === "function") {
+                const storageInfo = await window.appStorage.getStorageUsage();
+                if (storageInfo.isExceeded) {
+                    alert(`⚠️ 50.0 GB Institution Storage Quota Reached!\n\nCurrently used: ${storageInfo.usedGB} GB of 50.0 GB limit (${storageInfo.percentUsed}%).\n\nPlease delete older evaluated batches or completed examination papers from the Dashboard or Uploaded Papers Repository to free up storage space before uploading new answer scripts.`);
+                    return;
                 }
-                return {
-                    id: q.id || `q${idx + 1}`,
-                    qNo: q.qNo !== undefined ? q.qNo : idx + 1,
-                    number: q.qNumber || `Q${idx + 1}`,
-                    label: q.label || `${q.qNumber || `Q${idx + 1}`}. ${q.topic || ''}`,
-                    section: sName,
-                    sectionId: sId,
-                    maxMarks: Number(q.maxMarks) || 1,
-                    awardedMarks: 0,
-                    obtainedMarks: 0,
-                    status: "unmarked",
-                    remarks: "",
-                    isChoice: !!q.isChoice,
-                    choices: q.choices ? JSON.parse(JSON.stringify(q.choices)) : null,
-                    selectedChoice: q.selectedChoice || (q.choices ? (typeof q.choices[0] === 'string' ? q.choices[0] : q.choices[0].label) : null),
-                    hasSubQuestions: !!q.hasSubQuestions,
-                    subQuestions: q.subQuestions ? q.subQuestions.map(sq => ({
-                        subId: sq.subId || sq.letter,
-                        label: sq.label || `(${sq.subId || sq.letter})`,
-                        maxMarks: Number(sq.maxMarks) || 1,
-                        awardedMarks: 0
-                    })) : []
-                };
-            });
-
-            // Check if paper already exists for this student in this class & exam:
-            const rollKey = String(item.rollNo || "").trim().toLowerCase();
-            const nameKey = String(item.studentName || "").trim().toLowerCase();
-            const existingMatch = (this.existingPapers || []).find(p => {
-                const pRoll = String(p.rollNo || "").trim().toLowerCase();
-                const pName = String(p.studentName || "").trim().toLowerCase();
-                if (rollKey && pRoll && rollKey === pRoll) return true;
-                if (nameKey && pName && nameKey === pName) return true;
-                return false;
-            });
-
-            // Overwrite existing paper if found, rather than creating a duplicate!
-            const evalId = item.id || (existingMatch ? existingMatch.id : `eval-${Date.now()}-${Math.floor(Math.random() * 100000)}`);
-
-            const newEvaluation = {
-                id: evalId,
-                rawFile: item.file || null,
-                studentName: item.studentName || (existingMatch ? existingMatch.studentName : "Unnamed Student"),
-                rollNo: item.rollNo || (existingMatch ? existingMatch.rollNo : String(100 + publishedCount)),
-                class: cls.name || cls.label,
-                className: cls.name || cls.label,
-                section: cls.section || "A",
-                classLabel: cls.label || `${cls.name}-${cls.section}`,
-                subject: subject.name,
-                examName: template.examName || template.name,
-                templateName: template.name,
-                templateId: template.id,
-                examDate: (existingMatch && existingMatch.examDate) || new Date().toISOString().split("T")[0],
-                correctionDate: new Date().toISOString().split("T")[0],
-                maxMarks: template.maxMarks || 70,
-                obtainedMarks: existingMatch ? existingMatch.obtainedMarks : 0,
-                percentage: existingMatch ? existingMatch.percentage : 0,
-                grade: existingMatch ? existingMatch.grade : "Pending",
-                status: existingMatch ? existingMatch.status : "Pending",
-                isUserUploaded: true,
-                isMock: false,
-                pdfDataUrl: item.pdfDataUrl || (existingMatch ? existingMatch.pdfDataUrl : null),
-                pdfStorageUrl: item.file ? null : (existingMatch ? existingMatch.pdfStorageUrl : null),
-                pageCount: item.pageCount || (existingMatch ? existingMatch.pageCount : 1),
-                correctCount: existingMatch ? existingMatch.correctCount : 0,
-                wrongCount: existingMatch ? existingMatch.wrongCount : 0,
-                feedback: existingMatch ? existingMatch.feedback : "",
-                // Save compressed pages array for fast instant rendering in canvas engine
-                pages: (item.pages && item.pages.length > 0) ? item.pages : (item.pdfDataUrl ? [item.pdfDataUrl] : null),
-                annotations: existingMatch ? (existingMatch.annotations || []) : [],
-                sections: (template.sections && template.sections.length > 0)
-                    ? JSON.parse(JSON.stringify(template.sections))
-                    : (window.MockData?.physicsTemplate?.sections ? JSON.parse(JSON.stringify(window.MockData.physicsTemplate.sections)) : []),
-                questions: (existingMatch && existingMatch.questions && existingMatch.questions.length > 0) ? existingMatch.questions : questions,
-                createdAt: (existingMatch && existingMatch.createdAt) || new Date().toISOString(),
-                updatedAt: new Date().toISOString()
-            };
-
-            try {
-                await window.appStorage.saveEvaluation(newEvaluation);
-                publishedCount++;
-            } catch (err) {
-                console.error("Error saving evaluation:", err);
             }
 
-            const finishPct = Math.round(((i + 1) / total) * 98);
-            this.updatePublishDialogProgress(i + 1, total, finishPct, `✓ Saved paper ${i + 1} of ${total}: ${item.studentName}`);
-        }
+            // Show the loading dialog with real-time feedback
+            this.showPublishLoadingDialog(readyItems.length);
 
-        this.setPublishDialogComplete(publishedCount);
+            const subject = this.selectedSubject || (this.catalog && this.catalog[0]) || { name: "Physics" };
+            const template = this.selectedTemplate || (subject.templates ? subject.templates[0] : null) || { name: "Physics Board Paper (33 Qs / 70 Marks)", maxMarks: 70, id: "phy-cbse-70" };
+            const cls = this.selectedClass || (this.classes && this.classes[0]) || { name: "Class 12", section: "A", label: "Class 12-A" };
 
-        // Remove published items from active queue
-        this.fileQueue = this.fileQueue.filter(item => !readyItems.includes(item));
-        await this.loadExistingClassPapers();
-        if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
-            window.app.updateStorageQuotaDisplay();
-        }
+            let publishedCount = 0;
+            const total = readyItems.length;
 
-        if (cls && subject) {
-            sessionStorage.setItem("niprak_last_uploaded_class", cls.label || cls.name);
-            sessionStorage.setItem("niprak_last_uploaded_subject", subject.name);
-        }
+            for (let i = 0; i < total; i++) {
+                const item = readyItems[i];
+                const startPct = Math.round((i / total) * 90);
+                this.updatePublishDialogProgress(i + 1, total, startPct, `Optimizing & saving paper for ${item.studentName}...`);
+                if (publishBtn) {
+                    const textSpan = publishBtn.querySelector("#btn-publish-batch-text");
+                    if (textSpan) textSpan.textContent = `Publishing Papers (${startPct}%)... (${i + 1}/${total})`;
+                }
 
-        if (window.app && window.app.showToast) {
-            window.app.showToast(`Published ${publishedCount} paper(s) to Teacher Evaluator Desk!`);
+                // Build standardized question list based on selected template
+                let templateQs = (template.questions && template.questions.length > 0) ? template.questions : [];
+                if (templateQs.length === 0 && template.sections && Array.isArray(template.sections)) {
+                    let syntheticQNo = 1;
+                    template.sections.forEach(sec => {
+                        const start = sec.qStartNo || syntheticQNo;
+                        const end = sec.qEndNo || (start + (sec.qCount || 1) - 1);
+                        const marks = Number(sec.marksPerQ) || 1;
+                        const secName = sec.title || sec.name || `Section ${sec.letter || 'A'}`;
+                        const secId = sec.id || `sec_${(sec.letter || 'a').toLowerCase()}`;
+                        for (let qn = start; qn <= end; qn++) {
+                            templateQs.push({
+                                id: `q_${qn}`,
+                                qNo: qn,
+                                qNumber: `Q${qn}`,
+                                label: `Q${qn}`,
+                                section: secName,
+                                sectionId: secId,
+                                maxMarks: marks,
+                                isChoice: !!sec.hasChoice
+                            });
+                            syntheticQNo = Math.max(syntheticQNo, qn + 1);
+                        }
+                    });
+                }
+
+                const questions = templateQs.map((q, idx) => {
+                    const sName = q.section || (q.sectionName || "Section A");
+                    let sId = q.sectionId;
+                    const match = sName.match(/Section\s+([A-Za-z])/i);
+                    if (match) {
+                        sId = `sec_${match[1].toLowerCase()}`;
+                    } else if (!sId) {
+                        sId = "sec_a";
+                    }
+                    return {
+                        id: q.id || `q${idx + 1}`,
+                        qNo: q.qNo !== undefined ? q.qNo : idx + 1,
+                        number: q.qNumber || `Q${idx + 1}`,
+                        label: q.label || `${q.qNumber || `Q${idx + 1}`}. ${q.topic || ''}`,
+                        section: sName,
+                        sectionId: sId,
+                        maxMarks: Number(q.maxMarks) || 1,
+                        awardedMarks: 0,
+                        obtainedMarks: 0,
+                        status: "unmarked",
+                        remarks: "",
+                        isChoice: !!q.isChoice,
+                        choices: q.choices ? JSON.parse(JSON.stringify(q.choices)) : null,
+                        selectedChoice: q.selectedChoice || (q.choices ? (typeof q.choices[0] === 'string' ? q.choices[0] : q.choices[0].label) : null),
+                        hasSubQuestions: !!q.hasSubQuestions,
+                        subQuestions: q.subQuestions ? q.subQuestions.map(sq => ({
+                            subId: sq.subId || sq.letter,
+                            label: sq.label || `(${sq.subId || sq.letter})`,
+                            maxMarks: Number(sq.maxMarks) || 1,
+                            awardedMarks: 0
+                        })) : []
+                    };
+                });
+
+                // Check if paper already exists for this student in this class & exam:
+                const rollKey = String(item.rollNo || "").trim().toLowerCase();
+                const nameKey = String(item.studentName || "").trim().toLowerCase();
+                const existingMatch = (this.existingPapers || []).find(p => {
+                    const pRoll = String(p.rollNo || "").trim().toLowerCase();
+                    const pName = String(p.studentName || "").trim().toLowerCase();
+                    if (rollKey && pRoll && rollKey === pRoll) return true;
+                    if (nameKey && pName && nameKey === pName) return true;
+                    return false;
+                });
+
+                // Overwrite existing paper if found, rather than creating a duplicate!
+                const evalId = item.id || (existingMatch ? existingMatch.id : `eval-${Date.now()}-${Math.floor(Math.random() * 100000)}`);
+
+                const newEvaluation = {
+                    id: evalId,
+                    rawFile: item.file || null,
+                    studentName: item.studentName || (existingMatch ? existingMatch.studentName : "Unnamed Student"),
+                    rollNo: item.rollNo || (existingMatch ? existingMatch.rollNo : String(100 + publishedCount)),
+                    class: cls.name || cls.label,
+                    className: cls.name || cls.label,
+                    section: cls.section || "A",
+                    classLabel: cls.label || `${cls.name}-${cls.section}`,
+                    subject: subject.name,
+                    examName: template.examName || template.name,
+                    templateName: template.name,
+                    templateId: template.id,
+                    examDate: (existingMatch && existingMatch.examDate) || new Date().toISOString().split("T")[0],
+                    correctionDate: new Date().toISOString().split("T")[0],
+                    maxMarks: template.maxMarks || 70,
+                    obtainedMarks: existingMatch ? existingMatch.obtainedMarks : 0,
+                    percentage: existingMatch ? existingMatch.percentage : 0,
+                    grade: existingMatch ? existingMatch.grade : "Pending",
+                    status: existingMatch ? existingMatch.status : "Pending",
+                    isUserUploaded: true,
+                    isMock: false,
+                    pdfDataUrl: item.pdfDataUrl || (existingMatch ? existingMatch.pdfDataUrl : null),
+                    pdfStorageUrl: item.file ? null : (existingMatch ? existingMatch.pdfStorageUrl : null),
+                    pageCount: item.pageCount || (existingMatch ? existingMatch.pageCount : 1),
+                    correctCount: existingMatch ? existingMatch.correctCount : 0,
+                    wrongCount: existingMatch ? existingMatch.wrongCount : 0,
+                    feedback: existingMatch ? existingMatch.feedback : "",
+                    // Save compressed pages array for fast instant rendering in canvas engine
+                    pages: (item.pages && item.pages.length > 0) ? item.pages : (item.pdfDataUrl ? [item.pdfDataUrl] : null),
+                    annotations: existingMatch ? (existingMatch.annotations || []) : [],
+                    sections: (template.sections && template.sections.length > 0)
+                        ? JSON.parse(JSON.stringify(template.sections))
+                        : (window.MockData?.physicsTemplate?.sections ? JSON.parse(JSON.stringify(window.MockData.physicsTemplate.sections)) : []),
+                    questions: (existingMatch && existingMatch.questions && existingMatch.questions.length > 0) ? existingMatch.questions : questions,
+                    createdAt: (existingMatch && existingMatch.createdAt) || new Date().toISOString(),
+                    updatedAt: new Date().toISOString()
+                };
+
+                try {
+                    await window.appStorage.saveEvaluation(newEvaluation);
+                    publishedCount++;
+                } catch (err) {
+                    console.error("Error saving evaluation:", err);
+                }
+
+                const finishPct = Math.round(((i + 1) / total) * 98);
+                this.updatePublishDialogProgress(i + 1, total, finishPct, `✓ Saved paper ${i + 1} of ${total}: ${item.studentName}`);
+            }
+
+            this.setPublishDialogComplete(publishedCount);
+
+            // Remove published items from active queue
+            this.fileQueue = this.fileQueue.filter(item => !readyItems.includes(item));
+            await this.loadExistingClassPapers();
+            if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
+                window.app.updateStorageQuotaDisplay();
+            }
+
+            if (cls && subject) {
+                sessionStorage.setItem("niprak_last_uploaded_class", cls.label || cls.name);
+                sessionStorage.setItem("niprak_last_uploaded_subject", subject.name);
+            }
+
+            if (window.app && window.app.showToast) {
+                window.app.showToast(`Published ${publishedCount} paper(s) to Teacher Evaluator Desk!`);
+            }
+        } finally {
+            this.isPublishing = false;
+            if (publishBtn) {
+                publishBtn.disabled = false;
+                publishBtn.style.opacity = "";
+                publishBtn.style.cursor = "";
+                publishBtn.innerHTML = origPublishBtnHtml;
+            }
         }
     }
 

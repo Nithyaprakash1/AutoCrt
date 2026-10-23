@@ -30,6 +30,8 @@ class DashboardManager {
         this.teacherSubject = "";
         this.teacherName = "";
         this.charts = {}; // Store Chart.js instances
+        // Active batch key for drill-down ('className:::templateName' or null for batches overview)
+        this.activeBatchKey = null;
 
         // Drill-down step: 'papers' (direct view) | 'classes' (grid view)
         this.viewMode = "papers"; // Default to direct papers view with filters so teacher papers are never hidden
@@ -152,12 +154,22 @@ class DashboardManager {
                 if (activePortal === "evaluator") return false;
             }
 
+            // Active Batch filter: When drilled down into a specific batch card
+            if (this.activeBatchKey) {
+                const parts = this.activeBatchKey.split(":::");
+                const targetCls = (parts[0] || "").toLowerCase().trim();
+                const targetTpl = (parts[1] || "").toLowerCase().trim();
+                const eCls = (e.class || e.className || e.classLabel || "").toLowerCase().trim();
+                const eTpl = (e.templateName || e.examName || "Standard Assessment").toLowerCase().trim();
+                if (eCls !== targetCls || eTpl !== targetTpl) return false;
+            }
+
             // 1. Status Tab filter
             if (this.activeTab === "uncorrected" && isCorr) return false;
             if (this.activeTab === "corrected" && !isCorr) return false;
 
-            // 2. Class filter (flexible matching)
-            if (this.selectedClassFilter && this.selectedClassFilter !== "all") {
+            // 2. Class filter (flexible matching when on overview)
+            if (!this.activeBatchKey && this.selectedClassFilter && this.selectedClassFilter !== "all") {
                 const fCls = this.selectedClassFilter.toLowerCase().trim();
                 const eCls = (e.class || e.className || e.classLabel || "").toLowerCase().trim();
                 if (eCls !== fCls && !eCls.includes(fCls) && !fCls.includes(eCls)) return false;
@@ -272,158 +284,214 @@ class DashboardManager {
         });
         this.batches = Array.from(batchMap.values());
 
+        // =========================================================================
+        // VIEW 1: Batches Overview Mode (Default)
+        // Renders Welcome Banner + KPI Metric Cards + Class-Template Batches Grid ONLY.
+        // Hides flat table & saves cloud storage reads / DOM bloat until user enters a batch.
+        // =========================================================================
+        if (!this.activeBatchKey) {
+            this.container.innerHTML = `
+                <div class="dashboard-page">
+                    <!-- Welcome Banner with Dynamic Greeting, Subject Title & Quick Start Action -->
+                    <div class="dashboard-welcome-banner">
+                        <div class="welcome-text-col">
+                            <span class="welcome-greeting">${greetingStr}, ${displayName}! 👋</span>
+                            <h2 class="welcome-headline">${displaySubject} Evaluation Desk</h2>
+                            <p class="welcome-sub">Streamlined examination batches. Click into any class card below to view its student answer sheets, evaluate marks, and export results.</p>
+                        </div>
+                        <div class="welcome-action-col" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                            <button type="button" class="btn-primary btn-large" id="dash-btn-start-correction" title="Open first pending paper to evaluate">
+                                <span class="btn-icon">${ic.lightning || '⚡'}</span> Start Correction
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Live Counter Labels & KPI Metric Cards -->
+                    <div class="kpi-grid">
+                        <div class="kpi-card kpi-uncorrected-highlight" id="card-tab-uncorrected" title="Uncorrected Papers">
+                            <div class="kpi-card-header">
+                                <div class="kpi-icon-wrap bg-amber-light">
+                                    <span class="kpi-icon text-amber">${ic.pending || ''}</span>
+                                </div>
+                                <span class="counter-badge counter-badge-new" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(217, 119, 6, 0.12); color: #D97706; font-weight: 700; white-space: nowrap;">${uncorrectedCount} UNCORRECTED</span>
+                            </div>
+                            <div class="kpi-card-body">
+                                <span class="kpi-value text-amber">${uncorrectedCount}</span>
+                                <span class="kpi-title">PENDING EVALUATION</span>
+                            </div>
+                        </div>
+
+                        <div class="kpi-card kpi-corrected-highlight" id="card-tab-corrected" title="Corrected Papers">
+                            <div class="kpi-card-header">
+                                <div class="kpi-icon-wrap bg-green-light">
+                                    <span class="kpi-icon text-green">${ic.completed || ''}</span>
+                                </div>
+                                <span class="counter-badge counter-badge-done" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #34C759; font-weight: 700; white-space: nowrap;">${correctedCount} GRADED</span>
+                            </div>
+                            <div class="kpi-card-body">
+                                <span class="kpi-value text-green">${correctedCount}</span>
+                                <span class="kpi-title">CORRECTED PAPERS</span>
+                            </div>
+                        </div>
+
+                        <div class="kpi-card" id="card-tab-all" title="Total Papers">
+                            <div class="kpi-card-header">
+                                <div class="kpi-icon-wrap bg-blue-light">
+                                    <span class="kpi-icon text-blue">${ic.evaluations || ''}</span>
+                                </div>
+                                <span class="counter-badge" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(0, 122, 255, 0.12); color: #007AFF; font-weight: 700; white-space: nowrap;">TOTAL</span>
+                            </div>
+                            <div class="kpi-card-body">
+                                <span class="kpi-value">${totalCount}</span>
+                                <span class="kpi-title">TOTAL ASSIGNED</span>
+                            </div>
+                        </div>
+
+                        <div class="kpi-card">
+                            <div class="kpi-card-header">
+                                <div class="kpi-icon-wrap" style="background: rgba(255, 45, 85, 0.1);">
+                                    <span class="kpi-icon" style="color: #FF2D55;">${ic.performance || ''}</span>
+                                </div>
+                                <span class="counter-badge" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(255, 45, 85, 0.12); color: #FF2D55; font-weight: 700; white-space: nowrap;">${gradedEvals.length} EVALUATED</span>
+                            </div>
+                            <div class="kpi-card-body">
+                                <span class="kpi-value">${avgScorePct}%</span>
+                                <span class="kpi-title">AVG PERFORMANCE</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Class & Exam Blueprint Batches Section -->
+                    <div class="teacher-batches-section" id="teacher-batches-section">
+                        <div class="teacher-batches-header">
+                            <div class="teacher-batches-title-col">
+                                <h3 class="teacher-batches-title">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                                    Class & Exam Blueprint Batches
+                                    <span class="teacher-batches-count-pill">${this.batches.length} ${this.batches.length === 1 ? 'Batch' : 'Batches'}</span>
+                                </h3>
+                                <p class="teacher-batches-desc">Click any card to view its student answer sheets or start marking directly.</p>
+                            </div>
+                        </div>
+
+                        <div class="teacher-batches-grid">
+                            ${this.batches.length === 0 ? `
+                                <div class="teacher-batches-empty">
+                                    <p>No exam batches currently allotted for ${displaySubject}. Upload papers to populate class-template cards.</p>
+                                </div>
+                            ` : this.batches.map(b => {
+                                const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
+                                const isCompleted = b.uncorrected === 0 && b.total > 0;
+                                return `
+                                    <div class="teacher-batch-card" data-class="${b.className}" data-template="${b.templateName}" style="cursor: pointer;">
+                                        <div class="batch-card-top-row">
+                                            <div style="display: flex; align-items: center; gap: 6px;">
+                                                <span class="batch-class-badge">${b.className}</span>
+                                                <span class="batch-subject-tag">${b.subject}</span>
+                                            </div>
+                                            <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
+                                                ${isCompleted ? '✓ All Graded' : `${b.uncorrected} Pending`}
+                                            </span>
+                                        </div>
+
+                                        <h4 class="batch-card-name" title="${b.templateName}">${b.templateName}</h4>
+
+                                        <div class="batch-card-meta-row">
+                                            <span>Max Marks: <strong>${b.maxMarks}M</strong></span>
+                                            <span>Roster: <strong>${b.total} Papers</strong></span>
+                                        </div>
+
+                                        <div class="batch-progress-wrapper">
+                                            <div class="batch-progress-labels">
+                                                <span class="progress-ratio">${b.corrected} / ${b.total} Evaluated</span>
+                                                <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'}; font-weight: 700;">${pct}%</span>
+                                            </div>
+                                            <div class="batch-progress-bar">
+                                                <div class="batch-progress-fill" style="width: ${pct}%; background: ${pct === 100 ? '#16A34A' : 'linear-gradient(90deg, #0071E3, #38BDF8)'};"></div>
+                                            </div>
+                                        </div>
+
+                                        <div class="batch-actions-row">
+                                            <button type="button" class="btn-batch-view" data-class="${b.className}" data-template="${b.templateName}" title="Open papers in this batch">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                                View Papers (${b.total})
+                                            </button>
+                                            <button type="button" class="btn-batch-start" data-class="${b.className}" data-template="${b.templateName}" title="Start correcting papers in this batch">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                                ${isCompleted ? 'Review' : 'Start Marking'}
+                                            </button>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+            return;
+        }
+
+        // =========================================================================
+        // VIEW 2: Batch Drill-Down Mode (When teacher clicked a specific batch)
+        // Shows Batch Header Banner with [Back to All Batches] + Analytics + That batch's papers
+        // =========================================================================
+        const [targetClass, targetTemplate] = this.activeBatchKey.split(":::");
+        const currentBatch = (this.batches || []).find(b => b.className === targetClass && b.templateName === targetTemplate) || {
+            className: targetClass,
+            templateName: targetTemplate,
+            subject: displaySubject,
+            papers: this.filteredEvaluations,
+            total: this.filteredEvaluations.length,
+            corrected: this.filteredEvaluations.filter(e => this.isPaperCorrected(e)).length,
+            uncorrected: this.filteredEvaluations.filter(e => !this.isPaperCorrected(e)).length,
+            maxMarks: this.filteredEvaluations[0]?.maxMarks || 70
+        };
+        const batchPct = currentBatch.total > 0 ? Math.round((currentBatch.corrected / currentBatch.total) * 100) : 0;
+        const batchIsDone = currentBatch.uncorrected === 0 && currentBatch.total > 0;
+
         this.container.innerHTML = `
             <div class="dashboard-page">
-                <!-- Welcome Banner with Dynamic Greeting, Subject Title & Quick Export Actions -->
-                <div class="dashboard-welcome-banner">
-                    <div class="welcome-text-col">
-                        <span class="welcome-greeting">${greetingStr}, ${displayName}! 👋</span>
-                        <h2 class="welcome-headline">${displaySubject} Evaluation Desk</h2>
-                        <p class="welcome-sub">Manage answer sheet corrections, review live score distributions, and export evaluated student documents.</p>
-                    </div>
-                    <div class="welcome-action-col" style="display: flex; gap: 10px; flex-wrap: wrap;">
-                        <button type="button" class="btn-primary btn-large" id="dash-btn-start-correction" title="Open first pending paper to evaluate">
-                            <span class="btn-icon">${ic.lightning || '⚡'}</span> Start Correction
+                <!-- Batch Navigation Header Banner -->
+                <div class="batch-detail-header-banner" style="background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%); color: #FFFFFF; border-radius: 14px; padding: 20px 24px; margin-bottom: 22px; box-shadow: 0 4px 18px rgba(0,0,0,0.08); display: flex; flex-direction: column; gap: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                        <button type="button" class="btn-back-to-batches" id="btn-back-to-batches" style="background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.22); color: #FFFFFF; border-radius: 999px; padding: 7px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s ease;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                            <span>Back to All Batches</span>
                         </button>
-                        <button type="button" class="btn-secondary" id="dash-btn-banner-bulk-pdf" title="Bulk download all evaluated PDFs" style="background: #FFFFFF; border: 1px solid rgba(0, 122, 255, 0.4); color: #007AFF;">
-                            <span class="btn-icon">${ic.pdf || '📄'}</span> Bulk Download PDFs
-                        </button>
-                        <button type="button" class="btn-secondary" id="dash-btn-banner-export-excel" title="Export class result matrix to Excel" style="background: #FFFFFF; border: 1px solid rgba(52, 199, 89, 0.4); color: #2E7D32;">
-                            <span class="btn-icon">${ic.csv || '📊'}</span> Export Excel
-                        </button>
-                    </div>
-                </div>
-
-                <!-- Live Counter Labels & KPI Metric Cards -->
-                <div class="kpi-grid">
-                    <div class="kpi-card kpi-uncorrected-highlight" id="card-tab-uncorrected" title="Click to view Uncorrected Papers" style="cursor: pointer;">
-                        <div class="kpi-card-header">
-                            <div class="kpi-icon-wrap bg-amber-light">
-                                <span class="kpi-icon text-amber">${ic.pending || ''}</span>
-                            </div>
-                            <span class="counter-badge counter-badge-new" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(217, 119, 6, 0.12); color: #D97706; font-weight: 700; white-space: nowrap;">${uncorrectedCount} UNCORRECTED</span>
-                        </div>
-                        <div class="kpi-card-body">
-                            <span class="kpi-value text-amber">${uncorrectedCount}</span>
-                            <span class="kpi-title">UNCORRECTED PAPERS</span>
-                        </div>
-                    </div>
-
-                    <div class="kpi-card kpi-corrected-highlight" id="card-tab-corrected" title="Click to view Corrected Papers" style="cursor: pointer;">
-                        <div class="kpi-card-header">
-                            <div class="kpi-icon-wrap bg-green-light">
-                                <span class="kpi-icon text-green">${ic.completed || ''}</span>
-                            </div>
-                            <span class="counter-badge counter-badge-done" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #34C759; font-weight: 700; white-space: nowrap;">${correctedCount} GRADED</span>
-                        </div>
-                        <div class="kpi-card-body">
-                            <span class="kpi-value text-green">${correctedCount}</span>
-                            <span class="kpi-title">CORRECTED PAPERS</span>
-                        </div>
-                    </div>
-
-                    <div class="kpi-card" id="card-tab-all" title="Click to view All Papers" style="cursor: pointer;">
-                        <div class="kpi-card-header">
-                            <div class="kpi-icon-wrap bg-blue-light">
-                                <span class="kpi-icon text-blue">${ic.evaluations || ''}</span>
-                            </div>
-                            <span class="counter-badge" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(0, 122, 255, 0.12); color: #007AFF; font-weight: 700; white-space: nowrap;">TOTAL</span>
-                        </div>
-                        <div class="kpi-card-body">
-                            <span class="kpi-value">${totalCount}</span>
-                            <span class="kpi-title">TOTAL ASSIGNED</span>
-                        </div>
-                    </div>
-
-                    <div class="kpi-card">
-                        <div class="kpi-card-header">
-                            <div class="kpi-icon-wrap" style="background: rgba(255, 45, 85, 0.1);">
-                                <span class="kpi-icon" style="color: #FF2D55;">${ic.performance || ''}</span>
-                            </div>
-                            <span class="counter-badge" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(255, 45, 85, 0.12); color: #FF2D55; font-weight: 700; white-space: nowrap;">${gradedEvals.length} EVALUATED</span>
-                        </div>
-                        <div class="kpi-card-body">
-                            <span class="kpi-value">${avgScorePct}%</span>
-                            <span class="kpi-title">AVG PERFORMANCE</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Class & Exam Template Batches Section for Teachers (Class - Template Cards) -->
-                <div class="teacher-batches-section" id="teacher-batches-section">
-                    <div class="teacher-batches-header">
-                        <div class="teacher-batches-title-col">
-                            <h3 class="teacher-batches-title">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-                                Class & Exam Blueprint Batches
-                                <span class="teacher-batches-count-pill">${this.batches.length} ${this.batches.length === 1 ? 'Batch' : 'Batches'}</span>
-                            </h3>
-                            <p class="teacher-batches-desc">Streamlined cards organized by Class & Template. Select a card to view its student roster or click Start Marking to evaluate directly.</p>
-                        </div>
-                        ${this.selectedClassFilter !== "all" ? `
-                            <button type="button" class="btn-clear-batch-filter" id="btn-clear-batch-filter" title="Clear filter and view all classes">
-                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                <span>Reset Filter (${this.selectedClassFilter})</span>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 0.78rem; font-weight: 600; padding: 4px 12px; border-radius: 999px; background: ${batchIsDone ? 'rgba(52, 199, 89, 0.2)' : 'rgba(0, 122, 255, 0.2)'}; color: ${batchIsDone ? '#34C759' : '#60A5FA'}; border: 1px solid ${batchIsDone ? 'rgba(52, 199, 89, 0.4)' : 'rgba(96, 165, 250, 0.4)'};">
+                                ${batchIsDone ? '✓ All Papers Evaluated' : `${currentBatch.uncorrected} Pending Evaluation`}
+                            </span>
+                            <button type="button" class="btn-primary" id="btn-batch-start-marking" style="padding: 7px 16px; font-size: 0.82rem; border-radius: 999px; font-weight: 600; display: inline-flex; align-items: center; gap: 6px;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                                ${currentBatch.uncorrected === 0 ? 'Review Papers' : 'Start Marking'}
                             </button>
-                        ` : ''}
+                        </div>
                     </div>
 
-                    <div class="teacher-batches-grid">
-                        ${this.batches.length === 0 ? `
-                            <div class="teacher-batches-empty">
-                                <p>No exam batches currently allotted for ${displaySubject}. Upload papers to populate class-template cards.</p>
+                    <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                                <span style="background: #0071E3; color: #FFFFFF; font-size: 0.74rem; font-weight: 700; padding: 3px 9px; border-radius: 6px; text-transform: uppercase;">${currentBatch.className}</span>
+                                <span style="background: rgba(255,255,255,0.12); color: #E2E8F0; font-size: 0.74rem; font-weight: 600; padding: 3px 9px; border-radius: 6px;">${currentBatch.subject}</span>
+                                <span style="color: #94A3B8; font-size: 0.8rem;">Max Marks: <strong style="color: #FFFFFF;">${currentBatch.maxMarks}M</strong></span>
                             </div>
-                        ` : this.batches.map(b => {
-                            const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
-                            const isCompleted = b.uncorrected === 0 && b.total > 0;
-                            const isSelected = (this.selectedClassFilter === b.className);
-                            return `
-                                <div class="teacher-batch-card ${isSelected ? 'active' : ''}" data-class="${b.className}" data-template="${b.templateName}">
-                                    <div class="batch-card-top-row">
-                                        <div style="display: flex; align-items: center; gap: 6px;">
-                                            <span class="batch-class-badge">${b.className}</span>
-                                            <span class="batch-subject-tag">${b.subject}</span>
-                                        </div>
-                                        <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
-                                            ${isCompleted ? '✓ All Graded' : `${b.uncorrected} Pending`}
-                                        </span>
-                                    </div>
-
-                                    <h4 class="batch-card-name" title="${b.templateName}">${b.templateName}</h4>
-
-                                    <div class="batch-card-meta-row">
-                                        <span>Max Marks: <strong>${b.maxMarks}M</strong></span>
-                                        <span>Roster: <strong>${b.total} Papers</strong></span>
-                                    </div>
-
-                                    <div class="batch-progress-wrapper">
-                                        <div class="batch-progress-labels">
-                                            <span class="progress-ratio">${b.corrected} / ${b.total} Evaluated</span>
-                                            <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'}; font-weight: 700;">${pct}%</span>
-                                        </div>
-                                        <div class="batch-progress-bar">
-                                            <div class="batch-progress-fill" style="width: ${pct}%; background: ${pct === 100 ? '#16A34A' : 'linear-gradient(90deg, #0071E3, #38BDF8)'};"></div>
-                                        </div>
-                                    </div>
-
-                                    <div class="batch-actions-row">
-                                        <button type="button" class="btn-batch-view" data-class="${b.className}" data-template="${b.templateName}" title="Filter papers table to ${b.className}">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                            View Papers (${b.total})
-                                        </button>
-                                        <button type="button" class="btn-batch-start" data-class="${b.className}" data-template="${b.templateName}" title="Start correcting papers in this batch">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                                            ${isCompleted ? 'Review' : 'Start Marking'}
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                        }).join('')}
+                            <h2 style="font-size: 1.25rem; font-weight: 700; margin: 0; color: #FFFFFF;">${currentBatch.templateName}</h2>
+                        </div>
+                        <div style="min-width: 200px;">
+                            <div style="display: flex; justify-content: space-between; font-size: 0.78rem; margin-bottom: 5px; color: #CBD5E1;">
+                                <span>Batch Progress</span>
+                                <strong>${currentBatch.corrected} / ${currentBatch.total} Evaluated (${batchPct}%)</strong>
+                            </div>
+                            <div style="height: 7px; background: rgba(255,255,255,0.15); border-radius: 999px; overflow: hidden;">
+                                <div style="width: ${batchPct}%; height: 100%; background: ${batchIsDone ? '#10B981' : 'linear-gradient(90deg, #38BDF8, #818CF8)'}; border-radius: 999px;"></div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Analytics Charts Section -->
-                <div class="analytics-charts-grid" style="margin-bottom: 24px;">
+                <!-- Analytics Charts Section for This Batch Alone -->
+                <div class="analytics-charts-grid" style="margin-bottom: 22px;">
                     <div class="chart-card">
                         <div class="chart-header">
                             <h4 class="chart-title">Score Distribution</h4>
@@ -453,45 +521,29 @@ class DashboardManager {
                     </div>
                 </div>
 
-                <!-- Main Evaluation Desk Section with Filters & Bulk Actions -->
+                <!-- Batch Student Papers Table & Actions -->
                 <div class="dashboard-main-section">
-                    <div class="section-top-bar" style="margin-bottom: 16px;">
+                    <div class="section-top-bar" style="margin-bottom: 14px;">
                         <div>
                             <h3 class="section-title">Student Papers & Evaluation Desk</h3>
-                            <p class="section-subtitle">Real-time roster of answer sheets. Filter by class or status, mark papers, and bulk export PDFs or Excel matrices.</p>
+                            <p class="section-subtitle">Showing answer sheets for ${currentBatch.className} — ${currentBatch.templateName}. Mark papers or bulk export results.</p>
                         </div>
                     </div>
 
                     <!-- Comprehensive Filter and Control Bar -->
-                    <div class="dash-filters-toolbar" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: #FFFFFF; padding: 14px 18px; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
-                        <!-- Left: Filter Dropdowns & Search Box -->
-                        <div class="dash-filters-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 300px;">
-                            <!-- Status Filter Dropdown -->
+                    <div class="dash-filters-toolbar" style="display: flex; align-items: center; justify-content: space-between; gap: 14px; flex-wrap: wrap; background: #FFFFFF; padding: 12px 16px; border-radius: 12px; border: 1px solid #E2E8F0; margin-bottom: 18px; box-shadow: 0 1px 3px rgba(0,0,0,0.03);">
+                        <div class="dash-filters-group" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap; flex: 1; min-width: 260px;">
                             <select id="dash-filter-status" class="form-select-sm" title="Filter by paper status" style="font-size: 0.85rem; font-weight: 600; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; cursor: pointer; min-width: 160px;">
-                                <option value="all" ${this.activeTab === 'all' ? 'selected' : ''}>All Papers (${totalCount})</option>
-                                <option value="uncorrected" ${this.activeTab === 'uncorrected' ? 'selected' : ''}>Uncorrected (${uncorrectedCount})</option>
-                                <option value="corrected" ${this.activeTab === 'corrected' ? 'selected' : ''}>Corrected (${correctedCount})</option>
+                                <option value="all" ${this.activeTab === 'all' ? 'selected' : ''}>All Papers (${currentBatch.total})</option>
+                                <option value="uncorrected" ${this.activeTab === 'uncorrected' ? 'selected' : ''}>Uncorrected (${currentBatch.uncorrected})</option>
+                                <option value="corrected" ${this.activeTab === 'corrected' ? 'selected' : ''}>Corrected (${currentBatch.corrected})</option>
                             </select>
 
-                            <!-- Subject Filter Dropdown -->
-                            <select id="dash-filter-subject" class="form-select-sm" title="Filter by subject" style="font-size: 0.85rem; font-weight: 500; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; cursor: pointer; min-width: 140px;">
-                                <option value="all">All Subjects</option>
-                                ${subjectList.map(sub => `<option value="${sub}" ${this.selectedSubjectFilter === sub ? 'selected' : ''}>${sub}</option>`).join("")}
-                            </select>
-
-                            <!-- Class Filter Dropdown -->
-                            <select id="dash-filter-class" class="form-select-sm" title="Filter by class" style="font-size: 0.85rem; font-weight: 500; height: 38px; padding: 0 12px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #1E293B; cursor: pointer; min-width: 130px;">
-                                <option value="all">All Classes</option>
-                                ${classList.map(cls => `<option value="${cls}" ${this.selectedClassFilter === cls ? 'selected' : ''}>${cls}</option>`).join("")}
-                            </select>
-
-                            <!-- Search Input -->
                             <div style="position: relative; flex: 1; min-width: 200px;">
-                                <input type="text" id="dash-search-input" class="form-input form-input-sm" value="${this.searchQuery}" placeholder="🔍 Search student or roll no..." style="width: 100%; height: 38px; padding: 0 12px; font-size: 0.85rem; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF;" />
+                                <input type="text" id="dash-search-input" class="form-input form-input-sm" value="${this.searchQuery}" placeholder="🔍 Search student or roll no in this batch..." style="width: 100%; height: 38px; padding: 0 12px; font-size: 0.85rem; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF;" />
                             </div>
                         </div>
 
-                        <!-- Right: Bulk Actions Aligned Group -->
                         <div class="dash-actions-group" style="display: flex; align-items: center; gap: 10px; flex-shrink: 0; flex-wrap: wrap;">
                             <button type="button" class="btn-secondary" id="dash-btn-bulk-pdf" title="Bulk download selected or all PDFs" style="background: #FFFFFF; border: 1.5px solid #007AFF; color: #007AFF; font-size: 0.84rem; font-weight: 600; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
                                 <span class="btn-icon" style="display: flex; align-items: center;">${ic.pdf || '📄'}</span> Bulk Download PDFs <span id="dash-pdf-count-badge" style="background: rgba(0, 122, 255, 0.12); padding: 2px 7px; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">(${this.selectedIds.size > 0 ? this.selectedIds.size : 'All ' + this.filteredEvaluations.length})</span>
@@ -708,21 +760,22 @@ class DashboardManager {
     }
 
     bindEvents() {
-        // Teacher Batch Cards Interactions
+        // Teacher Batch Cards Interactions -> Drill down into that batch
         this.container.querySelectorAll(".teacher-batch-card").forEach(card => {
             card.addEventListener("click", (e) => {
                 if (e.target.closest("button")) return;
                 const cls = card.getAttribute("data-class");
-                if (cls) {
-                    this.selectedClassFilter = (this.selectedClassFilter === cls) ? "all" : cls;
+                const tpl = card.getAttribute("data-template");
+                if (cls && tpl) {
+                    this.activeBatchKey = `${cls}:::${tpl}`;
+                    this.activeTab = "all";
+                    this.searchQuery = "";
+                    this.selectedIds.clear();
                     this.applyFilters();
-                    this.renderTableRows();
-                    this.updateCountsInUI();
-                    this.container.querySelectorAll(".teacher-batch-card").forEach(c => {
-                        c.classList.toggle("active", c.getAttribute("data-class") === this.selectedClassFilter);
-                    });
-                    const clsSelect = this.container.querySelector("#dash-filter-class");
-                    if (clsSelect) clsSelect.value = this.selectedClassFilter;
+                    this.render();
+                    this.bindEvents();
+                    this.renderCharts();
+                    window.scrollTo({ top: 0, behavior: "smooth" });
                 }
             });
         });
@@ -731,19 +784,49 @@ class DashboardManager {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();
                 const cls = btn.getAttribute("data-class");
-                this.selectedClassFilter = cls;
-                this.applyFilters();
-                this.renderTableRows();
-                this.updateCountsInUI();
-                this.container.querySelectorAll(".teacher-batch-card").forEach(c => {
-                    c.classList.toggle("active", c.getAttribute("data-class") === this.selectedClassFilter);
-                });
-                const clsSelect = this.container.querySelector("#dash-filter-class");
-                if (clsSelect) clsSelect.value = this.selectedClassFilter;
-                const tableSec = this.container.querySelector(".dashboard-main-section");
-                if (tableSec) tableSec.scrollIntoView({ behavior: "smooth", block: "start" });
+                const tpl = btn.getAttribute("data-template");
+                if (cls && tpl) {
+                    this.activeBatchKey = `${cls}:::${tpl}`;
+                    this.activeTab = "all";
+                    this.searchQuery = "";
+                    this.selectedIds.clear();
+                    this.applyFilters();
+                    this.render();
+                    this.bindEvents();
+                    this.renderCharts();
+                    window.scrollTo({ top: 0, behavior: "smooth" });
+                }
             });
         });
+
+        // Back to All Batches Button (in View 2)
+        const btnBackToBatches = this.container.querySelector("#btn-back-to-batches");
+        if (btnBackToBatches) {
+            btnBackToBatches.addEventListener("click", () => {
+                this.activeBatchKey = null;
+                this.activeTab = "all";
+                this.searchQuery = "";
+                this.selectedIds.clear();
+                this.applyFilters();
+                this.render();
+                this.bindEvents();
+                window.scrollTo({ top: 0, behavior: "smooth" });
+            });
+        }
+
+        // Batch Start Marking Button (in View 2)
+        const btnBatchStartMarking = this.container.querySelector("#btn-batch-start-marking");
+        if (btnBatchStartMarking) {
+            btnBatchStartMarking.addEventListener("click", () => {
+                const uncorrected = this.filteredEvaluations.find(e => !this.isPaperCorrected(e));
+                const target = uncorrected || this.filteredEvaluations[0];
+                if (target && this.options.onOpenEvaluation) {
+                    this.options.onOpenEvaluation(target);
+                } else if (target && window.app) {
+                    window.app.openWorkspace(target);
+                }
+            });
+        }
 
         this.container.querySelectorAll(".btn-batch-start").forEach(btn => {
             btn.addEventListener("click", (e) => {
@@ -1262,8 +1345,11 @@ class DashboardManager {
             // Refresh UI
             this.evaluations = await window.appStorage.getAllEvaluations();
             this.applyFilters();
-            this.renderTableRows();
-            this.updateCountsInUI();
+            this.render();
+            this.bindEvents();
+            if (this.activeBatchKey) {
+                this.renderCharts();
+            }
 
             if (window.appInstance && window.appInstance.showToast) {
                 window.appInstance.showToast(`Deleted ${deleted} paper(s) to optimize space.`, "success");
@@ -1367,11 +1453,20 @@ class DashboardManager {
             return;
         }
 
+        this.destroyCharts();
+
+        // Only render charts if user has drilled into a batch
+        if (!this.activeBatchKey) {
+            return;
+        }
+
+        const batchEvals = this.filteredEvaluations;
+
         // 1. Score Distribution Bar Chart
         const scoreDistCanvas = document.getElementById("chart-score-dist");
         if (scoreDistCanvas) {
             const ranges = { "< 50%": 0, "50-69%": 0, "70-84%": 0, "85-100%": 0 };
-            this.evaluations.forEach(e => {
+            batchEvals.forEach(e => {
                 const pct = (e.percentage !== undefined && e.percentage !== null)
                     ? Number(e.percentage)
                     : (Number(e.maxMarks) > 0 ? (Number(e.obtainedMarks || 0) / Number(e.maxMarks)) * 100 : 0);
@@ -1431,7 +1526,7 @@ class DashboardManager {
         const gradeCanvas = document.getElementById("chart-grade-dist");
         if (gradeCanvas) {
             const grades = { "A1": 0, "A2": 0, "B1": 0, "B2": 0, "C1": 0, "C2": 0, "D": 0, "E1": 0, "E2": 0 };
-            this.evaluations.forEach(e => {
+            batchEvals.forEach(e => {
                 let g = e.grade;
                 if (!g && e.obtainedMarks !== undefined && e.maxMarks && window.calculateGradeScale) {
                     g = window.calculateGradeScale(e.obtainedMarks, e.maxMarks).grade;
@@ -1490,7 +1585,7 @@ class DashboardManager {
         const qPerfCanvas = document.getElementById("chart-question-perf");
         if (qPerfCanvas) {
             const qStats = {};
-            this.evaluations.forEach(e => {
+            batchEvals.forEach(e => {
                 if (Array.isArray(e.questions)) {
                     e.questions.forEach((q, idx) => {
                         const qNum = q.qNo || (idx + 1);
