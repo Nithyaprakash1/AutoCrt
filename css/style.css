@@ -4735,7 +4735,7 @@ body {
     align-items: center;
     justify-content: space-between;
     height: 56px;
-    padding: 0 16px;
+    padding: 0 14px;
     border-bottom: 1px solid var(--border-color);
 }
 
@@ -4744,14 +4744,40 @@ body {
     align-items: center;
     cursor: pointer;
     overflow: hidden;
+    width: 100%;
+}
+
+.sidebar-cobrand-wrap {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
 }
 
 .sidebar-brand-full {
-    height: 28px;
+    height: 24px;
     width: auto;
-    max-width: 170px;
+    max-width: 95px;
     object-fit: contain;
     display: block;
+    flex-shrink: 0;
+}
+
+.sidebar-brand-divider {
+    width: 1px;
+    height: 18px;
+    background: var(--border-color);
+    flex-shrink: 0;
+}
+
+.sidebar-school-full {
+    height: 24px;
+    width: auto;
+    max-width: 110px;
+    object-fit: contain;
+    display: block;
+    border-radius: 4px;
+    flex-shrink: 1;
 }
 
 .sidebar-brand-mark {
@@ -4761,12 +4787,15 @@ body {
     display: none;
 }
 
-.app-sidebar.collapsed .sidebar-brand-full {
-    display: none;
+.app-sidebar.collapsed .sidebar-cobrand-wrap,
+.app-sidebar.collapsed .sidebar-brand-full,
+.app-sidebar.collapsed .sidebar-school-full {
+    display: none !important;
 }
 
 .app-sidebar.collapsed .sidebar-brand-mark {
-    display: block;
+    display: block !important;
+    margin: 0 auto;
 }
 
 .app-sidebar.collapsed .sidebar-header {

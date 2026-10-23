@@ -3761,6 +3761,9 @@ class AppController {
         const navSchoolFullImg = document.getElementById("navbar-school-full-img");
         if (navSchoolFullImg && schoolLogoFull) navSchoolFullImg.src = schoolLogoFull;
 
+        const sideSchoolFullImg = document.getElementById("sidebar-school-full-img");
+        if (sideSchoolFullImg && schoolLogoFull) sideSchoolFullImg.src = schoolLogoFull;
+
         const navSchoolMarkImg = document.getElementById("navbar-school-mark-img");
         if (navSchoolMarkImg && schoolLogoMark) navSchoolMarkImg.src = schoolLogoMark;
 
