@@ -1363,12 +1363,54 @@ class AppController {
         if (btnOpenSettings) {
             btnOpenSettings.addEventListener("click", () => this.switchView("settings"));
         }
+
+        // Top Navbar Profile Dropdown Toggle
+        const btnProfile = document.getElementById("btn-navbar-profile");
+        const profileDropdown = document.getElementById("profile-dropdown-menu");
+        if (btnProfile && profileDropdown) {
+            btnProfile.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const isOpen = profileDropdown.classList.toggle("active");
+                btnProfile.classList.toggle("active", isOpen);
+            });
+
+            document.addEventListener("click", (e) => {
+                if (!e.target.closest("#nav-profile-wrapper")) {
+                    profileDropdown.classList.remove("active");
+                    btnProfile.classList.remove("active");
+                }
+            });
+        }
+
+        const btnDropdownSettings = document.getElementById("dropdown-item-settings");
+        if (btnDropdownSettings) {
+            btnDropdownSettings.addEventListener("click", () => {
+                if (profileDropdown) profileDropdown.classList.remove("active");
+                if (btnProfile) btnProfile.classList.remove("active");
+                this.switchView("settings");
+            });
+        }
+
+        const btnDropdownLogout = document.getElementById("dropdown-item-logout");
+        if (btnDropdownLogout) {
+            btnDropdownLogout.addEventListener("click", () => {
+                if (profileDropdown) profileDropdown.classList.remove("active");
+                if (btnProfile) btnProfile.classList.remove("active");
+                if (window.appStorage) window.appStorage.setCurrentUser(null);
+                this.showPortalLoginScreen();
+            });
+        }
     }
 
     applySettingsToUI() {
         const user = window.appStorage ? window.appStorage.getCurrentUser() : null;
         const nameEl = document.getElementById("header-user-name");
         const avatarEl = document.getElementById("header-user-avatar");
+        const navNameEl = document.getElementById("navbar-user-name");
+        const navAvatarEl = document.getElementById("navbar-user-avatar");
+        const dropNameEl = document.getElementById("dropdown-user-name");
+        const dropAvatarEl = document.getElementById("dropdown-user-avatar");
+        const dropRoleEl = document.getElementById("dropdown-user-role");
         const sideNameEl = document.getElementById("side-user-name");
         const sideAvatarEl = document.getElementById("side-user-avatar");
         const sideRoleEl = document.querySelector(".user-role-label");
@@ -1381,8 +1423,13 @@ class AppController {
             : "--");
 
         if (nameEl) nameEl.textContent = name || "Sign In";
+        if (navNameEl) navNameEl.textContent = name || "Sign In";
+        if (dropNameEl) dropNameEl.textContent = name || "Sign In";
+        if (dropRoleEl) dropRoleEl.textContent = roleLabel;
         if (sideNameEl) sideNameEl.textContent = name || "Sign In";
         if (sideRoleEl) sideRoleEl.textContent = roleLabel;
+        if (navAvatarEl) navAvatarEl.textContent = initials;
+        if (dropAvatarEl) dropAvatarEl.textContent = initials;
         if (avatarEl) {
             avatarEl.textContent = initials;
             if (isSuper) {
@@ -2067,54 +2114,115 @@ class AppController {
             evaluation.pages = [CanvasEngine.generateDefaultLinedPageDataUrl(evaluation.studentName, evaluation.rollNo)];
         }
 
-        // Detect English or Physics paper template
-        const subLower = (evaluation.subject || "").toLowerCase();
-        const tmplLower = (evaluation.templateName || evaluation.examName || "").toLowerCase();
-        const isEnglish = subLower.includes("english") || tmplLower.includes("english") || (evaluation.questions && evaluation.questions.length === 13);
+        // Retrieve fresh custom subject catalog if available to find active template definition
+        let catalog = null;
+        if (window.appStorage) {
+            catalog = await window.appStorage.getSubjectCatalog();
+        }
+        if (!catalog && window.uploadPortal && window.uploadPortal.catalog) {
+            catalog = window.uploadPortal.catalog;
+        }
 
-        if (isEnglish && window.MockData && window.MockData.englishTemplate) {
-            const tmpl = window.MockData.englishTemplate;
-            evaluation.subject = "English";
-            evaluation.maxMarks = tmpl.maxMarks || 80;
-            evaluation.sections = JSON.parse(JSON.stringify(tmpl.sections));
-            if (!evaluation.examName) evaluation.examName = tmpl.name;
-
-            if (!evaluation.questions || evaluation.questions.length !== 13) {
-                evaluation.questions = JSON.parse(JSON.stringify(tmpl.questions));
-            } else {
-                evaluation.questions.forEach((q, idx) => {
-                    const templateQ = tmpl.questions[idx];
-                    if (templateQ) {
-                        q.qNo = templateQ.qNo;
-                        q.qNumber = templateQ.qNumber;
-                        q.label = templateQ.label || `Q${idx + 1}`;
-                        q.section = templateQ.section;
-                        q.sectionId = templateQ.sectionId;
-                        q.maxMarks = templateQ.maxMarks;
-                        q.topic = templateQ.topic;
+        let matchedTemplate = null;
+        if (catalog && Array.isArray(catalog)) {
+            for (const sub of catalog) {
+                if (Array.isArray(sub.templates)) {
+                    for (const tpl of sub.templates) {
+                        if (evaluation.templateId && tpl.id === evaluation.templateId) {
+                            matchedTemplate = tpl;
+                            break;
+                        }
+                        if (evaluation.templateName && (tpl.name === evaluation.templateName || tpl.examName === evaluation.templateName)) {
+                            matchedTemplate = tpl;
+                            break;
+                        }
+                        if (evaluation.examName && (tpl.examName === evaluation.examName || tpl.name === evaluation.examName)) {
+                            matchedTemplate = tpl;
+                            break;
+                        }
                     }
-                });
+                }
+                if (matchedTemplate) break;
             }
-        } else if ((!evaluation.questions || evaluation.questions.length === 0) && window.MockData && window.MockData.physicsTemplate) {
-            evaluation.questions = JSON.parse(JSON.stringify(window.MockData.physicsTemplate.questions));
-            evaluation.maxMarks = window.MockData.physicsTemplate.maxMarks || 70;
-            evaluation.sections = window.MockData.physicsTemplate.sections || evaluation.sections || [];
-        } else if (evaluation.questions && evaluation.questions.length === 33 && window.MockData && window.MockData.physicsTemplate) {
-            // Ensure 33 Qs Physics Board paper has full 5-section separation (Sections A to E)
-            const hasMissingSections = !evaluation.sections || evaluation.sections.length <= 1;
-            const hasCollapsedSectionIds = evaluation.questions.some((q, idx) => idx >= 16 && (!q.sectionId || q.sectionId === "sec_a"));
-            if (hasMissingSections || hasCollapsedSectionIds) {
-                evaluation.sections = JSON.parse(JSON.stringify(window.MockData.physicsTemplate.sections));
-                evaluation.maxMarks = 70;
-                evaluation.questions.forEach((q, idx) => {
-                    const templateQ = window.MockData.physicsTemplate.questions[idx];
-                    if (templateQ) {
-                        q.section = templateQ.section;
-                        q.sectionId = templateQ.sectionId;
-                        q.maxMarks = templateQ.maxMarks;
-                        if (!q.topic) q.topic = templateQ.topic;
-                    }
-                });
+        }
+
+        if (matchedTemplate) {
+            evaluation.templateId = matchedTemplate.id;
+            evaluation.templateName = matchedTemplate.name;
+            if (!evaluation.examName) evaluation.examName = matchedTemplate.examName || matchedTemplate.name;
+            evaluation.maxMarks = matchedTemplate.maxMarks || evaluation.maxMarks || 70;
+            evaluation.sections = JSON.parse(JSON.stringify(matchedTemplate.sections || []));
+
+            // Sync questions: update sections, maxMarks, subQuestions, choices, while keeping awardedMarks
+            const oldMarksMap = new Map();
+            (evaluation.questions || []).forEach(q => {
+                if (q.status && q.status !== "unmarked" && q.status !== "pending") {
+                    oldMarksMap.set(q.qNo, {
+                        awardedMarks: q.awardedMarks,
+                        status: q.status
+                    });
+                }
+            });
+
+            evaluation.questions = (matchedTemplate.questions || []).map(tq => {
+                const newQ = JSON.parse(JSON.stringify(tq));
+                if (oldMarksMap.has(newQ.qNo)) {
+                    const prev = oldMarksMap.get(newQ.qNo);
+                    newQ.awardedMarks = Math.min(Number(prev.awardedMarks) || 0, newQ.maxMarks);
+                    newQ.status = prev.status;
+                }
+                return newQ;
+            });
+        } else {
+            // Fallback for built-in or legacy demo templates (English or Physics)
+            const subLower = (evaluation.subject || "").toLowerCase();
+            const tmplLower = (evaluation.templateName || evaluation.examName || "").toLowerCase();
+            const isEnglish = subLower.includes("english") || tmplLower.includes("english") || (evaluation.questions && evaluation.questions.length === 13);
+
+            if (isEnglish && window.MockData && window.MockData.englishTemplate) {
+                const tmpl = window.MockData.englishTemplate;
+                evaluation.subject = "English";
+                evaluation.maxMarks = tmpl.maxMarks || 80;
+                evaluation.sections = JSON.parse(JSON.stringify(tmpl.sections));
+                if (!evaluation.examName) evaluation.examName = tmpl.name;
+
+                if (!evaluation.questions || evaluation.questions.length !== 13) {
+                    evaluation.questions = JSON.parse(JSON.stringify(tmpl.questions));
+                } else {
+                    evaluation.questions.forEach((q, idx) => {
+                        const templateQ = tmpl.questions[idx];
+                        if (templateQ) {
+                            q.qNo = templateQ.qNo;
+                            q.qNumber = templateQ.qNumber;
+                            q.label = templateQ.label || `Q${idx + 1}`;
+                            q.section = templateQ.section;
+                            q.sectionId = templateQ.sectionId;
+                            q.maxMarks = templateQ.maxMarks;
+                            q.topic = templateQ.topic;
+                        }
+                    });
+                }
+            } else if ((!evaluation.questions || evaluation.questions.length === 0) && window.MockData && window.MockData.physicsTemplate) {
+                evaluation.questions = JSON.parse(JSON.stringify(window.MockData.physicsTemplate.questions));
+                evaluation.maxMarks = window.MockData.physicsTemplate.maxMarks || 70;
+                evaluation.sections = window.MockData.physicsTemplate.sections || evaluation.sections || [];
+            } else if (evaluation.questions && evaluation.questions.length === 33 && window.MockData && window.MockData.physicsTemplate) {
+                // Ensure 33 Qs Physics Board paper has full 5-section separation (Sections A to E)
+                const hasMissingSections = !evaluation.sections || evaluation.sections.length <= 1;
+                const hasCollapsedSectionIds = evaluation.questions.some((q, idx) => idx >= 16 && (!q.sectionId || q.sectionId === "sec_a"));
+                if (hasMissingSections || hasCollapsedSectionIds) {
+                    evaluation.sections = JSON.parse(JSON.stringify(window.MockData.physicsTemplate.sections));
+                    evaluation.maxMarks = 70;
+                    evaluation.questions.forEach((q, idx) => {
+                        const templateQ = window.MockData.physicsTemplate.questions[idx];
+                        if (templateQ) {
+                            q.section = templateQ.section;
+                            q.sectionId = templateQ.sectionId;
+                            q.maxMarks = templateQ.maxMarks;
+                            if (!q.topic) q.topic = templateQ.topic;
+                        }
+                    });
+                }
             }
         }
 
@@ -3024,8 +3132,14 @@ class AppController {
 
     isPaperCorrected(e) {
         if (!e) return false;
-        // Strictly consider corrected only when teacher explicitly saved/evaluated it
-        return e.status === "Completed" || e.status === "Corrected" || e.status === "Graded" || e.status === "Evaluated";
+        const s = (e.status || "").toLowerCase().trim();
+        if (s === "completed" || s === "corrected" || s === "graded" || s === "evaluated") {
+            return true;
+        }
+        if (e.percentage !== undefined && e.percentage !== null && Number(e.percentage) > 0 && s !== "pending" && s !== "in progress") {
+            return true;
+        }
+        return false;
     }
 
     // --- Save & Next Student Navigation ---
@@ -3047,7 +3161,7 @@ class AppController {
         await this.saveActiveEvaluation(true);
 
         // 2. Scan queue for next paper
-        this.updateActionProgressModal(70, "Scanning evaluation queue for next student paper...");
+        this.updateActionProgressModal(70, "Scanning evaluation queue for next uncorrected paper...");
         const allEvaluations = await window.appStorage.getAllEvaluations();
 
         // Match current class/exam/subject or all assigned papers
@@ -3079,11 +3193,14 @@ class AppController {
         });
 
         const currentIdx = sorted.findIndex(e => String(e.id) === currentId);
-        let nextEval = (currentIdx >= 0 && currentIdx + 1 < sorted.length) ? sorted[currentIdx + 1] : null;
 
-        // If no paper strictly following current index, search for any remaining uncorrected paper in queue
-        if (!nextEval) {
-            nextEval = sorted.find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
+        // Find next UNCORRECTED paper strictly:
+        // 1. First search subsequent papers after currentIdx
+        let nextEval = sorted.slice(currentIdx + 1).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
+
+        // 2. If no uncorrected paper found after currentIdx, wrap around from beginning of queue
+        if (!nextEval && currentIdx > 0) {
+            nextEval = sorted.slice(0, currentIdx).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
         }
 
         // --- CASE 1: No next paper found (Queue is finished) ---
@@ -3604,21 +3721,21 @@ class AppController {
             <div style="background: #FFFFFF; border-radius: 16px; max-width: 440px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.22); overflow: hidden; border: 1px solid #E2E8F0;">
                 <div style="padding: 24px; text-align: center;">
                     <div style="width: 52px; height: 52px; border-radius: 50%; background: #FEF3C7; color: #D97706; display: flex; align-items: center; justify-content: center; margin: 0 auto 14px;">
-                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                             <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
                             <path d="M3 3v5h5"/>
                         </svg>
                     </div>
-                    <h3 style="font-size: 1.2rem; font-weight: 700; color: #0F172A; margin: 0 0 8px;">Reset Paper Evaluation?</h3>
-                    <p style="font-size: 0.88rem; color: #64748B; margin: 0 0 18px; line-height: 1.45;">
-                        Are you sure you want to reset this paper? All annotations, marks, and feedback on <strong>${ev.studentName || "this paper"}</strong> will be cleared and reset to fresh Pending state.
+                    <h3 style="font-size: 1.15rem; font-weight: 400 !important; color: #0F172A; margin: 0 0 8px;">Reset Paper Evaluation?</h3>
+                    <p style="font-size: 0.88rem; font-weight: 400 !important; color: #64748B; margin: 0 0 18px; line-height: 1.45;">
+                        Are you sure you want to reset this paper? All annotations, marks, and feedback on <span style="color: #0F172A;">${ev.studentName || "this paper"}</span> will be cleared and reset to fresh Pending state.
                     </p>
 
                     <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                        <button type="button" id="ws-btn-cancel-reset" style="flex: 1; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 600; font-size: 0.88rem; cursor: pointer; transition: all 0.15s ease;">
+                        <button type="button" id="ws-btn-cancel-reset" style="flex: 1; height: 42px; border-radius: 10px; border: 1px solid #CBD5E1; background: #FFFFFF; color: #475569; font-weight: 400 !important; font-size: 0.88rem; cursor: pointer; transition: all 0.15s ease;">
                             Cancel
                         </button>
-                        <button type="button" id="ws-btn-confirm-reset" style="flex: 1; height: 42px; border-radius: 10px; border: none; background: #D97706; color: #FFFFFF; font-weight: 600; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;">
+                        <button type="button" id="ws-btn-confirm-reset" style="flex: 1; height: 42px; border-radius: 10px; border: none; background: #D97706; color: #FFFFFF; font-weight: 400 !important; font-size: 0.88rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s ease;">
                             <span id="ws-btn-reset-text">Reset Paper</span>
                         </button>
                     </div>

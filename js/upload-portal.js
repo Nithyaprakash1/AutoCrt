@@ -3206,6 +3206,49 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
             if (window.appStorage) {
                 await window.appStorage.saveSubjectCatalog(this.catalog);
+
+                if (isEdit && targetItem) {
+                    try {
+                        const allEvals = await window.appStorage.getAllEvaluations();
+                        const matchingEvals = (allEvals || []).filter(e => 
+                            (targetItem.id && e.templateId === targetItem.id) ||
+                            (e.templateName && (e.templateName === targetItem.name || e.templateName === tplName)) ||
+                            (e.examName && (e.examName.includes(targetItem.name) || e.examName.includes(tplName)))
+                        );
+
+                        for (const ev of matchingEvals) {
+                            ev.templateId = targetItem.id;
+                            ev.templateName = targetItem.name;
+                            ev.examName = targetItem.examName || `${targetItem.name} 2026`;
+                            ev.maxMarks = targetItem.maxMarks;
+                            ev.sections = JSON.parse(JSON.stringify(targetItem.sections || []));
+
+                            const oldMarksMap = new Map();
+                            (ev.questions || []).forEach(q => {
+                                if (q.status && q.status !== "unmarked" && q.status !== "pending") {
+                                    oldMarksMap.set(q.qNo, {
+                                        awardedMarks: q.awardedMarks,
+                                        status: q.status
+                                    });
+                                }
+                            });
+
+                            ev.questions = (targetItem.questions || []).map(tq => {
+                                const newQ = JSON.parse(JSON.stringify(tq));
+                                if (oldMarksMap.has(newQ.qNo)) {
+                                    const prev = oldMarksMap.get(newQ.qNo);
+                                    newQ.awardedMarks = Math.min(Number(prev.awardedMarks) || 0, newQ.maxMarks);
+                                    newQ.status = prev.status;
+                                }
+                                return newQ;
+                            });
+
+                            await window.appStorage.saveEvaluation(ev);
+                        }
+                    } catch (e) {
+                        console.error("Error updating papers with modified template:", e);
+                    }
+                }
             }
 
             closeModal();
@@ -4803,7 +4846,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     sections: (template.sections && template.sections.length > 0)
                         ? JSON.parse(JSON.stringify(template.sections))
                         : (window.MockData?.physicsTemplate?.sections ? JSON.parse(JSON.stringify(window.MockData.physicsTemplate.sections)) : []),
-                    questions: (existingMatch && existingMatch.questions && existingMatch.questions.length > 0) ? existingMatch.questions : questions,
+                    questions: (existingMatch && existingMatch.templateId === template.id && existingMatch.questions && existingMatch.questions.length === questions.length) 
+                        ? existingMatch.questions 
+                        : JSON.parse(JSON.stringify(questions)),
                     createdAt: (existingMatch && existingMatch.createdAt) || new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
