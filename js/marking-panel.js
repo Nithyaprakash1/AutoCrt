@@ -259,7 +259,7 @@ class MarkingPanel {
         this.container.innerHTML = `
             <div class="marking-panel-content">
                 <!-- Prominent Score Banner -->
-                <div class="score-banner-card">
+                <div class="score-banner-card" id="score-banner-card">
                     <div class="score-main">
                         <span class="score-label">TOTAL MARKS</span>
                         <div class="score-numbers">
@@ -269,8 +269,11 @@ class MarkingPanel {
                         </div>
                     </div>
                     <div class="score-meta-pills">
-                        <span class="score-pill pill-percent" id="score-percent-val">0%</span>
-                        <span class="score-pill pill-grade" id="score-grade-val">--</span>
+                        <span class="score-pill pill-status status-pending" id="score-card-status-pill">Pending</span>
+                        <div class="score-meta-sub-pills">
+                            <span class="score-pill pill-percent" id="score-percent-val">0%</span>
+                            <span class="score-pill pill-grade" id="score-grade-val">--</span>
+                        </div>
                     </div>
                 </div>
 
@@ -1210,6 +1213,40 @@ class MarkingPanel {
                     }
                 }
             }
+
+            // Update Card background shimmer & "✓ All Graded" popper celebration
+            let unmarkedCount = 0;
+            this.questions.forEach(q => {
+                if (q.status === "unmarked" || q.status === "pending") unmarkedCount++;
+            });
+            const isAllGraded = this.questions.length > 0 && unmarkedCount === 0;
+
+            const card = this.container.querySelector("#score-banner-card") || this.container.querySelector(".score-banner-card");
+            const statusPill = this.container.querySelector("#score-card-status-pill");
+            const topScoreDisplay = document.querySelector(".ws-score-display");
+
+            if (isAllGraded) {
+                if (card) card.classList.add("all-graded-shimmer");
+                if (topScoreDisplay) topScoreDisplay.classList.add("all-graded-shimmer");
+                if (statusPill) {
+                    statusPill.textContent = "✓ All Graded";
+                    statusPill.className = "score-pill pill-status status-all-graded";
+                    statusPill.title = "All questions evaluated and graded!";
+                }
+                if (!this.wasAllGraded && this.questions.length > 0) {
+                    this.triggerAllGradedConfetti(card || topScoreDisplay);
+                }
+                this.wasAllGraded = true;
+            } else {
+                if (card) card.classList.remove("all-graded-shimmer");
+                if (topScoreDisplay) topScoreDisplay.classList.remove("all-graded-shimmer");
+                if (statusPill) {
+                    statusPill.textContent = `${unmarkedCount} Pending`;
+                    statusPill.className = "score-pill pill-status status-pending";
+                    statusPill.title = `${unmarkedCount} questions remain unmarked`;
+                }
+                this.wasAllGraded = false;
+            }
         }
 
         const summary = {
@@ -1250,6 +1287,111 @@ class MarkingPanel {
     setActiveQuestionMark(marks, forcedStatus = null) {
         this.assignCurrentQuestionMark(marks, forcedStatus);
     }
+
+    triggerAllGradedConfetti(anchorEl = null) {
+        let originX = window.innerWidth / 2;
+        let originY = window.innerHeight / 3;
+
+        if (anchorEl) {
+            const rect = anchorEl.getBoundingClientRect();
+            originX = rect.left + rect.width / 2;
+            originY = rect.top + rect.height / 2;
+        }
+
+        const container = document.createElement("div");
+        container.className = "popper-celebration-canvas";
+        document.body.appendChild(container);
+
+        const colors = ["#10B981", "#3B82F6", "#F59E0B", "#EC4899", "#8B5CF6", "#34D399", "#FFD700", "#06B6D4"];
+        const shapes = ["rect", "circle", "star"];
+        const particleCount = 48;
+        const particles = [];
+
+        for (let i = 0; i < particleCount; i++) {
+            const p = document.createElement("div");
+            p.className = "popper-particle";
+            const color = colors[Math.floor(Math.random() * colors.length)];
+            const shape = shapes[Math.floor(Math.random() * shapes.length)];
+            const size = Math.random() * 8 + 6;
+
+            p.style.width = `${size}px`;
+            p.style.height = shape === "rect" ? `${size * 1.8}px` : `${size}px`;
+            p.style.backgroundColor = shape === "star" ? "transparent" : color;
+            p.style.borderRadius = shape === "circle" ? "50%" : (shape === "rect" ? "2px" : "0");
+
+            if (shape === "star") {
+                p.innerHTML = `<svg width="${size * 1.5}" height="${size * 1.5}" viewBox="0 0 24 24" fill="${color}"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`;
+            }
+
+            p.style.position = "absolute";
+            p.style.left = `${originX}px`;
+            p.style.top = `${originY}px`;
+            p.style.pointerEvents = "none";
+
+            container.appendChild(p);
+
+            // Velocity: burst upward and outwards in a celebratory fan arc
+            const angle = (Math.random() * 150 + 195) * (Math.PI / 180);
+            const speed = Math.random() * 9 + 4;
+            const rotSpeed = (Math.random() - 0.5) * 22;
+
+            particles.push({
+                el: p,
+                x: originX,
+                y: originY,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                rotation: Math.random() * 360,
+                rotSpeed: rotSpeed,
+                opacity: 1,
+                decay: Math.random() * 0.015 + 0.014
+            });
+        }
+
+        let start = null;
+        function animateConfetti(ts) {
+            if (!start) start = ts;
+            const progress = ts - start;
+
+            let alive = false;
+            particles.forEach(p => {
+                p.x += p.vx;
+                p.y += p.vy;
+                p.vy += 0.22; // gravity pull
+                p.vx *= 0.98; // air resistance
+                p.rotation += p.rotSpeed;
+                p.opacity -= p.decay;
+
+                if (p.opacity > 0) {
+                    alive = true;
+                    p.el.style.transform = `translate3d(${p.x - originX}px, ${p.y - originY}px, 0) rotate(${p.rotation}deg)`;
+                    p.el.style.opacity = Math.max(0, p.opacity);
+                } else {
+                    p.el.style.opacity = "0";
+                }
+            });
+
+            if (alive && progress < 2200) {
+                requestAnimationFrame(animateConfetti);
+            } else {
+                if (container.parentNode) {
+                    container.parentNode.removeChild(container);
+                }
+            }
+        }
+        requestAnimationFrame(animateConfetti);
+
+        if (navigator.vibrate) {
+            try { navigator.vibrate([40, 25, 50]); } catch (e) {}
+        }
+    }
 }
 
 window.MarkingPanel = MarkingPanel;
+window.triggerAllGradedConfetti = function(anchorEl) {
+    if (window.app?.markingPanel) {
+        window.app.markingPanel.triggerAllGradedConfetti(anchorEl);
+    } else {
+        MarkingPanel.prototype.triggerAllGradedConfetti(anchorEl);
+    }
+};

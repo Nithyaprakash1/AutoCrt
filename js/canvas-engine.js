@@ -13,7 +13,8 @@ class CanvasEngine {
             onAnnotationsChange: null,
             onPageChange: null,
             onRadialMarkAwarded: null,
-            getActiveQuestionInfo: null
+            getActiveQuestionInfo: null,
+            onAnnotationSelected: null
         }, options);
 
         // Core state - Strict Teacher Red Ink for Ticks & Correction
@@ -809,6 +810,9 @@ class CanvasEngine {
         this.selectedAnnotation = ann;
         this.selectedAnnotations = [ann];
         this.updateSelectionOverlay();
+        if (typeof this.options?.onAnnotationSelected === "function") {
+            this.options.onAnnotationSelected(ann);
+        }
     }
 
     deselectAnnotation() {
@@ -829,8 +833,15 @@ class CanvasEngine {
         if (this.selectedAnnotations.length === 1) {
             this.selectedAnnotation = this.selectedAnnotations[0];
             this.updateSelectionOverlay();
+            if (typeof this.options?.onAnnotationSelected === "function") {
+                this.options.onAnnotationSelected(this.selectedAnnotation);
+            }
         } else if (this.selectedAnnotations.length > 1) {
             this.updateMultiSelectionOverlay();
+            const firstWithQ = this.selectedAnnotations.find(a => a.qNo || a.qLabel);
+            if (firstWithQ && typeof this.options?.onAnnotationSelected === "function") {
+                this.options.onAnnotationSelected(firstWithQ);
+            }
         } else {
             this.deselectAll();
         }
@@ -1310,8 +1321,8 @@ class CanvasEngine {
                 return;
             }
 
-            // If another tool is active, but clicked an existing annotation
-            if (hit && !["pen", "circle", "highlight", "underline", "arrow", "tick"].includes(this.currentTool)) {
+            // If another tool is active, but clicked an existing annotation or margin/marks stamp
+            if (hit && (["margin_mark", "left_mark", "marks"].includes(hit.type) || !["pen", "circle", "highlight", "underline", "arrow", "tick"].includes(this.currentTool))) {
                 this.selectAnnotation(hit);
                 this.isDraggingAnnotation = true;
                 this.dragStartNorm = { ...normPos };
@@ -2009,6 +2020,13 @@ class CanvasEngine {
     addAnnotation(ann) {
         const page = this.pages[this.currentPageIndex];
         if (!page) return;
+        if (!ann.qNo && typeof this.options?.getActiveQuestionInfo === "function") {
+            const qInfo = this.options.getActiveQuestionInfo();
+            if (qInfo && qInfo.qNo) {
+                ann.qNo = qInfo.qNo;
+                ann.qLabel = qInfo.label || `Q${qInfo.qNo}`;
+            }
+        }
         page.annotations.push(ann);
         page.undoStack.push({ action: "add", item: ann });
         page.redoStack = [];

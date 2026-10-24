@@ -2285,6 +2285,35 @@ class AppController {
                     const markDesc = numVal === 0 ? `0 Marks` : `+${numVal} Mark`;
                     this.showToast(`Placed ${markDesc} on paper (Current: ${activeQ.awardedMarks}/${activeQ.maxMarks}M). Press Enter to calculate & advance.`);
                 }
+            },
+            onAnnotationSelected: (ann) => {
+                if (!ann) return;
+                const rawQ = ann.qNo || ann.qLabel;
+                if (rawQ && this.markingPanel && Array.isArray(this.markingPanel.questions)) {
+                    const targetKey = CanvasEngine.normalizeQKey(rawQ);
+                    const idx = this.markingPanel.questions.findIndex(q => 
+                        CanvasEngine.normalizeQKey(q.qNo) === targetKey || 
+                        CanvasEngine.normalizeQKey(q.label) === targetKey || 
+                        CanvasEngine.normalizeQKey(q.id) === targetKey
+                    );
+                    if (idx >= 0) {
+                        this.markingPanel.selectQuestion(idx);
+
+                        // Highlight & scroll question row in side list
+                        const listRow = document.querySelector(`.q-row[data-index="${idx}"]`);
+                        if (listRow) {
+                            listRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                            listRow.classList.add("q-row-highlight-pulse");
+                            setTimeout(() => listRow.classList.remove("q-row-highlight-pulse"), 1200);
+                        }
+
+                        // Scroll breakdown row
+                        const bRow = document.querySelector(`.q-breakdown-row[data-index="${idx}"]`);
+                        if (bRow) {
+                            bRow.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                        }
+                    }
+                }
             }
         });
 
