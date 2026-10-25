@@ -37,13 +37,13 @@ p, span, div, strong, b, th, td, label, a,
    ========================================================================== */
 
 .ws-top-toolbar {
-    height: 56px;
+    height: 48px;
     background-color: #FFFFFF;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 14px;
+    padding: 0 12px;
     z-index: 50;
     box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
     flex-wrap: nowrap;
@@ -261,6 +261,31 @@ p, span, div, strong, b, th, td, label, a,
     align-items: center;
     gap: 6px;
     flex-shrink: 0 !important;
+}
+
+.ws-zoom-pct-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 44px;
+    height: 28px;
+    padding: 0 6px;
+    background: #F8FAFC;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    font-size: 0.72rem;
+    font-weight: 500;
+    color: var(--text-main);
+    font-family: var(--font-mono, monospace);
+    cursor: pointer;
+    user-select: none;
+    transition: all 0.15s ease;
+}
+
+.ws-zoom-pct-badge:hover {
+    background: #EFF6FF;
+    border-color: #0071E3;
+    color: #0071E3;
 }
 
 .btn-ws-tool {
@@ -506,39 +531,39 @@ p, span, div, strong, b, th, td, label, a,
    ========================================================================== */
 
 .ws-left-toolbar {
-    width: 88px;
+    width: 70px;
     background-color: #FFFFFF;
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
     align-items: center;
-    padding: 12px 6px;
-    gap: 8px;
+    padding: 8px 4px;
+    gap: 6px;
     overflow-y: auto;
     z-index: 40;
     box-shadow: 1px 0 3px rgba(0, 0, 0, 0.03);
 }
 
 .tool-category-title {
-    font-size: 0.65rem;
+    font-size: 0.62rem;
     font-weight: 400;
     text-transform: uppercase;
     color: var(--text-light);
     letter-spacing: 0.05em;
-    margin: 4px 0 2px;
+    margin: 3px 0 1px;
 }
 
 .tool-button {
-    width: 74px;
-    height: 56px;
+    width: 60px;
+    height: 48px;
     background-color: #FFFFFF;
     border: 1.5px solid #F1F5F9;
-    border-radius: var(--radius-md);
+    border-radius: var(--radius-sm, 8px);
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     cursor: pointer;
     transition: all 0.15s ease;
     user-select: none;
@@ -1376,13 +1401,14 @@ p, span, div, strong, b, th, td, label, a,
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-    padding: 8px 16px;
+    padding: 4px 14px;
+    min-height: 40px;
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 12px;
+    gap: 8px;
     z-index: 45;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
     overflow-x: auto;
     white-space: nowrap;
 }

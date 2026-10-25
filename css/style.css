@@ -13,6 +13,11 @@ p, span, div, strong, b, th, td, label, a,
     font-weight: 400 !important;
 }
 
+html {
+    font-size: 14px;
+    -webkit-text-size-adjust: 100%;
+}
+
 /* ==========================================================================
    Niprak Digital Correction - Apple Cupertino / Human Interface Design Theme
    ========================================================================== */
@@ -5960,6 +5965,132 @@ body {
     color: #FFFFFF;
     border-color: #16A34A;
     transform: translateY(-1px);
+}
+
+/* --- Logout Confirmation Dialog (Apple Style) --- */
+.logout-confirm-dialog {
+    max-width: 440px;
+    width: 90%;
+    border-radius: 18px;
+    background: #FFFFFF;
+    box-shadow: 0 20px 48px -8px rgba(0, 0, 0, 0.18), 0 8px 16px -4px rgba(0, 0, 0, 0.08);
+    border: 1px solid var(--border-color);
+    padding: 0;
+    overflow: hidden;
+}
+
+.logout-dialog-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 24px 20px 14px;
+    position: relative;
+}
+
+.logout-icon-ring {
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    background: #FEE2E2;
+    color: #DC2626;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+    box-shadow: 0 2px 8px rgba(220, 38, 38, 0.15);
+}
+
+.logout-dialog-title {
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: var(--text-main, #0F172A);
+    margin: 0 0 6px 0;
+}
+
+.logout-dialog-sub {
+    font-size: 0.82rem;
+    font-weight: 400 !important;
+    color: var(--text-muted, #64748B);
+    margin: 0;
+    line-height: 1.45;
+    max-width: 340px;
+}
+
+.logout-user-card {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin: 4px 24px 16px;
+    padding: 10px 14px;
+    background: #F8FAFC;
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+}
+
+.logout-avatar-circle {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #4F46E5, #6366F1);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.82rem;
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.logout-user-details {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    text-align: left;
+}
+
+.logout-user-name {
+    font-size: 0.88rem;
+    font-weight: 500;
+    color: var(--text-main, #0F172A);
+}
+
+.logout-user-role {
+    font-size: 0.74rem;
+    font-weight: 400 !important;
+    color: var(--text-muted, #64748B);
+}
+
+.logout-dialog-footer {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    padding: 14px 24px;
+    background: #FAFAFC;
+    border-top: 1px solid var(--border-color);
+}
+
+.btn-danger-logout {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 18px;
+    background: #DC2626;
+    color: #FFFFFF;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 400 !important;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(220, 38, 38, 0.3);
+}
+
+.btn-danger-logout:hover {
+    background: #B91C1C;
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(220, 38, 38, 0.35);
 }
 
 /* 6. Responsive Nav Breakpoints */

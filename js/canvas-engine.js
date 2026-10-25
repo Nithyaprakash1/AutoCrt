@@ -542,19 +542,27 @@ class CanvasEngine {
     }
 
     setZoom(newZoom) {
-        this.zoom = Math.max(0.25, Math.min(3.0, newZoom));
+        this.zoom = Math.max(0.20, Math.min(3.0, newZoom));
         this.updateCanvasDimensions();
         this.renderAll();
+        this.updateZoomIndicator();
+    }
+
+    updateZoomIndicator() {
+        const badge = document.getElementById("ws-zoom-pct-badge");
+        if (badge) {
+            badge.textContent = `${Math.round(this.zoom * 100)}%`;
+        }
     }
 
     zoomIn() {
         this._hasUserZoomed = true;
-        this.setZoom(this.zoom + 0.15);
+        this.setZoom(this.zoom + 0.10);
     }
 
     zoomOut() {
         this._hasUserZoomed = true;
-        this.setZoom(this.zoom - 0.15);
+        this.setZoom(this.zoom - 0.10);
     }
 
     fitToWidth() {
@@ -562,16 +570,15 @@ class CanvasEngine {
         const page = this.pages[this.currentPageIndex];
         if (!page) return;
 
-        const pad = 48;
-        let availableWidth = (this.container.clientWidth || 0) - pad;
-        if (availableWidth < 200) {
-            const stage = document.getElementById("ws-viewport-container");
-            availableWidth = (stage?.clientWidth || window.innerWidth - 380) - pad;
-        }
+        const stage = document.getElementById("ws-viewport-container");
+        const stageWidth = stage?.clientWidth || this.container.clientWidth || (window.innerWidth - 350);
+
+        const padX = 48;
+        const availableWidth = Math.max(120, stageWidth - padX);
 
         if (availableWidth > 150 && page.origWidth > 0) {
-            const targetZoom = availableWidth / page.origWidth;
-            this.setZoom(Math.max(0.3, Math.min(2.5, targetZoom)));
+            const targetZoom = (availableWidth / page.origWidth) * 0.95;
+            this.setZoom(Math.max(0.25, Math.min(2.5, targetZoom)));
         }
     }
 
@@ -580,18 +587,16 @@ class CanvasEngine {
         const page = this.pages[this.currentPageIndex];
         if (!page) return;
 
-        const padX = 48;
-        const padY = 48;
-        let availableWidth = (this.container.clientWidth || 0) - padX;
-        let availableHeight = (this.container.clientHeight || 0) - padY;
-
         const stage = document.getElementById("ws-viewport-container");
-        if (availableWidth < 200) {
-            availableWidth = (stage?.clientWidth || window.innerWidth - 380) - padX;
-        }
-        if (availableHeight < 200) {
-            availableHeight = (stage?.clientHeight || window.innerHeight - 150) - padY;
-        }
+        const stageWidth = stage?.clientWidth || this.container.clientWidth || (window.innerWidth - 350);
+        const stageHeight = stage?.clientHeight || this.container.clientHeight || (window.innerHeight - 130);
+
+        // Leaves comfortable margins so paper does NOT touch edges or hide under bottom floating pager
+        const padX = 56;
+        const padY = 96; // 48px top + 48px bottom for floating pager
+
+        const availableWidth = Math.max(120, stageWidth - padX);
+        const availableHeight = Math.max(120, stageHeight - padY);
 
         const origW = page.origWidth || 1200;
         const origH = page.origHeight || 1650;
@@ -599,8 +604,9 @@ class CanvasEngine {
         if (origW > 0 && origH > 0 && availableWidth > 100 && availableHeight > 100) {
             const zoomW = availableWidth / origW;
             const zoomH = availableHeight / origH;
-            const targetZoom = Math.min(zoomW, zoomH);
-            this.setZoom(Math.max(0.3, Math.min(2.0, targetZoom)));
+            // 90% comfortable fit factor ensures the entire paper page is beautifully framed & 100% visible on screen without scrolling
+            const targetZoom = Math.min(zoomW, zoomH) * 0.90;
+            this.setZoom(Math.max(0.20, Math.min(2.0, targetZoom)));
         }
     }
 
@@ -1530,6 +1536,18 @@ class CanvasEngine {
         this.overlayCanvas.addEventListener("touchstart", onDown, { passive: false });
         window.addEventListener("touchmove", onMove, { passive: false });
         window.addEventListener("touchend", onUp, { passive: false });
+
+        // Smooth Canvas Zooming via Ctrl + Mouse Wheel
+        this.container.addEventListener("wheel", (e) => {
+            if (e.ctrlKey) {
+                e.preventDefault();
+                if (e.deltaY < 0) {
+                    this.zoomIn();
+                } else {
+                    this.zoomOut();
+                }
+            }
+        }, { passive: false });
     }
 
     startDrawing(pos) {

@@ -1266,8 +1266,7 @@ class AppController {
 
         // Header, Sidebar & Mobile Logout / Change Desk button
         const handleLogout = () => {
-            if (window.appStorage) window.appStorage.setCurrentUser(null);
-            this.showPortalLoginScreen();
+            this.showLogoutConfirmationModal();
         };
         const btnLogout = document.getElementById("btn-header-logout");
         if (btnLogout) btnLogout.addEventListener("click", handleLogout);
@@ -1398,8 +1397,7 @@ class AppController {
             btnDropdownLogout.addEventListener("click", () => {
                 if (profileDropdown) profileDropdown.classList.remove("active");
                 if (btnProfile) btnProfile.classList.remove("active");
-                if (window.appStorage) window.appStorage.setCurrentUser(null);
-                this.showPortalLoginScreen();
+                this.showLogoutConfirmationModal();
             });
         }
     }
@@ -1842,6 +1840,93 @@ class AppController {
 
         modal.style.display = "flex";
         modal.classList.add("active");
+    }
+
+    showLogoutConfirmationModal() {
+        const modal = document.getElementById("modal-confirm-logout");
+        if (!modal) {
+            if (window.appStorage) window.appStorage.setCurrentUser(null);
+            this.showPortalLoginScreen();
+            return;
+        }
+
+        const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        const userName = currentUser?.name || currentUser?.username || "Evaluator";
+        const role = currentUser?.role || "evaluator";
+        const isSuper = currentUser && (currentUser.role === 'super_admin' || (currentUser.email && currentUser.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
+        const roleLabel = isSuper ? "👑 Super Admin (Owner)" : (currentUser?.roleLabel || (role.charAt(0).toUpperCase() + role.slice(1).replace("_", " ") + " Desk"));
+
+        // Format initials for avatar
+        const initials = isSuper ? "NP" : (userName
+            .split(" ")
+            .filter(Boolean)
+            .map(w => w[0].toUpperCase())
+            .slice(0, 2)
+            .join("") || "U");
+
+        const nameEl = document.getElementById("logout-user-name");
+        const roleEl = document.getElementById("logout-user-role");
+        const avatarEl = document.getElementById("logout-user-avatar");
+
+        if (nameEl) nameEl.textContent = userName;
+        if (roleEl) roleEl.textContent = roleLabel;
+        if (avatarEl) {
+            avatarEl.textContent = initials;
+            if (isSuper) {
+                avatarEl.style.background = "linear-gradient(135deg, #AF52DE, #5856D6)";
+                avatarEl.style.color = "#FFFFFF";
+            } else {
+                avatarEl.style.background = "linear-gradient(135deg, #007AFF, #5856D6)";
+                avatarEl.style.color = "#FFFFFF";
+            }
+        }
+
+        // Display modal
+        modal.style.display = "flex";
+        requestAnimationFrame(() => modal.classList.add("active"));
+
+        const closeModal = () => {
+            modal.classList.remove("active");
+            setTimeout(() => {
+                modal.style.display = "none";
+            }, 200);
+        };
+
+        const btnClose = document.getElementById("btn-close-logout-modal");
+        const btnCancel = document.getElementById("btn-cancel-logout");
+        const btnConfirm = document.getElementById("btn-confirm-logout");
+
+        if (btnClose) btnClose.onclick = closeModal;
+        if (btnCancel) btnCancel.onclick = closeModal;
+
+        // Dismiss on clicking backdrop
+        modal.onclick = (e) => {
+            if (e.target === modal) closeModal();
+        };
+
+        if (btnConfirm) {
+            btnConfirm.onclick = async () => {
+                closeModal();
+
+                // If user is inside active evaluation workspace, safely auto-persist changes
+                if (this.activeEvaluation && this.currentView === "workspace") {
+                    try {
+                        await this.saveActiveEvaluation(false);
+                        this.stopAutosave();
+                    } catch (e) {
+                        console.warn("Autosave before logout:", e);
+                    }
+                    this.activeEvaluation = null;
+                }
+
+                if (window.appStorage) {
+                    window.appStorage.setCurrentUser(null);
+                }
+
+                this.showPortalLoginScreen();
+                this.showToast("Logged out successfully. See you again!", "info");
+            };
+        }
     }
 
     applySettingsToUI() {
@@ -3060,6 +3145,21 @@ class AppController {
 
         const btnFitP = document.getElementById("ws-btn-fit-page");
         if (btnFitP) btnFitP.addEventListener("click", () => this.canvasEngine?.fitToPage());
+
+        const zoomBadge = document.getElementById("ws-zoom-pct-badge");
+        if (zoomBadge) {
+            zoomBadge.addEventListener("click", () => {
+                if (!this.canvasEngine) return;
+                const cur = Math.round(this.canvasEngine.zoom * 100);
+                if (Math.abs(cur - 100) < 6) {
+                    this.canvasEngine.fitToPage();
+                } else if (Math.abs(cur - 85) < 6) {
+                    this.canvasEngine.setZoom(1.0);
+                } else {
+                    this.canvasEngine.setZoom(0.85);
+                }
+            });
+        }
 
         const btnFullscreen = document.getElementById("ws-btn-fullscreen");
         if (btnFullscreen) {
