@@ -12643,6 +12643,129 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     color: var(--text-muted);
 }
 
+/* Oversight KPI Quick Filter Cards */
+.admin-oversight-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    gap: 16px;
+    margin-bottom: 22px;
+}
+
+.admin-oversight-card {
+    background: var(--bg-card, #FFFFFF);
+    border: 1.5px solid var(--border-color, #E2E8F0);
+    border-radius: 16px;
+    padding: 16px 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    position: relative;
+    user-select: none;
+}
+
+.admin-oversight-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-sm, 0 4px 12px rgba(0, 0, 0, 0.05));
+    border-color: #CBD5E1;
+}
+
+.admin-oversight-card.active-all {
+    border-color: #007AFF !important;
+    background: linear-gradient(135deg, rgba(0, 122, 255, 0.05), rgba(0, 122, 255, 0.02)) !important;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15) !important;
+}
+
+.admin-oversight-card.active-corrected {
+    border-color: #16A34A !important;
+    background: linear-gradient(135deg, rgba(22, 163, 74, 0.06), rgba(22, 163, 74, 0.02)) !important;
+    box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.18) !important;
+}
+
+.admin-oversight-card.active-pending {
+    border-color: #D97706 !important;
+    background: linear-gradient(135deg, rgba(217, 119, 6, 0.06), rgba(217, 119, 6, 0.02)) !important;
+    box-shadow: 0 0 0 3px rgba(217, 119, 6, 0.18) !important;
+}
+
+.admin-oversight-card .kpi-icon-wrap {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.admin-oversight-card .kpi-icon-wrap.all {
+    background: rgba(0, 122, 255, 0.1);
+    color: #007AFF;
+}
+
+.admin-oversight-card .kpi-icon-wrap.corrected {
+    background: rgba(22, 163, 74, 0.12);
+    color: #16A34A;
+}
+
+.admin-oversight-card .kpi-icon-wrap.pending {
+    background: rgba(217, 119, 6, 0.12);
+    color: #D97706;
+}
+
+.admin-oversight-card .kpi-details {
+    flex: 1;
+    min-width: 0;
+}
+
+.admin-oversight-card .kpi-label {
+    font-size: 0.82rem;
+    font-weight: 500;
+    color: var(--text-muted, #64748B);
+    display: block;
+    margin-bottom: 2px;
+}
+
+.admin-oversight-card .kpi-value {
+    font-size: 1.65rem;
+    font-weight: 500;
+    color: var(--text-main, #0F172A);
+    line-height: 1.1;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", sans-serif;
+}
+
+.admin-oversight-card .kpi-sub {
+    font-size: 0.72rem;
+    color: var(--text-muted, #94A3B8);
+    display: block;
+    margin-top: 3px;
+}
+
+.admin-oversight-card .kpi-active-pill {
+    position: absolute;
+    top: 10px;
+    right: 12px;
+    font-size: 0.68rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    background: rgba(22, 163, 74, 0.15);
+    color: #16A34A;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.admin-oversight-card .kpi-active-pill.pending {
+    background: rgba(217, 119, 6, 0.15);
+    color: #D97706;
+}
+
+.admin-oversight-card .kpi-active-pill.all {
+    background: rgba(0, 122, 255, 0.15);
+    color: #007AFF;
+}
+
 /* Quick Filter Tabs (All / Corrected / Pending) */
 .admin-tab-nav {
     display: inline-flex;

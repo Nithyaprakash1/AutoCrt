@@ -384,31 +384,77 @@ class AdminPanelManager {
 
                 <!-- Section 2: Detailed Corrected Papers & Evaluation Oversight Table -->
                 <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 30px;">
-                    <!-- Filter Toolbar -->
-                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
-                        <div>
-                            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
-                                <h2 style="font-size: 1.15rem; font-weight: 400; color: var(--text-main); margin: 0;">Evaluation Records &amp; Student Oversight</h2>
-                                
-                                <!-- Quick Status Filter Tabs (One-click toggle between All, Corrected Only, Pending Only) -->
-                                <div class="admin-tab-nav" id="admin-status-tab-nav">
-                                    <button type="button" class="admin-tab-btn ${this.statusFilter === 'all' ? 'active' : ''}" data-status="all">
-                                        <span>All Papers</span>
-                                        <span class="admin-tab-count-pill">${totalUploadedCount}</span>
-                                    </button>
-                                    <button type="button" class="admin-tab-btn ${this.statusFilter === 'corrected' ? 'active' : ''}" data-status="corrected">
-                                        <span style="color: #16A34A;">✓ Corrected</span>
-                                        <span class="admin-tab-count-pill">${totalCorrectedCount}</span>
-                                    </button>
-                                    <button type="button" class="admin-tab-btn ${this.statusFilter === 'pending' ? 'active' : ''}" data-status="pending">
-                                        <span style="color: #D97706;">◐ Need To Do</span>
-                                        <span class="admin-tab-count-pill">${totalPendingCount}</span>
-                                    </button>
-                                </div>
+                    <!-- Section Title -->
+                    <div style="margin-bottom: 16px;">
+                        <h2 style="font-size: 1.25rem; font-weight: 400; color: var(--text-main); margin: 0 0 4px;">Evaluation Records &amp; Student Oversight</h2>
+                        <p style="font-size: 0.84rem; color: var(--text-muted); margin: 0;">Click on <strong>✓ Corrected</strong> or <strong>◐ Need To Do</strong> below to filter the paper evaluation records in real time.</p>
+                    </div>
+
+                    <!-- Prominent Interactive KPI Filter Cards (Requested by User) -->
+                    <div class="admin-oversight-kpi-row" id="admin-kpi-filter-cards">
+                        <!-- Total Answer Sheets -->
+                        <div class="admin-oversight-card ${this.statusFilter === 'all' ? 'active-all' : ''}" data-status="all" role="button" title="Show All Evaluation Papers">
+                            <div class="kpi-icon-wrap all">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                             </div>
-                            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0;">
-                                Select any student row or click <strong>View Student 360</strong> to inspect that student's complete marks across all other subjects.
-                            </p>
+                            <div class="kpi-details">
+                                <span class="kpi-label">Total Answer Papers</span>
+                                <div class="kpi-value">${totalUploadedCount}</div>
+                                <span class="kpi-sub">All subjects ingested</span>
+                            </div>
+                            ${this.statusFilter === 'all' ? '<span class="kpi-active-pill all">Active</span>' : ''}
+                        </div>
+
+                        <!-- ✓ Corrected -->
+                        <div class="admin-oversight-card ${this.statusFilter === 'corrected' ? 'active-corrected' : ''}" data-status="corrected" role="button" title="Click to view only Corrected papers">
+                            <div class="kpi-icon-wrap corrected">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                            </div>
+                            <div class="kpi-details">
+                                <span class="kpi-label" style="color: #16A34A; font-weight: 600;">✓ Corrected</span>
+                                <div class="kpi-value" style="color: #16A34A;">${totalCorrectedCount}</div>
+                                <span class="kpi-sub" style="color: #16A34A;">Graded &amp; finalized</span>
+                            </div>
+                            ${this.statusFilter === 'corrected' ? '<span class="kpi-active-pill">Showing Only</span>' : '<span style="font-size: 0.72rem; color: #16A34A; position: absolute; top: 12px; right: 14px; font-weight: 500;">Click to View →</span>'}
+                        </div>
+
+                        <!-- ◐ Need To Do -->
+                        <div class="admin-oversight-card ${this.statusFilter === 'pending' ? 'active-pending' : ''}" data-status="pending" role="button" title="Click to view papers pending teacher evaluation">
+                            <div class="kpi-icon-wrap pending">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            </div>
+                            <div class="kpi-details">
+                                <span class="kpi-label" style="color: #D97706; font-weight: 600;">◐ Need To Do</span>
+                                <div class="kpi-value" style="color: #D97706;">${totalPendingCount}</div>
+                                <span class="kpi-sub" style="color: #D97706;">Pending evaluation</span>
+                            </div>
+                            ${this.statusFilter === 'pending' ? '<span class="kpi-active-pill pending">Showing Only</span>' : '<span style="font-size: 0.72rem; color: #D97706; position: absolute; top: 12px; right: 14px; font-weight: 500;">Click to View →</span>'}
+                        </div>
+                    </div>
+
+                    <!-- Filter Toolbar -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color);">
+                        <div>
+                            <!-- Dynamic Filter Status Banner -->
+                            <div>
+                                ${this.statusFilter === 'corrected' ? `
+                                    <span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem;">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                        Showing ${filteredPapers.length} Corrected Papers (${totalCorrectedCount} Graded)
+                                    </span>
+                                    <button type="button" class="btn-reset-filter-link" data-status="all" style="margin-left: 10px; background: none; border: none; color: #007AFF; font-size: 0.8rem; text-decoration: underline; cursor: pointer;">Show All Papers</button>
+                                ` : (this.statusFilter === 'pending' ? `
+                                    <span style="color: #D97706; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem;">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                        Showing ${filteredPapers.length} Papers Needing Evaluation (${totalPendingCount} Need To Do)
+                                    </span>
+                                    <button type="button" class="btn-reset-filter-link" data-status="all" style="margin-left: 10px; background: none; border: none; color: #007AFF; font-size: 0.8rem; text-decoration: underline; cursor: pointer;">Show All Papers</button>
+                                ` : `
+                                    <span style="color: var(--text-muted); font-size: 0.85rem;">
+                                        Showing All ${filteredPapers.length} Papers (${totalCorrectedCount} Corrected • ${totalPendingCount} Need To Do)
+                                    </span>
+                                `)}
+                            </div>
                         </div>
 
                         <!-- Search & Dropdown Filters -->
@@ -506,6 +552,25 @@ class AdminPanelManager {
 
     bindEvents() {
         if (!this.container) return;
+
+        // Clickable Oversight KPI filter cards (Total, ✓ Corrected, ◐ Need To Do)
+        this.container.querySelectorAll(".admin-oversight-card").forEach(card => {
+            card.addEventListener("click", () => {
+                const targetStatus = card.getAttribute("data-status");
+                if (targetStatus) {
+                    this.statusFilter = targetStatus;
+                    this.render();
+                }
+            });
+        });
+
+        // "Show All Papers" reset buttons in filter banner
+        this.container.querySelectorAll(".btn-reset-filter-link").forEach(btn => {
+            btn.addEventListener("click", () => {
+                this.statusFilter = "all";
+                this.render();
+            });
+        });
 
         // Quick Filter Tabs (All / Corrected / Pending)
         const tabNav = this.container.querySelector("#admin-status-tab-nav");
