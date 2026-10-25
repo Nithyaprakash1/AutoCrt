@@ -382,6 +382,12 @@ class UploadedPapersPageManager {
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                                 <span>View Papers (${b.total})</span>
                                             </button>
+                                            ${isCompleted ? `
+                                                <button type="button" class="btn-batch-cleanup-scans" data-batch-key="${b.key}" title="Optimize storage by clearing heavy raw PDF scans while preserving marks">
+                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/></svg>
+                                                    <span>Clean Scans</span>
+                                                </button>
+                                            ` : ''}
                                             <button type="button" class="btn-batch-delete" data-batch-key="${b.key}" title="Delete Batch">
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                                             </button>
@@ -411,6 +417,12 @@ class UploadedPapersPageManager {
                                     <button type="button" class="btn-papers-secondary btn-papers-bulk-delete" id="btn-papers-bulk-delete" title="Delete selected papers" style="color: #DC2626; border-color: #DC2626;">
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                         <span>Delete Selected (${this.selectedIds.size})</span>
+                                    </button>
+                                ` : ''}
+                                ${activeBatchObj.pending === 0 && activeBatchObj.total > 0 ? `
+                                    <button type="button" class="btn-batch-cleanup-scans" data-batch-key="${activeBatchObj.key}" title="Optimize storage by clearing heavy raw PDF scans while preserving marks">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/></svg>
+                                        <span>Clean Scans</span>
                                     </button>
                                 ` : ''}
                                 <button type="button" class="btn-papers-secondary btn-batch-delete-active" data-batch-key="${activeBatchObj.key}" title="Delete this whole batch" style="color: #DC2626; border-color: #DC2626;">
@@ -706,6 +718,27 @@ class UploadedPapersPageManager {
                 const targetBatch = batches.find(b => b.key === key);
                 if (targetBatch) {
                     this.showBatchDeleteModal(targetBatch);
+                }
+            });
+        });
+
+        // Batch Card: Clean Scans Storage Optimization
+        this.container.querySelectorAll(".btn-batch-cleanup-scans").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const key = btn.getAttribute("data-batch-key");
+                const batches = this.computeBatches();
+                const targetBatch = batches.find(b => b.key === key);
+                if (targetBatch && window.app && typeof window.app.showCleanupConfirmationModal === "function") {
+                    window.app.showCleanupConfirmationModal({
+                        subject: targetBatch.subject,
+                        className: targetBatch.className,
+                        examName: targetBatch.templateName,
+                        paperIds: targetBatch.papers.map(p => p.id),
+                        paperCount: targetBatch.total,
+                        potentialSavingsBytes: Math.round(targetBatch.totalBytes * 0.98),
+                        potentialSavingsFormatted: this.formatBytes(Math.round(targetBatch.totalBytes * 0.98))
+                    });
                 }
             });
         });

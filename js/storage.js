@@ -13,6 +13,7 @@ class StorageService {
         this.memoryStore = [];
         this.pdfCacheMap = new Map();
         this.deletedEvaluations = this._loadDeletedIds();
+        this.notifications = this._loadNotifications();
         this.readyPromise = this.init();
     }
 
@@ -204,6 +205,101 @@ class StorageService {
                 localStorage.setItem("onespace_deleted_ids", json);
             } catch (e) {}
         }
+    }
+
+    _loadNotifications() {
+        try {
+            const raw = localStorage.getItem("niprak_notifications") || localStorage.getItem("onespace_notifications");
+            if (raw) {
+                const parsed = JSON.parse(raw);
+                if (Array.isArray(parsed)) return parsed;
+            }
+        } catch (e) {}
+        return [];
+    }
+
+    async getNotifications() {
+        const list = this._loadNotifications();
+        return list.sort((a, b) => new Date(b.timestamp || 0) - new Date(a.timestamp || 0));
+    }
+
+    async saveNotification(notif) {
+        if (!notif || !notif.id) return notif;
+        let list = this._loadNotifications();
+        const existingIdx = list.findIndex(n => n.id === notif.id);
+        if (existingIdx >= 0) {
+            list[existingIdx] = { ...list[existingIdx], ...notif };
+        } else {
+            list.unshift(notif);
+        }
+        // Limit to latest 60 notifications
+        if (list.length > 60) list = list.slice(0, 60);
+        try {
+            const json = JSON.stringify(list);
+            localStorage.setItem("niprak_notifications", json);
+            localStorage.setItem("onespace_notifications", json);
+        } catch (e) {}
+        this.notifications = list;
+        window.dispatchEvent(new CustomEvent("niprak-notification-change", { detail: notif }));
+        return notif;
+    }
+
+    async markNotificationRead(id = null) {
+        let list = this._loadNotifications();
+        if (!id || id === "all") {
+            list = list.map(n => ({ ...n, read: true }));
+        } else {
+            const target = list.find(n => n.id === id);
+            if (target) target.read = true;
+        }
+        try {
+            const json = JSON.stringify(list);
+            localStorage.setItem("niprak_notifications", json);
+            localStorage.setItem("onespace_notifications", json);
+        } catch (e) {}
+        this.notifications = list;
+        window.dispatchEvent(new CustomEvent("niprak-notification-change"));
+        return list;
+    }
+
+    async markNotificationCleaned(id, purgedBytes = 0) {
+        if (!id) return;
+        let list = this._loadNotifications();
+        const target = list.find(n => n.id === id);
+        if (target) {
+            target.cleaned = true;
+            target.purgedBytes = purgedBytes;
+            target.cleanedAt = new Date().toISOString();
+            try {
+                const json = JSON.stringify(list);
+                localStorage.setItem("niprak_notifications", json);
+                localStorage.setItem("onespace_notifications", json);
+            } catch (e) {}
+            this.notifications = list;
+            window.dispatchEvent(new CustomEvent("niprak-notification-change", { detail: target }));
+        }
+    }
+
+    async deleteNotification(id) {
+        if (!id) return;
+        let list = this._loadNotifications();
+        list = list.filter(n => n.id !== id);
+        try {
+            const json = JSON.stringify(list);
+            localStorage.setItem("niprak_notifications", json);
+            localStorage.setItem("onespace_notifications", json);
+        } catch (e) {}
+        this.notifications = list;
+        window.dispatchEvent(new CustomEvent("niprak-notification-change"));
+    }
+
+    async clearAllNotifications() {
+        this.notifications = [];
+        try {
+            localStorage.setItem("niprak_notifications", "[]");
+            localStorage.setItem("onespace_notifications", "[]");
+        } catch (e) {}
+        window.dispatchEvent(new CustomEvent("niprak-notification-change"));
     }
 
     fallbackInit() {
@@ -688,6 +784,9 @@ class StorageService {
 
     measurePaperBytesSync(ev) {
         if (!ev) return 0;
+        if (ev.rawScansPurged) {
+            return Math.max(1024, Number(ev.fileSizeBytes) || 2048);
+        }
         let bytes = 0;
         const cached = this.pdfCacheMap ? this.pdfCacheMap.get(String(ev.id)) : null;
         const pdfStr = ev.pdfDataUrl || (cached && cached.pdfDataUrl) || null;
@@ -1520,7 +1619,107 @@ class StorageService {
         return { locked: false, reason: null, license };
     }
 
-    // --- Master Storage Deep Cleanup Operations ---
+    // --- Purge Raw PDF Scans for Storage Optimization (Retains Student Marks & Scorecard) ---
+    async purgeRawPdfScansForPapers(paperIds) {
+        if (!Array.isArray(paperIds) || paperIds.length === 0) return { purgedCount: 0, reclaimedBytes: 0 };
+        await this.readyPromise;
+        let purgedCount = 0;
+        let reclaimedBytes = 0;
+
+        for (const rawId of paperIds) {
+            const id = String(rawId);
+            try {
+                // 1. Remove binary cache entry in memory
+                if (this.pdfCacheMap) {
+                    this.pdfCacheMap.delete(id);
+                }
+
+                // 2. Clear browser CacheStorage entries
+                if ('caches' in window) {
+                    for (const cName of ["niprak-pdf-cache-v1", "onespace-pdf-cache-v1"]) {
+                        try {
+                            const cache = await caches.open(cName);
+                            await cache.delete(`/pdf-cache/${id}`);
+                        } catch (e) {}
+                    }
+                }
+
+                // 3. Clear session draft
+                try {
+                    sessionStorage.removeItem(`niprak_draft_${id}`);
+                    sessionStorage.removeItem(`onespace_draft_${id}`);
+                } catch (e) {}
+
+                // 4. Retrieve evaluation record
+                const ev = await this.getEvaluationById(id);
+                if (ev) {
+                    const originalBytes = this.measurePaperBytesSync(ev);
+                    ev.rawScansPurged = true;
+                    ev.pdfDataUrl = null;
+                    delete ev.pdfDataUrl;
+                    ev.pages = [];
+                    delete ev.pages;
+                    if (ev.rawFile) delete ev.rawFile;
+                    ev.fileSizeBytes = 2048; // lightweight metadata footprint
+                    reclaimedBytes += Math.max(0, originalBytes - 2048);
+
+                    // Update memory store
+                    const memIdx = this.memoryStore.findIndex(m => String(m.id) === id);
+                    if (memIdx >= 0) {
+                        this.memoryStore[memIdx] = ev;
+                    }
+
+                    // Update IndexedDB
+                    if (this.db) {
+                        await new Promise((resolve) => {
+                            try {
+                                const tx = this.db.transaction(["evaluations"], "readwrite");
+                                const store = tx.objectStore("evaluations");
+                                const req = store.put(ev);
+                                req.onsuccess = () => resolve();
+                                req.onerror = () => resolve();
+                            } catch (e) { resolve(); }
+                        });
+                    }
+
+                    // Update LocalStorage summary if stored there
+                    try {
+                        const raw = localStorage.getItem("niprak_evaluations_summary") || localStorage.getItem("onespace_evaluations_summary");
+                        if (raw) {
+                            let list = JSON.parse(raw);
+                            if (Array.isArray(list)) {
+                                const lIdx = list.findIndex(e => String(e.id) === id);
+                                if (lIdx >= 0) {
+                                    list[lIdx].rawScansPurged = true;
+                                    list[lIdx].fileSizeBytes = 2048;
+                                    delete list[lIdx].pdfDataUrl;
+                                    delete list[lIdx].pages;
+                                    const json = JSON.stringify(list);
+                                    localStorage.setItem("niprak_evaluations_summary", json);
+                                    localStorage.setItem("onespace_evaluations_summary", json);
+                                }
+                            }
+                        }
+                    } catch (e) {}
+
+                    purgedCount++;
+                }
+            } catch (err) {
+                console.warn(`Error purging raw PDF scans for paper ${id}:`, err);
+            }
+        }
+
+        // Trigger storage quota recalculation & sync
+        if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
+            window.app.updateStorageQuotaDisplay();
+        }
+
+        return { purgedCount, reclaimedBytes };
+    }
+
+    async deleteSubjectBatchCompletely(paperIds) {
+        return await this.cleanStoragePapers(paperIds);
+    }
 
     async cleanStoragePapers(paperIds) {
         if (!Array.isArray(paperIds) || paperIds.length === 0) return 0;

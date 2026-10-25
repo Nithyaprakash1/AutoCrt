@@ -50,10 +50,12 @@ class AppController {
         // Bind global UI elements
         this.bindPortalControls();
         this.bindNavigation();
+        this.bindNotificationCenter();
         this.bindWorkspaceControls();
         this.bindKeyboardShortcuts();
         this.bindSettingsModal();
         this.updateStorageQuotaDisplay();
+        this.updateNotificationBadge();
         this.initLoginSlideshow();
         this.initIOSInteractions();
 
@@ -1400,6 +1402,446 @@ class AppController {
                 this.showPortalLoginScreen();
             });
         }
+    }
+
+    // --- Notification Center & Subject Completion Management ---
+
+    bindNotificationCenter() {
+        const btnNavbarNotif = document.getElementById("btn-navbar-notif");
+        const btnMobileNotif = document.getElementById("btn-mobile-notif");
+        const notifPopover = document.getElementById("notification-dropdown-popover");
+        const profileDropdown = document.getElementById("profile-dropdown-menu");
+        const btnProfile = document.getElementById("btn-navbar-profile");
+
+        const toggleNotifPopover = (e) => {
+            if (e) e.stopPropagation();
+            if (!notifPopover) return;
+            const isOpen = notifPopover.classList.toggle("active");
+            if (btnNavbarNotif) btnNavbarNotif.classList.toggle("active", isOpen);
+            if (btnMobileNotif) btnMobileNotif.classList.toggle("active", isOpen);
+            if (isOpen) {
+                // Close profile dropdown if open
+                if (profileDropdown) profileDropdown.classList.remove("active");
+                if (btnProfile) btnProfile.classList.remove("active");
+                this.renderNotificationPopover();
+            }
+        };
+
+        if (btnNavbarNotif) {
+            btnNavbarNotif.addEventListener("click", toggleNotifPopover);
+        }
+        if (btnMobileNotif) {
+            btnMobileNotif.addEventListener("click", toggleNotifPopover);
+        }
+
+        // Close when clicking outside
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest("#nav-notification-wrapper") && !e.target.closest("#btn-mobile-notif")) {
+                if (notifPopover) notifPopover.classList.remove("active");
+                if (btnNavbarNotif) btnNavbarNotif.classList.remove("active");
+                if (btnMobileNotif) btnMobileNotif.classList.remove("active");
+            }
+        });
+
+        // Mark all read button
+        const btnMarkRead = document.getElementById("btn-notif-mark-read");
+        if (btnMarkRead) {
+            btnMarkRead.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                if (window.appStorage) {
+                    await window.appStorage.markNotificationRead("all");
+                    await this.renderNotificationPopover();
+                    this.updateNotificationBadge();
+                }
+            });
+        }
+
+        // Clear all notifications button
+        const btnClearAll = document.getElementById("btn-notif-clear-all");
+        if (btnClearAll) {
+            btnClearAll.addEventListener("click", async (e) => {
+                e.stopPropagation();
+                if (window.appStorage) {
+                    await window.appStorage.clearAllNotifications();
+                    await this.renderNotificationPopover();
+                    this.updateNotificationBadge();
+                }
+            });
+        }
+
+        // Action button inside popover: Clean Scans
+        const notifBody = document.getElementById("notif-popover-body");
+        if (notifBody) {
+            notifBody.addEventListener("click", async (e) => {
+                const cleanBtn = e.target.closest(".btn-notif-action-clean");
+                if (cleanBtn) {
+                    e.stopPropagation();
+                    const notifId = cleanBtn.getAttribute("data-notif-id");
+                    if (notifId && window.appStorage) {
+                        const notifs = await window.appStorage.getNotifications();
+                        const notif = notifs.find(n => n.id === notifId);
+                        if (notif) {
+                            if (notifPopover) notifPopover.classList.remove("active");
+                            if (btnNavbarNotif) btnNavbarNotif.classList.remove("active");
+                            this.showCleanupConfirmationModal(notif);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Reactive event listener for background notification changes
+        window.addEventListener("niprak-notification-change", () => {
+            this.updateNotificationBadge();
+            if (notifPopover && notifPopover.classList.contains("active")) {
+                this.renderNotificationPopover();
+            }
+        });
+    }
+
+    async updateNotificationBadge() {
+        if (!window.appStorage) return;
+        try {
+            const notifs = await window.appStorage.getNotifications();
+            const unread = notifs.filter(n => !n.read).length;
+            const dot = document.getElementById("notif-badge-dot");
+            const mobileDot = document.getElementById("mobile-notif-badge-dot");
+            const countPill = document.getElementById("notif-unread-count-pill");
+
+            if (dot) {
+                if (unread > 0) {
+                    dot.textContent = unread > 99 ? "99+" : unread;
+                    dot.style.display = "flex";
+                } else {
+                    dot.style.display = "none";
+                }
+            }
+            if (mobileDot) {
+                if (unread > 0) {
+                    mobileDot.textContent = unread > 99 ? "99+" : unread;
+                    mobileDot.style.display = "flex";
+                } else {
+                    mobileDot.style.display = "none";
+                }
+            }
+            if (countPill) {
+                countPill.textContent = `${unread} New`;
+            }
+        } catch (e) {
+            console.warn("updateNotificationBadge error:", e);
+        }
+    }
+
+    async renderNotificationPopover() {
+        const body = document.getElementById("notif-popover-body");
+        if (!body || !window.appStorage) return;
+
+        try {
+            const notifs = await window.appStorage.getNotifications();
+            if (notifs.length === 0) {
+                body.innerHTML = `
+                    <div class="notif-empty-state">
+                        <div class="notif-empty-icon">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                            </svg>
+                        </div>
+                        <span>No notifications right now</span>
+                    </div>
+                `;
+                return;
+            }
+
+            body.innerHTML = notifs.map(n => {
+                const isUnread = !n.read;
+                const timeStr = this.formatRelativeTime(n.timestamp);
+                const savingsStr = n.potentialSavingsFormatted || (n.potentialSavingsBytes ? window.appStorage.formatStorageSize(n.potentialSavingsBytes) : "Storage");
+                const isCleaned = n.cleaned === true;
+
+                return `
+                    <div class="notif-item-card ${isUnread ? 'unread' : ''}" data-id="${n.id}">
+                        <div class="notif-item-top">
+                            <div class="notif-item-title-wrap">
+                                <div class="notif-item-icon">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                                        <polyline points="20 6 9 17 4 12"/>
+                                    </svg>
+                                </div>
+                                <span class="notif-item-title">${n.title || 'Subject Completed'}</span>
+                            </div>
+                            <span class="notif-item-time">${timeStr}</span>
+                        </div>
+                        <p class="notif-item-message">${n.message || ''}</p>
+                        <div class="notif-item-footer">
+                            <span class="notif-badge-pill">${n.paperCount || (n.paperIds ? n.paperIds.length : 1)} Papers Graded</span>
+                            ${isCleaned ? `
+                                <span class="notif-cleaned-tag">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                                    <span>Scans Purged (${savingsStr} Saved)</span>
+                                </span>
+                            ` : `
+                                <button type="button" class="btn-notif-action-clean" data-notif-id="${n.id}" title="Reclaim device storage while preserving marks">
+                                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+                                    <span>Clean Scans (~${savingsStr})</span>
+                                </button>
+                            `}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        } catch (e) {
+            console.warn("renderNotificationPopover error:", e);
+        }
+    }
+
+    formatRelativeTime(isoString) {
+        if (!isoString) return "Just now";
+        try {
+            const diffMs = Date.now() - new Date(isoString).getTime();
+            const mins = Math.floor(diffMs / 60000);
+            if (mins < 1) return "Just now";
+            if (mins < 60) return `${mins}m ago`;
+            const hrs = Math.floor(mins / 60);
+            if (hrs < 24) return `${hrs}h ago`;
+            const days = Math.floor(hrs / 24);
+            return `${days}d ago`;
+        } catch (e) {
+            return "recently";
+        }
+    }
+
+    async checkAndSendSubjectCompletedNotification(currentEval) {
+        if (!currentEval || !window.appStorage) return;
+        try {
+            const allEvaluations = await window.appStorage.getAllEvaluations();
+            if (!Array.isArray(allEvaluations) || allEvaluations.length === 0) return;
+
+            const sub = (currentEval.subject || "General").trim();
+            const cls = (currentEval.className || currentEval.class || "").trim();
+            const exam = (currentEval.examName || currentEval.templateName || "").trim();
+            const curSubLower = sub.toLowerCase();
+
+            // Match papers belonging to this subject batch
+            const batchPapers = allEvaluations.filter(e => {
+                if (!e || !e.id) return false;
+                const eSub = (e.subject || "").toLowerCase().trim();
+                const eExam = (e.examName || e.templateName || "").toLowerCase().trim();
+                const subMatch = eSub === curSubLower || eSub.includes(curSubLower) || curSubLower.includes(eSub) || eExam.includes(curSubLower);
+                if (!subMatch) return false;
+                if (cls) {
+                    const eCls = (e.className || e.class || "").trim();
+                    if (eCls && eCls !== cls) return false;
+                }
+                return true;
+            });
+
+            if (batchPapers.length === 0) return;
+
+            // Check if all papers are graded / completed
+            const pendingCount = batchPapers.filter(p => !this.isPaperCorrected(p)).length;
+            if (pendingCount > 0) {
+                return; // Still papers remaining
+            }
+
+            // 100% completed!
+            let potentialSavings = 0;
+            const paperIds = [];
+            batchPapers.forEach(p => {
+                paperIds.push(p.id);
+                if (!p.rawScansPurged) {
+                    const sz = window.appStorage.measurePaperBytesSync(p);
+                    potentialSavings += Math.max(0, sz - 2048);
+                }
+            });
+
+            const formattedSavings = window.appStorage.formatStorageSize(potentialSavings);
+            const currentUser = window.appStorage.getCurrentUser();
+            const evaluatorName = (currentUser && currentUser.name) ? currentUser.name : (currentEval.teacherName || "Evaluator");
+            const batchTitle = `${cls ? cls + ' ' : ''}${sub}`;
+
+            // Check if an uncleaned notification for this batch already exists to prevent duplicate spam
+            const existingNotifs = await window.appStorage.getNotifications();
+            const alreadyNotified = existingNotifs.find(n => 
+                n.subject === sub && 
+                (!cls || n.className === cls) && 
+                !n.cleaned &&
+                (Date.now() - new Date(n.timestamp).getTime()) < 3600000 // within last 1 hr
+            );
+
+            if (alreadyNotified) return;
+
+            const notif = {
+                id: `notif-comp-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
+                type: "subject_completed",
+                title: `${batchTitle} Evaluation Completed`,
+                message: `${evaluatorName} has completed grading all ${batchPapers.length} papers for ${batchTitle}. Raw PDF scans can now be deleted to optimize system storage.`,
+                subject: sub,
+                className: cls,
+                examName: exam,
+                paperIds: paperIds,
+                paperCount: batchPapers.length,
+                completedBy: evaluatorName,
+                timestamp: new Date().toISOString(),
+                read: false,
+                cleaned: false,
+                potentialSavingsBytes: potentialSavings,
+                potentialSavingsFormatted: formattedSavings
+            };
+
+            await window.appStorage.saveNotification(notif);
+
+            // Show immediate toast to the teacher confirming notification sent
+            this.showToast(`🎉 All papers for ${batchTitle} completed! Notification sent to Uploader for storage optimization.`, "success");
+
+            this.updateNotificationBadge();
+        } catch (err) {
+            console.warn("checkAndSendSubjectCompletedNotification error:", err);
+        }
+    }
+
+    showCleanupConfirmationModal(data) {
+        if (!data) return;
+        const modal = document.getElementById("modal-cleanup-completed-pdfs");
+        if (!modal) return;
+
+        const subject = data.subject || "General";
+        const className = data.className || data.class || "";
+        const paperIds = Array.isArray(data.paperIds) ? data.paperIds : (Array.isArray(data.papers) ? data.papers.map(p => p.id) : []);
+        const paperCount = data.paperCount || (data.papers ? data.papers.length : paperIds.length);
+        const savingsBytes = data.potentialSavingsBytes || (data.totalBytes ? Math.round(data.totalBytes * 0.98) : (paperCount * 220 * 1024));
+        const savingsFormatted = data.potentialSavingsFormatted || (window.appStorage ? window.appStorage.formatStorageSize(savingsBytes) : "Storage");
+
+        // Populate modal text
+        const titleEl = document.getElementById("cleanup-dialog-title");
+        const subEl = document.getElementById("cleanup-dialog-subtitle");
+        const batchNameEl = document.getElementById("cleanup-metric-batch-name");
+        const papersCountEl = document.getElementById("cleanup-metric-papers-count");
+        const savingsValEl = document.getElementById("cleanup-metric-savings-val");
+        const confirmBtnText = document.getElementById("btn-confirm-cleanup-text");
+
+        if (titleEl) titleEl.textContent = `${className ? className + ' • ' : ''}${subject} Evaluation Complete`;
+        if (subEl) subEl.textContent = `All ${paperCount} student papers have been evaluated. Choose an optimization option below to manage storage.`;
+        if (batchNameEl) batchNameEl.textContent = `${className ? className + ' • ' : ''}${subject}`;
+        if (papersCountEl) papersCountEl.textContent = `${paperCount} Student Papers Evaluated`;
+        if (savingsValEl) savingsValEl.textContent = `~${savingsFormatted}`;
+        if (confirmBtnText) confirmBtnText.textContent = `Free ~${savingsFormatted} Storage`;
+
+        // Reset radio selection to "scans_only"
+        const radioScans = document.getElementById("cleanup-opt-scans-only");
+        const radioFull = document.getElementById("cleanup-opt-full-batch");
+        const labelScans = document.getElementById("cleanup-opt-scans-only-label");
+        const labelFull = document.getElementById("cleanup-opt-full-batch-label");
+        const progressTrack = document.getElementById("cleanup-execution-progress");
+        const footer = document.getElementById("cleanup-dialog-footer");
+        const progressBar = document.getElementById("cleanup-progress-fill");
+        const progressStatus = document.getElementById("cleanup-progress-status");
+        const progressPct = document.getElementById("cleanup-progress-percent");
+
+        if (radioScans) radioScans.checked = true;
+        if (labelScans) labelScans.classList.add("selected");
+        if (labelFull) labelFull.classList.remove("selected");
+        if (progressTrack) progressTrack.style.display = "none";
+        if (footer) footer.style.display = "flex";
+
+        // Setup radio card click toggles
+        if (labelScans && labelFull && radioScans && radioFull) {
+            labelScans.onclick = () => {
+                radioScans.checked = true;
+                labelScans.classList.add("selected");
+                labelFull.classList.remove("selected");
+                if (confirmBtnText) confirmBtnText.textContent = `Free ~${savingsFormatted} Storage`;
+            };
+            labelFull.onclick = () => {
+                radioFull.checked = true;
+                labelFull.classList.add("selected");
+                labelScans.classList.remove("selected");
+                if (confirmBtnText) confirmBtnText.textContent = `Permanently Delete Batch`;
+            };
+        }
+
+        // Modal close bindings
+        const closeModal = () => {
+            modal.style.display = "none";
+            modal.classList.remove("active");
+        };
+
+        const btnClose = document.getElementById("btn-close-cleanup-modal");
+        const btnCancel = document.getElementById("btn-cancel-cleanup");
+        if (btnClose) btnClose.onclick = closeModal;
+        if (btnCancel) btnCancel.onclick = closeModal;
+
+        // Confirm button click
+        const btnConfirm = document.getElementById("btn-confirm-cleanup");
+        if (btnConfirm) {
+            btnConfirm.onclick = async () => {
+                const isFullDelete = radioFull && radioFull.checked;
+
+                // Show execution progress track
+                if (progressTrack) progressTrack.style.display = "flex";
+                if (footer) footer.style.display = "none";
+                if (progressBar) progressBar.style.width = "30%";
+                if (progressStatus) progressStatus.textContent = isFullDelete ? "Deleting evaluation records..." : "Purging heavy raw PDF scans & caches...";
+                if (progressPct) progressPct.textContent = "30%";
+
+                await new Promise(r => setTimeout(r, 400));
+
+                if (progressBar) progressBar.style.width = "75%";
+                if (progressStatus) progressStatus.textContent = isFullDelete ? "Wiping storage entries..." : "Reclaiming system storage quota...";
+                if (progressPct) progressPct.textContent = "75%";
+
+                try {
+                    if (isFullDelete) {
+                        await window.appStorage.deleteSubjectBatchCompletely(paperIds);
+                        if (data.notificationId) {
+                            await window.appStorage.deleteNotification(data.notificationId);
+                        } else if (data.id) {
+                            await window.appStorage.deleteNotification(data.id);
+                        }
+                    } else {
+                        const res = await window.appStorage.purgeRawPdfScansForPapers(paperIds);
+                        const recBytes = res.reclaimedBytes || savingsBytes;
+                        if (data.notificationId) {
+                            await window.appStorage.markNotificationCleaned(data.notificationId, recBytes);
+                        } else if (data.id) {
+                            await window.appStorage.markNotificationCleaned(data.id, recBytes);
+                        }
+                    }
+
+                    if (progressBar) progressBar.style.width = "100%";
+                    if (progressStatus) progressStatus.textContent = "✓ Complete!";
+                    if (progressPct) progressPct.textContent = "100%";
+
+                    await new Promise(r => setTimeout(r, 350));
+                    closeModal();
+
+                    // Refresh views
+                    if (this.currentView === "uploaded-papers" && this.uploadedPapersPage) {
+                        await this.uploadedPapersPage.loadData();
+                        this.uploadedPapersPage.render();
+                    } else if (this.currentView === "dashboard" && this.dashboardManager) {
+                        await this.dashboardManager.loadData();
+                        this.dashboardManager.render();
+                    }
+
+                    this.updateStorageQuotaDisplay();
+                    this.updateNotificationBadge();
+
+                    if (isFullDelete) {
+                        this.showToast(`Batch "${subject}" and all associated files deleted.`, "info");
+                    } else {
+                        this.showToast(`🎉 Storage optimized! Reclaimed ~${savingsFormatted}. All student marks and scorecards are 100% preserved.`, "success");
+                    }
+                } catch (err) {
+                    console.error("Cleanup execution error:", err);
+                    closeModal();
+                    this.showToast("Cleanup failed: " + err.message, "error");
+                }
+            };
+        }
+
+        modal.style.display = "flex";
+        modal.classList.add("active");
     }
 
     applySettingsToUI() {
@@ -3126,6 +3568,7 @@ class AppController {
         this.setAutosaveBadge("saved");
         if (notify) {
             console.log("Evaluation state persisted successfully.");
+            this.checkAndSendSubjectCompletedNotification(this.activeEvaluation);
         }
     }
 
@@ -3260,6 +3703,7 @@ class AppController {
 
         // --- CASE 1: No next paper found (Queue is finished) ---
         if (!nextEval) {
+            this.checkAndSendSubjectCompletedNotification(this.activeEvaluation);
             this.setActionProgressModalSuccess({
                 title: "✓ Saved! No More Papers In Queue",
                 subtitle: `All student papers have been evaluated successfully.`,

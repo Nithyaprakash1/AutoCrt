@@ -186,6 +186,13 @@
             <span class="brand-text-main">Niprak <span class="text-osm">OSM</span></span>
         </div>
         <div class="mobile-top-right">
+            <button type="button" class="btn-mobile-notif" id="btn-mobile-notif" title="Notifications & Storage Optimization">
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                </svg>
+                <span class="notif-badge-dot" id="mobile-notif-badge-dot" style="display: none;">0</span>
+            </button>
             <img src="assets/school_logo.jpg" alt="School" class="mobile-school-logo" id="mobile-school-logo-img" />
             <button type="button" class="btn-mobile-logout" id="btn-mobile-logout" title="Change Desk / Logout">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -449,6 +456,32 @@
                                 </div>
                                 <div class="storage-bar-track">
                                     <div class="storage-bar-fill" id="nav-storage-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notification Bell Trigger & Dropdown Popover -->
+                        <div class="nav-notification-wrapper" id="nav-notification-wrapper">
+                            <button type="button" class="btn-navbar-notif" id="btn-navbar-notif" title="Notifications & Storage Optimization">
+                                <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path>
+                                    <path d="M13.73 21a2 2 0 0 1-3.46 0"></path>
+                                </svg>
+                                <span class="notif-badge-dot" id="notif-badge-dot" style="display: none;">0</span>
+                            </button>
+                            <div class="notification-dropdown-popover" id="notification-dropdown-popover">
+                                <div class="notif-popover-header">
+                                    <div class="notif-header-left">
+                                        <span class="notif-header-title">Notifications</span>
+                                        <span class="notif-header-count" id="notif-unread-count-pill">0 New</span>
+                                    </div>
+                                    <div class="notif-header-actions">
+                                        <button type="button" class="btn-notif-mark-read" id="btn-notif-mark-read" title="Mark all notifications as read">Mark Read</button>
+                                        <button type="button" class="btn-notif-clear-all" id="btn-notif-clear-all" title="Clear all notifications">Clear</button>
+                                    </div>
+                                </div>
+                                <div class="notif-popover-body" id="notif-popover-body">
+                                    <!-- Dynamic notifications injected by app.js -->
                                 </div>
                             </div>
                         </div>
@@ -952,6 +985,106 @@
         </div>
     </div>
 
+    <!-- Subject Evaluation Complete & Storage Cleanup Custom Confirmation Modal -->
+    <div class="modal-backdrop" id="modal-cleanup-completed-pdfs" style="display: none;">
+        <div class="modal-dialog cleanup-confirm-dialog">
+            <div class="cleanup-dialog-header">
+                <div class="cleanup-header-icon-wrap">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                        <line x1="12" y1="22.08" x2="12" y2="12"/>
+                    </svg>
+                </div>
+                <div class="cleanup-header-text">
+                    <div class="cleanup-badge-row">
+                        <span class="cleanup-pill-highlight">Storage Optimization</span>
+                        <span class="cleanup-pill-status">100% Graded</span>
+                    </div>
+                    <h3 class="cleanup-dialog-title" id="cleanup-dialog-title">Subject Evaluation Complete</h3>
+                    <p class="cleanup-dialog-sub" id="cleanup-dialog-subtitle">All answer sheets in this subject batch have been graded. Storage can now be safely optimized.</p>
+                </div>
+                <button type="button" class="btn-modal-close" id="btn-close-cleanup-modal">×</button>
+            </div>
+
+            <div class="cleanup-dialog-body">
+                <!-- Storage Metric Overview Card -->
+                <div class="cleanup-storage-metric-box">
+                    <div class="metric-col">
+                        <span class="metric-title">Batch Overview</span>
+                        <span class="metric-val" id="cleanup-metric-batch-name">—</span>
+                        <span class="metric-sub" id="cleanup-metric-papers-count">0 Student Papers</span>
+                    </div>
+                    <div class="metric-divider"></div>
+                    <div class="metric-col">
+                        <span class="metric-title">Reclaimable Storage</span>
+                        <span class="metric-val text-green" id="cleanup-metric-savings-val">~0.0 MB</span>
+                        <span class="metric-sub text-green">⚡ ~99% Storage Savings</span>
+                    </div>
+                </div>
+
+                <!-- Zero Data Loss Safe Guarantee Alert -->
+                <div class="cleanup-safe-callout">
+                    <div class="safe-callout-icon">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <div class="safe-callout-content">
+                        <span class="safe-callout-title">Safe Data Retention Guarantee</span>
+                        <p class="safe-callout-text">All student marks, question-by-question scoring breakdown, total marks, percentages, letter grades, feedback, and official scorecards remain <strong>100% permanently preserved</strong> in your database. Only heavy binary PDF scans are cleared to minimize storage costs.</p>
+                    </div>
+                </div>
+
+                <!-- Deletion Options -->
+                <div class="cleanup-options-group">
+                    <label class="cleanup-option-card selected" id="cleanup-opt-scans-only-label">
+                        <input type="radio" name="cleanup-action-type" id="cleanup-opt-scans-only" value="scans_only" checked />
+                        <div class="option-card-body">
+                            <div class="option-header-row">
+                                <span class="option-title">Purge Raw PDF Scans Only</span>
+                                <span class="option-recommended-tag">Recommended</span>
+                            </div>
+                            <p class="option-desc">Deletes heavy scan images &amp; binary PDF cache to free device storage (~99% less storage). Keeps student marks, grades, and full scorecards 100% intact.</p>
+                        </div>
+                    </label>
+
+                    <label class="cleanup-option-card" id="cleanup-opt-full-batch-label">
+                        <input type="radio" name="cleanup-action-type" id="cleanup-opt-full-batch" value="full_batch" />
+                        <div class="option-card-body">
+                            <div class="option-header-row">
+                                <span class="option-title">Permanently Delete Entire Batch</span>
+                                <span class="option-danger-tag">Irreversible</span>
+                            </div>
+                            <p class="option-desc">Completely removes all evaluation records and student scores for this batch from the database. Use only if this batch was uploaded in error.</p>
+                        </div>
+                    </label>
+                </div>
+
+                <!-- Animated Execution Track (hidden until confirmed) -->
+                <div class="cleanup-execution-progress" id="cleanup-execution-progress" style="display: none;">
+                    <div class="cleanup-progress-row">
+                        <span class="cleanup-progress-status" id="cleanup-progress-status">Optimizing storage...</span>
+                        <span class="cleanup-progress-percent" id="cleanup-progress-percent">0%</span>
+                    </div>
+                    <div class="cleanup-progress-track">
+                        <div class="cleanup-progress-fill" id="cleanup-progress-fill" style="width: 0%;"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="cleanup-dialog-footer" id="cleanup-dialog-footer">
+                <button type="button" class="btn-secondary" id="btn-cancel-cleanup">Cancel</button>
+                <button type="button" class="btn-cleanup-confirm" id="btn-confirm-cleanup">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"/>
+                    </svg>
+                    <span id="btn-confirm-cleanup-text">Free Storage</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications Root -->
     <div class="toast-container" id="toast-container"></div>
 
@@ -961,23 +1094,23 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
     <!-- Application Script Modules (Cache-busted for cross-device consistency) -->
-    <script src="js/firebase-config.js?v=2.4"></script>
-    <script src="js/mock-data.js?v=2.4"></script>
-    <script src="js/storage.js?v=2.4"></script>
-    <script src="js/canvas-engine.js?v=2.4"></script>
-    <script src="js/marking-panel.js?v=2.4"></script>
-    <script src="js/pdf-generator.js?v=2.4"></script>
-    <script src="js/bulk-report.js?v=2.4"></script>
-    <script src="js/dashboard.js?v=2.4"></script>
-    <script src="js/history.js?v=2.4"></script>
-    <script src="js/eval-form.js?v=2.4"></script>
-    <script src="js/upload-portal.js?v=2.4"></script>
-    <script src="js/classes-page.js?v=2.4"></script>
-    <script src="js/uploaded-papers-page.js?v=2.4"></script>
-    <script src="js/settings-page.js?v=2.4"></script>
-    <script src="js/user-management-page.js?v=2.4"></script>
-    <script src="js/admin-panel.js?v=2.4"></script>
-    <script src="js/super-admin.js?v=2.4"></script>
-    <script src="js/app.js?v=2.4"></script>
+    <script src="js/firebase-config.js?v=2.5"></script>
+    <script src="js/mock-data.js?v=2.5"></script>
+    <script src="js/storage.js?v=2.5"></script>
+    <script src="js/canvas-engine.js?v=2.5"></script>
+    <script src="js/marking-panel.js?v=2.5"></script>
+    <script src="js/pdf-generator.js?v=2.5"></script>
+    <script src="js/bulk-report.js?v=2.5"></script>
+    <script src="js/dashboard.js?v=2.5"></script>
+    <script src="js/history.js?v=2.5"></script>
+    <script src="js/eval-form.js?v=2.5"></script>
+    <script src="js/upload-portal.js?v=2.5"></script>
+    <script src="js/classes-page.js?v=2.5"></script>
+    <script src="js/uploaded-papers-page.js?v=2.5"></script>
+    <script src="js/settings-page.js?v=2.5"></script>
+    <script src="js/user-management-page.js?v=2.5"></script>
+    <script src="js/admin-panel.js?v=2.5"></script>
+    <script src="js/super-admin.js?v=2.5"></script>
+    <script src="js/app.js?v=2.5"></script>
 </body>
 </html>
