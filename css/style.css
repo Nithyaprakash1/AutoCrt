@@ -1959,7 +1959,8 @@ body {
     padding: 0;
 }
 
-.btn-portal-enter {
+.btn-portal-enter,
+#btn-login-as-uploader {
     height: 40px !important;
     border-radius: 11px !important;
     font-size: 0.88rem !important;
@@ -1970,6 +1971,14 @@ body {
     font-weight: 600;
     text-decoration: none;
     box-shadow: 0 4px 14px rgba(175, 82, 222, 0.3);
+    color: #FFFFFF !important;
+}
+
+.btn-portal-enter *,
+#btn-login-as-uploader * {
+    color: #FFFFFF !important;
+    fill: #FFFFFF !important;
+    stroke: #FFFFFF !important;
 }
 
 .portal-login-footer {
@@ -2237,6 +2246,15 @@ body {
 
 .btn-enter-green:hover {
     background: var(--primary-hover);
+}
+
+.btn-enter-purple {
+    background: linear-gradient(135deg, #AF52DE, #5856D6);
+    color: #FFFFFF !important;
+}
+
+.btn-enter-purple:hover {
+    background: linear-gradient(135deg, #9b3ec7, #4846c4);
 }
 
 .portal-login-footer {
@@ -10782,6 +10800,21 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     border: 1px solid rgba(175, 82, 222, 0.3) !important;
 }
 
+.portal-pill-admin {
+    background: rgba(175, 82, 222, 0.1) !important;
+    color: #AF52DE !important;
+    border: 1px solid rgba(175, 82, 222, 0.25) !important;
+}
+
+.portal-pill-admin .portal-pill-dot {
+    background: #AF52DE !important;
+}
+
+.side-card-admin {
+    background: linear-gradient(135deg, rgba(175, 82, 222, 0.06), rgba(88, 86, 214, 0.06)) !important;
+    border: 1px solid rgba(175, 82, 222, 0.22) !important;
+}
+
 .side-card-super {
     background: linear-gradient(135deg, rgba(175, 82, 222, 0.08), rgba(88, 86, 214, 0.08)) !important;
     border: 1px solid rgba(175, 82, 222, 0.25) !important;
@@ -12560,5 +12593,354 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
 .btn-back-to-batches:hover {
     background: rgba(255, 255, 255, 0.24) !important;
     transform: translateY(-1px);
+}
+
+/* ==========================================================================
+   ADMIN AUDIT DESK & STUDENT 360 ALL-SUBJECTS DOSSIER (APPLE CUPERTINO)
+   ========================================================================== */
+
+.admin-panel-layout {
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 20px 20px 60px;
+    animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.admin-header-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 24px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 18px;
+    box-shadow: var(--shadow-sm);
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+}
+
+.admin-title-badge {
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #AF52DE;
+    background: rgba(175, 82, 222, 0.1);
+    padding: 3px 10px;
+    border-radius: 20px;
+    font-weight: 500;
+}
+
+.admin-title-main {
+    font-size: 1.55rem;
+    font-weight: 400 !important;
+    color: var(--text-main);
+    margin: 6px 0 2px;
+}
+
+.admin-sub-text {
+    font-size: 0.88rem;
+    color: var(--text-muted);
+}
+
+/* Quick Filter Tabs (All / Corrected / Pending) */
+.admin-tab-nav {
+    display: inline-flex;
+    background: var(--bg-subtle, #F1F5F9);
+    padding: 4px;
+    border-radius: 12px;
+    gap: 4px;
+    border: 1px solid var(--border-color);
+}
+
+.admin-tab-btn {
+    padding: 7px 16px;
+    border-radius: 9px;
+    font-size: 0.84rem;
+    border: none;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.admin-tab-btn.active {
+    background: #FFFFFF;
+    color: var(--text-main);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+
+.admin-tab-count-pill {
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-size: 0.74rem;
+    background: rgba(0, 0, 0, 0.06);
+}
+
+.admin-tab-btn.active .admin-tab-count-pill {
+    background: rgba(175, 82, 222, 0.12);
+    color: #AF52DE;
+}
+
+/* Subject Progress Cards Grid */
+.admin-subject-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.admin-sub-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 18px 20px;
+    box-shadow: var(--shadow-xs);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.admin-sub-card:hover {
+    box-shadow: var(--shadow-sm);
+    transform: translateY(-2px);
+}
+
+.admin-sub-card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.admin-sub-code-tag {
+    font-size: 0.74rem;
+    font-weight: 500;
+    padding: 2px 8px;
+    border-radius: 6px;
+    background: rgba(175, 82, 222, 0.1);
+    color: #AF52DE;
+}
+
+.admin-sub-status-pill {
+    font-size: 0.76rem;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-weight: 500;
+}
+
+.admin-sub-status-pill.completed {
+    background: rgba(52, 199, 89, 0.12);
+    color: #16A34A;
+}
+
+.admin-sub-status-pill.in-progress {
+    background: rgba(255, 149, 0, 0.12);
+    color: #D97706;
+}
+
+.admin-sub-status-pill.pending {
+    background: rgba(148, 163, 184, 0.15);
+    color: #64748B;
+}
+
+.admin-sub-title {
+    font-size: 1.05rem;
+    color: var(--text-main);
+    margin-bottom: 3px;
+    font-weight: 400 !important;
+}
+
+.admin-sub-teacher {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    margin-bottom: 12px;
+}
+
+.admin-sub-progress-track {
+    background: var(--bg-subtle, #E2E8F0);
+    height: 6px;
+    border-radius: 999px;
+    overflow: hidden;
+    margin-bottom: 12px;
+}
+
+.admin-sub-progress-fill {
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #AF52DE, #5856D6);
+    transition: width 0.3s ease;
+}
+
+.admin-sub-progress-fill.full {
+    background: #34C759;
+}
+
+.admin-sub-metrics-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+}
+
+.admin-sub-metrics-row strong {
+    color: var(--text-main);
+}
+
+.admin-sub-last-corrected {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding-top: 8px;
+    border-top: 1px dashed var(--border-color);
+}
+
+/* Student 360 All-Subjects Modal */
+.modal-student-360-dialog {
+    max-width: 820px !important;
+    width: 95% !important;
+    background: var(--bg-card);
+    border-radius: 22px;
+    box-shadow: 0 25px 70px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    max-height: 90vh;
+}
+
+.student-360-banner {
+    padding: 22px 24px;
+    background: linear-gradient(135deg, rgba(175, 82, 222, 0.08), rgba(0, 122, 255, 0.08));
+    border-bottom: 1px solid var(--border-color);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.student-360-profile-wrap {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+}
+
+.student-360-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 16px;
+    background: linear-gradient(135deg, #AF52DE, #5856D6);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    font-weight: 500;
+    box-shadow: 0 4px 14px rgba(175, 82, 222, 0.3);
+}
+
+.student-360-name {
+    font-size: 1.25rem;
+    color: var(--text-main);
+    margin: 0 0 2px;
+    font-weight: 400 !important;
+}
+
+.student-360-meta {
+    font-size: 0.82rem;
+    color: var(--text-muted);
+}
+
+.student-360-kpis-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    padding: 16px 24px;
+    background: var(--bg-subtle, #F8FAFC);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.student-360-kpi-item {
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 12px;
+    padding: 10px 14px;
+}
+
+.student-360-kpi-lbl {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.student-360-kpi-val {
+    font-size: 1.2rem;
+    color: var(--text-main);
+    margin-top: 2px;
+}
+
+.student-360-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.student-360-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+}
+
+.student-360-table th {
+    background: var(--bg-subtle, #F1F5F9);
+    padding: 10px 14px;
+    text-align: left;
+    font-size: 0.74rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-color);
+}
+
+.student-360-table td {
+    padding: 12px 14px;
+    border-bottom: 1px solid var(--border-color);
+    color: var(--text-main);
+}
+
+.student-360-table tr:hover td {
+    background: rgba(0, 0, 0, 0.015);
+}
+
+.student-360-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-card);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.btn-student-360-pill {
+    padding: 4px 10px;
+    border-radius: 8px;
+    background: rgba(0, 122, 255, 0.08);
+    border: 1px solid rgba(0, 122, 255, 0.2);
+    color: #007AFF;
+    font-size: 0.78rem;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.15s ease;
+}
+
+.btn-student-360-pill:hover {
+    background: #007AFF;
+    color: #FFFFFF;
 }
 

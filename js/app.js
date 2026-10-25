@@ -861,6 +861,7 @@ class AppController {
         const sidePillLabel = document.getElementById("side-portal-label");
         const sideCard = document.getElementById("side-portal-card");
         const uploaderNav = document.getElementById("sidebar-uploader-nav");
+        const adminNav = document.getElementById("sidebar-admin-nav");
         const teacherNav = document.getElementById("sidebar-teacher-nav");
         const superAdminNav = document.getElementById("sidebar-super-admin-nav");
 
@@ -868,14 +869,15 @@ class AppController {
             if (pillLabel) pillLabel.textContent = "Super Admin";
             if (sidePillLabel) sidePillLabel.textContent = "Super Admin";
             if (pill) {
-                pill.classList.remove("portal-pill-eval", "portal-pill-upload");
+                pill.classList.remove("portal-pill-eval", "portal-pill-upload", "portal-pill-admin");
                 pill.classList.add("portal-pill-super");
             }
             if (sideCard) {
-                sideCard.classList.remove("side-card-eval", "side-card-upload");
+                sideCard.classList.remove("side-card-eval", "side-card-upload", "side-card-admin");
                 sideCard.classList.add("side-card-super");
             }
             if (superAdminNav) superAdminNav.style.display = "block";
+            if (adminNav) adminNav.style.display = "none";
             if (uploaderNav) uploaderNav.style.display = "none";
             if (teacherNav) teacherNav.style.display = "none";
             if (doSwitchView) this.switchView("super-admin");
@@ -883,34 +885,47 @@ class AppController {
             if (pillLabel) pillLabel.textContent = "Upload Desk";
             if (sidePillLabel) sidePillLabel.textContent = "Upload Desk";
             if (pill) {
-                pill.classList.remove("portal-pill-eval", "portal-pill-super");
+                pill.classList.remove("portal-pill-eval", "portal-pill-super", "portal-pill-admin");
                 pill.classList.add("portal-pill-upload");
             }
             if (sideCard) {
-                sideCard.classList.remove("side-card-eval", "side-card-super");
+                sideCard.classList.remove("side-card-eval", "side-card-super", "side-card-admin");
                 sideCard.classList.add("side-card-upload");
             }
             if (superAdminNav) superAdminNav.style.display = "none";
+            if (adminNav) adminNav.style.display = "none";
             if (uploaderNav) uploaderNav.style.display = "block";
             if (teacherNav) teacherNav.style.display = "none";
             if (doSwitchView) this.switchView("upload-portal");
         } else if (portalName === "admin") {
             if (pillLabel) pillLabel.textContent = "Admin Desk";
             if (sidePillLabel) sidePillLabel.textContent = "Admin Desk";
+            if (pill) {
+                pill.classList.remove("portal-pill-eval", "portal-pill-upload", "portal-pill-super");
+                pill.classList.add("portal-pill-admin");
+            }
+            if (sideCard) {
+                sideCard.classList.remove("side-card-eval", "side-card-upload", "side-card-super");
+                sideCard.classList.add("side-card-admin");
+            }
             if (superAdminNav) superAdminNav.style.display = "none";
+            if (uploaderNav) uploaderNav.style.display = "none";
+            if (teacherNav) teacherNav.style.display = "none";
+            if (adminNav) adminNav.style.display = "block";
             if (doSwitchView) this.switchView("admin-panel");
         } else {
             if (pillLabel) pillLabel.textContent = "Teacher Desk";
             if (sidePillLabel) sidePillLabel.textContent = "Teacher Desk";
             if (pill) {
-                pill.classList.remove("portal-pill-upload", "portal-pill-super");
+                pill.classList.remove("portal-pill-upload", "portal-pill-super", "portal-pill-admin");
                 pill.classList.add("portal-pill-eval");
             }
             if (sideCard) {
-                sideCard.classList.remove("side-card-upload", "side-card-super");
+                sideCard.classList.remove("side-card-upload", "side-card-super", "side-card-admin");
                 sideCard.classList.add("side-card-eval");
             }
             if (superAdminNav) superAdminNav.style.display = "none";
+            if (adminNav) adminNav.style.display = "none";
             if (uploaderNav) uploaderNav.style.display = "none";
             if (teacherNav) teacherNav.style.display = "block";
             if (doSwitchView) this.switchView("dashboard");
@@ -923,10 +938,12 @@ class AppController {
 
         let next;
         if (isSuperAdmin) {
-            if (this.activePortal === "super_admin") next = "uploader";
+            if (this.activePortal === "super_admin") next = "admin";
+            else if (this.activePortal === "admin") next = "uploader";
             else if (this.activePortal === "uploader") next = "evaluator";
-            else if (this.activePortal === "evaluator") next = "admin";
             else next = "super_admin";
+        } else if (currentUser && currentUser.role === "admin") {
+            next = this.activePortal === "admin" ? "evaluator" : (this.activePortal === "evaluator" ? "uploader" : "admin");
         } else {
             next = this.activePortal === "uploader" ? "evaluator" : "uploader";
         }
@@ -934,9 +951,9 @@ class AppController {
         this.setPortal(next, true);
         const labels = {
             super_admin: "Super Admin Master Console",
+            admin: "Institution Admin Desk",
             uploader: "Exam Upload Desk",
-            evaluator: "Teacher Evaluator Desk",
-            admin: "Institution Admin Desk"
+            evaluator: "Teacher Evaluator Desk"
         };
         this.showToast(`Switched to ${labels[next] || next}`);
     }
@@ -966,6 +983,7 @@ class AppController {
             } else {
                 btnEnter.innerHTML = `Access ${roleTitle} <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>`;
             }
+            btnEnter.style.color = "#FFFFFF";
         };
 
         const btnForgot = document.getElementById("btn-forgot-password");
@@ -1009,7 +1027,10 @@ class AppController {
             tabAdmin.addEventListener("click", () => {
                 selectedRole = "admin";
                 setTabActive(tabAdmin);
-                if (btnEnter) btnEnter.style.background = "linear-gradient(135deg, #AF52DE, #5856D6)";
+                if (btnEnter) {
+                    btnEnter.style.background = "linear-gradient(135deg, #AF52DE, #5856D6)";
+                    btnEnter.style.color = "#FFFFFF";
+                }
                 updateEnterBtnText();
             });
         }
@@ -1018,7 +1039,10 @@ class AppController {
             tabUploader.addEventListener("click", () => {
                 selectedRole = "uploader";
                 setTabActive(tabUploader);
-                if (btnEnter) btnEnter.style.background = "#007AFF";
+                if (btnEnter) {
+                    btnEnter.style.background = "#007AFF";
+                    btnEnter.style.color = "#FFFFFF";
+                }
                 updateEnterBtnText();
             });
         }
@@ -1027,7 +1051,10 @@ class AppController {
             tabEvaluator.addEventListener("click", () => {
                 selectedRole = "evaluator";
                 setTabActive(tabEvaluator);
-                if (btnEnter) btnEnter.style.background = "#34C759";
+                if (btnEnter) {
+                    btnEnter.style.background = "#34C759";
+                    btnEnter.style.color = "#FFFFFF";
+                }
                 updateEnterBtnText();
             });
         }

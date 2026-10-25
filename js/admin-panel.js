@@ -1,10 +1,10 @@
 /**
- * Niprak Digital Correction - Admin Panel & Master Analytics Manager
- * Features:
- * 1. Subject & Teacher Correction Tracker (Papers Uploaded vs Graded by Teacher)
- * 2. Student All-Subject Score Matrix Table (Roll No, Name, Physics, Chem, Math, Bio, Total, %, Grade)
- * 3. Class-wise Performance & Pass Rate Summary
- * 4. Excel CSV Export & Print Report Controls
+ * Niprak Digital Correction - Master Admin Panel & Institutional Evaluation Audit
+ * Dedicated exclusively to Institution Administrators:
+ * 1. Subject & Teacher Correction Tracker: Total Uploaded, Completed/Corrected, Pending ("How many need to do"), Last Corrected Date & Time.
+ * 2. Dedicated Corrected Papers Oversight Table with Quick Filters ("All", "✓ Corrected Only", "◐ Pending Only").
+ * 3. Student 360 Multi-Subject Scorecard (Admin Only): View that student's complete marks across all curriculum subjects with print transcript.
+ * 4. Master Excel & Print Analytics Exports.
  */
 
 class AdminPanelManager {
@@ -13,13 +13,19 @@ class AdminPanelManager {
         this.options = options;
         this.evaluations = [];
         this.users = [];
+        this.catalog = [];
+        this.classes = [];
         this.searchQuery = "";
         this.selectedClass = "all";
+        this.selectedSubject = "all";
+        this.statusFilter = "all"; // "all" | "corrected" | "pending"
+        this.activeTab = "papers"; // "papers" (Corrected Papers Oversight) | "matrix" (All-Subject Grid)
+        this.selectedStudentData = null;
     }
 
     async init() {
         if (!this.container) {
-            this.container = document.getElementById("view-admin-panel");
+            this.container = document.getElementById("admin-panel-container-root") || document.getElementById("view-admin-panel");
         }
         await this.loadData();
         this.render();
@@ -30,161 +36,467 @@ class AdminPanelManager {
             await window.appStorage.init();
             this.evaluations = await window.appStorage.getAllEvaluations();
             this.users = await window.appStorage.getUsersList();
+            try {
+                this.catalog = await window.appStorage.getSubjectCatalog() || [];
+                this.classes = await window.appStorage.getClassesList() || [];
+            } catch (e) {
+                this.catalog = [];
+                this.classes = [];
+            }
         }
+    }
+
+    isEvaluationCorrected(ev) {
+        if (!ev) return false;
+        const s = (ev.status || "").toLowerCase().trim();
+        if (s === "completed" || s === "corrected" || s === "graded" || s === "evaluated") {
+            return true;
+        }
+        if (ev.percentage !== undefined && ev.percentage !== null && Number(ev.percentage) > 0 && s !== "pending" && s !== "in progress") {
+            return true;
+        }
+        return false;
+    }
+
+    formatDateTime(isoStr) {
+        if (!isoStr) return "—";
+        try {
+            const d = new Date(isoStr);
+            if (isNaN(d.getTime())) return "—";
+            return d.toLocaleDateString("en-IN", {
+                day: "2-digit",
+                month: "short",
+                year: "numeric"
+            }) + " • " + d.toLocaleTimeString("en-IN", {
+                hour: "2-digit",
+                minute: "2-digit",
+                hour12: true
+            });
+        } catch (e) {
+            return "—";
+        }
+    }
+
+    computeSubjectStats() {
+        const subjectMap = new Map();
+
+        // 1. Seed from subject catalog if available
+        if (Array.isArray(this.catalog) && this.catalog.length > 0) {
+            this.catalog.forEach(sub => {
+                if (sub && sub.name) {
+                    const norm = sub.name.trim();
+                    subjectMap.set(norm, {
+                        code: sub.code || norm.substring(0, 4).toUpperCase(),
+                        name: norm,
+                        teacher: sub.teacherName || sub.evaluator || "—",
+                        uploaded: 0,
+                        corrected: 0,
+                        lastCorrectedTimestamp: null,
+                        totalScoreObt: 0,
+                        totalScoreMax: 0
+                    });
+                }
+            });
+        }
+
+        // 2. Accumulate evaluations
+        this.evaluations.forEach(ev => {
+            const subject = (ev.subject || "General").trim();
+            if (!subjectMap.has(subject)) {
+                subjectMap.set(subject, {
+                    code: subject.substring(0, 4).toUpperCase(),
+                    name: subject,
+                    teacher: ev.teacherName || ev.evaluatorName || "—",
+                    uploaded: 0,
+                    corrected: 0,
+                    lastCorrectedTimestamp: null,
+                    totalScoreObt: 0,
+                    totalScoreMax: 0
+                });
+            }
+            const entry = subjectMap.get(subject);
+            entry.uploaded++;
+
+            const isCorr = this.isEvaluationCorrected(ev);
+            if (isCorr) {
+                entry.corrected++;
+                entry.totalScoreObt += Number(ev.obtainedMarks) || 0;
+                entry.totalScoreMax += Number(ev.maxMarks) || 70;
+
+                const ts = ev.updatedAt || ev.lastUpdated || ev.completedAt || ev.createdAt;
+                if (ts) {
+                    const tsTime = new Date(ts).getTime();
+                    if (!entry.lastCorrectedTimestamp || tsTime > new Date(entry.lastCorrectedTimestamp).getTime()) {
+                        entry.lastCorrectedTimestamp = ts;
+                    }
+                }
+            }
+
+            // Derive faculty name
+            if ((!entry.teacher || entry.teacher === "—") && (ev.teacherName || ev.evaluatorName)) {
+                entry.teacher = ev.teacherName || ev.evaluatorName;
+            }
+        });
+
+        // Match with assigned faculty from user directory if still unassigned
+        if (Array.isArray(this.users)) {
+            subjectMap.forEach((entry, subName) => {
+                if (!entry.teacher || entry.teacher === "—") {
+                    const teacherUser = this.users.find(u => 
+                        u.role === "evaluator" && 
+                        Array.isArray(u.assignedSubjects) && 
+                        u.assignedSubjects.some(s => s.toLowerCase() === subName.toLowerCase())
+                    );
+                    if (teacherUser) entry.teacher = teacherUser.name;
+                }
+            });
+        }
+
+        return Array.from(subjectMap.values()).map(entry => {
+            const pending = Math.max(0, entry.uploaded - entry.corrected);
+            const pct = entry.uploaded > 0 ? Math.round((entry.corrected / entry.uploaded) * 100) : (entry.corrected > 0 ? 100 : 0);
+            const avgPct = entry.corrected > 0 && entry.totalScoreMax > 0 
+                ? Math.round((entry.totalScoreObt / entry.totalScoreMax) * 100)
+                : 0;
+            return {
+                ...entry,
+                pending,
+                pct,
+                avgPct,
+                lastCorrectedFormatted: this.formatDateTime(entry.lastCorrectedTimestamp)
+            };
+        });
+    }
+
+    computeDetailedPapers() {
+        return this.evaluations.map(ev => {
+            const isCorr = this.isEvaluationCorrected(ev);
+            const ts = ev.updatedAt || ev.lastUpdated || ev.completedAt || ev.createdAt;
+            const maxMarks = ev.maxMarks || 70;
+            const obtainedMarks = ev.obtainedMarks !== undefined ? Number(ev.obtainedMarks) : 0;
+            const pct = maxMarks > 0 ? Math.round((obtainedMarks / maxMarks) * 100) : 0;
+            const grade = ev.grade || (window.calculateGradeScale ? window.calculateGradeScale(obtainedMarks, maxMarks).grade : (pct >= 80 ? "A1" : pct >= 60 ? "B1" : "C"));
+
+            return {
+                id: ev.id,
+                rollNo: ev.rollNo || "—",
+                studentName: ev.studentName || "Student Paper",
+                className: ev.className || ev.class || "Class 12",
+                section: ev.section || "A",
+                subject: (ev.subject || "General").trim(),
+                examName: ev.examName || ev.templateName || "Annual Assessment",
+                obtainedMarks,
+                maxMarks,
+                percentage: pct,
+                grade,
+                isCorrected: isCorr,
+                status: isCorr ? "Completed" : "Pending",
+                timestamp: ts,
+                lastCorrectedFormatted: isCorr ? this.formatDateTime(ts) : "—",
+                teacherName: ev.teacherName || ev.evaluatorName || "Faculty Evaluator",
+                feedback: ev.feedback || ""
+            };
+        });
+    }
+
+    filterPapers(papers) {
+        return papers.filter(p => {
+            // 1. Status Filter (All / Corrected Only / Pending Only)
+            if (this.statusFilter === "corrected" && !p.isCorrected) return false;
+            if (this.statusFilter === "pending" && p.isCorrected) return false;
+
+            // 2. Subject Filter
+            if (this.selectedSubject !== "all" && p.subject.toLowerCase() !== this.selectedSubject.toLowerCase()) {
+                return false;
+            }
+
+            // 3. Class Filter
+            if (this.selectedClass !== "all") {
+                const combined = `${p.className}-${p.section}`.toLowerCase();
+                const target = this.selectedClass.toLowerCase().replace("class ", "").trim();
+                if (!combined.includes(target) && !p.className.toLowerCase().includes(target)) {
+                    return false;
+                }
+            }
+
+            // 4. Search Query
+            if (this.searchQuery) {
+                const q = this.searchQuery.toLowerCase().trim();
+                const matchName = p.studentName.toLowerCase().includes(q);
+                const matchRoll = p.rollNo.toLowerCase().includes(q);
+                const matchSub = p.subject.toLowerCase().includes(q);
+                if (!matchName && !matchRoll && !matchSub) return false;
+            }
+
+            return true;
+        });
+    }
+
+    computeStudentMatrix() {
+        if (!this.evaluations || this.evaluations.length === 0) return [];
+
+        const studentMap = new Map();
+
+        this.evaluations.forEach(ev => {
+            const key = (ev.rollNo || ev.studentName || ev.id).toString().trim().toLowerCase();
+            if (!studentMap.has(key)) {
+                studentMap.set(key, {
+                    rollNo: ev.rollNo || "—",
+                    studentName: ev.studentName || "Student Paper",
+                    class: `${ev.className || ev.class || 'Class 12'}-${ev.section || 'A'}`,
+                    evaluations: [],
+                    subjectsMap: {},
+                    totalObtained: 0,
+                    totalMax: 0,
+                    gradedCount: 0,
+                    totalCount: 0
+                });
+            }
+            const s = studentMap.get(key);
+            s.evaluations.push(ev);
+            const subName = (ev.subject || "General").trim();
+            s.subjectsMap[subName] = ev;
+            s.totalCount++;
+
+            if (this.isEvaluationCorrected(ev)) {
+                s.gradedCount++;
+                s.totalObtained += Number(ev.obtainedMarks) || 0;
+                s.totalMax += Number(ev.maxMarks) || 70;
+            }
+        });
+
+        return Array.from(studentMap.values()).map(s => {
+            const totalMax = s.totalMax > 0 ? s.totalMax : 70;
+            const pct = totalMax > 0 ? Math.round((s.totalObtained / totalMax) * 100) : 0;
+            const grade = window.calculateGradeScale ? window.calculateGradeScale(s.totalObtained, totalMax).grade : (pct >= 80 ? "A1" : pct >= 60 ? "B1" : "C");
+            const allGraded = s.gradedCount === s.totalCount && s.totalCount > 0;
+
+            return {
+                ...s,
+                percentage: pct,
+                grade,
+                status: allGraded ? "Completed" : "Pending"
+            };
+        });
     }
 
     render() {
         const subjectsData = this.computeSubjectStats();
+        const allPapers = this.computeDetailedPapers();
+        const filteredPapers = this.filterPapers(allPapers);
         const studentMatrix = this.computeStudentMatrix();
-        const filteredMatrix = this.filterMatrix(studentMatrix);
-        const classStats = this.computeClassStats(studentMatrix);
 
-        // Check if static table bodies exist (e.g. in admin.html)
-        const subjectTbody = document.getElementById("admin-subject-tracker-tbody");
-        const studentTbody = document.getElementById("admin-student-matrix-tbody");
+        const totalUploadedCount = allPapers.length;
+        const totalCorrectedCount = allPapers.filter(p => p.isCorrected).length;
+        const totalPendingCount = allPapers.filter(p => !p.isCorrected).length;
+        const overallCompletionPct = totalUploadedCount > 0 ? Math.round((totalCorrectedCount / totalUploadedCount) * 100) : 100;
 
-        if (subjectTbody && studentTbody) {
-            this.renderStaticMode(subjectsData, filteredMatrix, classStats, studentMatrix);
+        // Check if static table bodies exist (e.g. in standalone admin.html)
+        const staticSubTbody = document.getElementById("admin-subject-tracker-tbody");
+        const staticStudentTbody = document.getElementById("admin-student-matrix-tbody");
+        if (staticSubTbody && staticStudentTbody) {
+            this.renderStaticMode(subjectsData, studentMatrix, allPapers);
             this.bindStaticEvents();
             return;
         }
 
         if (!this.container) return;
 
+        // Build Unique Subject & Class filter options
+        const uniqueSubjects = Array.from(new Set(allPapers.map(p => p.subject))).filter(Boolean);
+        const uniqueClasses = Array.from(new Set(allPapers.map(p => `${p.className}-${p.section}`))).filter(Boolean);
+
         this.container.innerHTML = `
-            <div class="admin-panel-layout" style="padding: 24px; max-width: 1400px; margin: 0 auto; animation: fadeIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);">
-                <!-- Header Title Bar -->
-                <div class="admin-header-bar" style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; padding-bottom: 20px; border-bottom: 1px solid var(--border-color);">
+            <div class="admin-panel-layout">
+                <!-- Header Card (Apple Cupertino Governance Card) -->
+                <div class="admin-header-card">
                     <div>
-                        <span style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--apple-blue); font-weight: 500;">INSTITUTION GOVERNANCE & ANALYTICS</span>
-                        <h1 style="font-size: 1.8rem; font-weight: 400; color: var(--text-main); margin-top: 4px;">Master Admin & Evaluation Audit Desk</h1>
-                        <p style="font-size: 0.92rem; color: var(--text-muted); margin-top: 2px;">Track teacher correction progress, view multi-subject student scorecards, and export class reports.</p>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <span class="admin-title-badge">Institution Central Audit Desk</span>
+                            <span style="font-size: 0.76rem; background: rgba(52, 199, 89, 0.12); color: #16A34A; padding: 3px 10px; border-radius: 20px; font-weight: 500;">
+                                ${overallCompletionPct}% Graded (${totalCorrectedCount}/${totalUploadedCount})
+                            </span>
+                        </div>
+                        <h1 class="admin-title-main">Administrative Oversight &amp; Student Marks Audit</h1>
+                        <p class="admin-sub-text">Monitor faculty correction progress across subjects, review completed papers, and inspect individual student multi-subject dossiers.</p>
                     </div>
+
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                        <button type="button" class="btn-mgmt-secondary" id="btn-admin-clean-data" style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 12px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); color: #DC2626; font-size: 0.88rem; cursor: pointer;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                            Clean Up Data
+                        <button type="button" class="btn-secondary" id="btn-admin-print-report" style="display: flex; align-items: center; gap: 6px; height: 38px;">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+                            <span>Print Audit</span>
                         </button>
-                        <button type="button" class="btn-mgmt-secondary" id="btn-admin-print-report" style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 12px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.88rem; cursor: pointer;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                            Print Summary Report
-                        </button>
-                        <button type="button" class="btn-mgmt-primary" id="btn-admin-export-excel" style="display: flex; align-items: center; gap: 8px; padding: 10px 18px; border-radius: 12px; background: var(--primary); color: #fff; border: none; font-size: 0.88rem; cursor: pointer;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
-                            Export Excel Matrix
+                        <button type="button" class="btn-primary" id="btn-admin-export-excel" style="display: flex; align-items: center; gap: 6px; height: 38px; background: linear-gradient(135deg, #AF52DE, #5856D6);">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                            <span>Export Master Excel</span>
                         </button>
                     </div>
                 </div>
 
-                <!-- Section 1: Subject & Teacher Correction Tracker -->
-                <div style="margin-bottom: 32px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
-                        <h2 style="font-size: 1.25rem; font-weight: 400; color: var(--text-main);">Subject & Faculty Evaluation Audit</h2>
-                        <span style="font-size: 0.82rem; color: var(--text-muted);">${subjectsData.length} Active Faculty Desks</span>
+                <!-- Section 1: Subject Evaluation Progress & Last Corrected Status -->
+                <div style="margin-bottom: 28px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                        <div>
+                            <h2 style="font-size: 1.15rem; font-weight: 400; color: var(--text-main); margin: 0;">Subject &amp; Faculty Evaluation Tracker</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0;">Real-time progress, papers pending ("how many need to do"), and faculty last correction timestamp</p>
+                        </div>
+                        <span style="font-size: 0.82rem; color: var(--text-muted);">${subjectsData.length} Subjects Monitored</span>
                     </div>
 
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
-                        ${subjectsData.map(sub => `
-                            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 18px; padding: 20px; box-shadow: var(--shadow-sm);">
-                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
-                                    <span style="font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em; padding: 3px 10px; border-radius: 20px; background: rgba(0,122,255,0.1); color: var(--apple-blue); font-weight: 500;">${sub.code}</span>
-                                    <span style="font-size: 0.85rem; font-weight: 500; color: ${sub.pct === 100 ? '#34C759' : '#D97706'};">${sub.pct}% Completed</span>
-                                </div>
-                                <h3 style="font-size: 1.1rem; font-weight: 400; color: var(--text-main); margin-bottom: 4px;">${sub.name}</h3>
-                                <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px;">Faculty: ${sub.teacher}</p>
+                    <div class="admin-subject-grid">
+                        ${subjectsData.length === 0 ? `
+                            <div style="grid-column: 1 / -1; padding: 30px; text-align: center; background: var(--bg-card); border-radius: 16px; border: 1px solid var(--border-color); color: var(--text-muted);">
+                                No subject evaluations ingested yet. Upload papers on the Upload Desk to populate subject audit stats.
+                            </div>
+                        ` : subjectsData.map(sub => {
+                            const is100 = sub.pct === 100 && sub.uploaded > 0;
+                            const statusCls = is100 ? "completed" : (sub.corrected > 0 ? "in-progress" : "pending");
+                            const statusText = is100 ? "✓ 100% All Graded" : (sub.corrected > 0 ? `${sub.pct}% In Progress` : "0% Awaiting Grading");
 
-                                <div style="background: var(--bg-subtle); height: 8px; border-radius: 4px; overflow: hidden; margin-bottom: 12px;">
-                                    <div style="background: var(--primary); height: 100%; width: ${sub.pct}%; transition: width 0.3s ease;"></div>
-                                </div>
+                            return `
+                                <div class="admin-sub-card">
+                                    <div class="admin-sub-card-top">
+                                        <span class="admin-sub-code-tag">${sub.code}</span>
+                                        <span class="admin-sub-status-pill ${statusCls}">${statusText}</span>
+                                    </div>
+                                    <h3 class="admin-sub-title">${sub.name}</h3>
+                                    <div class="admin-sub-teacher">Faculty: <strong>${sub.teacher}</strong></div>
 
-                                <div style="display: flex; justify-content: space-between; font-size: 0.82rem; color: var(--text-body);">
-                                    <span>Uploaded: <strong>${sub.uploaded}</strong></span>
-                                    <span>Corrected: <strong>${sub.corrected}</strong></span>
-                                    <span>Pending: <strong>${sub.pending}</strong></span>
+                                    <div class="admin-sub-progress-track">
+                                        <div class="admin-sub-progress-fill ${is100 ? 'full' : ''}" style="width: ${sub.pct}%;"></div>
+                                    </div>
+
+                                    <div class="admin-sub-metrics-row">
+                                        <span>Total: <strong>${sub.uploaded}</strong></span>
+                                        <span style="color: #16A34A;">Corrected: <strong>${sub.corrected}</strong></span>
+                                        <span style="color: #D97706;">Need To Do: <strong>${sub.pending}</strong></span>
+                                    </div>
+
+                                    <div class="admin-sub-last-corrected">
+                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                        <span>Last Corrected: <strong>${sub.lastCorrectedFormatted}</strong></span>
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                </div>
+
+                <!-- Section 2: Detailed Corrected Papers & Evaluation Oversight Table -->
+                <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 30px;">
+                    <!-- Filter Toolbar -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                <h2 style="font-size: 1.15rem; font-weight: 400; color: var(--text-main); margin: 0;">Evaluation Records &amp; Student Oversight</h2>
+                                
+                                <!-- Quick Status Filter Tabs (One-click toggle between All, Corrected Only, Pending Only) -->
+                                <div class="admin-tab-nav" id="admin-status-tab-nav">
+                                    <button type="button" class="admin-tab-btn ${this.statusFilter === 'all' ? 'active' : ''}" data-status="all">
+                                        <span>All Papers</span>
+                                        <span class="admin-tab-count-pill">${totalUploadedCount}</span>
+                                    </button>
+                                    <button type="button" class="admin-tab-btn ${this.statusFilter === 'corrected' ? 'active' : ''}" data-status="corrected">
+                                        <span style="color: #16A34A;">✓ Corrected</span>
+                                        <span class="admin-tab-count-pill">${totalCorrectedCount}</span>
+                                    </button>
+                                    <button type="button" class="admin-tab-btn ${this.statusFilter === 'pending' ? 'active' : ''}" data-status="pending">
+                                        <span style="color: #D97706;">◐ Need To Do</span>
+                                        <span class="admin-tab-count-pill">${totalPendingCount}</span>
+                                    </button>
                                 </div>
                             </div>
-                        `).join("")}
-                    </div>
-                </div>
-
-                <!-- Section 2: Student All-Subject Grade Matrix Table -->
-                <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-sm); margin-bottom: 32px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; padding-bottom: 16px; border-bottom: 1px solid var(--border-color);">
-                        <div>
-                            <h2 style="font-size: 1.25rem; font-weight: 400; color: var(--text-main);">All-Subject Student Score Matrix</h2>
-                            <p style="font-size: 0.84rem; color: var(--text-muted);">Consolidated marks across all subjects for each student</p>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 4px 0 0;">
+                                Select any student row or click <strong>View Student 360</strong> to inspect that student's complete marks across all other subjects.
+                            </p>
                         </div>
 
-                        <div style="display: flex; gap: 12px; align-items: center;">
-                            <input type="text" id="admin-matrix-search" placeholder="Search student name or roll..." value="${this.searchQuery}" style="height: 38px; padding: 0 14px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.88rem; background: var(--bg-subtle); width: 220px;" />
+                        <!-- Search & Dropdown Filters -->
+                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                            <input type="text" id="admin-papers-search" placeholder="Search student or roll no..." value="${this.searchQuery}" style="height: 36px; padding: 0 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.84rem; background: var(--bg-subtle); width: 210px;" />
                             
-                            <select id="admin-matrix-class-filter" style="height: 38px; padding: 0 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.88rem; background: var(--bg-subtle);">
-                                <option value="all" ${this.selectedClass === 'all' ? 'selected' : ''}>All Classes</option>
-                                <option value="Class 12-A" ${this.selectedClass === 'Class 12-A' ? 'selected' : ''}>Class 12-A</option>
-                                <option value="Class 12-B" ${this.selectedClass === 'Class 12-B' ? 'selected' : ''}>Class 12-B</option>
-                                <option value="Class 10-A" ${this.selectedClass === 'Class 10-A' ? 'selected' : ''}>Class 10-A</option>
+                            <select id="admin-papers-subject-filter" style="height: 36px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.84rem; background: var(--bg-subtle);">
+                                <option value="all">All Subjects</option>
+                                ${uniqueSubjects.map(sub => `<option value="${sub}" ${this.selectedSubject.toLowerCase() === sub.toLowerCase() ? 'selected' : ''}>${sub}</option>`).join("")}
+                            </select>
+
+                            <select id="admin-papers-class-filter" style="height: 36px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.84rem; background: var(--bg-subtle);">
+                                <option value="all">All Classes</option>
+                                ${uniqueClasses.map(cls => `<option value="${cls}" ${this.selectedClass === cls ? 'selected' : ''}>${cls}</option>`).join("")}
                             </select>
                         </div>
                     </div>
 
-                    <div style="overflow-x: auto;">
-                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.88rem;">
+                    <!-- Papers Table -->
+                    <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 14px;">
+                        <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.86rem;">
                             <thead>
-                                <tr style="background: var(--bg-subtle); border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em;">
+                                <tr style="background: var(--bg-subtle); border-bottom: 1px solid var(--border-color); color: var(--text-muted); font-size: 0.74rem; text-transform: uppercase; letter-spacing: 0.05em;">
                                     <th style="padding: 12px 14px;">Roll No</th>
                                     <th style="padding: 12px 14px;">Student Name</th>
                                     <th style="padding: 12px 14px;">Class</th>
-                                    <th style="padding: 12px 14px; text-align: center;">Physics (70M)</th>
-                                    <th style="padding: 12px 14px; text-align: center;">Chemistry (70M)</th>
-                                    <th style="padding: 12px 14px; text-align: center;">Maths (80M)</th>
-                                    <th style="padding: 12px 14px; text-align: center;">Total Score</th>
+                                    <th style="padding: 12px 14px;">Subject</th>
+                                    <th style="padding: 12px 14px; text-align: center;">Score</th>
                                     <th style="padding: 12px 14px; text-align: center;">Percentage</th>
                                     <th style="padding: 12px 14px; text-align: center;">Grade</th>
                                     <th style="padding: 12px 14px; text-align: center;">Status</th>
+                                    <th style="padding: 12px 14px;">Last Corrected</th>
+                                    <th style="padding: 12px 14px;">Faculty</th>
+                                    <th style="padding: 12px 14px; text-align: center;">Admin Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                ${filteredMatrix.length === 0 ? `
+                                ${filteredPapers.length === 0 ? `
                                     <tr>
-                                        <td colspan="10" style="padding: 40px; text-align: center; color: var(--text-muted);">
-                                            No student records found. Upload papers on the Upload Desk to populate student marks.
+                                        <td colspan="11" style="padding: 40px; text-align: center; color: var(--text-muted);">
+                                            No evaluation papers matching current filter criteria.
                                         </td>
                                     </tr>
-                                ` : filteredMatrix.map(row => `
-                                    <tr style="border-bottom: 1px solid var(--border-color); transition: background 0.15s ease;">
-                                        <td style="padding: 12px 14px; font-weight: 500;">${row.rollNo}</td>
-                                        <td style="padding: 12px 14px; color: var(--text-main);">${row.studentName}</td>
-                                        <td style="padding: 12px 14px; color: var(--text-muted);">${row.class}</td>
-                                        <td style="padding: 12px 14px; text-align: center; font-weight: 500; color: ${row.physicsMarks !== '--' ? 'var(--primary)' : 'var(--text-muted)'};">${row.physicsMarks}</td>
-                                        <td style="padding: 12px 14px; text-align: center; color: var(--text-muted);">${row.chemMarks}</td>
-                                        <td style="padding: 12px 14px; text-align: center; color: var(--text-muted);">${row.mathMarks}</td>
-                                        <td style="padding: 12px 14px; text-align: center; font-weight: 600;">${row.totalObtained} / ${row.totalMax}</td>
-                                        <td style="padding: 12px 14px; text-align: center;">${row.percentage}%</td>
-                                        <td style="padding: 12px 14px; text-align: center;"><span style="padding: 2px 8px; border-radius: 6px; background: rgba(52,199,89,0.1); color: #34C759; font-weight: 500;">${row.grade}</span></td>
-                                        <td style="padding: 12px 14px; text-align: center;">
-                                            <span style="padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; background: ${row.status === 'Completed' ? 'rgba(52,199,89,0.1)' : 'rgba(255,149,0,0.1)'}; color: ${row.status === 'Completed' ? '#34C759' : '#D97706'};">
-                                                ${row.status === 'Completed' ? '✓ Graded' : '◐ Pending'}
+                                ` : filteredPapers.map(p => `
+                                    <tr class="admin-paper-row" data-roll="${p.rollNo}" data-name="${p.studentName}" style="border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s ease;">
+                                        <td style="padding: 11px 14px; font-weight: 500; color: var(--text-main); font-family: 'JetBrains Mono', monospace;">${p.rollNo}</td>
+                                        <td style="padding: 11px 14px; color: var(--text-main); font-weight: 500;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <span>${p.studentName}</span>
+                                            </div>
+                                        </td>
+                                        <td style="padding: 11px 14px; color: var(--text-muted);">${p.className}-${p.section}</td>
+                                        <td style="padding: 11px 14px;">
+                                            <span style="padding: 2px 8px; border-radius: 6px; background: rgba(0, 122, 255, 0.08); color: #007AFF; font-size: 0.8rem; font-weight: 500;">
+                                                ${p.subject}
                                             </span>
+                                        </td>
+                                        <td style="padding: 11px 14px; text-align: center; font-weight: 600; color: ${p.isCorrected ? '#16A34A' : 'var(--text-muted)'};">
+                                            ${p.isCorrected ? `${p.obtainedMarks} / ${p.maxMarks}` : '—'}
+                                        </td>
+                                        <td style="padding: 11px 14px; text-align: center; font-weight: 500;">
+                                            ${p.isCorrected ? `${p.percentage}%` : '—'}
+                                        </td>
+                                        <td style="padding: 11px 14px; text-align: center;">
+                                            ${p.isCorrected ? `<span style="padding: 2px 7px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #16A34A; font-weight: 600; font-size: 0.78rem;">${p.grade}</span>` : '—'}
+                                        </td>
+                                        <td style="padding: 11px 14px; text-align: center;">
+                                            <span style="padding: 3px 10px; border-radius: 12px; font-size: 0.76rem; font-weight: 500; background: ${p.isCorrected ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)'}; color: ${p.isCorrected ? '#16A34A' : '#D97706'};">
+                                                ${p.isCorrected ? '✓ Corrected' : '◐ Pending'}
+                                            </span>
+                                        </td>
+                                        <td style="padding: 11px 14px; color: var(--text-muted); font-size: 0.8rem; white-space: nowrap;">
+                                            ${p.lastCorrectedFormatted}
+                                        </td>
+                                        <td style="padding: 11px 14px; color: var(--text-muted); font-size: 0.82rem;">
+                                            ${p.teacherName}
+                                        </td>
+                                        <td style="padding: 11px 14px; text-align: center;">
+                                            <button type="button" class="btn-student-360-pill" data-roll="${p.rollNo}" data-name="${p.studentName}" title="Inspect full marks across other subjects">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                <span>Student 360</span>
+                                            </button>
                                         </td>
                                     </tr>
                                 `).join("")}
                             </tbody>
                         </table>
                     </div>
-                </div>
-
-                <!-- Section 3: Class Summary KPI Cards -->
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 20px;">
-                    ${classStats.map(cs => `
-                        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 18px; padding: 20px;">
-                            <span style="font-size: 0.78rem; text-transform: uppercase; color: var(--text-muted);">${cs.className} SUMMARY</span>
-                            <div style="font-size: 1.6rem; font-weight: 400; color: var(--text-main); margin: 6px 0;">${cs.avgPct}% Avg</div>
-                            <div style="font-size: 0.82rem; color: var(--text-body); display: flex; justify-content: space-between;">
-                                <span>Students: ${cs.count}</span>
-                                <span>Pass Rate: <strong style="color: #34C759;">${cs.passRate}%</strong></span>
-                            </div>
-                        </div>
-                    `).join("")}
                 </div>
             </div>
         `;
@@ -193,15 +505,39 @@ class AdminPanelManager {
     }
 
     bindEvents() {
-        const searchInp = this.container.querySelector("#admin-matrix-search");
-        if (searchInp) {
-            searchInp.addEventListener("input", (e) => {
+        if (!this.container) return;
+
+        // Quick Filter Tabs (All / Corrected / Pending)
+        const tabNav = this.container.querySelector("#admin-status-tab-nav");
+        if (tabNav) {
+            tabNav.querySelectorAll(".admin-tab-btn").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    this.statusFilter = btn.getAttribute("data-status") || "all";
+                    this.render();
+                });
+            });
+        }
+
+        // Live Search Input
+        const searchInput = this.container.querySelector("#admin-papers-search");
+        if (searchInput) {
+            searchInput.addEventListener("input", (e) => {
                 this.searchQuery = e.target.value.toLowerCase();
                 this.render();
             });
         }
 
-        const classSelect = this.container.querySelector("#admin-matrix-class-filter");
+        // Subject Filter
+        const subSelect = this.container.querySelector("#admin-papers-subject-filter");
+        if (subSelect) {
+            subSelect.addEventListener("change", (e) => {
+                this.selectedSubject = e.target.value;
+                this.render();
+            });
+        }
+
+        // Class Filter
+        const classSelect = this.container.querySelector("#admin-papers-class-filter");
         if (classSelect) {
             classSelect.addEventListener("change", (e) => {
                 this.selectedClass = e.target.value;
@@ -209,306 +545,293 @@ class AdminPanelManager {
             });
         }
 
+        // Print Report
         const printBtn = this.container.querySelector("#btn-admin-print-report");
         if (printBtn) {
             printBtn.addEventListener("click", () => window.print());
         }
 
+        // Export Excel
         const exportBtn = this.container.querySelector("#btn-admin-export-excel");
         if (exportBtn) {
             exportBtn.addEventListener("click", () => this.exportExcelMatrix());
         }
 
-        const cleanBtn = this.container.querySelector("#btn-admin-clean-data");
-        if (cleanBtn) {
-            cleanBtn.addEventListener("click", async () => {
-                if (confirm("Clean Up Unwanted / Demo Data?\n\nThis will permanently delete demo math evaluations and the 5 Dharnish test records from browser storage & cloud sync.\n\nOfficial curriculum blueprints and class rosters will remain intact.")) {
-                    cleanBtn.disabled = true;
-                    cleanBtn.textContent = "Cleaning...";
-                    if (window.appStorage && typeof window.appStorage.purgeUnwantedData === "function") {
-                        await window.appStorage.purgeUnwantedData();
-                    }
-                    if (window.app && typeof window.app.updateStorageQuotaDisplay === "function") {
-                        window.app.updateStorageQuotaDisplay();
-                    }
-                    await this.init();
-                    if (window.app && window.app.showToast) {
-                        window.app.showToast("✓ Cleaned up unwanted test data and Dharnish records successfully!", "success");
-                    }
-                }
+        // Student 360 trigger buttons and row clicks
+        this.container.querySelectorAll(".btn-student-360-pill").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const roll = btn.getAttribute("data-roll");
+                const name = btn.getAttribute("data-name");
+                this.openStudent360(roll, name);
             });
+        });
+
+        this.container.querySelectorAll(".admin-paper-row").forEach(row => {
+            row.addEventListener("click", () => {
+                const roll = row.getAttribute("data-roll");
+                const name = row.getAttribute("data-name");
+                this.openStudent360(roll, name);
+            });
+        });
+    }
+
+    // --- Student 360 All-Subjects Modal (Only for Admin) ---
+
+    openStudent360(rollNo, studentName) {
+        const modal = document.getElementById("modal-admin-student-profile");
+        if (!modal) return;
+
+        // Group all evaluations belonging to this student
+        const normRoll = (rollNo || "").toString().trim().toLowerCase();
+        const normName = (studentName || "").toString().trim().toLowerCase();
+
+        const studentEvals = this.evaluations.filter(ev => {
+            const evRoll = (ev.rollNo || "").toString().trim().toLowerCase();
+            const evName = (ev.studentName || "").toString().trim().toLowerCase();
+            if (normRoll && normRoll !== "—" && evRoll === normRoll) return true;
+            if (normName && evName === normName) return true;
+            return false;
+        });
+
+        // Derive metadata
+        const refEval = studentEvals[0] || {};
+        const displayName = refEval.studentName || studentName || "Student Paper";
+        const displayRoll = refEval.rollNo || rollNo || "101";
+        const displayClass = `${refEval.className || refEval.class || "Class 12"}-${refEval.section || "A"}`;
+
+        // Avatar initials
+        const initials = displayName
+            .split(" ")
+            .filter(Boolean)
+            .slice(0, 2)
+            .map(w => w[0].toUpperCase())
+            .join("") || "ST";
+
+        // Map evaluations by subject
+        const evalBySubject = new Map();
+        studentEvals.forEach(ev => {
+            const sub = (ev.subject || "General").trim();
+            evalBySubject.set(sub.toLowerCase(), ev);
+        });
+
+        // Determine all curriculum subjects: union of catalog subjects and student's evaluated subjects
+        const allSubjectNames = new Set();
+        if (Array.isArray(this.catalog) && this.catalog.length > 0) {
+            this.catalog.forEach(c => { if (c && c.name) allSubjectNames.add(c.name.trim()); });
+        }
+        studentEvals.forEach(e => {
+            if (e.subject) allSubjectNames.add(e.subject.trim());
+        });
+        if (allSubjectNames.size === 0) {
+            allSubjectNames.add("Physics");
+            allSubjectNames.add("Chemistry");
+            allSubjectNames.add("Mathematics");
+            allSubjectNames.add("Biology");
+            allSubjectNames.add("English");
+        }
+
+        // Build subject rows & calculate cumulative totals
+        let totalObtained = 0;
+        let totalMax = 0;
+        let gradedCount = 0;
+        let teacherRemarks = [];
+
+        const subjectRowsHtml = Array.from(allSubjectNames).map(subName => {
+            const ev = evalBySubject.get(subName.toLowerCase());
+            if (ev) {
+                const isCorr = this.isEvaluationCorrected(ev);
+                const max = Number(ev.maxMarks) || 70;
+                const obt = Number(ev.obtainedMarks) || 0;
+                const pct = max > 0 ? Math.round((obt / max) * 100) : 0;
+                const grade = ev.grade || (window.calculateGradeScale ? window.calculateGradeScale(obt, max).grade : (pct >= 80 ? "A1" : "B1"));
+                const ts = ev.updatedAt || ev.lastUpdated || ev.completedAt || ev.createdAt;
+                const teacher = ev.teacherName || ev.evaluatorName || "Faculty Evaluator";
+
+                if (isCorr) {
+                    gradedCount++;
+                    totalObtained += obt;
+                    totalMax += max;
+                }
+
+                if (ev.feedback && ev.feedback.trim()) {
+                    teacherRemarks.push(`<strong>${subName}:</strong> "${ev.feedback.trim()}"`);
+                }
+
+                return `
+                    <tr>
+                        <td style="font-weight: 500;">
+                            <span style="color: var(--text-main);">${subName}</span>
+                            <div style="font-size: 0.72rem; color: var(--text-muted);">${ev.examName || 'Assessment'}</div>
+                        </td>
+                        <td style="text-align: center; color: var(--text-muted);">${max} M</td>
+                        <td style="text-align: center; font-weight: 600; color: ${isCorr ? '#16A34A' : 'var(--text-muted)'};">
+                            ${isCorr ? `${obt} M` : '—'}
+                        </td>
+                        <td style="text-align: center; font-weight: 500;">${isCorr ? `${pct}%` : '—'}</td>
+                        <td style="text-align: center;">
+                            ${isCorr ? `<span style="padding: 2px 7px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #16A34A; font-weight: 600; font-size: 0.78rem;">${grade}</span>` : '—'}
+                        </td>
+                        <td style="text-align: center;">
+                            <span style="padding: 2px 8px; border-radius: 10px; font-size: 0.74rem; font-weight: 500; background: ${isCorr ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)'}; color: ${isCorr ? '#16A34A' : '#D97706'};">
+                                ${isCorr ? '✓ Graded' : '◐ In Progress'}
+                            </span>
+                        </td>
+                        <td style="font-size: 0.78rem; color: var(--text-muted);">${isCorr ? this.formatDateTime(ts) : '—'}</td>
+                        <td style="font-size: 0.8rem; color: var(--text-muted);">${teacher}</td>
+                    </tr>
+                `;
+            } else {
+                return `
+                    <tr style="opacity: 0.7;">
+                        <td style="font-weight: 500; color: var(--text-muted);">${subName}</td>
+                        <td style="text-align: center; color: var(--text-muted);">—</td>
+                        <td style="text-align: center; color: var(--text-muted);">—</td>
+                        <td style="text-align: center; color: var(--text-muted);">—</td>
+                        <td style="text-align: center; color: var(--text-muted);">—</td>
+                        <td style="text-align: center;">
+                            <span style="padding: 2px 8px; border-radius: 10px; font-size: 0.74rem; background: rgba(148, 163, 184, 0.15); color: #64748B;">
+                                ⚠️ Not Uploaded
+                            </span>
+                        </td>
+                        <td style="font-size: 0.78rem; color: var(--text-muted);">—</td>
+                        <td style="font-size: 0.8rem; color: var(--text-muted);">Department Faculty</td>
+                    </tr>
+                `;
+            }
+        }).join("");
+
+        // Set KPIs
+        const overallPct = totalMax > 0 ? Math.round((totalObtained / totalMax) * 100) : 0;
+        const overallGrade = totalMax > 0 ? (window.calculateGradeScale ? window.calculateGradeScale(totalObtained, totalMax).grade : (overallPct >= 80 ? "A1" : "B1")) : "—";
+
+        // Populate modal DOM
+        const elAvatar = document.getElementById("s360-avatar");
+        const elName = document.getElementById("s360-name");
+        const elMeta = document.getElementById("s360-meta");
+        const elTotalScore = document.getElementById("s360-total-score");
+        const elOverallPct = document.getElementById("s360-overall-pct");
+        const elGrade = document.getElementById("s360-grade");
+        const elRatio = document.getElementById("s360-completion-ratio");
+        const elTbody = document.getElementById("s360-subjects-tbody");
+        const elFeedbackBox = document.getElementById("s360-teacher-feedback-box");
+        const elFeedbackText = document.getElementById("s360-feedback-text");
+
+        if (elAvatar) elAvatar.textContent = initials;
+        if (elName) elName.textContent = displayName;
+        if (elMeta) elMeta.textContent = `Roll No: ${displayRoll} • Class: ${displayClass} • Central Institutional Examination Cell`;
+        if (elTotalScore) elTotalScore.textContent = `${totalObtained} / ${totalMax} M`;
+        if (elOverallPct) elOverallPct.textContent = `${overallPct}%`;
+        if (elGrade) elGrade.textContent = overallGrade;
+        if (elRatio) elRatio.textContent = `${gradedCount} of ${allSubjectNames.size} Graded`;
+        if (elTbody) elTbody.innerHTML = subjectRowsHtml;
+
+        if (elFeedbackBox && elFeedbackText) {
+            if (teacherRemarks.length > 0) {
+                elFeedbackBox.style.display = "block";
+                elFeedbackText.innerHTML = teacherRemarks.join(" • ");
+            } else {
+                elFeedbackBox.style.display = "none";
+            }
+        }
+
+        // Show modal
+        modal.style.display = "flex";
+        requestAnimationFrame(() => modal.classList.add("active"));
+
+        const closeModal = () => {
+            modal.classList.remove("active");
+            setTimeout(() => { modal.style.display = "none"; }, 200);
+        };
+
+        const btnClose = document.getElementById("btn-close-s360-modal");
+        const btnDone = document.getElementById("btn-done-s360-modal");
+        const btnPrint = document.getElementById("btn-print-s360-report");
+
+        if (btnClose) btnClose.onclick = closeModal;
+        if (btnDone) btnDone.onclick = closeModal;
+        modal.onclick = (e) => { if (e.target === modal) closeModal(); };
+
+        if (btnPrint) {
+            btnPrint.onclick = () => {
+                window.print();
+            };
         }
     }
 
-    renderStaticMode(subjectsData, filteredMatrix, classStats, studentMatrix) {
-        // Update KPI Cards
-        const totalPapers = subjectsData.reduce((acc, s) => acc + s.uploaded, 0);
-        const totalCorrected = subjectsData.reduce((acc, s) => acc + s.corrected, 0);
-        const totalPending = subjectsData.reduce((acc, s) => acc + s.pending, 0);
-
-        const kpiTotal = document.getElementById("kpi-total-papers");
-        if (kpiTotal) kpiTotal.textContent = totalPapers;
-
-        const kpiCorrected = document.getElementById("kpi-corrected-papers");
-        if (kpiCorrected) kpiCorrected.textContent = totalCorrected;
-
-        const kpiCorrectedSub = document.getElementById("kpi-corrected-sub");
-        if (kpiCorrectedSub) {
-            const pct = totalPapers > 0 ? Math.round((totalCorrected / totalPapers) * 100) : 100;
-            kpiCorrectedSub.textContent = `${pct}% completion rate`;
-        }
-
-        const kpiPending = document.getElementById("kpi-pending-papers");
-        if (kpiPending) kpiPending.textContent = totalPending;
-
-        // Render Subject & Faculty Audit Table
-        const subjectTbody = document.getElementById("admin-subject-tracker-tbody");
-        if (subjectTbody) {
-            subjectTbody.innerHTML = subjectsData.map(sub => `
+    renderStaticMode(subjectsData, studentMatrix, allPapers) {
+        // Fallback for standalone admin.html static DOM
+        const subTbody = document.getElementById("admin-subject-tracker-tbody");
+        if (subTbody) {
+            subTbody.innerHTML = subjectsData.map(sub => `
                 <tr style="border-bottom: 1px solid var(--border-color);">
                     <td style="padding: 12px 16px; font-weight: 600; color: var(--text-main);">
                         ${sub.name}
-                        <div style="font-size: 0.72rem; color: var(--apple-blue);">${sub.code}</div>
+                        <div style="font-size: 0.72rem; color: #AF52DE;">${sub.code}</div>
                     </td>
                     <td style="padding: 12px 16px; color: var(--text-muted);">${sub.teacher}</td>
                     <td style="padding: 12px 16px; font-weight: 500;">${sub.uploaded}</td>
-                    <td style="padding: 12px 16px; color: #34C759; font-weight: 600;">${sub.corrected}</td>
-                    <td style="padding: 12px 16px; color: #FF9500; font-weight: 500;">${sub.pending}</td>
-                    <td style="padding: 12px 16px;">
-                        <div style="display: flex; align-items: center; gap: 10px;">
-                            <div style="flex: 1; background: var(--bg-subtle); height: 6px; border-radius: 3px; overflow: hidden;">
-                                <div style="background: ${sub.pct === 100 ? '#34C759' : '#007AFF'}; height: 100%; width: ${sub.pct}%;"></div>
-                            </div>
-                            <span style="font-size: 0.78rem; font-weight: 600; color: var(--text-main);">${sub.pct}%</span>
-                        </div>
-                    </td>
+                    <td style="padding: 12px 16px; color: #16A34A; font-weight: 600;">${sub.corrected}</td>
+                    <td style="padding: 12px 16px; color: #D97706; font-weight: 500;">${sub.pending}</td>
+                    <td style="padding: 12px 16px; font-size: 0.8rem; color: var(--text-muted);">${sub.lastCorrectedFormatted}</td>
                 </tr>
             `).join("");
         }
 
-        // Render Student Score Matrix Table
         const studentTbody = document.getElementById("admin-student-matrix-tbody");
         if (studentTbody) {
-            if (filteredMatrix.length === 0) {
-                studentTbody.innerHTML = `
-                    <tr>
-                        <td colspan="10" style="padding: 32px; text-align: center; color: var(--text-muted);">
-                            No evaluation records found. Upload student answer sheets on the Upload Desk to view live marks matrix.
-                        </td>
-                    </tr>
-                `;
-            } else {
-                studentTbody.innerHTML = filteredMatrix.map(row => `
-                    <tr style="border-bottom: 1px solid var(--border-color);">
-                        <td style="padding: 12px 14px; font-weight: 500; color: var(--text-main);">${row.rollNo}</td>
-                        <td style="padding: 12px 14px; color: var(--text-main);">${row.studentName}</td>
-                        <td style="padding: 12px 14px; color: var(--text-muted);">${row.class}</td>
-                        <td style="padding: 12px 14px; text-align: center; font-weight: 600; color: #007AFF;">${row.physicsMarks}</td>
-                        <td style="padding: 12px 14px; text-align: center; color: var(--text-muted);">${row.chemMarks}</td>
-                        <td style="padding: 12px 14px; text-align: center; color: var(--text-muted);">${row.mathMarks}</td>
-                        <td style="padding: 12px 14px; text-align: center; font-weight: 600; color: var(--text-main);">${row.totalObtained} / ${row.totalMax}</td>
-                        <td style="padding: 12px 14px; text-align: center; font-weight: 600;">${row.percentage}%</td>
-                        <td style="padding: 12px 14px; text-align: center;"><span style="padding: 2px 8px; border-radius: 6px; background: rgba(52,199,89,0.12); color: #34C759; font-weight: 600; font-size: 0.8rem;">${row.grade}</span></td>
-                        <td style="padding: 12px 14px; text-align: center;">
-                            <div style="display: flex; align-items: center; justify-content: center; gap: 8px;">
-                                <span style="padding: 3px 10px; border-radius: 12px; font-size: 0.78rem; font-weight: 500; background: ${row.status === 'Completed' ? 'rgba(52,199,89,0.12)' : 'rgba(255,149,0,0.12)'}; color: ${row.status === 'Completed' ? '#34C759' : '#FF9500'};">
-                                    ${row.status === 'Completed' ? '✓ Graded' : '◐ Pending'}
-                                </span>
-                                <button type="button" class="btn-admin-delete-eval" data-eval-id="${row.id}" title="Delete Physics Paper" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.25); color: #DC2626; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                    Delete
-                                </button>
-                            </div>
-                        </td>
-                    </tr>
-                `).join("");
-            }
-        }
-
-        // Render Class Summary Metrics
-        if (classStats.length > 0) {
-            const avgScoreEl = document.getElementById("class-metric-avg-score");
-            if (avgScoreEl) avgScoreEl.textContent = `${classStats[0].avgPct}%`;
-
-            const highestScoreEl = document.getElementById("class-metric-highest-score");
-            if (highestScoreEl) {
-                const maxPct = studentMatrix.length > 0 ? Math.max(...studentMatrix.map(s => s.percentage)) : 0;
-                highestScoreEl.textContent = `${maxPct}%`;
-            }
-
-            const passRateEl = document.getElementById("class-metric-pass-pct");
-            if (passRateEl) passRateEl.textContent = `${classStats[0].passRate}%`;
+            studentTbody.innerHTML = allPapers.map(p => `
+                <tr class="admin-paper-row" data-roll="${p.rollNo}" data-name="${p.studentName}" style="border-bottom: 1px solid var(--border-color); cursor: pointer;">
+                    <td style="padding: 12px 14px; font-weight: 500;">${p.rollNo}</td>
+                    <td style="padding: 12px 14px; color: var(--text-main);">${p.studentName}</td>
+                    <td style="padding: 12px 14px; color: var(--text-muted);">${p.className}-${p.section}</td>
+                    <td style="padding: 12px 14px; font-weight: 500; color: #007AFF;">${p.subject}</td>
+                    <td style="padding: 12px 14px; text-align: center; font-weight: 600;">${p.isCorrected ? `${p.obtainedMarks}/${p.maxMarks}` : '—'}</td>
+                    <td style="padding: 12px 14px; text-align: center;">${p.isCorrected ? `${p.percentage}%` : '—'}</td>
+                    <td style="padding: 12px 14px; text-align: center;">
+                        <span style="padding: 2px 8px; border-radius: 6px; background: ${p.isCorrected ? 'rgba(52,199,89,0.12)' : 'rgba(255,149,0,0.12)'}; color: ${p.isCorrected ? '#16A34A' : '#D97706'}; font-size: 0.78rem;">
+                            ${p.isCorrected ? '✓ Corrected' : '◐ Pending'}
+                        </span>
+                    </td>
+                    <td style="padding: 12px 14px; font-size: 0.8rem; color: var(--text-muted);">${p.lastCorrectedFormatted}</td>
+                    <td style="padding: 12px 14px; text-align: center;">
+                        <button type="button" class="btn-student-360-pill" data-roll="${p.rollNo}" data-name="${p.studentName}">
+                            Student 360
+                        </button>
+                    </td>
+                </tr>
+            `).join("");
         }
     }
 
     bindStaticEvents() {
-        const searchInput = document.getElementById("admin-search-student");
-        if (searchInput && !searchInput.dataset.bound) {
-            searchInput.dataset.bound = "true";
-            searchInput.addEventListener("input", (e) => {
-                this.searchQuery = e.target.value.toLowerCase();
-                this.render();
-            });
-        }
-
-        const classFilter = document.getElementById("admin-filter-class");
-        if (classFilter && !classFilter.dataset.bound) {
-            classFilter.dataset.bound = "true";
-            classFilter.addEventListener("change", (e) => {
-                this.selectedClass = e.target.value;
-                this.render();
-            });
-        }
-
-        const btnExport = document.getElementById("btn-admin-export-excel") || document.getElementById("btn-sidebar-admin-export-excel");
-        if (btnExport && !btnExport.dataset.bound) {
-            btnExport.dataset.bound = "true";
-            btnExport.addEventListener("click", () => this.exportExcelMatrix());
-        }
-
-        const btnSidebarExport = document.getElementById("btn-sidebar-admin-export-excel");
-        if (btnSidebarExport && !btnSidebarExport.dataset.bound) {
-            btnSidebarExport.dataset.bound = "true";
-            btnSidebarExport.addEventListener("click", () => this.exportExcelMatrix());
-        }
-
-        const btnPrint = document.getElementById("btn-admin-print-report") || document.getElementById("btn-sidebar-admin-print-report");
-        if (btnPrint && !btnPrint.dataset.bound) {
-            btnPrint.dataset.bound = "true";
-            btnPrint.addEventListener("click", () => window.print());
-        }
-
-        const btnSidebarPrint = document.getElementById("btn-sidebar-admin-print-report");
-        if (btnSidebarPrint && !btnSidebarPrint.dataset.bound) {
-            btnSidebarPrint.dataset.bound = "true";
-            btnSidebarPrint.addEventListener("click", () => window.print());
-        }
-
         const studentTbody = document.getElementById("admin-student-matrix-tbody");
         if (studentTbody && !studentTbody.dataset.bound) {
             studentTbody.dataset.bound = "true";
-            studentTbody.addEventListener("click", async (e) => {
-                const delBtn = e.target.closest(".btn-admin-delete-eval");
-                if (delBtn) {
-                    const id = delBtn.getAttribute("data-eval-id");
-                    if (confirm("Are you sure you want to delete this Physics paper? This action cannot be undone.")) {
-                        await window.appStorage.deleteEvaluation(id);
-                        await this.init();
-                    }
+            studentTbody.addEventListener("click", (e) => {
+                const target = e.target.closest(".btn-student-360-pill") || e.target.closest(".admin-paper-row");
+                if (target) {
+                    const roll = target.getAttribute("data-roll");
+                    const name = target.getAttribute("data-name");
+                    this.openStudent360(roll, name);
                 }
             });
         }
     }
 
-    computeSubjectStats() {
-        // Build subject stats purely from real evaluation data
-        const subjectMap = new Map();
-        this.evaluations.forEach(ev => {
-            const subject = ev.subject || "General";
-            if (!subjectMap.has(subject)) {
-                subjectMap.set(subject, { uploaded: 0, corrected: 0 });
-            }
-            const entry = subjectMap.get(subject);
-            entry.uploaded++;
-            if (ev.status === "Completed" || ev.obtainedMarks > 0) {
-                entry.corrected++;
-            }
-        });
-
-        if (subjectMap.size === 0) return [];
-
-        return Array.from(subjectMap.entries()).map(([subject, stats]) => {
-            const { uploaded, corrected } = stats;
-            const pending = Math.max(0, uploaded - corrected);
-            const pct = uploaded > 0 ? Math.round((corrected / uploaded) * 100) : 100;
-            // Derive teacher name from most recent evaluation for this subject
-            const subjectEvals = this.evaluations.filter(e => (e.subject || "General") === subject);
-            const latestTeacher = subjectEvals.find(e => e.teacherName)?.teacherName || "—";
-            return {
-                code: subject.substring(0, 4).toUpperCase(),
-                name: subject,
-                teacher: latestTeacher,
-                uploaded,
-                corrected,
-                pending,
-                pct
-            };
-        });
-    }
-
-    computeStudentMatrix() {
-        if (!this.evaluations || this.evaluations.length === 0) return [];
-
-        // Group evaluations by student rollNo or id
-        const studentMap = new Map();
-
-        this.evaluations.forEach(ev => {
-            const key = ev.rollNo || ev.id;
-            if (!studentMap.has(key)) {
-                studentMap.set(key, {
-                    id: ev.id,
-                    rollNo: ev.rollNo || "101",
-                    studentName: ev.studentName || "Student Paper",
-                    class: `${ev.class || 'Class 12'}-${ev.section || 'A'}`,
-                    physicsMarks: ev.obtainedMarks !== undefined ? `${ev.obtainedMarks}/${ev.maxMarks || 70}` : "--",
-                    chemMarks: "--",
-                    mathMarks: "--",
-                    totalObtained: ev.obtainedMarks || 0,
-                    totalMax: ev.maxMarks || 70,
-                    percentage: ev.percentage || Math.round(((ev.obtainedMarks || 0) / (ev.maxMarks || 70)) * 100),
-                    grade: ev.grade || (window.calculateGradeScale ? window.calculateGradeScale(ev.obtainedMarks || 0, ev.maxMarks || 70).grade : "B1"),
-                    status: ev.status || "Pending"
-                });
-            }
-        });
-
-        return Array.from(studentMap.values());
-    }
-
-    filterMatrix(matrix) {
-        return matrix.filter(row => {
-            const matchesQuery = !this.searchQuery || 
-                row.studentName.toLowerCase().includes(this.searchQuery) || 
-                row.rollNo.toLowerCase().includes(this.searchQuery);
-
-            const matchesClass = this.selectedClass === "all" || row.class.includes(this.selectedClass.replace("Class ", ""));
-
-            return matchesQuery && matchesClass;
-        });
-    }
-
-    computeClassStats(matrix) {
-        if (!matrix || matrix.length === 0) {
-            return [
-                { className: "Class 12-A", count: 0, avgPct: 0, passRate: 100 },
-                { className: "Class 12-B", count: 0, avgPct: 0, passRate: 100 }
-            ];
-        }
-
-        const class12A = matrix.filter(m => m.class.includes("12-A"));
-        const class12B = matrix.filter(m => m.class.includes("12-B"));
-
-        const getAvg = (arr) => arr.length > 0 ? Math.round(arr.reduce((s, a) => s + a.percentage, 0) / arr.length) : 0;
-
-        return [
-            { className: "Class 12-A", count: class12A.length, avgPct: getAvg(class12A), passRate: 100 },
-            { className: "Class 12-B", count: class12B.length, avgPct: getAvg(class12B), passRate: 100 }
-        ];
-    }
-
     exportExcelMatrix() {
-        const matrix = this.computeStudentMatrix();
+        const papers = this.computeDetailedPapers();
         let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += "Roll No,Student Name,Class,Physics Score,Chemistry Score,Mathematics Score,Total Score,Percentage,Grade,Status\n";
+        csvContent += "Roll No,Student Name,Class,Subject,Max Marks,Obtained Marks,Percentage,Grade,Status,Last Corrected,Faculty Evaluator\n";
 
-        matrix.forEach(row => {
-            csvContent += `"${row.rollNo}","${row.studentName}","${row.class}","${row.physicsMarks}","${row.chemMarks}","${row.mathMarks}","${row.totalObtained}/${row.totalMax}","${row.percentage}%","${row.grade}","${row.status}"\n`;
+        papers.forEach(p => {
+            csvContent += `"${p.rollNo}","${p.studentName}","${p.className}-${p.section}","${p.subject}","${p.maxMarks}","${p.obtainedMarks}","${p.percentage}%","${p.grade}","${p.status}","${p.lastCorrectedFormatted}","${p.teacherName}"\n`;
         });
 
         const encodedUri = encodeURI(csvContent);
         const link = document.createElement("a");
         link.setAttribute("href", encodedUri);
-        link.setAttribute("download", `Student_Master_Score_Matrix_${new Date().toISOString().split('T')[0]}.csv`);
+        link.setAttribute("download", `Admin_Master_Evaluation_Audit_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
