@@ -436,10 +436,6 @@ class AdminPanelManager {
         const kpiCorrectedCount = scopePapers.filter(p => p.isCorrected).length;
         const kpiPendingCount = scopePapers.filter(p => !p.isCorrected).length;
 
-        const overallTotalUploaded = allPapers.length;
-        const overallTotalCorrected = allPapers.filter(p => p.isCorrected).length;
-        const overallCompletionPct = overallTotalUploaded > 0 ? Math.round((overallTotalCorrected / overallTotalUploaded) * 100) : 100;
-
         // Check if static table bodies exist (e.g. in standalone admin.html)
         const staticSubTbody = document.getElementById("admin-subject-tracker-tbody");
         const staticStudentTbody = document.getElementById("admin-student-matrix-tbody");
