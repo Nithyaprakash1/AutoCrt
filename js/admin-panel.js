@@ -20,6 +20,7 @@ class AdminPanelManager {
         this.selectedSubject = "all";
         this.statusFilter = "all"; // "all" | "corrected" | "pending"
         this.activeTab = "papers"; // "papers" (Corrected Papers Oversight) | "matrix" (All-Subject Grid)
+        this.leaderboardScope = "12-full"; // "all" | "12-full" | "12-A" | "12-B" | "11-full" | "11-A" | "11-B"
         this.selectedStudentData = null;
     }
 
@@ -320,12 +321,110 @@ class AdminPanelManager {
         });
     }
 
+    parseClassInfo(item) {
+        if (!item) return { grade: "12", section: "A", normalizedClass: "Class 12", combined: "Class 12-A" };
+        const clsStr = (item.className || item.class || "").toString().trim();
+        const secStr = (item.section || "").toString().trim();
+
+        let grade = "";
+        let section = "";
+
+        const m = clsStr.match(/(?:class\s*)?(\d{1,2})(?:[\s\-_]*([A-Za-z]))?/i);
+        if (m) {
+            grade = m[1] || "";
+            section = m[2] ? m[2].toUpperCase() : "";
+        }
+
+        if (!section && secStr) {
+            section = secStr.toUpperCase();
+        }
+
+        const normalizedClass = grade ? `Class ${grade}` : "Class 12";
+        const normalizedSection = section || "A";
+        const combined = `${normalizedClass}-${normalizedSection}`;
+
+        return {
+            grade: grade || "12",
+            section: normalizedSection,
+            normalizedClass,
+            combined
+        };
+    }
+
+    computeLeaderboardData() {
+        const studentMatrix = this.computeStudentMatrix();
+        const allPapers = this.computeDetailedPapers();
+
+        // 1. Filter student matrix by selected scope
+        const filteredStudents = studentMatrix.filter(s => {
+            const info = this.parseClassInfo(s);
+            if (this.leaderboardScope === "12-full") return info.grade === "12";
+            if (this.leaderboardScope === "12-A") return info.grade === "12" && info.section === "A";
+            if (this.leaderboardScope === "12-B") return info.grade === "12" && info.section === "B";
+            if (this.leaderboardScope === "11-full") return info.grade === "11";
+            if (this.leaderboardScope === "11-A") return info.grade === "11" && info.section === "A";
+            if (this.leaderboardScope === "11-B") return info.grade === "11" && info.section === "B";
+            return true; // "all"
+        });
+
+        // 2. Sort overall toppers by percentage (descending) and totalObtained
+        const overallRankers = [...filteredStudents]
+            .filter(s => s.gradedCount > 0)
+            .sort((a, b) => (b.percentage - a.percentage) || (b.totalObtained - a.totalObtained));
+
+        // 3. Filter corrected papers by scope for Subject Champions
+        const scopedPapers = allPapers.filter(p => {
+            if (!p.isCorrected) return false;
+            const info = this.parseClassInfo(p);
+            if (this.leaderboardScope === "12-full") return info.grade === "12";
+            if (this.leaderboardScope === "12-A") return info.grade === "12" && info.section === "A";
+            if (this.leaderboardScope === "12-B") return info.grade === "12" && info.section === "B";
+            if (this.leaderboardScope === "11-full") return info.grade === "11";
+            if (this.leaderboardScope === "11-A") return info.grade === "11" && info.section === "A";
+            if (this.leaderboardScope === "11-B") return info.grade === "11" && info.section === "B";
+            return true;
+        });
+
+        // 4. Calculate subject champions
+        const subjectsList = ["Physics", "Chemistry", "Mathematics", "Biology", "English"];
+        scopedPapers.forEach(p => {
+            if (p.subject && !subjectsList.some(s => s.toLowerCase() === p.subject.toLowerCase())) {
+                subjectsList.push(p.subject);
+            }
+        });
+
+        const subjectChampions = subjectsList.map(subName => {
+            const subPapers = scopedPapers.filter(p => p.subject.toLowerCase() === subName.toLowerCase());
+            if (subPapers.length === 0) {
+                return {
+                    subject: subName,
+                    hasTopper: false,
+                    topper: null
+                };
+            }
+            const sorted = [...subPapers].sort((a, b) => (b.obtainedMarks - a.obtainedMarks) || (b.percentage - a.percentage));
+            return {
+                subject: subName,
+                hasTopper: true,
+                topper: sorted[0]
+            };
+        });
+
+        return {
+            overallRankers,
+            top1Student: overallRankers[0] || null,
+            subjectChampions,
+            totalStudentsInScope: filteredStudents.length
+        };
+    }
+
     render() {
         const subjectsData = this.computeSubjectStats();
         const allPapers = this.computeDetailedPapers();
         const filteredPapers = this.filterPapers(allPapers);
         const studentMatrix = this.computeStudentMatrix();
         const filteredStudents = this.filterStudentMatrix(studentMatrix);
+        const lbData = this.computeLeaderboardData();
 
         // Subject Scoping
         const isSubjectScoped = Boolean(this.selectedSubject && this.selectedSubject !== "all");
@@ -368,12 +467,9 @@ class AdminPanelManager {
                     <div>
                         <div style="display: flex; align-items: center; gap: 8px;">
                             <span class="admin-title-badge">Institution Central Audit Desk</span>
-                            <span style="font-size: 0.76rem; background: rgba(52, 199, 89, 0.12); color: #16A34A; padding: 3px 10px; border-radius: 20px; font-weight: 500;">
-                                ${overallCompletionPct}% Graded (${overallTotalCorrected}/${overallTotalUploaded})
-                            </span>
                         </div>
                         <h1 class="admin-title-main">Administrative Oversight &amp; Student Marks Audit</h1>
-                        <p class="admin-sub-text">Monitor faculty correction progress across subjects, review completed papers, and inspect individual student multi-subject dossiers.</p>
+                        <p class="admin-sub-text">Monitor academic performance leaderboards, faculty correction progress across subjects, and inspect individual student multi-subject dossiers.</p>
                     </div>
 
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -385,6 +481,212 @@ class AdminPanelManager {
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
                             <span>Export Master Excel</span>
                         </button>
+                    </div>
+                </div>
+
+                <!-- Section 0: Academic Merit & Toppers Leaderboard (Class 12th & 11th) -->
+                <div class="admin-leaderboard-card" id="admin-leaderboard-section">
+                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
+                        <div>
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 3px;">
+                                <h2 style="font-size: 1.25rem; font-weight: 400; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
+                                    <span>🏆</span>
+                                    <span>Academic Merit Leaderboard &amp; Top Performers</span>
+                                </h2>
+                                <span style="background: rgba(175, 82, 222, 0.12); color: #AF52DE; font-size: 0.76rem; font-weight: 500; padding: 2px 10px; border-radius: 12px;">
+                                    Institutional Rankings
+                                </span>
+                            </div>
+                            <p style="font-size: 0.84rem; color: var(--text-muted); margin: 0;">
+                                Select a class or division below to inspect which student ranked first overall and top subject performers.
+                            </p>
+                        </div>
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">
+                            ${lbData.totalStudentsInScope} Students in Scope • ${lbData.overallRankers.length} Evaluated
+                        </span>
+                    </div>
+
+                    <!-- Scope Filter Buttons (Class 12th fully, 12th section, 11th fully, 11th section) -->
+                    <div class="leaderboard-scope-row" id="leaderboard-scope-nav">
+                        <button type="button" class="leaderboard-scope-pill ${this.leaderboardScope === 'all' ? 'active' : ''}" data-scope="all">
+                            <span>🏆 All Institution</span>
+                        </button>
+                        <button type="button" class="leaderboard-scope-pill ${this.leaderboardScope === '12-full' ? 'active' : ''}" data-scope="12-full">
+                            <span>🎓 Class 12th (Fully)</span>
+                        </button>
+                        <button type="button" class="leaderboard-scope-pill ${this.leaderboardScope === '12-A' ? 'active' : ''}" data-scope="12-A">
+                            <span>Class 12-A</span>
+                        </button>
+                        <button type="button" class="leaderboard-scope-pill ${this.leaderboardScope === '12-B' ? 'active' : ''}" data-scope="12-B">
+                            <span>Class 12-B</span>
+                        </button>
+                        <button type="button" class="leaderboard-scope-pill ${this.leaderboardScope === '11-full' ? 'active' : ''}" data-scope="11-full">
+                            <span>📘 Class 11th (Fully)</span>
+                        </button>
+                        <button type="button" class="leaderboard-scope-pill ${this.leaderboardScope === '11-A' ? 'active' : ''}" data-scope="11-A">
+                            <span>Class 11-A</span>
+                        </button>
+                        <button type="button" class="leaderboard-scope-pill ${this.leaderboardScope === '11-B' ? 'active' : ''}" data-scope="11-B">
+                            <span>Class 11-B</span>
+                        </button>
+                    </div>
+
+                    <!-- Leaderboard Grid: Overall Champions (Left) & Subject Champions (Right) -->
+                    <div class="leaderboard-grid">
+                        <!-- Column 1: Overall Champions (Which student first overall) -->
+                        <div>
+                            ${lbData.top1Student ? `
+                                <!-- Rank 1 First Overall Hero Banner -->
+                                <div class="overall-champion-banner admin-paper-row" data-roll="${lbData.top1Student.rollNo}" data-name="${lbData.top1Student.studentName}" title="Inspect full marks across all subjects for ${lbData.top1Student.studentName}">
+                                    <div style="display: flex; align-items: center; gap: 14px; min-width: 0;">
+                                        <div class="champion-crown-wrap">🥇</div>
+                                        <div style="min-width: 0;">
+                                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 2px;">
+                                                <span style="font-size: 0.72rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; background: rgba(245, 158, 11, 0.2); color: #B45309; padding: 2px 8px; border-radius: 6px;">
+                                                    Rank 1 • First Overall
+                                                </span>
+                                                <span style="font-size: 0.76rem; color: var(--text-muted);">${lbData.top1Student.class}</span>
+                                            </div>
+                                            <h4 style="font-size: 1.15rem; font-weight: 500; color: var(--text-main); margin: 0 0 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                ${lbData.top1Student.studentName}
+                                            </h4>
+                                            <div style="font-size: 0.78rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace;">
+                                                Roll No: ${lbData.top1Student.rollNo}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div style="text-align: right; flex-shrink: 0;">
+                                        <div style="font-size: 1.55rem; font-weight: 600; color: #16A34A; line-height: 1;">
+                                            ${lbData.top1Student.percentage}%
+                                        </div>
+                                        <div style="font-size: 0.74rem; color: var(--text-muted); margin-top: 3px;">
+                                            ${lbData.top1Student.totalObtained} / ${lbData.top1Student.totalMax} M
+                                        </div>
+                                        <span style="display: inline-block; margin-top: 4px; padding: 2px 7px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #16A34A; font-weight: 600; font-size: 0.74rem;">
+                                            Grade ${lbData.top1Student.grade}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                <!-- Top 5 Rankers Podium -->
+                                <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 14px;">
+                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+                                        <span style="font-size: 0.78rem; font-weight: 500; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px;">
+                                            Top Performers Podium
+                                        </span>
+                                        <span style="font-size: 0.72rem; color: #007AFF;">Click to inspect student</span>
+                                    </div>
+                                    <div class="rank-list-wrap">
+                                        ${lbData.overallRankers.slice(0, 5).map((s, idx) => {
+                                            const rank = idx + 1;
+                                            const badgeCls = rank === 1 ? 'gold' : (rank === 2 ? 'silver' : (rank === 3 ? 'bronze' : 'standard'));
+                                            const icon = rank === 1 ? '🥇' : (rank === 2 ? '🥈' : (rank === 3 ? '🥉' : rank));
+                                            return `
+                                                <div class="rank-item-row admin-paper-row" data-roll="${s.rollNo}" data-name="${s.studentName}" title="Inspect full marks across all subjects for ${s.studentName}">
+                                                    <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                                                        <span class="rank-badge-pill ${badgeCls}">${icon}</span>
+                                                        <div style="min-width: 0;">
+                                                            <div style="font-size: 0.88rem; font-weight: 500; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                                ${s.studentName}
+                                                            </div>
+                                                            <div style="font-size: 0.74rem; color: var(--text-muted);">
+                                                                Roll: ${s.rollNo} • ${s.class}
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div style="display: flex; align-items: center; gap: 10px; flex-shrink: 0;">
+                                                        <div style="text-align: right;">
+                                                            <span style="font-size: 0.92rem; font-weight: 600; color: #16A34A;">${s.percentage}%</span>
+                                                            <div style="font-size: 0.72rem; color: var(--text-muted);">${s.totalObtained}/${s.totalMax} M</div>
+                                                        </div>
+                                                        <button type="button" class="btn-student-360-pill" data-roll="${s.rollNo}" data-name="${s.studentName}" title="Student 360">
+                                                            <span>360</span>
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        }).join("")}
+                                    </div>
+                                </div>
+                            ` : `
+                                <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 14px; padding: 36px 20px; text-align: center; color: var(--text-muted);">
+                                    <div style="font-size: 1.8rem; margin-bottom: 8px;">📋</div>
+                                    <div style="font-size: 0.92rem; font-weight: 500; color: var(--text-main); margin-bottom: 4px;">No evaluations completed yet for this scope</div>
+                                    <p style="font-size: 0.8rem; margin: 0;">Grade student papers on the Teacher Workspace to populate overall class rankings.</p>
+                                </div>
+                            `}
+                        </div>
+
+                        <!-- Column 2: Subject Champions (Which student first in which subject) -->
+                        <div>
+                            <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 16px; padding: 16px; height: 100%; box-sizing: border-box;">
+                                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px;">
+                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                        <span style="font-size: 1rem;">🎯</span>
+                                        <span style="font-size: 0.88rem; font-weight: 500; color: var(--text-main);">Subject Champions (First by Subject)</span>
+                                    </div>
+                                    <span style="font-size: 0.72rem; color: var(--text-muted);">Highest score in each subject</span>
+                                </div>
+
+                                <div class="subject-topper-grid">
+                                    ${lbData.subjectChampions.map(sc => {
+                                        const subjectIcons = {
+                                            "Physics": "⚛️",
+                                            "Chemistry": "🧪",
+                                            "Mathematics": "📐",
+                                            "Biology": "🧬",
+                                            "English": "📖"
+                                        };
+                                        const icon = subjectIcons[sc.subject] || "📝";
+
+                                        if (sc.hasTopper && sc.topper) {
+                                            const t = sc.topper;
+                                            return `
+                                                <div class="subject-topper-card has-champion admin-paper-row" data-roll="${t.rollNo}" data-name="${t.studentName}" title="Inspect full marks across all subjects for ${t.studentName}">
+                                                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                                        <span style="font-size: 0.8rem; font-weight: 500; color: var(--text-main); display: inline-flex; align-items: center; gap: 4px;">
+                                                            <span>${icon}</span>
+                                                            <span>${sc.subject}</span>
+                                                        </span>
+                                                        <span style="padding: 1px 6px; border-radius: 4px; background: rgba(52, 199, 89, 0.12); color: #16A34A; font-weight: 600; font-size: 0.72rem;">
+                                                            ${t.grade}
+                                                        </span>
+                                                    </div>
+
+                                                    <div style="font-size: 1.22rem; font-weight: 600; color: #16A34A; line-height: 1.1; margin-bottom: 4px;">
+                                                        ${t.obtainedMarks} <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: 400;">/ ${t.maxMarks} (${t.percentage}%)</span>
+                                                    </div>
+
+                                                    <div style="font-size: 0.84rem; font-weight: 500; color: var(--text-main); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                                                        ${t.studentName}
+                                                    </div>
+                                                    <div style="font-size: 0.72rem; color: var(--text-muted); font-family: 'JetBrains Mono', monospace; margin-bottom: 6px;">
+                                                        Roll: ${t.rollNo} • ${t.className}-${t.section}
+                                                    </div>
+
+                                                    <div style="display: flex; align-items: center; justify-content: space-between; padding-top: 6px; border-top: 1px dashed var(--border-color); font-size: 0.72rem; color: var(--text-muted);">
+                                                        <span>Faculty: ${t.teacherName ? t.teacherName.split(" ")[0] : 'Evaluator'}</span>
+                                                        <span style="color: #007AFF; font-weight: 500;">View 360 →</span>
+                                                    </div>
+                                                </div>
+                                            `;
+                                        } else {
+                                            return `
+                                                <div class="subject-topper-card" style="opacity: 0.65;">
+                                                    <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px; font-size: 0.8rem; color: var(--text-muted);">
+                                                        <span>${icon}</span>
+                                                        <span>${sc.subject}</span>
+                                                    </div>
+                                                    <div style="font-size: 0.95rem; color: var(--text-muted); margin-bottom: 4px;">—</div>
+                                                    <div style="font-size: 0.74rem; color: var(--text-muted);">Awaiting Graded Papers</div>
+                                                </div>
+                                            `;
+                                        }
+                                    }).join("")}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -721,6 +1023,15 @@ class AdminPanelManager {
 
     bindEvents() {
         if (!this.container) return;
+
+        // 0. Clickable Leaderboard Scope Pills (All, 12th fully, 12-A, 12-B, 11th fully, 11-A, 11-B)
+        this.container.querySelectorAll(".leaderboard-scope-pill").forEach(pill => {
+            pill.addEventListener("click", () => {
+                const scope = pill.getAttribute("data-scope") || "12-full";
+                this.leaderboardScope = scope;
+                this.render();
+            });
+        });
 
         // 1. Clickable Subject Tracker Cards (Section 1)
         this.container.querySelectorAll(".admin-sub-card").forEach(card => {
