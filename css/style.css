@@ -12822,12 +12822,126 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     border-radius: 16px;
     padding: 18px 20px;
     box-shadow: var(--shadow-xs);
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
 }
 
 .admin-sub-card:hover {
     box-shadow: var(--shadow-sm);
     transform: translateY(-2px);
+    border-color: #007AFF;
+}
+
+.admin-sub-card.active-subject {
+    border-color: #007AFF !important;
+    background: linear-gradient(135deg, rgba(0, 122, 255, 0.06), rgba(88, 86, 214, 0.02)) !important;
+    box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.18) !important;
+}
+
+.admin-sub-card .sub-view-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: #007AFF;
+    margin-top: 6px;
+    transition: transform 0.15s ease;
+}
+
+.admin-sub-card:hover .sub-view-link {
+    transform: translateX(3px);
+}
+
+/* Subject Filter Pills Bar */
+.admin-subject-pill-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 18px;
+    scrollbar-width: thin;
+}
+
+.admin-subject-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--border-color, #E2E8F0);
+    background: var(--bg-card, #FFFFFF);
+    color: var(--text-muted, #64748B);
+    font-size: 0.82rem;
+    font-weight: 400;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+    user-select: none;
+}
+
+.admin-subject-pill:hover {
+    border-color: #007AFF;
+    color: #007AFF;
+    background: rgba(0, 122, 255, 0.04);
+}
+
+.admin-subject-pill.active {
+    background: #007AFF !important;
+    color: #FFFFFF !important;
+    border-color: #007AFF !important;
+    box-shadow: 0 2px 8px rgba(0, 122, 255, 0.35);
+}
+
+.admin-subject-pill .pill-count {
+    padding: 1px 6px;
+    border-radius: 10px;
+    font-size: 0.72rem;
+    background: rgba(0, 0, 0, 0.06);
+    color: inherit;
+}
+
+.admin-subject-pill.active .pill-count {
+    background: rgba(255, 255, 255, 0.25);
+    color: #FFFFFF;
+}
+
+/* Admin Papers & Matrix View Switcher */
+.admin-view-toggle-bar {
+    display: inline-flex;
+    align-items: center;
+    background: var(--bg-subtle, #F1F5F9);
+    padding: 3px;
+    border-radius: 10px;
+    gap: 2px;
+}
+
+.admin-view-toggle-btn {
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    font-weight: 400;
+    border: none;
+    background: none;
+    color: var(--text-muted);
+    border-radius: 8px;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.15s ease;
+}
+
+.admin-view-toggle-btn.active {
+    background: var(--bg-card, #FFFFFF);
+    color: var(--text-main);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.admin-paper-row:hover {
+    background: rgba(0, 122, 255, 0.04) !important;
 }
 
 .admin-sub-card-top {
