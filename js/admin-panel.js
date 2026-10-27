@@ -370,6 +370,10 @@ class AdminPanelManager {
                     </div>
 
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                        <button type="button" class="btn-secondary" id="btn-admin-manage-users" style="display: flex; align-items: center; gap: 6px; height: 38px; border-color: rgba(175, 82, 222, 0.3); color: #AF52DE; background: rgba(175, 82, 222, 0.06);" title="Manage administrator, exam officer, and faculty evaluator credentials">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            <span>User Management</span>
+                        </button>
                         <button type="button" class="btn-secondary" id="btn-admin-print-report" style="display: flex; align-items: center; gap: 6px; height: 38px;">
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
                             <span>Print Audit</span>
@@ -797,6 +801,18 @@ class AdminPanelManager {
             classSelect.addEventListener("change", (e) => {
                 this.selectedClass = e.target.value;
                 this.render();
+            });
+        }
+
+        // 9.5. Manage Users & Faculty Desk
+        const manageUsersBtn = this.container.querySelector("#btn-admin-manage-users");
+        if (manageUsersBtn) {
+            manageUsersBtn.addEventListener("click", () => {
+                if (typeof window.switchAdminView === "function") {
+                    window.switchAdminView("user-management");
+                } else if (window.app && typeof window.app.switchView === "function") {
+                    window.app.switchView("user-management");
+                }
             });
         }
 

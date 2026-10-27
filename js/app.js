@@ -1358,6 +1358,10 @@ class AppController {
         if (btnUploaderUsers) {
             btnUploaderUsers.addEventListener("click", () => this.switchView("user-management"));
         }
+        const btnAdminUsers = document.getElementById("side-nav-admin-users");
+        if (btnAdminUsers) {
+            btnAdminUsers.addEventListener("click", () => this.switchView("user-management"));
+        }
         const btnTeacherSettings = document.getElementById("side-nav-teacher-settings");
         if (btnTeacherSettings) {
             btnTeacherSettings.addEventListener("click", () => this.switchView("settings"));
