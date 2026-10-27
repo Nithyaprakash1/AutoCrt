@@ -85,44 +85,60 @@ class PDFGenerator {
             }
         }
 
-        // 1. Render each answer sheet page with overlaid annotations
-        for (let i = 0; i < pages.length; i++) {
-            if (onProgress) {
-                const pct = Math.round(35 + ((i + 1) / (pages.length + 1)) * 50);
-                onProgress(pct, `Composing page ${i + 1} of ${pages.length} with markings...`);
-            }
-            if (i > 0) {
-                doc.addPage("a4", "portrait");
+        const isPurgedOnly = Boolean(evaluation.rawScansPurged) || pages.length === 0;
+
+        if (!isPurgedOnly) {
+            // 1. Render each answer sheet page with overlaid annotations
+            for (let i = 0; i < pages.length; i++) {
+                if (onProgress) {
+                    const pct = Math.round(35 + ((i + 1) / (pages.length + 1)) * 50);
+                    onProgress(pct, `Composing page ${i + 1} of ${pages.length} with markings...`);
+                }
+                if (i > 0) {
+                    doc.addPage("a4", "portrait");
+                }
+
+                const pageAnnotations = annotations.filter(a => (a.pageIndex || 0) === i);
+                const compositeDataUrl = await this.renderCompositePage(pages[i], pageAnnotations);
+
+                // A4 is 210 x 297 mm
+                doc.addImage(compositeDataUrl, "JPEG", 0, 0, 210, 297, undefined, "FAST");
             }
 
-            const pageAnnotations = annotations.filter(a => (a.pageIndex || 0) === i);
-            const compositeDataUrl = await this.renderCompositePage(pages[i], pageAnnotations);
+            if (onProgress) onProgress(88, "Appending official Student Mark Summary scorecard...");
 
-            // A4 is 210 x 297 mm
-            doc.addImage(compositeDataUrl, "JPEG", 0, 0, 210, 297, undefined, "FAST");
+            // Preload co-branding logos for institutional co-branding header
+            const [schoolLogoData, appLogoData] = await Promise.all([
+                this.loadLogoDataUrl("assets/school_fulllogo.jpg"),
+                this.loadLogoDataUrl("assets/fulllogo.png")
+            ]);
+
+            // 2. Add Final Student Mark Summary Page
+            doc.addPage("a4", "portrait");
+            this.renderSummaryPage(doc, evaluation, {
+                schoolLogo: schoolLogoData,
+                appLogo: appLogoData
+            });
+        } else {
+            if (onProgress) onProgress(60, "Generating official Student Mark Summary scorecard...");
+            const [schoolLogoData, appLogoData] = await Promise.all([
+                this.loadLogoDataUrl("assets/school_fulllogo.jpg"),
+                this.loadLogoDataUrl("assets/fulllogo.png")
+            ]);
+            // Direct first page rendering for archived score logs
+            this.renderSummaryPage(doc, evaluation, {
+                schoolLogo: schoolLogoData,
+                appLogo: appLogoData
+            });
         }
-
-        if (onProgress) onProgress(88, "Appending official Student Mark Summary scorecard...");
-
-        // Preload co-branding logos for institutional co-branding header
-        const [schoolLogoData, appLogoData] = await Promise.all([
-            this.loadLogoDataUrl("assets/school_fulllogo.jpg"),
-            this.loadLogoDataUrl("assets/fulllogo.png")
-        ]);
-
-        // 2. Add Final Student Mark Summary Page
-        doc.addPage("a4", "portrait");
-        this.renderSummaryPage(doc, evaluation, {
-            schoolLogo: schoolLogoData,
-            appLogo: appLogoData
-        });
 
         if (onProgress) onProgress(98, "Finalizing and downloading PDF file...");
 
         // 3. Save or Download
         const sanitizedName = (evaluation.studentName || "Student").replace(/[^a-zA-Z0-9_-]/g, "_");
         const sanitizedExam = (evaluation.examName || "Exam").replace(/[^a-zA-Z0-9_-]/g, "_");
-        const filename = `${sanitizedName}_${sanitizedExam}_Corrected.pdf`;
+        const suffix = isPurgedOnly ? "Scorecard" : "Corrected";
+        const filename = `${sanitizedName}_${sanitizedExam}_${suffix}.pdf`;
 
         doc.save(filename);
         return filename;

@@ -740,6 +740,12 @@ body {
     color: #D97706;
 }
 
+.badge-archived {
+    background-color: rgba(175, 82, 222, 0.12);
+    color: #8E44AD;
+    border: 1px solid rgba(175, 82, 222, 0.25);
+}
+
 .pct-pill {
     font-weight: 400;
     color: var(--text-main);
@@ -7712,6 +7718,12 @@ body {
 .status-pill.status-pending {
     background: rgba(255, 149, 0, 0.12);
     color: #d97706;
+}
+
+.status-pill.status-archived {
+    background: rgba(175, 82, 222, 0.12);
+    color: #8E44AD;
+    border: 1px solid rgba(175, 82, 222, 0.25);
 }
 
 .status-pill .status-dot {

@@ -213,6 +213,7 @@ class AdminPanelManager {
                 percentage: pct,
                 grade,
                 isCorrected: isCorr,
+                rawScansPurged: Boolean(ev.rawScansPurged),
                 status: isCorr ? "Completed" : "Pending",
                 timestamp: ts,
                 lastCorrectedFormatted: isCorr ? this.formatDateTime(ts) : "—",
@@ -631,8 +632,8 @@ class AdminPanelManager {
                                                 ${p.isCorrected ? `<span style="padding: 2px 7px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #16A34A; font-weight: 600; font-size: 0.78rem;">${p.grade}</span>` : '—'}
                                             </td>
                                             <td style="padding: 11px 14px; text-align: center;">
-                                                <span style="padding: 3px 10px; border-radius: 12px; font-size: 0.76rem; font-weight: 500; background: ${p.isCorrected ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)'}; color: ${p.isCorrected ? '#16A34A' : '#D97706'};">
-                                                    ${p.isCorrected ? '✓ Corrected' : '◐ Pending'}
+                                                <span style="padding: 3px 10px; border-radius: 12px; font-size: 0.76rem; font-weight: 500; background: ${p.isCorrected ? (p.rawScansPurged ? 'rgba(175, 82, 222, 0.12)' : 'rgba(52, 199, 89, 0.12)') : 'rgba(255, 149, 0, 0.12)'}; color: ${p.isCorrected ? (p.rawScansPurged ? '#8E44AD' : '#16A34A') : '#D97706'};">
+                                                    ${p.isCorrected ? (p.rawScansPurged ? '✓ Log Archived' : '✓ Corrected') : '◐ Pending'}
                                                 </span>
                                             </td>
                                             <td style="padding: 11px 14px; color: var(--text-muted); font-size: 0.8rem; white-space: nowrap;">
@@ -974,8 +975,8 @@ class AdminPanelManager {
                             ${isCorr ? `<span style="padding: 2px 7px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #16A34A; font-weight: 600; font-size: 0.78rem;">${grade}</span>` : '—'}
                         </td>
                         <td style="padding: 12px 14px; text-align: center;">
-                            <span style="padding: 3px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 500; background: ${isCorr ? 'rgba(52, 199, 89, 0.12)' : 'rgba(255, 149, 0, 0.12)'}; color: ${isCorr ? '#16A34A' : '#D97706'};">
-                                ${isCorr ? '✓ Graded' : '◐ In Progress'}
+                            <span style="padding: 3px 10px; border-radius: 12px; font-size: 0.74rem; font-weight: 500; background: ${isCorr ? (ev.rawScansPurged ? 'rgba(175, 82, 222, 0.12)' : 'rgba(52, 199, 89, 0.12)') : 'rgba(255, 149, 0, 0.12)'}; color: ${isCorr ? (ev.rawScansPurged ? '#8E44AD' : '#16A34A') : '#D97706'};">
+                                ${isCorr ? (ev.rawScansPurged ? '✓ Log Archived' : '✓ Graded') : '◐ In Progress'}
                             </span>
                         </td>
                         <td style="padding: 12px 14px; font-size: 0.78rem; color: var(--text-muted); white-space: nowrap;">${isCorr ? this.formatDateTime(ts) : '—'}</td>

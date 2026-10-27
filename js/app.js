@@ -2350,6 +2350,7 @@ class AppController {
             activateSection("view-admin-panel");
             if (root && window.AdminPanelManager) {
                 this.adminPanelManager = new AdminPanelManager(root);
+                window.adminPanelManager = this.adminPanelManager;
                 await Promise.all([this.adminPanelManager.init(), minSkeletonDelay()]);
             }
         } else if (viewName === "super-admin") {
@@ -2652,6 +2653,25 @@ class AppController {
         if (evaluation.id && window.appStorage) {
             const fresh = await window.appStorage.getEvaluationById(evaluation.id);
             if (fresh) evaluation = fresh;
+        }
+
+        // If raw PDF scans are purged to preserve storage, open the Student Scorecard directly
+        if (evaluation.rawScansPurged) {
+            if (this.showToast) {
+                this.showToast(`Displaying score log for ${evaluation.studentName || 'Student'} (scans purged to save storage)`);
+            }
+            if (this.adminPanelManager && typeof this.adminPanelManager.openStudent360 === "function") {
+                this.adminPanelManager.openStudent360(evaluation.rollNo, evaluation.studentName);
+                return;
+            } else if (window.adminPanelManager && typeof window.adminPanelManager.openStudent360 === "function") {
+                window.adminPanelManager.openStudent360(evaluation.rollNo, evaluation.studentName);
+                return;
+            } else if (window.AdminPanelManager && document.getElementById("modal-admin-student-profile")) {
+                const tempMgr = new window.AdminPanelManager(document.getElementById("view-admin-panel") || document.body);
+                await tempMgr.init();
+                tempMgr.openStudent360(evaluation.rollNo, evaluation.studentName);
+                return;
+            }
         }
 
         if ((!evaluation.pages || evaluation.pages.length === 0) && window.appStorage) {

@@ -472,7 +472,10 @@ class UploadedPapersPageManager {
                                         </tr>
                                     ` : filteredPapers.map(p => {
                                         const pageCount = p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1));
+                                        const isPurged = Boolean(p.rawScansPurged);
                                         const isComp = p.status === "Completed";
+                                        const statusPillClass = isPurged ? 'status-archived' : (isComp ? 'status-completed' : 'status-pending');
+                                        const statusPillLabel = isPurged ? 'Log Archived' : (isComp ? 'Evaluated' : 'Pending');
                                         const initials = (p.studentName || "ST").split(" ").map(n => n[0]).slice(0, 2).join("").toUpperCase();
                                         const isChecked = this.selectedIds.has(String(p.id));
                                         return `
@@ -503,9 +506,9 @@ class UploadedPapersPageManager {
                                                     </span>
                                                 </td>
                                                 <td class="cell-status">
-                                                    <span class="status-pill ${isComp ? 'status-completed' : 'status-pending'}">
+                                                    <span class="status-pill ${statusPillClass}">
                                                         <span class="status-dot"></span>
-                                                        ${isComp ? 'Evaluated' : 'Pending'}
+                                                        ${statusPillLabel}
                                                     </span>
                                                 </td>
                                                 <td class="cell-score">
@@ -517,9 +520,9 @@ class UploadedPapersPageManager {
                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
                                                             <span>Inspect</span>
                                                         </button>
-                                                        <button type="button" class="btn-paper-action btn-action-eval" data-paper-id="${p.id}" title="Open evaluation workspace">
+                                                        <button type="button" class="btn-paper-action btn-action-eval" data-paper-id="${p.id}" title="${isPurged ? 'View Student Scorecard' : 'Open evaluation workspace'}">
                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                                                            <span>Evaluate</span>
+                                                            <span>${isPurged ? 'Scorecard' : 'Evaluate'}</span>
                                                         </button>
                                                         <button type="button" class="btn-paper-action btn-action-delete" data-paper-id="${p.id}" title="Delete paper" aria-label="Delete paper">
                                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>

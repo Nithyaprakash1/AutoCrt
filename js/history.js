@@ -121,8 +121,22 @@ class EvaluationHistoryManager {
         }
 
         tbody.innerHTML = this.filteredList.map(ev => {
+            const isPurged = Boolean(ev.rawScansPurged);
             const isCompleted = ev.status === "Completed";
-            const statusClass = isCompleted ? "badge-completed" : "badge-pending";
+            let statusClass = "badge-pending";
+            let statusLabel = ev.status || "Pending";
+
+            if (isPurged) {
+                statusClass = "badge-archived";
+                statusLabel = "✓ Log Archived";
+            } else if (isCompleted) {
+                statusClass = "badge-completed";
+                statusLabel = "Completed";
+            }
+
+            const actionLabel = isPurged ? 'View Scorecard' : (isCompleted ? 'View Paper' : 'Continue');
+            const pdfLabel = isPurged ? 'Scorecard' : 'PDF';
+            const pdfTitle = isPurged ? 'Download Official Scorecard PDF' : 'Download Corrected PDF';
 
             return `
                 <tr>
@@ -144,17 +158,17 @@ class EvaluationHistoryManager {
                         </div>
                     </td>
                     <td>
-                        <span class="status-pill ${statusClass}">${ev.status || "Pending"}</span>
+                        <span class="status-pill ${statusClass}">${statusLabel}</span>
                     </td>
                     <td class="text-right">
                         <div class="action-btn-group">
                             <button type="button" class="btn-action-view btn-hist-open" data-id="${ev.id}">
-                                ${isCompleted ? 'View Paper' : 'Continue'}
+                                ${actionLabel}
                             </button>
-                            <button type="button" class="btn-action-pdf btn-hist-pdf" data-id="${ev.id}" title="Download Corrected PDF">
-                                ${(window.Icons && window.Icons.pdf) || ''} PDF
+                            <button type="button" class="btn-action-pdf btn-hist-pdf" data-id="${ev.id}" title="${pdfTitle}">
+                                ${(window.Icons && window.Icons.pdf) || ''} ${pdfLabel}
                             </button>
-                            <button type="button" class="btn-action-delete btn-hist-delete" data-id="${ev.id}" title="Delete Physics Paper" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.3); color: #DC2626; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                            <button type="button" class="btn-action-delete btn-hist-delete" data-id="${ev.id}" title="Delete Record" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.3); color: #DC2626; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                                 Delete
                             </button>
@@ -209,8 +223,22 @@ class EvaluationHistoryManager {
                 if (openBtn) {
                     const id = openBtn.getAttribute("data-id");
                     const ev = await window.appStorage.getEvaluationById(id);
-                    if (ev && this.options.onOpenEvaluation) {
-                        this.options.onOpenEvaluation(ev);
+                    if (ev) {
+                        if (ev.rawScansPurged) {
+                            if (window.adminPanelManager && typeof window.adminPanelManager.openStudent360 === "function") {
+                                window.adminPanelManager.openStudent360(ev.rollNo, ev.studentName);
+                            } else if (window.appInstance && window.appInstance.adminPanelManager && typeof window.appInstance.adminPanelManager.openStudent360 === "function") {
+                                window.appInstance.adminPanelManager.openStudent360(ev.rollNo, ev.studentName);
+                            } else if (window.AdminPanelManager && document.getElementById("modal-admin-student-profile")) {
+                                const tempMgr = new window.AdminPanelManager(document.getElementById("view-admin-panel") || document.body);
+                                await tempMgr.init();
+                                tempMgr.openStudent360(ev.rollNo, ev.studentName);
+                            } else if (this.options.onOpenEvaluation) {
+                                this.options.onOpenEvaluation(ev);
+                            }
+                        } else if (this.options.onOpenEvaluation) {
+                            this.options.onOpenEvaluation(ev);
+                        }
                     }
                 }
 

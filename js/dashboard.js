@@ -647,8 +647,17 @@ class DashboardManager {
         const ic = window.Icons || {};
 
         tbody.innerHTML = this.filteredEvaluations.map(ev => {
+            const isPurged = Boolean(ev.rawScansPurged);
             const isCompleted = this.isPaperCorrected(ev);
-            const statusClass = isCompleted ? "badge-completed" : "badge-pending";
+            let statusClass = "badge-pending";
+            let statusLabel = isCompleted ? "Corrected" : "Uncorrected";
+            if (isPurged) {
+                statusClass = "badge-archived";
+                statusLabel = "✓ Log Archived";
+            } else if (isCompleted) {
+                statusClass = "badge-completed";
+                statusLabel = "Corrected";
+            }
             const rawDate = ev.updatedAt || ev.lastUpdated || ev.createdAt;
             let dateStr = "—";
             if (rawDate) {
@@ -697,16 +706,16 @@ class DashboardManager {
                         ` : `<span style="color: #94A3B8; font-size: 0.84rem;">Pending</span>`}
                     </td>
                     <td>
-                        <span class="status-pill ${statusClass}">${isCompleted ? 'Corrected' : 'Uncorrected'}</span>
+                        <span class="status-pill ${statusClass}">${statusLabel}</span>
                     </td>
                     <td class="text-muted font-sm">${dateStr}</td>
                     <td class="text-right">
                         <div class="action-btn-group" style="display: inline-flex; gap: 6px; justify-content: flex-end;">
-                            <button type="button" class="btn-action-view btn-dash-open" data-id="${ev.id}" title="${isCompleted ? 'Review or edit marks' : 'Start correction'}">
-                                ${isCompleted ? 'View / Edit' : 'Evaluate'}
+                            <button type="button" class="btn-action-view btn-dash-open" data-id="${ev.id}" title="${isPurged ? 'View Student Scorecard' : (isCompleted ? 'Review or edit marks' : 'Start correction')}">
+                                ${isPurged ? 'Scorecard' : (isCompleted ? 'View / Edit' : 'Evaluate')}
                             </button>
-                            <button type="button" class="btn-action-pdf btn-dash-pdf" data-id="${ev.id}" title="Download individual evaluated PDF">
-                                ${ic.pdf || '📄'} PDF
+                            <button type="button" class="btn-action-pdf btn-dash-pdf" data-id="${ev.id}" title="${isPurged ? 'Download official scorecard PDF' : 'Download individual evaluated PDF'}">
+                                ${ic.pdf || '📄'} ${isPurged ? 'Scorecard' : 'PDF'}
                             </button>
                             <button type="button" class="btn-action-delete btn-dash-delete" data-id="${ev.id}" title="Delete paper" style="background: rgba(220, 38, 38, 0.08); border: 1px solid rgba(220, 38, 38, 0.25); color: #DC2626; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;">
                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
