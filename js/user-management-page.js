@@ -7,6 +7,7 @@
  * - Access Control: Strict permission boundaries (Uploaders cannot delete Admin accounts; Admins govern all)
  * - Credential Management: User ID, Email, Secure Passwords with live reveal & copy
  * - Academic Specializations: Authorizations across Subject Catalog & Assigned Classes
+ * - On-Screen Edit / Add Form (Rendered directly on screen in-place, eliminating popup overlay clipping)
  * - Strict Regular Typography (font-weight: 400 !important)
  */
 
@@ -22,6 +23,7 @@ class UserManagementPageManager {
         this.subjectFilter = "all";
         this.statusFilter = "all";
         this.revealedPasswords = new Set();
+        this.currentViewMode = "list"; // "list" | "edit" | "add"
         this.editingUser = null;
     }
 
@@ -124,17 +126,10 @@ class UserManagementPageManager {
             badgeClass: "role-badge-evaluator",
             avatarClass: "avatar-evaluator",
             icon: `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`,
-            desc: "On-Screen Marking, Sectional Question Scoring & Feedback"
+            desc: "On-Screen Marking, Sectional Question Scoring & Remarks"
         };
     }
 
-    /**
-     * Strict Access Control Policy:
-     * - Root Super Admin can NEVER be removed.
-     * - Current active user cannot delete their own session account.
-     * - Uploader CANNOT delete an Administrator account ("uploader cant delete the admin alone").
-     * - Administrator CAN delete Uploader and Evaluator accounts ("admin can delete uploader also ok").
-     */
     canDeleteUser(targetUser) {
         if (!targetUser) return { allowed: false, reason: "Invalid target user." };
         const currentUser = this.getCurrentUser();
@@ -168,7 +163,6 @@ class UserManagementPageManager {
             return { allowed: false, reason: "Access restricted: Only Administrators can remove Admin accounts." };
         }
 
-        // 6. Uploader deleting an evaluator is permitted if permitted in desk
         return { allowed: true };
     }
 
@@ -180,26 +174,33 @@ class UserManagementPageManager {
         const isTargetAdmin = isTargetSuper || targetRole === "admin";
 
         if (isTargetSuper) {
-            return isTargetSuper; // only super admin can edit super admin
+            return isTargetSuper;
         }
         if (isTargetAdmin && !isCurrentAdmin) {
-            return false; // uploader cannot edit admin
+            return false;
         }
         return true;
     }
 
-    // --- Main Layout Rendering ---
+    // --- Master Render Routing ---
 
     render() {
         if (!this.container) return;
 
+        if (this.currentViewMode === "edit" || this.currentViewMode === "add") {
+            this.renderFormView();
+        } else {
+            this.renderListView();
+        }
+    }
+
+    // --- 1. Users Directory List View ---
+
+    renderListView() {
         const totalUsers = this.users.length;
         const adminCount = this.users.filter(u => u.role === "admin" || u.role === "super_admin").length;
         const uploaderCount = this.users.filter(u => u.role === "uploader").length;
         const evaluatorCount = this.users.filter(u => u.role === "evaluator" || (!u.role && u.role !== "admin" && u.role !== "uploader" && u.role !== "super_admin")).length;
-
-        const currentUser = this.getCurrentUser();
-        const isAdmin = this.isCurrentUserAdmin();
 
         this.container.innerHTML = `
             <div class="user-mgmt-layout animate-fade-in">
@@ -219,7 +220,7 @@ class UserManagementPageManager {
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
                             <span>Sync Credentials</span>
                         </button>
-                        <button type="button" class="btn-mgmt-secondary" id="btn-export-users-csv" title="Export users list as CSV file">
+                        <button type="button" class="btn-mgmt-secondary" id="btn-export-users-csv" title="Export users directory as CSV">
                             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                             <span>Export CSV</span>
                         </button>
@@ -315,19 +316,14 @@ class UserManagementPageManager {
                     </div>
                 </div>
             </div>
-
-            <!-- Add / Edit / Delete Modal Roots -->
-            <div id="user-modal-container-root"></div>
-            <div id="user-delete-confirm-root"></div>
         `;
 
-        this.bindEvents();
+        this.bindListEvents();
     }
 
     renderTableHTML() {
         const filtered = this.getFilteredUsers();
         const currentUser = this.getCurrentUser();
-        const isCurrentAdmin = this.isCurrentUserAdmin();
 
         if (filtered.length === 0) {
             return `
@@ -497,9 +493,8 @@ class UserManagementPageManager {
             // Subject filter
             if (this.subjectFilter !== "all") {
                 const r = (u.role || "evaluator").toLowerCase();
-                // Admin and super_admin have access to all subjects
                 if (r === "admin" || r === "super_admin") {
-                    // include in all subjects
+                    // Admins have access to all subjects
                 } else {
                     const subs = u.assignedSubjects || [];
                     if (!subs.includes(this.subjectFilter) && !subs.includes("All Subjects")) return false;
@@ -521,9 +516,7 @@ class UserManagementPageManager {
         });
     }
 
-    // --- Interactive Event Bindings ---
-
-    bindEvents() {
+    bindListEvents() {
         if (!this.container) return;
 
         // Search Input
@@ -584,15 +577,15 @@ class UserManagementPageManager {
             });
         });
 
-        // Add User Button
+        // Add User Button (Opens On-Screen Form directly)
         const btnAdd = this.container.querySelector("#btn-add-new-user");
         if (btnAdd) {
-            btnAdd.addEventListener("click", () => this.openUserModal());
+            btnAdd.addEventListener("click", () => this.openUserForm(null));
         }
 
         const btnEmptyAdd = this.container.querySelector("#btn-empty-add-user");
         if (btnEmptyAdd) {
-            btnEmptyAdd.addEventListener("click", () => this.openUserModal());
+            btnEmptyAdd.addEventListener("click", () => this.openUserForm(null));
         }
 
         // Sync Credentials Button
@@ -639,7 +632,7 @@ class UserManagementPageManager {
                 // Empty state add button
                 const btnEmptyAdd = e.target.closest("#btn-empty-add-user");
                 if (btnEmptyAdd) {
-                    this.openUserModal();
+                    this.openUserForm(null);
                     return;
                 }
 
@@ -670,17 +663,13 @@ class UserManagementPageManager {
                     return;
                 }
 
-                // Edit User
+                // Edit User: Opens directly on screen!
                 const btnEdit = e.target.closest(".btn-edit-user");
                 if (btnEdit && !btnEdit.disabled) {
                     const uId = btnEdit.getAttribute("data-user-id");
                     const u = this.users.find(item => item.id === uId);
                     if (u) {
-                        if (!this.canEditUser(u)) {
-                            alert("Access Denied: You do not have permission to modify this Administrator account.");
-                            return;
-                        }
-                        this.openUserModal(u);
+                        this.openUserForm(u);
                     }
                     return;
                 }
@@ -724,7 +713,6 @@ class UserManagementPageManager {
         const u = this.users.find(item => item.id === userId);
         if (!u) return;
 
-        // Security check: non-admin cannot deactivate admin
         const isCurrentAdmin = this.isCurrentUserAdmin();
         const role = (u.role || "evaluator").toLowerCase();
         if ((role === "admin" || role === "super_admin") && !isCurrentAdmin) {
@@ -743,93 +731,38 @@ class UserManagementPageManager {
         this.showToast(`User ${u.name} marked as ${u.status === 'active' ? 'Active' : 'Suspended'}`);
     }
 
-    // --- Deletion Flow with Permission Checks & Custom Apple Confirmation Dialog ---
+    // --- 2. On-Screen Edit & Add Form (Rendered Directly On Screen, No Popup) ---
 
-    handleDeleteUser(userId) {
-        const u = this.users.find(item => item.id === userId);
-        if (!u) return;
-
-        const check = this.canDeleteUser(u);
-        if (!check.allowed) {
-            alert(`Access Denied: ${check.reason}`);
+    openUserForm(user = null) {
+        if (user && !this.canEditUser(user)) {
+            alert("Access Denied: You do not have permission to modify this Administrator account.");
             return;
         }
+        this.editingUser = user;
+        this.currentViewMode = user ? "edit" : "add";
+        this.render();
 
-        const roleMeta = this.getRoleMeta(u);
-        const confirmRoot = document.getElementById("user-delete-confirm-root") || this.container;
-
-        const modalEl = document.createElement("div");
-        modalEl.className = "user-modal-backdrop animate-fade-in";
-        modalEl.innerHTML = `
-            <div class="custom-delete-modal-dialog">
-                <div class="delete-icon-ring">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
-                </div>
-                <h3 class="delete-modal-title">Delete User Account</h3>
-                <p class="delete-modal-msg">
-                    Are you sure you want to permanently delete <strong>${u.name}</strong> (<span style="color: #64748B;">@${u.username || u.id}</span>)?
-                    <br/><br/>
-                    <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; background: rgba(0,0,0,0.04); font-size: 0.82rem; color: #475569;">
-                        Role: <strong>${roleMeta.label}</strong>
-                    </span>
-                    <br/><br/>
-                    This will immediately revoke their access to the evaluation desk and credentials. All existing answer sheets already graded remain preserved.
-                </p>
-                <div class="delete-modal-actions">
-                    <button type="button" class="btn-mgmt-secondary" id="btn-cancel-delete">Cancel</button>
-                    <button type="button" class="btn-danger-confirm" id="btn-confirm-delete">Permanently Delete</button>
-                </div>
-            </div>
-        `;
-
-        confirmRoot.innerHTML = "";
-        confirmRoot.appendChild(modalEl);
-
-        const btnCancel = modalEl.querySelector("#btn-cancel-delete");
-        const btnConfirm = modalEl.querySelector("#btn-confirm-delete");
-
-        const closeModal = () => { confirmRoot.innerHTML = ""; };
-        if (btnCancel) btnCancel.addEventListener("click", closeModal);
-
-        if (btnConfirm) {
-            btnConfirm.addEventListener("click", async () => {
-                btnConfirm.disabled = true;
-                btnConfirm.textContent = "Deleting...";
-
-                try {
-                    this.users = this.users.filter(item => item.id !== userId);
-                    await window.appStorage.saveUsersList(this.users);
-
-                    if (window.firebaseManager && window.firebaseManager.firestore) {
-                        try {
-                            await window.firebaseManager.firestore.collection("users").doc(u.uid || u.id).delete();
-                        } catch (e) {
-                            console.warn("Firestore user delete notice:", e);
-                        }
-                    }
-
-                    closeModal();
-                    this.render();
-                    this.showToast(`User "${u.name}" (${roleMeta.label}) was permanently deleted.`);
-                } catch (err) {
-                    console.error("Error deleting user:", err);
-                    alert("Failed to delete user: " + err.message);
-                    closeModal();
-                }
-            });
+        // Smooth scroll to top of form
+        if (this.container) {
+            this.container.scrollIntoView({ behavior: "smooth", block: "start" });
         }
     }
 
-    // --- Add & Edit User Modal Form ---
+    closeUserForm() {
+        this.currentViewMode = "list";
+        this.editingUser = null;
+        this.render();
 
-    openUserModal(user = null) {
-        this.editingUser = user;
-        const isEdit = !!user;
+        if (this.container) {
+            this.container.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
+    }
+
+    renderFormView() {
+        const isEdit = this.currentViewMode === "edit" && !!this.editingUser;
         const isCurrentAdmin = this.isCurrentUserAdmin();
-        const modalRoot = document.getElementById("user-modal-container-root");
-        if (!modalRoot) return;
 
-        const uData = user || {
+        const uData = this.editingUser || {
             name: "",
             username: "",
             email: "",
@@ -840,160 +773,216 @@ class UserManagementPageManager {
             status: "active"
         };
 
-        const modalEl = document.createElement("div");
-        modalEl.className = "user-modal-backdrop animate-fade-in";
-        modalEl.innerHTML = `
-            <div class="user-modal-card">
-                <div class="modal-header">
-                    <div class="modal-title-wrap">
-                        <span class="modal-tag-pill">${isEdit ? 'Update Credentials & Permissions' : 'New User Account Registration'}</span>
-                        <h3 class="modal-heading">${isEdit ? `Edit User: ${uData.name}` : 'Create New User Account'}</h3>
-                    </div>
-                    <button type="button" class="btn-modal-close" id="btn-user-modal-close" title="Close">×</button>
-                </div>
+        const roleMeta = this.getRoleMeta(uData);
 
-                <form id="form-user-details" class="modal-body-form">
-                    <div class="form-row-two-col">
-                        <div class="form-group">
-                            <label class="form-label" for="inp-user-fullname">Full Name <span class="required-star">*</span></label>
-                            <input type="text" id="inp-user-fullname" class="form-input" placeholder="e.g. Dr. Sarah Johnson" value="${uData.name || ''}" required />
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label" for="inp-user-username">User ID / Username <span class="required-star">*</span></label>
-                            <input type="text" id="inp-user-username" class="form-input" placeholder="e.g. sarah.bio" value="${uData.username || ''}" required />
+        this.container.innerHTML = `
+            <div class="user-mgmt-layout animate-fade-in">
+                <div class="user-form-screen-wrap">
+                    <!-- Top Navigation & Header Bar -->
+                    <div class="user-form-screen-header">
+                        <button type="button" class="btn-screen-back" id="btn-user-form-back" title="Return to Users Directory without saving">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                            <span>Back to Users Directory</span>
+                        </button>
+
+                        <div class="header-titles" style="margin-top: 12px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
+                                <span class="header-tag-pill" style="margin-bottom: 0;">
+                                    ${isEdit ? 'Account Modification' : 'New User Registration'}
+                                </span>
+                                ${isEdit ? `
+                                    <span class="role-badge ${roleMeta.badgeClass}">
+                                        ${roleMeta.icon}
+                                        <span>${roleMeta.label}</span>
+                                    </span>
+                                ` : ''}
+                            </div>
+                            <h1 class="page-title">${isEdit ? `Edit User Credentials: ${uData.name}` : 'Register New User Account'}</h1>
+                            <p class="page-subtitle">${isEdit ? `Update credentials for user ID @${uData.username || uData.id}, assign role permissions, and customize academic subject allocations.` : 'Create a new administrator, exam officer, or evaluator account, set login credentials, and configure subject allocations.'}</p>
                         </div>
                     </div>
 
-                    <div class="form-row-two-col">
-                        <div class="form-group">
-                            <label class="form-label" for="inp-user-email">Email Address <span class="required-star">*</span></label>
-                            <input type="email" id="inp-user-email" class="form-input" placeholder="e.g. sarah@adwaith.edu" value="${uData.email || ''}" required />
-                        </div>
-                        <div class="form-group">
-                            <div class="label-with-action-row">
-                                <label class="form-label" for="inp-user-pass">Password <span class="required-star">*</span></label>
-                                <div style="display: flex; gap: 8px;">
-                                    <button type="button" class="btn-label-link" id="btn-gen-pass" title="Generate random password">Generate</button>
-                                    <button type="button" class="btn-label-link" id="btn-modal-copy-pass" title="Copy to clipboard">Copy</button>
+                    <!-- On-Screen Form Card -->
+                    <div class="user-screen-form-card">
+                        <form id="form-user-details" class="user-onscreen-form">
+                            <!-- Section 1: User Identity & Login Credentials -->
+                            <div class="form-section-card">
+                                <div class="form-section-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                                    <span>Account Identity & Credentials</span>
+                                </div>
+
+                                <div class="form-row-two-col">
+                                    <div class="form-group">
+                                        <label class="form-label" for="inp-user-fullname">Full Name <span class="required-star">*</span></label>
+                                        <input type="text" id="inp-user-fullname" class="form-input" placeholder="e.g. Dr. Sarah Johnson" value="${uData.name || ''}" required />
+                                    </div>
+                                    <div class="form-group">
+                                        <label class="form-label" for="inp-user-username">User ID / Username <span class="required-star">*</span></label>
+                                        <input type="text" id="inp-user-username" class="form-input" placeholder="e.g. sarah.bio" value="${uData.username || ''}" required />
+                                    </div>
+                                </div>
+
+                                <div class="form-row-two-col" style="margin-top: 14px;">
+                                    <div class="form-group">
+                                        <label class="form-label" for="inp-user-email">Email Address <span class="required-star">*</span></label>
+                                        <input type="email" id="inp-user-email" class="form-input" placeholder="e.g. sarah@adwaith.edu" value="${uData.email || ''}" required />
+                                    </div>
+                                    <div class="form-group">
+                                        <div class="label-with-action-row">
+                                            <label class="form-label" for="inp-user-pass">Password <span class="required-star">*</span></label>
+                                            <div style="display: flex; gap: 8px;">
+                                                <button type="button" class="btn-label-link" id="btn-gen-pass" title="Generate secure random password">⚡ Generate</button>
+                                                <button type="button" class="btn-label-link" id="btn-form-copy-pass" title="Copy to clipboard">📋 Copy</button>
+                                            </div>
+                                        </div>
+                                        <input type="text" id="inp-user-pass" class="form-input" placeholder="Enter secure password (min 6 characters)" value="${uData.password || ''}" required />
+                                    </div>
                                 </div>
                             </div>
-                            <div class="input-with-inline-btn">
-                                <input type="text" id="inp-user-pass" class="form-input" placeholder="Enter secure password (min 6 characters)" value="${uData.password || ''}" required />
+
+                            <!-- Section 2: Role & System Governance -->
+                            <div class="form-section-card">
+                                <div class="form-section-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                                    <span>Role & Governance Permissions</span>
+                                </div>
+
+                                <div class="form-group">
+                                    <label class="form-label" for="select-user-role">System Role <span class="required-star">*</span></label>
+                                    <select id="select-user-role" class="form-select">
+                                        <option value="admin" ${uData.role === 'admin' ? 'selected' : ''} ${(!isCurrentAdmin && !isEdit) ? 'disabled' : ''}>
+                                            Administrator (Institutional Audit, Subject Progress & User Governance)
+                                        </option>
+                                        <option value="uploader" ${uData.role === 'uploader' ? 'selected' : ''}>
+                                            Exam Officer / Uploader (Upload Desk, Batch Scans & Class Ingestion)
+                                        </option>
+                                        <option value="evaluator" ${(uData.role === 'evaluator' || !uData.role) ? 'selected' : ''}>
+                                            Faculty Evaluator (Marking Desk, On-Screen Scoring & Question Remarks)
+                                        </option>
+                                    </select>
+                                    <div id="role-helper-note" class="role-helper-box" style="margin-top: 10px;"></div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
 
-                    <!-- Role Selector with Administrator, Uploader, Evaluator -->
-                    <div class="form-group">
-                        <label class="form-label" for="select-user-role">System Role & Permissions <span class="required-star">*</span></label>
-                        <select id="select-user-role" class="form-select">
-                            <option value="admin" ${uData.role === 'admin' ? 'selected' : ''} ${(!isCurrentAdmin && !isEdit) ? 'disabled' : ''}>
-                                Administrator (Institutional Audit, Subject Progress & User Governance)
-                            </option>
-                            <option value="uploader" ${uData.role === 'uploader' ? 'selected' : ''}>
-                                Exam Officer / Uploader (Upload Desk, Batch Scans & Class Ingestion)
-                            </option>
-                            <option value="evaluator" ${(uData.role === 'evaluator' || !uData.role) ? 'selected' : ''}>
-                                Faculty Evaluator (Marking Desk, On-Screen Scoring & Remarks)
-                            </option>
-                        </select>
-                        <div id="role-helper-note" class="role-helper-box">
-                            <!-- Populated dynamically based on role -->
-                        </div>
-                    </div>
+                            <!-- Section 3: Academic Authorizations -->
+                            <div class="form-section-card">
+                                <div class="form-section-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                    <span>Academic Specialization & Authorizations</span>
+                                </div>
 
-                    <!-- Assigned Subjects Checkbox Grid -->
-                    <div class="form-group" id="group-assigned-subjects">
-                        <div class="label-with-action-row">
-                            <label class="form-label">Authorized Subject(s) <span class="required-star">*</span></label>
-                            <button type="button" class="btn-label-link" id="btn-select-all-subs">Select All</button>
-                        </div>
-                        <p class="form-help-sub">Select the academic subjects this faculty member is authorized to correct:</p>
-                        <div class="checkbox-options-grid" id="subs-checkbox-grid">
-                            ${this.subjectsList.map(s => {
-                                const isChecked = (uData.assignedSubjects || []).includes(s) || (uData.assignedSubjects || []).includes("All Subjects");
-                                return `
-                                    <label class="custom-checkbox-card">
-                                        <input type="checkbox" name="assigned_subject" value="${s}" ${isChecked ? 'checked' : ''} />
-                                        <span class="chk-label">${s}</span>
-                                    </label>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
+                                <!-- Authorized Subjects -->
+                                <div class="form-group" style="margin-bottom: 18px;">
+                                    <div class="label-with-action-row">
+                                        <label class="form-label">Authorized Subject(s) <span class="required-star">*</span></label>
+                                        <button type="button" class="btn-label-link" id="btn-select-all-subs">Select All</button>
+                                    </div>
+                                    <p class="form-help-sub">Choose which academic subjects this user is authorized to evaluate:</p>
+                                    <div class="checkbox-options-grid" id="subs-checkbox-grid">
+                                        ${this.subjectsList.map(s => {
+                                            const isChecked = (uData.assignedSubjects || []).includes(s) || (uData.assignedSubjects || []).includes("All Subjects");
+                                            return `
+                                                <label class="custom-checkbox-card">
+                                                    <input type="checkbox" name="assigned_subject" value="${s}" ${isChecked ? 'checked' : ''} />
+                                                    <span class="chk-label">${s}</span>
+                                                </label>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
 
-                    <!-- Assigned Classes Checkbox Grid -->
-                    <div class="form-group" id="group-assigned-classes">
-                        <div class="label-with-action-row">
-                            <label class="form-label">Assigned Classes / Divisions</label>
-                            <button type="button" class="btn-label-link" id="btn-select-all-classes">Select All</button>
-                        </div>
-                        <div class="checkbox-options-grid" id="classes-checkbox-grid">
-                            ${this.classesList.map(c => {
-                                const isChecked = (uData.assignedClasses || []).includes(c) || (uData.assignedClasses || []).includes("All Classes");
-                                return `
-                                    <label class="custom-checkbox-card">
-                                        <input type="checkbox" name="assigned_class" value="${c}" ${isChecked ? 'checked' : ''} />
-                                        <span class="chk-label">${c}</span>
-                                    </label>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
+                                <!-- Assigned Classes -->
+                                <div class="form-group">
+                                    <div class="label-with-action-row">
+                                        <label class="form-label">Assigned Classes / Divisions</label>
+                                        <button type="button" class="btn-label-link" id="btn-select-all-classes">Select All</button>
+                                    </div>
+                                    <div class="checkbox-options-grid" id="classes-checkbox-grid">
+                                        ${this.classesList.map(c => {
+                                            const isChecked = (uData.assignedClasses || []).includes(c) || (uData.assignedClasses || []).includes("All Classes");
+                                            return `
+                                                <label class="custom-checkbox-card">
+                                                    <input type="checkbox" name="assigned_class" value="${c}" ${isChecked ? 'checked' : ''} />
+                                                    <span class="chk-label">${c}</span>
+                                                </label>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                </div>
+                            </div>
 
-                    <!-- Account Status -->
-                    <div class="form-group">
-                        <label class="form-label" for="select-user-status">Account Access Status</label>
-                        <select id="select-user-status" class="form-select">
-                            <option value="active" ${uData.status === 'active' ? 'selected' : ''}>Active (Authorized to log in & evaluate)</option>
-                            <option value="inactive" ${uData.status === 'inactive' ? 'selected' : ''}>Suspended / Inactive (Login temporarily disabled)</option>
-                        </select>
-                    </div>
+                            <!-- Section 4: Account Access Status -->
+                            <div class="form-section-card">
+                                <div class="form-section-title">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+                                    <span>Account Access Status</span>
+                                </div>
 
-                    <div class="modal-footer-row">
-                        <button type="button" class="btn-mgmt-secondary" id="btn-user-modal-cancel">Cancel</button>
-                        <button type="submit" class="btn-mgmt-primary" id="btn-user-modal-save">
-                            ${isEdit ? 'Save Changes' : 'Create User Account'}
-                        </button>
+                                <div class="form-group">
+                                    <label class="form-label" for="select-user-status">Status</label>
+                                    <select id="select-user-status" class="form-select">
+                                        <option value="active" ${uData.status === 'active' ? 'selected' : ''}>Active (Authorized to log in & evaluate)</option>
+                                        <option value="inactive" ${uData.status === 'inactive' ? 'selected' : ''}>Suspended / Inactive (Login temporarily disabled)</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Action Footer Buttons -->
+                            <div class="form-onscreen-footer">
+                                <button type="button" class="btn-mgmt-secondary" id="btn-user-form-cancel">Cancel</button>
+                                <button type="submit" class="btn-mgmt-primary" id="btn-user-form-save">
+                                    ${isEdit ? 'Save Changes' : 'Create User Account'}
+                                </button>
+                            </div>
+                        </form>
                     </div>
-                </form>
+                </div>
             </div>
         `;
 
-        modalRoot.innerHTML = "";
-        modalRoot.appendChild(modalEl);
+        this.bindFormEvents(isEdit);
+    }
 
-        const closeBtn = modalEl.querySelector("#btn-user-modal-close");
-        const cancelBtn = modalEl.querySelector("#btn-user-modal-cancel");
-        const closeModal = () => { modalRoot.innerHTML = ""; };
+    bindFormEvents(isEdit) {
+        if (!this.container) return;
+        const isCurrentAdmin = this.isCurrentUserAdmin();
 
-        if (closeBtn) closeBtn.addEventListener("click", closeModal);
-        if (cancelBtn) cancelBtn.addEventListener("click", closeModal);
+        // Back button & Cancel button
+        const btnBack = this.container.querySelector("#btn-user-form-back");
+        if (btnBack) {
+            btnBack.addEventListener("click", () => this.closeUserForm());
+        }
+
+        const btnCancel = this.container.querySelector("#btn-user-form-cancel");
+        if (btnCancel) {
+            btnCancel.addEventListener("click", () => this.closeUserForm());
+        }
 
         // Role change dynamic helper
-        const roleSelect = modalEl.querySelector("#select-user-role");
-        const roleHelper = modalEl.querySelector("#role-helper-note");
+        const roleSelect = this.container.querySelector("#select-user-role");
+        const roleHelper = this.container.querySelector("#role-helper-note");
         const updateRoleHelper = () => {
             if (!roleSelect || !roleHelper) return;
             const r = roleSelect.value;
             if (r === "admin") {
                 roleHelper.innerHTML = `
                     <div class="helper-pill-admin">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                        <span><strong>Administrator:</strong> Unrestricted access to Exam Audit, Faculty Progress Tracker, Student Mark Matrix, and User Management. Automatically authorized across all subjects.</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <span><strong>Administrator:</strong> Master oversight of Exam Audit, Faculty Progress Tracker, Student Score Matrix, and User Governance. Automatically authorized across all subjects.</span>
                     </div>
                 `;
             } else if (r === "uploader") {
                 roleHelper.innerHTML = `
                     <div class="helper-pill-uploader">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-                        <span><strong>Exam Officer / Uploader:</strong> Authorized for Upload Desk, batch paper ingestion, class roster uploads, and PDF scan deletion. Cannot delete Administrator accounts.</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                        <span><strong>Exam Officer / Uploader:</strong> Full access to Upload Desk, batch paper ingestion, class roster uploads, and PDF scan deletion. Cannot delete Administrator accounts.</span>
                     </div>
                 `;
             } else {
                 roleHelper.innerHTML = `
                     <div class="helper-pill-evaluator">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                         <span><strong>Faculty Evaluator:</strong> Marking Desk access restricted strictly to their assigned subjects and classes below.</span>
                     </div>
                 `;
@@ -1005,22 +994,22 @@ class UserManagementPageManager {
         }
 
         // Generate Password
-        const genBtn = modalEl.querySelector("#btn-gen-pass");
+        const genBtn = this.container.querySelector("#btn-gen-pass");
         if (genBtn) {
             genBtn.addEventListener("click", () => {
-                const passInp = modalEl.querySelector("#inp-user-pass");
+                const passInp = this.container.querySelector("#inp-user-pass");
                 if (passInp) {
                     passInp.value = this.generateRandomPassword();
-                    this.showToast("Generated secure password!");
+                    this.showToast("Generated new secure password!");
                 }
             });
         }
 
-        // Copy Password from modal
-        const copyBtn = modalEl.querySelector("#btn-modal-copy-pass");
+        // Copy Password from form
+        const copyBtn = this.container.querySelector("#btn-form-copy-pass");
         if (copyBtn) {
             copyBtn.addEventListener("click", () => {
-                const passInp = modalEl.querySelector("#inp-user-pass");
+                const passInp = this.container.querySelector("#inp-user-pass");
                 if (passInp && passInp.value) {
                     navigator.clipboard.writeText(passInp.value).then(() => {
                         this.showToast("Password copied to clipboard!");
@@ -1030,10 +1019,10 @@ class UserManagementPageManager {
         }
 
         // Select All Subjects
-        const btnAllSubs = modalEl.querySelector("#btn-select-all-subs");
+        const btnAllSubs = this.container.querySelector("#btn-select-all-subs");
         if (btnAllSubs) {
             btnAllSubs.addEventListener("click", () => {
-                const cbs = modalEl.querySelectorAll("input[name='assigned_subject']");
+                const cbs = this.container.querySelectorAll("input[name='assigned_subject']");
                 const allChecked = Array.from(cbs).every(cb => cb.checked);
                 cbs.forEach(cb => cb.checked = !allChecked);
                 btnAllSubs.textContent = allChecked ? "Select All" : "Deselect All";
@@ -1041,10 +1030,10 @@ class UserManagementPageManager {
         }
 
         // Select All Classes
-        const btnAllClasses = modalEl.querySelector("#btn-select-all-classes");
+        const btnAllClasses = this.container.querySelector("#btn-select-all-classes");
         if (btnAllClasses) {
             btnAllClasses.addEventListener("click", () => {
-                const cbs = modalEl.querySelectorAll("input[name='assigned_class']");
+                const cbs = this.container.querySelectorAll("input[name='assigned_class']");
                 const allChecked = Array.from(cbs).every(cb => cb.checked);
                 cbs.forEach(cb => cb.checked = !allChecked);
                 btnAllClasses.textContent = allChecked ? "Select All" : "Deselect All";
@@ -1052,20 +1041,20 @@ class UserManagementPageManager {
         }
 
         // Form Submit
-        const form = modalEl.querySelector("#form-user-details");
+        const form = this.container.querySelector("#form-user-details");
         if (form) {
             form.addEventListener("submit", async (e) => {
                 e.preventDefault();
-                const btnSubmit = modalEl.querySelector("#btn-user-modal-save");
-                const name = modalEl.querySelector("#inp-user-fullname")?.value.trim();
-                const username = modalEl.querySelector("#inp-user-username")?.value.trim();
-                const email = modalEl.querySelector("#inp-user-email")?.value.trim().toLowerCase();
-                const password = modalEl.querySelector("#inp-user-pass")?.value.trim();
-                const role = modalEl.querySelector("#select-user-role")?.value || "evaluator";
-                const status = modalEl.querySelector("#select-user-status")?.value || "active";
+                const btnSubmit = this.container.querySelector("#btn-user-form-save");
+                const name = this.container.querySelector("#inp-user-fullname")?.value.trim();
+                const username = this.container.querySelector("#inp-user-username")?.value.trim();
+                const email = this.container.querySelector("#inp-user-email")?.value.trim().toLowerCase();
+                const password = this.container.querySelector("#inp-user-pass")?.value.trim();
+                const role = this.container.querySelector("#select-user-role")?.value || "evaluator";
+                const status = this.container.querySelector("#select-user-status")?.value || "active";
 
-                let selectedSubjects = Array.from(modalEl.querySelectorAll("input[name='assigned_subject']:checked")).map(cb => cb.value);
-                let selectedClasses = Array.from(modalEl.querySelectorAll("input[name='assigned_class']:checked")).map(cb => cb.value);
+                let selectedSubjects = Array.from(this.container.querySelectorAll("input[name='assigned_subject']:checked")).map(cb => cb.value);
+                let selectedClasses = Array.from(this.container.querySelectorAll("input[name='assigned_class']:checked")).map(cb => cb.value);
 
                 if (!name || !username || !email || !password) {
                     alert("Please fill in all required fields (Full Name, User ID, Email, Password).");
@@ -1077,7 +1066,6 @@ class UserManagementPageManager {
                     return;
                 }
 
-                // If role is Admin or Uploader, automatically assign all subjects if none selected
                 if ((role === "admin" || role === "uploader") && selectedSubjects.length === 0) {
                     selectedSubjects = ["All Subjects"];
                 }
@@ -1087,7 +1075,6 @@ class UserManagementPageManager {
                     return;
                 }
 
-                // Check security permission: non-admin cannot create/promote to admin
                 if (role === "admin" && !isCurrentAdmin && !isEdit) {
                     alert("Access Denied: Only Administrators can create Administrator accounts.");
                     return;
@@ -1131,14 +1118,14 @@ class UserManagementPageManager {
                                     updatedAt: new Date().toISOString()
                                 }, { merge: true });
                             } catch (fsErr) {
-                                console.warn("Firestore user update warning:", fsErr);
+                                console.warn("Firestore user update notice:", fsErr);
                             }
                         }
                     } else {
-                        // Check for duplicate email locally
+                        // Check for duplicate email
                         const existingEmail = this.users.find(u => u.email && u.email.toLowerCase() === email);
                         if (existingEmail) {
-                            alert(`Account notice: A user with email "${email}" already exists. Please use a unique email or edit the existing account.`);
+                            alert(`Account notice: A user with email "${email}" already exists. Please use a unique email.`);
                             if (btnSubmit) {
                                 btnSubmit.disabled = false;
                                 btnSubmit.textContent = "Create User Account";
@@ -1146,7 +1133,7 @@ class UserManagementPageManager {
                             return;
                         }
 
-                        // Provision account in Firebase Auth / Firestore if connected
+                        // Provision account in Firebase Auth / Firestore
                         let createdProfile = null;
                         if (window.firebaseManager) {
                             const res = await window.firebaseManager.createTeacherAccount({
@@ -1190,9 +1177,8 @@ class UserManagementPageManager {
                     }
 
                     await window.appStorage.saveUsersList(this.users);
-                    closeModal();
-                    this.render();
                     this.showToast(isEdit ? `Account for ${name} updated successfully.` : `New ${roleLabel} account registered for ${name}!`);
+                    this.closeUserForm();
                 } catch (err) {
                     console.error("Error creating/saving user:", err);
                     alert("Failed to save user: " + err.message);
@@ -1200,6 +1186,86 @@ class UserManagementPageManager {
                         btnSubmit.disabled = false;
                         btnSubmit.textContent = isEdit ? "Save Changes" : "Create User Account";
                     }
+                }
+            });
+        }
+    }
+
+    // --- 3. Deletion Flow with Permission Checks & Body-Attached Modal ---
+
+    handleDeleteUser(userId) {
+        const u = this.users.find(item => item.id === userId);
+        if (!u) return;
+
+        const check = this.canDeleteUser(u);
+        if (!check.allowed) {
+            alert(`Access Denied: ${check.reason}`);
+            return;
+        }
+
+        const roleMeta = this.getRoleMeta(u);
+
+        // Append modal directly to document.body with max z-index to avoid clipping
+        const modalEl = document.createElement("div");
+        modalEl.className = "user-modal-backdrop animate-fade-in";
+        modalEl.style.zIndex = "999999";
+        modalEl.innerHTML = `
+            <div class="custom-delete-modal-dialog">
+                <div class="delete-icon-ring">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+                </div>
+                <h3 class="delete-modal-title">Delete User Account</h3>
+                <p class="delete-modal-msg">
+                    Are you sure you want to permanently delete <strong>${u.name}</strong> (<span style="color: #64748B;">@${u.username || u.id}</span>)?
+                    <br/><br/>
+                    <span style="display: inline-block; padding: 4px 10px; border-radius: 6px; background: rgba(0,0,0,0.04); font-size: 0.82rem; color: #475569;">
+                        Role: <strong>${roleMeta.label}</strong>
+                    </span>
+                    <br/><br/>
+                    This will immediately revoke their access to the evaluation desk and credentials. All existing answer sheets already graded remain preserved.
+                </p>
+                <div class="delete-modal-actions">
+                    <button type="button" class="btn-mgmt-secondary" id="btn-cancel-delete">Cancel</button>
+                    <button type="button" class="btn-danger-confirm" id="btn-confirm-delete">Permanently Delete</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modalEl);
+
+        const btnCancel = modalEl.querySelector("#btn-cancel-delete");
+        const btnConfirm = modalEl.querySelector("#btn-confirm-delete");
+
+        const removeModal = () => {
+            modalEl.remove();
+        };
+
+        if (btnCancel) btnCancel.addEventListener("click", removeModal);
+
+        if (btnConfirm) {
+            btnConfirm.addEventListener("click", async () => {
+                btnConfirm.disabled = true;
+                btnConfirm.textContent = "Deleting...";
+
+                try {
+                    this.users = this.users.filter(item => item.id !== userId);
+                    await window.appStorage.saveUsersList(this.users);
+
+                    if (window.firebaseManager && window.firebaseManager.firestore) {
+                        try {
+                            await window.firebaseManager.firestore.collection("users").doc(u.uid || u.id).delete();
+                        } catch (e) {
+                            console.warn("Firestore user delete notice:", e);
+                        }
+                    }
+
+                    removeModal();
+                    this.render();
+                    this.showToast(`User "${u.name}" (${roleMeta.label}) was permanently deleted.`);
+                } catch (err) {
+                    console.error("Error deleting user:", err);
+                    alert("Failed to delete user: " + err.message);
+                    removeModal();
                 }
             });
         }

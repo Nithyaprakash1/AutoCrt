@@ -9532,6 +9532,80 @@ body {
 }
 
 /* ==========================================================================
+   On-Screen Edit / Add User Form View (Apple Cupertino Theme)
+   ========================================================================== */
+.user-form-screen-wrap {
+    max-width: 880px;
+    margin: 0 auto;
+}
+
+.user-form-screen-header {
+    margin-bottom: 24px;
+}
+
+.btn-screen-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    background: var(--bg-card, #FFFFFF);
+    border: 1px solid var(--border-color, #E2E8F0);
+    color: var(--text-main, #1E293B);
+    font-size: 0.84rem;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.btn-screen-back:hover {
+    background: var(--bg-subtle, #F1F5F9);
+    border-color: var(--border-hover, #CBD5E1);
+    color: var(--apple-blue, #007AFF);
+    transform: translateX(-2px);
+}
+
+.user-screen-form-card {
+    background: var(--bg-card, #FFFFFF);
+    border: 1px solid var(--border-color, #E2E8F0);
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(0, 0, 0, 0.04));
+}
+
+.user-onscreen-form {
+    display: flex;
+    flex-direction: column;
+    gap: 22px;
+}
+
+.form-section-card {
+    background: var(--bg-subtle, #F8FAFC);
+    border: 1px solid var(--border-color, #E2E8F0);
+    border-radius: 16px;
+    padding: 20px 22px;
+}
+
+.form-section-title {
+    font-size: 0.95rem;
+    color: var(--text-main, #0F172A);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--border-color, #E2E8F0);
+}
+
+.form-onscreen-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding-top: 18px;
+    border-top: 1px solid var(--border-color, #E2E8F0);
+}
+
+/* ==========================================================================
    Card Action Buttons (Edit, Duplicate, Delete) & Upload Portal Grids
    ========================================================================== */
 
