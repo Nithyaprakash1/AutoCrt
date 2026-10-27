@@ -77,7 +77,7 @@ class AppController {
         const targetBatch = urlParams.get("batch");
         const targetView = urlParams.get("view");
 
-        const hasSharedTarget = Boolean(evalId || targetSubject || targetBatch || targetView === "uploaded-papers");
+        const hasSharedTarget = Boolean(evalId || targetSubject || targetBatch || targetView === "dashboard" || targetView === "uploaded-papers");
 
         if (hasSharedTarget) {
             sessionStorage.setItem("niprak_shared_target", JSON.stringify({
@@ -94,6 +94,8 @@ class AppController {
                     name: "Faculty Evaluator",
                     role: "evaluator",
                     roleLabel: "Teacher Desk",
+                    subject: targetSubject || "Physics",
+                    assignedSubjects: targetSubject ? [targetSubject] : ["Physics"],
                     status: "active"
                 };
                 window.appStorage.setCurrentUser(guestUser);
@@ -109,23 +111,45 @@ class AppController {
                         this.showToast(`✓ Opened ${ev.studentName || 'Student'}'s ${ev.subject || 'paper'} via WhatsApp link`);
                     }
                 } else {
-                    // Fall back to uploaded papers repository
-                    await this.switchView("uploaded-papers");
+                    // Fall back to Teacher Desk dashboard
+                    this.switchPortal("evaluator", false);
+                    await this.switchView("dashboard");
                     if (this.showToast) {
-                        this.showToast("Paper not found locally, showing all uploaded papers.");
+                        this.showToast("Paper not found locally, opening Teacher Desk.");
                     }
                 }
             } 
-            // 2. Subject or Batch Direct Navigation
-            else if (targetSubject || targetBatch || targetView === "uploaded-papers") {
+            // 2. Pure Uploaded Papers (Only if explicitly requested without subject or batch)
+            else if (targetView === "uploaded-papers" && !targetSubject && !targetBatch) {
                 await this.switchView("uploaded-papers");
                 if (this.uploadedPapersPageManager) {
-                    if (targetSubject) this.uploadedPapersPageManager.selectedSubject = targetSubject;
-                    if (targetBatch) this.uploadedPapersPageManager.selectedBatchKey = targetBatch;
                     this.uploadedPapersPageManager.render();
                 }
                 if (this.showToast) {
-                    this.showToast(`✓ Viewing ${targetSubject || 'shared'} papers via WhatsApp link`);
+                    this.showToast("✓ Viewing Uploaded Papers Repository");
+                }
+            }
+            // 3. Subject or Batch Direct Navigation -> Navigate to Teacher Desk with Cards
+            else if (targetSubject || targetBatch || targetView === "dashboard" || targetView === "uploaded-papers") {
+                // Ensure portal is switched to Teacher Desk
+                this.switchPortal("evaluator", false);
+                await this.switchView("dashboard");
+                if (this.dashboardManager) {
+                    if (targetSubject) {
+                        this.dashboardManager.teacherSubject = targetSubject;
+                        this.dashboardManager.teacherSubjects = [targetSubject];
+                        this.dashboardManager.selectedSubjectFilter = targetSubject;
+                    }
+                    if (targetBatch) {
+                        this.dashboardManager.highlightBatchKey = targetBatch;
+                    }
+                    this.dashboardManager.activeBatchKey = null; // Always display CARDS overview mode
+                    this.dashboardManager.applyFilters();
+                    this.dashboardManager.render();
+                    this.dashboardManager.bindEvents();
+                }
+                if (this.showToast) {
+                    this.showToast(`✓ Viewing ${targetSubject || 'examination'} blueprint cards on Teacher Desk`);
                 }
             }
         } else {

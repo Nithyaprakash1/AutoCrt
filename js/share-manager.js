@@ -18,11 +18,11 @@ class ShareManager {
     }
 
     /**
-     * Build direct access URL for an uploaded subject batch
+     * Build direct access URL for an uploaded subject batch (Navigates directly to Teacher Desk)
      */
     static buildSubjectUrl(subject, batchKey = null) {
         const base = this.getBaseUrl();
-        let url = `${base}?view=uploaded-papers`;
+        let url = `${base}?view=dashboard`;
         if (subject && subject !== "all") {
             url += `&subject=${encodeURIComponent(subject)}`;
         }

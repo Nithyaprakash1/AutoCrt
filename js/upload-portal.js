@@ -4681,7 +4681,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             
             const directUrl = singlePaper 
                 ? (window.ShareManager ? window.ShareManager.buildPaperUrl(singlePaper.id) : `?paperId=${singlePaper.id}`)
-                : (window.ShareManager ? window.ShareManager.buildSubjectUrl(subName, batchKey) : `?view=uploaded-papers&subject=${encodeURIComponent(subName)}`);
+                : (window.ShareManager ? window.ShareManager.buildSubjectUrl(subName, batchKey) : `?view=dashboard&subject=${encodeURIComponent(subName)}`);
 
             shareCard.innerHTML = `
                 <div class="publish-share-title-row">

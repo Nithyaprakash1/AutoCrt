@@ -32,6 +32,8 @@ class DashboardManager {
         this.charts = {}; // Store Chart.js instances
         // Active batch key for drill-down ('className:::templateName' or null for batches overview)
         this.activeBatchKey = null;
+        // Highlight batch key from shared direct links (keeps overview cards visible with target card highlighted)
+        this.highlightBatchKey = null;
 
         // Drill-down step: 'papers' (direct view) | 'classes' (grid view)
         this.viewMode = "papers"; // Default to direct papers view with filters so teacher papers are never hidden
@@ -66,6 +68,33 @@ class DashboardManager {
                 : (user.subject ? [user.subject] : []);
         }
 
+        // Check URL parameters or direct shared target (e.g. ?view=dashboard&subject=Physics&batch=Class 12-A:::Physics...)
+        const urlParams = new URLSearchParams(window.location.search);
+        let sharedSub = urlParams.get("subject");
+        let sharedBatch = urlParams.get("batch");
+        if (!sharedSub && !sharedBatch) {
+            try {
+                const rawShared = sessionStorage.getItem("niprak_shared_target");
+                if (rawShared) {
+                    const parsed = JSON.parse(rawShared);
+                    sharedSub = parsed.targetSubject;
+                    sharedBatch = parsed.targetBatch;
+                }
+            } catch (e) {}
+        }
+
+        if (sharedSub && sharedSub !== "all") {
+            this.teacherSubject = sharedSub;
+            this.teacherSubjects = [sharedSub];
+            this.selectedSubjectFilter = sharedSub;
+        }
+
+        if (sharedBatch && sharedBatch !== "all") {
+            this.highlightBatchKey = sharedBatch;
+            // Always keep activeBatchKey null on initial load so Teacher Desk displays the CARDS overview mode
+            this.activeBatchKey = null;
+        }
+
         this.applyFilters();
         this.render();
         this.bindEvents();
@@ -77,8 +106,13 @@ class DashboardManager {
                 if (Array.isArray(freshList) && freshList.length > 0 && freshList.length !== this.evaluations.length) {
                     this.evaluations = freshList;
                     this.applyFilters();
-                    this.renderTableRows();
-                    this.updateCountsInUI();
+                    if (!this.activeBatchKey) {
+                        this.render();
+                        this.bindEvents();
+                    } else {
+                        this.renderTableRows();
+                        this.updateCountsInUI();
+                    }
                 }
             }).catch(() => {});
         }
@@ -287,6 +321,18 @@ class DashboardManager {
             }
         });
         this.batches = Array.from(batchMap.values());
+        if (this.highlightBatchKey) {
+            const hKey = this.highlightBatchKey.toLowerCase().trim();
+            this.batches.sort((a, b) => {
+                const aMatch = a.key.toLowerCase().trim() === hKey || hKey.includes(a.key.toLowerCase().trim()) ||
+                               (hKey.includes(a.className.toLowerCase()) && hKey.includes(a.templateName.toLowerCase()));
+                const bMatch = b.key.toLowerCase().trim() === hKey || hKey.includes(b.key.toLowerCase().trim()) ||
+                               (hKey.includes(b.className.toLowerCase()) && hKey.includes(b.templateName.toLowerCase()));
+                if (aMatch && !bMatch) return -1;
+                if (!aMatch && bMatch) return 1;
+                return 0;
+            });
+        }
 
         // =========================================================================
         // VIEW 1: Batches Overview Mode (Default)
@@ -367,15 +413,21 @@ class DashboardManager {
 
                     <!-- Class & Exam Blueprint Batches Section -->
                     <div class="teacher-batches-section" id="teacher-batches-section">
-                        <div class="teacher-batches-header">
+                        <div class="teacher-batches-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
                             <div class="teacher-batches-title-col">
-                                <h3 class="teacher-batches-title">
+                                <h3 class="teacher-batches-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
                                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
                                     Class & Exam Blueprint Batches
                                     <span class="teacher-batches-count-pill">${this.batches.length} ${this.batches.length === 1 ? 'Batch' : 'Batches'}</span>
                                 </h3>
-                                <p class="teacher-batches-desc">Click any card to view its student answer sheets or start marking directly.</p>
+                                <p class="teacher-batches-desc" style="margin: 2px 0 0;">Click any card to view its student answer sheets or start marking directly.</p>
                             </div>
+                            ${this.highlightBatchKey ? `
+                                <button type="button" class="btn-admin-clear-batch" id="btn-clear-dash-highlight" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid #0071E3; background: rgba(0, 113, 227, 0.08); color: #0071E3; font-size: 0.78rem; font-weight: 500; cursor: pointer;">
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                    <span>Focus: ${this.highlightBatchKey.replace(':::', ' • ')} (Clear)</span>
+                                </button>
+                            ` : ''}
                         </div>
 
                         <div class="teacher-batches-grid">
@@ -386,12 +438,21 @@ class DashboardManager {
                             ` : this.batches.map(b => {
                                 const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
                                 const isCompleted = b.uncorrected === 0 && b.total > 0;
+                                const isSharedTarget = Boolean(this.highlightBatchKey && (
+                                    b.key.toLowerCase().trim() === this.highlightBatchKey.toLowerCase().trim() ||
+                                    this.highlightBatchKey.toLowerCase().trim().includes(b.key.toLowerCase().trim()) ||
+                                    (this.highlightBatchKey.toLowerCase().includes(b.className.toLowerCase()) && this.highlightBatchKey.toLowerCase().includes(b.templateName.toLowerCase()))
+                                ));
+
                                 return `
-                                    <div class="teacher-batch-card" data-class="${b.className}" data-template="${b.templateName}" style="cursor: pointer;">
+                                    <div class="teacher-batch-card ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" style="cursor: pointer; ${isSharedTarget ? 'border: 2px solid #0071E3; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.22), 0 10px 28px rgba(0, 113, 227, 0.12);' : ''}">
                                         <div class="batch-card-top-row">
-                                            <div style="display: flex; align-items: center; gap: 6px;">
+                                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
                                                 <span class="batch-class-badge">${b.className}</span>
                                                 <span class="batch-subject-tag">${b.subject}</span>
+                                                ${isSharedTarget ? `
+                                                    <span class="batch-status-pill" style="background: rgba(0, 113, 227, 0.12); color: #0071E3; font-weight: 600; border: 1px solid rgba(0, 113, 227, 0.25);">★ Shared Batch</span>
+                                                ` : ''}
                                             </div>
                                             <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
                                                 ${isCompleted ? '✓ All Graded' : `${b.uncorrected} Pending`}
@@ -402,6 +463,7 @@ class DashboardManager {
 
                                         <div class="batch-card-meta-row">
                                             <span>Max Marks: <strong>${b.maxMarks}M</strong></span>
+                                            <span>•</span>
                                             <span>Roster: <strong>${b.total} Papers</strong></span>
                                         </div>
 
@@ -418,11 +480,15 @@ class DashboardManager {
                                         <div class="batch-actions-row">
                                             <button type="button" class="btn-batch-view" data-class="${b.className}" data-template="${b.templateName}" title="Open papers in this batch">
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                                View Papers (${b.total})
+                                                <span>View Papers (${b.total})</span>
                                             </button>
                                             <button type="button" class="btn-batch-start" data-class="${b.className}" data-template="${b.templateName}" title="Start correcting papers in this batch">
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                                                ${isCompleted ? 'Review' : 'Start Marking'}
+                                                <span>${isCompleted ? 'Review' : 'Start Marking'}</span>
+                                            </button>
+                                            <button type="button" class="btn-batch-share btn-dash-batch-share" data-class="${b.className}" data-template="${b.templateName}" data-subject="${b.subject}" data-total="${b.total}" title="Share this batch via WhatsApp">
+                                                ${(window.Icons && window.Icons.whatsapp) || ''}
+                                                <span>Share</span>
                                             </button>
                                         </div>
                                     </div>
@@ -433,6 +499,7 @@ class DashboardManager {
                 </div>
             `;
             return;
+        }
         }
 
         // =========================================================================
@@ -860,6 +927,47 @@ class DashboardManager {
             });
         });
 
+        // Clear Direct WhatsApp Highlight Button
+        const btnClearHighlight = this.container.querySelector("#btn-clear-dash-highlight");
+        if (btnClearHighlight) {
+            btnClearHighlight.addEventListener("click", () => {
+                this.highlightBatchKey = null;
+                this.render();
+                this.bindEvents();
+            });
+        }
+
+        // WhatsApp Share from Teacher Desk Batch Card
+        this.container.querySelectorAll(".btn-dash-batch-share").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const cls = btn.getAttribute("data-class");
+                const tpl = btn.getAttribute("data-template");
+                const sub = btn.getAttribute("data-subject") || this.teacherSubject || "Physics";
+                const total = btn.getAttribute("data-total");
+                const batchKey = `${cls}:::${tpl}`;
+                if (window.ShareManager) {
+                    window.ShareManager.shareSubject({
+                        subject: sub,
+                        className: cls,
+                        templateName: tpl,
+                        paperCount: total,
+                        batchKey: batchKey
+                    });
+                }
+            });
+        });
+
+        // Smooth scroll shared batch card into view if arriving via direct link
+        if (this.highlightBatchKey) {
+            setTimeout(() => {
+                const targetCard = this.container.querySelector(".teacher-batch-card.active-shared-batch");
+                if (targetCard) {
+                    targetCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+                }
+            }, 120);
+        }
+
         const btnClearBatch = this.container.querySelector("#btn-clear-batch-filter");
         if (btnClearBatch) {
             btnClearBatch.addEventListener("click", () => {
@@ -878,8 +986,8 @@ class DashboardManager {
         const startBtn = this.container.querySelector("#dash-btn-start-correction");
         if (startBtn) {
             startBtn.addEventListener("click", () => {
-                // Find first uncorrected paper to open directly
-                const uncorrected = this.evaluations.find(e => !this.isPaperCorrected(e));
+                // Find first uncorrected paper in active scope to open directly
+                const uncorrected = (this.filteredEvaluations && this.filteredEvaluations.find(e => !this.isPaperCorrected(e))) || this.evaluations.find(e => !this.isPaperCorrected(e));
                 if (uncorrected && this.options.onOpenEvaluation) {
                     this.options.onOpenEvaluation(uncorrected);
                 } else if (this.evaluations.length > 0 && this.options.onOpenEvaluation) {
