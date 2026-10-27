@@ -33,8 +33,8 @@
     <script src="js/icons.js"></script>
 
     <!-- App Stylesheets -->
-    <link rel="stylesheet" href="css/style.css?v=3.5">
-    <link rel="stylesheet" href="css/workspace.css?v=3.5">
+    <link rel="stylesheet" href="css/style.css?v=3.6">
+    <link rel="stylesheet" href="css/workspace.css?v=3.6">
 </head>
 <body data-default-portal="admin">
 
@@ -98,14 +98,9 @@
                     <span class="nav-label">Subject & Faculty Audit</span>
                 </a>
 
-                <a href="#admin-student-matrix-section" class="nav-item" id="nav-item-student-matrix">
+                <a href="#admin-oversight-section" class="nav-item" id="nav-item-student-matrix">
                     <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg></span>
-                    <span class="nav-label">Student Mark Matrix</span>
-                </a>
-
-                <a href="#admin-class-summary-section" class="nav-item" id="nav-item-class-analytics">
-                    <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
-                    <span class="nav-label">Class Performance</span>
+                    <span class="nav-label">Evaluation Records & Oversight</span>
                 </a>
 
                 <div class="menu-section-label" style="margin-top: 16px;">ADMINISTRATION</div>
@@ -174,157 +169,8 @@
             <main class="main-content-scroll" id="main-content-area">
                 
                 <!-- VIEW 5: Admin Panel & Evaluation Audit Matrix -->
-                <section class="view-section active" id="view-admin-panel" style="padding: 28px; max-width: 1400px; margin: 0 auto;">
-                    <div class="admin-panel-header" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; flex-wrap: wrap; gap: 16px;">
-                        <div>
-                            <h2 style="font-size: 1.5rem; font-weight: 700; color: var(--text-main); margin-bottom: 4px; display: flex; align-items: center; gap: 10px;">
-                                <span style="display: inline-flex; padding: 8px; border-radius: 12px; background: rgba(175, 82, 222, 0.12); color: #AF52DE;">
-                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                                </span>
-                                Examination Audit & Management Panel
-                            </h2>
-                            <p style="font-size: 0.88rem; color: var(--text-muted); margin: 0;">Comprehensive Subject Correction Tracker, Multi-Subject Student Score Matrix, and Class Marks Summary</p>
-                        </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button type="button" class="btn-secondary" id="btn-admin-export-excel" style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; background: rgba(52, 199, 89, 0.1); color: #34C759; border: 1px solid rgba(52, 199, 89, 0.2); cursor: pointer;">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-                                Export Excel Matrix (.csv)
-                            </button>
-                            <button type="button" class="btn-primary" id="btn-admin-print-report" style="display: flex; align-items: center; gap: 8px; height: 40px; padding: 0 16px; border-radius: 10px; font-size: 0.85rem; font-weight: 600; cursor: pointer;">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-                                Print Report
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- KPI Metric Cards Grid -->
-                    <div class="admin-kpi-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 28px;">
-                        <div class="admin-kpi-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 18px; padding: 20px; box-shadow: var(--shadow-sm);">
-                            <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Total Answer Papers</div>
-                            <div style="font-size: 1.8rem; font-weight: 700; color: var(--text-main);" id="kpi-total-papers">0</div>
-                            <div style="font-size: 0.75rem; color: #007AFF; margin-top: 6px;" id="kpi-total-papers-sub">Uploaded across all subjects</div>
-                        </div>
-                        <div class="admin-kpi-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 18px; padding: 20px; box-shadow: var(--shadow-sm);">
-                            <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Corrected & Evaluated</div>
-                            <div style="font-size: 1.8rem; font-weight: 700; color: #34C759;" id="kpi-corrected-papers">0</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;" id="kpi-corrected-sub">0% completion rate</div>
-                        </div>
-                        <div class="admin-kpi-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 18px; padding: 20px; box-shadow: var(--shadow-sm);">
-                            <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Pending Correction</div>
-                            <div style="font-size: 1.8rem; font-weight: 700; color: #FF9500;" id="kpi-pending-papers">0</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;">Awaiting teacher marking</div>
-                        </div>
-                        <div class="admin-kpi-card" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 18px; padding: 20px; box-shadow: var(--shadow-sm);">
-                            <div style="font-size: 0.78rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">Class Pass Percentage</div>
-                            <div style="font-size: 1.8rem; font-weight: 700; color: #AF52DE;" id="kpi-pass-rate">0%</div>
-                            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px;" id="kpi-pass-rate-sub">Target threshold: 35%</div>
-                        </div>
-                    </div>
-
-                    <!-- Subject & Teacher Audit Tracker -->
-                    <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 24px; margin-bottom: 28px; box-shadow: var(--shadow-sm);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px;">
-                            <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin: 0; display: flex; align-items: center; gap: 8px;">
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                                Subject & Faculty Correction Status
-                            </h3>
-                            <span style="font-size: 0.78rem; color: var(--text-muted);" id="admin-last-sync-time">Last synchronized: Just now</span>
-                        </div>
-                        <div style="overflow-x: auto;">
-                            <table class="data-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
-                                <thead>
-                                    <tr style="background: var(--bg-subtle); text-align: left; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">
-                                        <th style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); border-radius: 10px 0 0 10px;">Subject Name</th>
-                                        <th style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">Assigned Evaluator</th>
-                                        <th style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">Total Papers</th>
-                                        <th style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">Corrected</th>
-                                        <th style="padding: 12px 16px; border-bottom: 1px solid var(--border-color);">Pending</th>
-                                        <th style="padding: 12px 16px; border-bottom: 1px solid var(--border-color); border-radius: 0 10px 10px 0;">Completion Progress</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="admin-subject-tracker-tbody">
-                                    <!-- Populated dynamically by AdminPanelManager -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Multi-Subject Student Score Matrix Table -->
-                    <div id="admin-student-matrix-section" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-sm);">
-                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; flex-wrap: wrap; gap: 12px;">
-                            <div>
-                                <h3 style="font-size: 1.1rem; font-weight: 600; color: var(--text-main); margin: 0 0 4px 0; display: flex; align-items: center; gap: 8px;">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
-                                    Student All-Subject Score Matrix
-                                </h3>
-                                <span style="font-size: 0.8rem; color: var(--text-muted);">Consolidated subject marks table with overall class rankings</span>
-                            </div>
-
-                            <!-- Search and Filter Bar -->
-                            <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                                <input type="text" id="admin-search-student" placeholder="Search student name or roll no..." style="height: 38px; padding: 0 14px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.85rem; background: var(--bg-subtle); color: var(--text-main); width: 220px;" />
-                                <select id="admin-filter-class" style="height: 38px; padding: 0 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.85rem; background: var(--bg-subtle); color: var(--text-main);">
-                                    <option value="all">All Classes</option>
-                                    <option value="Class 12-A">Class 12-A</option>
-                                    <option value="Class 12-B">Class 12-B</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <!-- Data Table -->
-                        <div style="overflow-x: auto;">
-                            <table class="data-table" style="width: 100%; border-collapse: separate; border-spacing: 0;">
-                                <thead>
-                                    <tr style="background: var(--bg-subtle); text-align: left; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted);">
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color); border-radius: 10px 0 0 10px;">Roll No</th>
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color);">Student Name</th>
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color);">Class</th>
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: center;">Physics (70)</th>
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: center;">Chemistry (70)</th>
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: center;">Mathematics (80)</th>
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: center;">Total Marks</th>
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: center;">% Score</th>
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color); text-align: center;">Grade</th>
-                                        <th style="padding: 12px 14px; border-bottom: 1px solid var(--border-color); border-radius: 0 10px 10px 0; text-align: center;">Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="admin-student-matrix-tbody">
-                                    <!-- Dynamic Rows -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                    <!-- Class Performance & Distribution Summary -->
-                    <div id="admin-class-summary-section" style="margin-top: 28px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
-                        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-sm);">
-                            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-main); margin-bottom: 14px;">Class Performance Metrics</h4>
-                            <div style="display: flex; flex-direction: column; gap: 12px;">
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-subtle); border-radius: 12px;">
-                                    <span style="font-size: 0.85rem; color: var(--text-muted);">Class Average Score</span>
-                                    <span style="font-size: 1rem; font-weight: 700; color: var(--text-main);" id="class-metric-avg-score">--</span>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-subtle); border-radius: 12px;">
-                                    <span style="font-size: 0.85rem; color: var(--text-muted);">Highest Score Recorded</span>
-                                    <span style="font-size: 1rem; font-weight: 700; color: #34C759;" id="class-metric-highest-score">--</span>
-                                </div>
-                                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 14px; background: var(--bg-subtle); border-radius: 12px;">
-                                    <span style="font-size: 0.85rem; color: var(--text-muted);">Overall Pass Percentage</span>
-                                    <span style="font-size: 1rem; font-weight: 700; color: #007AFF;" id="class-metric-pass-pct">--</span>
-                                </div>
-                            </div>
-                        </div>
-
-                        <div style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 24px; box-shadow: var(--shadow-sm);">
-                            <h4 style="font-size: 1rem; font-weight: 600; color: var(--text-main); margin-bottom: 14px;">Evaluation Audit Notes</h4>
-                            <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5; margin: 0 0 12px 0;">
-                                Student evaluation records update automatically whenever papers are corrected and saved by subject teachers.
-                            </p>
-                            <div style="padding: 12px 14px; background: rgba(52, 199, 89, 0.08); border: 1px solid rgba(52, 199, 89, 0.2); border-radius: 12px; font-size: 0.82rem; color: #248A3D;">
-                                <strong>System Status:</strong> All evaluation records are synchronized with local storage & database.
-                            </div>
-                        </div>
-                    </div>
+                <section class="view-section active" id="view-admin-panel" style="padding: 24px; max-width: 1400px; margin: 0 auto;">
+                    <div id="admin-panel-container-root"></div>
                 </section>
 
                 <!-- VIEW 6: User Management in Admin Portal -->
@@ -425,12 +271,12 @@
     <script src="js/firebase-config.js"></script>
 
     <!-- App JavaScript Modules -->
-    <script src="js/storage.js?v=3.5"></script>
-    <script src="js/mock-data.js?v=3.5"></script>
-    <script src="js/admin-panel.js?v=3.5"></script>
-    <script src="js/user-management-page.js?v=3.5"></script>
-    <script src="js/share-manager.js?v=3.5"></script>
-    <script src="js/app.js?v=3.5"></script>
+    <script src="js/storage.js?v=3.6"></script>
+    <script src="js/mock-data.js?v=3.6"></script>
+    <script src="js/admin-panel.js?v=3.6"></script>
+    <script src="js/user-management-page.js?v=3.6"></script>
+    <script src="js/share-manager.js?v=3.6"></script>
+    <script src="js/app.js?v=3.6"></script>
 
     <script>
         // Switch view between Audit and User Management in Admin Portal
@@ -466,8 +312,29 @@
 
         // Auto-initialize Admin Panel on page load
         document.addEventListener("DOMContentLoaded", () => {
-            if (window.adminPanelManager) {
+            const root = document.getElementById("admin-panel-container-root");
+            if (root && window.AdminPanelManager) {
+                window.adminPanelManager = new AdminPanelManager(root);
                 window.adminPanelManager.init();
+            } else if (window.adminPanelManager) {
+                window.adminPanelManager.init();
+            }
+
+            // Quick actions in sidebar
+            const btnExport = document.getElementById("btn-sidebar-admin-export-excel");
+            if (btnExport) {
+                btnExport.addEventListener("click", () => {
+                    if (window.adminPanelManager && typeof window.adminPanelManager.exportExcelMatrix === "function") {
+                        window.adminPanelManager.exportExcelMatrix();
+                    }
+                });
+            }
+
+            const btnPrint = document.getElementById("btn-sidebar-admin-print-report");
+            if (btnPrint) {
+                btnPrint.addEventListener("click", () => {
+                    window.print();
+                });
             }
 
             const navUsers = document.getElementById("nav-item-admin-users");

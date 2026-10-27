@@ -2276,6 +2276,9 @@ class AppController {
     }
 
     async switchView(viewName, targetSubTab = null) {
+        if (viewName === "history") {
+            viewName = "dashboard";
+        }
         if (viewName !== "super-admin") {
             const isLocked = await this.enforceLicenseGate();
             if (isLocked) return;

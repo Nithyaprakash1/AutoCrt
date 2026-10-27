@@ -1,10 +1,11 @@
 /**
  * Niprak Digital Correction - Master Admin Panel & Institutional Evaluation Audit
  * Dedicated exclusively to Institution Administrators:
- * 1. Subject & Teacher Correction Tracker: Total Uploaded, Completed/Corrected, Pending ("How many need to do"), Last Corrected Date & Time.
- * 2. Dedicated Corrected Papers Oversight Table with Quick Filters ("All", "✓ Corrected Only", "◐ Pending Only").
- * 3. Student 360 Multi-Subject Scorecard (Admin Only): View that student's complete marks across all curriculum subjects with print transcript.
- * 4. Master Excel & Print Analytics Exports.
+ * 1. Subject & Teacher Correction Tracker: All monitored curriculum subjects, Total Uploaded, Completed/Corrected, Pending ("How many need to do"), Last Corrected Date & Time.
+ * 2. Class & Exam Blueprint Batches: Comprehensive cards for every academic class cohort and examination blueprint batch across all subjects.
+ * 3. Dedicated Corrected Papers Oversight Table with Quick Filters ("All", "✓ Corrected Only", "◐ Pending Only") and Batch Drilldown.
+ * 4. Student 360 Multi-Subject Scorecard (Admin Only): View that student's complete marks across all curriculum subjects with print transcript.
+ * 5. Master Excel & Print Analytics Exports.
  */
 
 class AdminPanelManager {
@@ -19,6 +20,7 @@ class AdminPanelManager {
         this.selectedClass = "all";
         this.selectedSubject = "all";
         this.statusFilter = "all"; // "all" | "corrected" | "pending"
+        this.selectedBatchKey = "all"; // "all" | specific batch key
         this.activeTab = "papers"; // "papers" (Corrected Papers Oversight) | "matrix" (All-Subject Grid)
         this.selectedStudentData = null;
     }
@@ -38,9 +40,12 @@ class AdminPanelManager {
             this.users = await window.appStorage.getUsersList();
             try {
                 this.catalog = await window.appStorage.getSubjectCatalog() || [];
-                this.classes = await window.appStorage.getClassesList() || [];
             } catch (e) {
                 this.catalog = [];
+            }
+            try {
+                this.classes = await window.appStorage.getClassesList() || [];
+            } catch (e) {
                 this.classes = [];
             }
         }
@@ -48,35 +53,27 @@ class AdminPanelManager {
 
     isEvaluationCorrected(ev) {
         if (!ev) return false;
-        const s = (ev.status || "").toLowerCase().trim();
-        if (s === "completed" || s === "corrected" || s === "graded" || s === "evaluated") {
-            return true;
-        }
-        if (ev.percentage !== undefined && ev.percentage !== null && Number(ev.percentage) > 0 && s !== "pending" && s !== "in progress") {
-            return true;
-        }
+        if (ev.status === "Completed") return true;
+        if (ev.percentage !== undefined && ev.percentage !== null && Number(ev.percentage) > 0) return true;
+        if (ev.obtainedMarks !== undefined && ev.obtainedMarks !== null && Number(ev.obtainedMarks) > 0) return true;
+        if (Array.isArray(ev.annotations) && ev.annotations.length > 0) return true;
         return false;
     }
 
-    formatDateTime(isoStr) {
-        if (!isoStr) return "—";
+    formatDateTime(ts) {
+        if (!ts) return "—";
         try {
-            const d = new Date(isoStr);
+            const d = new Date(ts);
             if (isNaN(d.getTime())) return "—";
-            return d.toLocaleDateString("en-IN", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric"
-            }) + " • " + d.toLocaleTimeString("en-IN", {
-                hour: "2-digit",
-                minute: "2-digit",
-                hour12: true
-            });
+            const datePart = d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+            const timePart = d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: true });
+            return `${datePart} at ${timePart}`;
         } catch (e) {
             return "—";
         }
     }
 
+    // --- All Monitored Curriculum Subjects ---
     computeSubjectStats() {
         const subjectMap = new Map();
 
@@ -89,7 +86,7 @@ class AdminPanelManager {
             { name: "English", code: "ENG", teacher: "Mrs. Shanthi Rao" }
         ];
         standardCore.forEach(sc => {
-            subjectMap.set(sc.name, {
+            subjectMap.set(sc.name.toLowerCase(), {
                 code: sc.code,
                 name: sc.name,
                 teacher: sc.teacher,
@@ -106,8 +103,9 @@ class AdminPanelManager {
             this.catalog.forEach(sub => {
                 if (sub && sub.name) {
                     const norm = sub.name.trim();
-                    if (!subjectMap.has(norm)) {
-                        subjectMap.set(norm, {
+                    const key = norm.toLowerCase();
+                    if (!subjectMap.has(key)) {
+                        subjectMap.set(key, {
                             code: sub.code || norm.substring(0, 4).toUpperCase(),
                             name: norm,
                             teacher: sub.teacherName || sub.evaluator || "Faculty Evaluator",
@@ -125,8 +123,9 @@ class AdminPanelManager {
         // 3. Accumulate evaluations
         this.evaluations.forEach(ev => {
             const subject = (ev.subject || "General").trim();
-            if (!subjectMap.has(subject)) {
-                subjectMap.set(subject, {
+            const key = subject.toLowerCase();
+            if (!subjectMap.has(key)) {
+                subjectMap.set(key, {
                     code: subject.substring(0, 4).toUpperCase(),
                     name: subject,
                     teacher: ev.teacherName || ev.evaluatorName || "—",
@@ -137,7 +136,7 @@ class AdminPanelManager {
                     totalScoreMax: 0
                 });
             }
-            const entry = subjectMap.get(subject);
+            const entry = subjectMap.get(key);
             entry.uploaded++;
 
             const isCorr = this.isEvaluationCorrected(ev);
@@ -163,12 +162,12 @@ class AdminPanelManager {
 
         // Match with assigned faculty from user directory if still unassigned
         if (Array.isArray(this.users)) {
-            subjectMap.forEach((entry, subName) => {
+            subjectMap.forEach((entry, subKey) => {
                 if (!entry.teacher || entry.teacher === "—") {
                     const teacherUser = this.users.find(u => 
                         u.role === "evaluator" && 
                         Array.isArray(u.assignedSubjects) && 
-                        u.assignedSubjects.some(s => s.toLowerCase() === subName.toLowerCase())
+                        u.assignedSubjects.some(s => s.toLowerCase() === subKey)
                     );
                     if (teacherUser) entry.teacher = teacherUser.name;
                 }
@@ -189,6 +188,54 @@ class AdminPanelManager {
                 lastCorrectedFormatted: this.formatDateTime(entry.lastCorrectedTimestamp)
             };
         });
+    }
+
+    // --- All Class & Exam Blueprint Batches ---
+    computeBatches() {
+        const batchMap = new Map();
+        this.evaluations.forEach(ev => {
+            const cls = ev.className || ev.class || ev.classLabel || "Class 12-A";
+            const tpl = ev.templateName || ev.examName || "Annual Assessment Blueprint";
+            const sub = (ev.subject || "General").trim();
+            const batchKey = `${cls}:::${tpl}:::${sub}`;
+            if (!batchMap.has(batchKey)) {
+                batchMap.set(batchKey, {
+                    key: batchKey,
+                    className: cls,
+                    templateName: tpl,
+                    subject: sub,
+                    papers: [],
+                    total: 0,
+                    corrected: 0,
+                    pending: 0,
+                    maxMarks: ev.maxMarks || 70,
+                    teacherName: ev.teacherName || ev.evaluatorName || "Faculty Evaluator",
+                    lastUpdated: ev.updatedAt || ev.lastUpdated || ev.createdAt
+                });
+            }
+            const b = batchMap.get(batchKey);
+            b.papers.push(ev);
+            b.total++;
+            const isCorr = this.isEvaluationCorrected(ev);
+            if (isCorr) {
+                b.corrected++;
+            } else {
+                b.pending++;
+            }
+            const ts = ev.updatedAt || ev.lastUpdated || ev.createdAt;
+            if (ts && (!b.lastUpdated || new Date(ts).getTime() > new Date(b.lastUpdated).getTime())) {
+                b.lastUpdated = ts;
+            }
+        });
+        return Array.from(batchMap.values());
+    }
+
+    getFilteredBatches() {
+        const allBatches = this.computeBatches();
+        if (!this.selectedSubject || this.selectedSubject === "all") {
+            return allBatches;
+        }
+        return allBatches.filter(b => b.subject.toLowerCase() === this.selectedSubject.toLowerCase());
     }
 
     computeDetailedPapers() {
@@ -225,6 +272,25 @@ class AdminPanelManager {
 
     filterPapers(papers) {
         return papers.filter(p => {
+            // 0. Batch Filter
+            if (this.selectedBatchKey && this.selectedBatchKey !== "all") {
+                const parts = this.selectedBatchKey.split(":::");
+                const bCls = parts[0] || "";
+                const bTpl = parts[1] || "";
+                const bSub = (parts[2] || "").toLowerCase();
+
+                const pCls = p.className || "Class 12";
+                const pSec = p.section || "A";
+                const pTpl = p.examName || p.templateName || "";
+                const pSub = (p.subject || "").toLowerCase();
+
+                const clsMatch = bCls.includes(pCls) || pCls.includes(bCls) || `${pCls}-${pSec}` === bCls;
+                const tplMatch = bTpl === pTpl || pTpl.includes(bTpl) || bTpl.includes(pTpl);
+                const subMatch = !bSub || bSub === pSub;
+
+                if (!clsMatch || !tplMatch || !subMatch) return false;
+            }
+
             // 1. Status Filter (All / Corrected Only / Pending Only)
             if (this.statusFilter === "corrected" && !p.isCorrected) return false;
             if (this.statusFilter === "pending" && p.isCorrected) return false;
@@ -249,114 +315,113 @@ class AdminPanelManager {
                 const matchName = p.studentName.toLowerCase().includes(q);
                 const matchRoll = p.rollNo.toLowerCase().includes(q);
                 const matchSub = p.subject.toLowerCase().includes(q);
-                if (!matchName && !matchRoll && !matchSub) return false;
+                const matchExam = p.examName.toLowerCase().includes(q);
+                if (!matchName && !matchRoll && !matchSub && !matchExam) return false;
             }
 
             return true;
         });
     }
 
-    computeStudentMatrix() {
-        if (!this.evaluations || this.evaluations.length === 0) return [];
-
+    computeStudentMultiSubjectMatrix() {
         const studentMap = new Map();
 
         this.evaluations.forEach(ev => {
-            const key = (ev.rollNo || ev.studentName || ev.id).toString().trim().toLowerCase();
+            const roll = (ev.rollNo || "—").toString().trim();
+            const name = (ev.studentName || "Student Paper").trim();
+            const key = `${roll}:::${name}`;
+
             if (!studentMap.has(key)) {
                 studentMap.set(key, {
-                    rollNo: ev.rollNo || "—",
-                    studentName: ev.studentName || "Student Paper",
-                    class: `${ev.className || ev.class || 'Class 12'}-${ev.section || 'A'}`,
-                    evaluations: [],
-                    subjectsMap: {},
+                    rollNo: roll,
+                    studentName: name,
+                    className: ev.className || ev.class || "Class 12",
+                    section: ev.section || "A",
+                    subjects: {},
                     totalObtained: 0,
                     totalMax: 0,
-                    gradedCount: 0,
-                    totalCount: 0
+                    completedSubjects: 0
                 });
             }
-            const s = studentMap.get(key);
-            s.evaluations.push(ev);
-            const subName = (ev.subject || "General").trim();
-            s.subjectsMap[subName] = ev;
-            s.totalCount++;
 
-            if (this.isEvaluationCorrected(ev)) {
-                s.gradedCount++;
-                s.totalObtained += Number(ev.obtainedMarks) || 0;
-                s.totalMax += Number(ev.maxMarks) || 70;
+            const student = studentMap.get(key);
+            const sub = (ev.subject || "General").trim();
+            const isCorr = this.isEvaluationCorrected(ev);
+            const obt = Number(ev.obtainedMarks) || 0;
+            const max = Number(ev.maxMarks) || 70;
+
+            student.subjects[sub] = {
+                obtainedMarks: obt,
+                maxMarks: max,
+                percentage: max > 0 ? Math.round((obt / max) * 100) : 0,
+                grade: ev.grade || (obt >= 60 ? "A" : obt >= 40 ? "B" : "C"),
+                isCorrected: isCorr,
+                feedback: ev.feedback || ""
+            };
+
+            if (isCorr) {
+                student.totalObtained += obt;
+                student.totalMax += max;
+                student.completedSubjects++;
             }
         });
 
         return Array.from(studentMap.values()).map(s => {
-            const totalMax = s.totalMax > 0 ? s.totalMax : 70;
-            const pct = totalMax > 0 ? Math.round((s.totalObtained / totalMax) * 100) : 0;
-            const grade = window.calculateGradeScale ? window.calculateGradeScale(s.totalObtained, totalMax).grade : (pct >= 80 ? "A1" : pct >= 60 ? "B1" : "C");
-            const allGraded = s.gradedCount === s.totalCount && s.totalCount > 0;
-
+            const overallPct = s.totalMax > 0 ? Math.round((s.totalObtained / s.totalMax) * 100) : 0;
+            const overallGrade = window.calculateGradeScale 
+                ? window.calculateGradeScale(s.totalObtained, s.totalMax).grade 
+                : (overallPct >= 80 ? "A1" : overallPct >= 60 ? "B1" : "C");
             return {
                 ...s,
-                percentage: pct,
-                grade,
-                status: allGraded ? "Completed" : "Pending"
+                overallPercentage: overallPct,
+                overallGrade
             };
         });
     }
 
-    filterStudentMatrix(students) {
-        return students.filter(s => {
-            if (this.selectedClass !== "all") {
-                const combined = (s.class || "").toLowerCase();
-                const target = this.selectedClass.toLowerCase().replace("class ", "").trim();
-                if (!combined.includes(target)) return false;
-            }
+    render() {
+        if (!this.container) {
+            this.container = document.getElementById("admin-panel-container-root") || document.getElementById("view-admin-panel");
+        }
+        if (!this.container) return;
+
+        const subjectsData = this.computeSubjectStats();
+        const allBatches = this.computeBatches();
+        const filteredBatches = this.getFilteredBatches();
+        const allPapers = this.computeDetailedPapers();
+        const filteredPapers = this.filterPapers(allPapers);
+        const studentMatrix = this.computeStudentMultiSubjectMatrix();
+        const filteredStudents = studentMatrix.filter(s => {
             if (this.searchQuery) {
-                const q = this.searchQuery.toLowerCase().trim();
-                const matchName = (s.studentName || "").toLowerCase().includes(q);
-                const matchRoll = (s.rollNo || "").toLowerCase().includes(q);
-                if (!matchName && !matchRoll) return false;
+                const q = this.searchQuery.toLowerCase();
+                if (!s.studentName.toLowerCase().includes(q) && !s.rollNo.toLowerCase().includes(q)) return false;
+            }
+            if (this.selectedClass !== "all") {
+                const clsStr = `${s.className}-${s.section}`.toLowerCase();
+                const target = this.selectedClass.toLowerCase().replace("class ", "").trim();
+                if (!clsStr.includes(target)) return false;
             }
             return true;
         });
-    }
-
-    render() {
-        const subjectsData = this.computeSubjectStats();
-        const allPapers = this.computeDetailedPapers();
-        const filteredPapers = this.filterPapers(allPapers);
-        const studentMatrix = this.computeStudentMatrix();
-        const filteredStudents = this.filterStudentMatrix(studentMatrix);
 
         // Subject Scoping
-        const isSubjectScoped = Boolean(this.selectedSubject && this.selectedSubject !== "all");
-        const scopePapers = isSubjectScoped
-            ? allPapers.filter(p => p.subject.toLowerCase() === this.selectedSubject.toLowerCase())
-            : allPapers;
+        const isSubjectScoped = this.selectedSubject !== "all";
+        const isBatchScoped = this.selectedBatchKey !== "all";
 
-        const kpiTotalCount = scopePapers.length;
-        const kpiCorrectedCount = scopePapers.filter(p => p.isCorrected).length;
-        const kpiPendingCount = scopePapers.filter(p => !p.isCorrected).length;
-
-        // Check if static table bodies exist (e.g. in standalone admin.html)
-        const staticSubTbody = document.getElementById("admin-subject-tracker-tbody");
-        const staticStudentTbody = document.getElementById("admin-student-matrix-tbody");
-        if (staticSubTbody && staticStudentTbody) {
-            this.renderStaticMode(subjectsData, studentMatrix, allPapers);
-            this.bindStaticEvents();
-            return;
-        }
-
-        if (!this.container) return;
-
-        // Build Unique Subject & Class filter options
-        const uniqueSubjects = Array.from(new Set(allPapers.map(p => p.subject))).filter(Boolean);
-        ["Physics", "Chemistry", "Mathematics", "Biology", "English"].forEach(s => {
-            if (!uniqueSubjects.some(u => u.toLowerCase() === s.toLowerCase())) {
-                uniqueSubjects.push(s);
-            }
+        // KPI Counts based on current scope
+        const scopedPapers = allPapers.filter(p => {
+            if (isSubjectScoped && p.subject.toLowerCase() !== this.selectedSubject.toLowerCase()) return false;
+            return true;
         });
-        const uniqueClasses = Array.from(new Set(allPapers.map(p => `${p.className}-${p.section}`))).filter(Boolean);
+        const kpiTotalCount = scopedPapers.length;
+        const kpiCorrectedCount = scopedPapers.filter(p => p.isCorrected).length;
+        const kpiPendingCount = Math.max(0, kpiTotalCount - kpiCorrectedCount);
+
+        let activeBatchTitle = "";
+        if (isBatchScoped) {
+            const parts = this.selectedBatchKey.split(":::");
+            activeBatchTitle = `${parts[0]} • ${parts[1]}`;
+        }
 
         this.container.innerHTML = `
             <div class="admin-panel-layout">
@@ -367,7 +432,7 @@ class AdminPanelManager {
                             <span class="admin-title-badge">Institution Central Audit Desk</span>
                         </div>
                         <h1 class="admin-title-main">Administrative Oversight &amp; Student Marks Audit</h1>
-                        <p class="admin-sub-text">Monitor faculty correction progress across subjects, review completed papers, and inspect individual student multi-subject dossiers.</p>
+                        <p class="admin-sub-text">Monitor faculty correction progress across subjects, review all class blueprint batches, and inspect individual student multi-subject dossiers.</p>
                     </div>
 
                     <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
@@ -386,14 +451,21 @@ class AdminPanelManager {
                     </div>
                 </div>
 
-                <!-- Section 1: Subject Evaluation Progress & Last Corrected Status -->
+                <!-- Section 1: Subject Evaluation Progress & Last Corrected Status (All Subjects) -->
                 <div style="margin-bottom: 28px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
                         <div>
-                            <h2 style="font-size: 1.15rem; font-weight: 400; color: var(--text-main); margin: 0;">Subject &amp; Faculty Evaluation Tracker</h2>
-                            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0;">Click any subject card below to drill down into its records &amp; monitor "how many need to do".</p>
+                            <h2 style="font-size: 1.15rem; font-weight: 500; color: var(--text-main); margin: 0;">Subject &amp; Faculty Evaluation Tracker</h2>
+                            <p style="font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0;">All monitored curriculum subjects. Click any card to drill down into its blueprint batches &amp; records.</p>
                         </div>
-                        <span style="font-size: 0.82rem; color: var(--text-muted);">${subjectsData.length} Subjects Monitored</span>
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 0.82rem; color: var(--text-muted); font-weight: 500;">${subjectsData.length} Subjects Monitored</span>
+                            ${isSubjectScoped ? `
+                                <button type="button" class="btn-clear-subject-pill" style="display: inline-flex; align-items: center; gap: 4px; padding: 4px 10px; border-radius: 8px; border: 1px solid var(--border-color); background: var(--bg-subtle); color: #007AFF; font-size: 0.78rem; font-weight: 500; cursor: pointer;">
+                                    <span>Show All Subjects</span>
+                                </button>
+                            ` : ''}
+                        </div>
                     </div>
 
                     <div class="admin-subject-grid">
@@ -408,7 +480,7 @@ class AdminPanelManager {
                             const isCurrentSub = isSubjectScoped && this.selectedSubject.toLowerCase() === sub.name.toLowerCase();
 
                             return `
-                                <div class="admin-sub-card ${isCurrentSub ? 'active-subject' : ''}" data-subject="${sub.name}" role="button" title="Click to view evaluation records for ${sub.name}">
+                                <div class="admin-sub-card ${isCurrentSub ? 'active-subject' : ''}" data-subject="${sub.name}" role="button" title="Click to view blueprint batches and evaluation records for ${sub.name}">
                                     <div class="admin-sub-card-top">
                                         <span class="admin-sub-code-tag">${sub.code}</span>
                                         <span class="admin-sub-status-pill ${statusCls}">${statusText}</span>
@@ -440,31 +512,117 @@ class AdminPanelManager {
                     </div>
                 </div>
 
-                <!-- Section 2: Detailed Corrected Papers & Evaluation Oversight Table -->
+                <!-- Section 2: Class & Exam Blueprint Batches (All Subjects & Classes) -->
+                <div class="teacher-batches-section" style="margin-bottom: 28px;">
+                    <div class="teacher-batches-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                        <div class="teacher-batches-title-col">
+                            <h3 class="teacher-batches-title" style="display: flex; align-items: center; gap: 8px; font-size: 1.15rem; font-weight: 500; color: var(--text-main); margin: 0;">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#AF52DE" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                                <span>Class &amp; Exam Blueprint Batches</span>
+                                <span class="teacher-batches-count-pill" style="font-size: 0.76rem; padding: 2px 8px; border-radius: 12px; background: rgba(175, 82, 222, 0.1); color: #AF52DE; border: 1px solid rgba(175, 82, 222, 0.2);">
+                                    ${filteredBatches.length} ${filteredBatches.length === 1 ? 'Batch' : 'Batches'}
+                                </span>
+                            </h3>
+                            <p class="teacher-batches-desc" style="font-size: 0.8rem; color: var(--text-muted); margin: 2px 0 0;">
+                                ${isSubjectScoped ? `All cohort blueprint batches for <strong>${this.selectedSubject}</strong>.` : 'All academic class cohorts and examination blueprints across curriculum subjects.'} Click any batch to filter records below or share directly.
+                            </p>
+                        </div>
+                        ${isBatchScoped ? `
+                            <button type="button" class="btn-admin-clear-batch" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid #0071E3; background: rgba(0, 113, 227, 0.08); color: #0071E3; font-size: 0.78rem; font-weight: 500; cursor: pointer;">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                                <span>Showing Batch: ${activeBatchTitle} (Clear)</span>
+                            </button>
+                        ` : ''}
+                    </div>
+
+                    <div class="teacher-batches-grid">
+                        ${filteredBatches.length === 0 ? `
+                            <div class="teacher-batches-empty">
+                                <p>No examination batches found for ${isSubjectScoped ? this.selectedSubject : 'current selection'}. Ingest papers to populate blueprint batches.</p>
+                            </div>
+                        ` : filteredBatches.map(b => {
+                            const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
+                            const isCompleted = b.pending === 0 && b.total > 0;
+                            const isBatchActive = this.selectedBatchKey === b.key;
+
+                            return `
+                                <div class="teacher-batch-card admin-batch-card ${isBatchActive ? 'active' : ''}" data-batch-key="${b.key}" data-subject="${b.subject}">
+                                    <div class="batch-card-top-row">
+                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                                            <span class="batch-class-badge">${b.className}</span>
+                                            <span class="batch-subject-tag">${b.subject}</span>
+                                        </div>
+                                        <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
+                                            ${isCompleted ? '✓ 100% Graded' : `${b.pending} Need To Do`}
+                                        </span>
+                                    </div>
+
+                                    <h4 class="batch-card-name" title="${b.templateName}">${b.templateName}</h4>
+
+                                    <div class="batch-card-meta-row">
+                                        <span>Max Marks: <strong>${b.maxMarks}M</strong></span>
+                                        <span>•</span>
+                                        <span>Roster: <strong>${b.total} Papers</strong></span>
+                                    </div>
+
+                                    <div class="batch-progress-wrapper">
+                                        <div class="batch-progress-labels">
+                                            <span class="progress-ratio">${b.corrected} / ${b.total} Graded</span>
+                                            <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'}; font-weight: 600;">${pct}%</span>
+                                        </div>
+                                        <div class="batch-progress-bar">
+                                            <div class="batch-progress-fill" style="width: ${pct}%; background: ${pct === 100 ? '#16A34A' : 'linear-gradient(90deg, #AF52DE, #0071E3)'};"></div>
+                                        </div>
+                                    </div>
+
+                                    <div class="batch-actions-row" style="margin-top: 10px; display: flex; gap: 6px;">
+                                        <button type="button" class="btn-batch-view btn-admin-filter-batch" data-batch-key="${b.key}" data-subject="${b.subject}" title="Filter evaluation records to this batch">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                            <span>${isBatchActive ? '✓ Viewing' : `View (${b.total})`}</span>
+                                        </button>
+                                        <button type="button" class="btn-batch-share btn-admin-batch-share" data-batch-key="${b.key}" data-subject="${b.subject}" data-class="${b.className}" data-template="${b.templateName}" data-total="${b.total}" title="Share this batch via WhatsApp">
+                                            ${(window.Icons && window.Icons.whatsapp) || ''}
+                                            <span>Share</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            `;
+                        }).join("")}
+                    </div>
+                </div>
+
+                <!-- Section 3: Detailed Corrected Papers & Evaluation Oversight Table -->
                 <div id="admin-oversight-section" style="background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 20px; padding: 22px; box-shadow: var(--shadow-sm); margin-bottom: 30px;">
                     <!-- Section Title & Subject Filter Notice -->
                     <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; margin-bottom: 16px;">
                         <div>
                             <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                                <h2 style="font-size: 1.25rem; font-weight: 400; color: var(--text-main); margin: 0;">Evaluation Records &amp; Student Oversight</h2>
+                                <h2 style="font-size: 1.25rem; font-weight: 500; color: var(--text-main); margin: 0;">Evaluation Records &amp; Student Oversight</h2>
                                 ${isSubjectScoped ? `
                                     <span style="background: rgba(0, 122, 255, 0.1); color: #007AFF; font-size: 0.78rem; font-weight: 500; padding: 2px 10px; border-radius: 12px; border: 1px solid rgba(0, 122, 255, 0.2);">
                                         ${this.selectedSubject}
                                     </span>
                                 ` : ''}
+                                ${isBatchScoped ? `
+                                    <span style="background: rgba(175, 82, 222, 0.1); color: #AF52DE; font-size: 0.78rem; font-weight: 500; padding: 2px 10px; border-radius: 12px; border: 1px solid rgba(175, 82, 222, 0.2);">
+                                        Batch: ${activeBatchTitle}
+                                    </span>
+                                ` : ''}
                             </div>
                             <p style="font-size: 0.84rem; color: var(--text-muted); margin: 0;">
-                                ${isSubjectScoped 
-                                    ? `Showing records for <strong>${this.selectedSubject}</strong>. Click <strong>✓ Corrected</strong> or <strong>◐ Need To Do</strong> below to filter by grading status.` 
-                                    : `Click on a subject pill below or select <strong>✓ Corrected</strong> / <strong>◐ Need To Do</strong> to filter evaluation records.`}
+                                ${isBatchScoped 
+                                    ? `Filtered to batch <strong>${activeBatchTitle}</strong> (${filteredPapers.length} papers).`
+                                    : (isSubjectScoped 
+                                        ? `Showing records for <strong>${this.selectedSubject}</strong>. Click <strong>✓ Corrected</strong> or <strong>◐ Need To Do</strong> below to filter by grading status.` 
+                                        : `Click on a subject pill below or select <strong>✓ Corrected</strong> / <strong>◐ Need To Do</strong> to filter evaluation records.`)}
                             </p>
                         </div>
 
                         <div style="display: flex; align-items: center; gap: 10px;">
-                            ${isSubjectScoped ? `
+                            ${isSubjectScoped || isBatchScoped ? `
                                 <button type="button" class="btn-clear-subject-pill" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 14px; border-radius: 10px; border: 1px solid var(--border-color); background: var(--bg-subtle); color: #007AFF; font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: all 0.15s ease;">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                                    <span>Show All Subjects</span>
+                                    <span>Reset All Filters</span>
                                 </button>
                             ` : ''}
 
@@ -520,69 +678,65 @@ class AdminPanelManager {
                                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
                             </div>
                             <div class="kpi-details">
-                                <span class="kpi-label" style="color: #16A34A; font-weight: 600;">✓ Corrected</span>
+                                <span class="kpi-label">✓ Corrected</span>
                                 <div class="kpi-value" style="color: #16A34A;">${kpiCorrectedCount}</div>
-                                <span class="kpi-sub" style="color: #16A34A;">${isSubjectScoped ? `${this.selectedSubject} Graded` : 'Graded & finalized'}</span>
+                                <span class="kpi-sub">${isSubjectScoped ? `${this.selectedSubject} Evaluated` : 'Grading complete'}</span>
                             </div>
-                            ${this.statusFilter === 'corrected' ? '<span class="kpi-active-pill">Showing Only</span>' : '<span style="font-size: 0.72rem; color: #16A34A; position: absolute; top: 12px; right: 14px; font-weight: 500;">Click to View →</span>'}
+                            ${this.statusFilter === 'corrected' ? '<span class="kpi-active-pill corrected">Active</span>' : ''}
                         </div>
 
                         <!-- ◐ Need To Do -->
-                        <div class="admin-oversight-card ${this.statusFilter === 'pending' ? 'active-pending' : ''}" data-status="pending" role="button" title="Click to view papers pending teacher evaluation for ${isSubjectScoped ? this.selectedSubject : 'all subjects'}">
+                        <div class="admin-oversight-card ${this.statusFilter === 'pending' ? 'active-pending' : ''}" data-status="pending" role="button" title="Click to view only Pending papers needing correction for ${isSubjectScoped ? this.selectedSubject : 'all subjects'}">
                             <div class="kpi-icon-wrap pending">
-                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                             </div>
                             <div class="kpi-details">
-                                <span class="kpi-label" style="color: #D97706; font-weight: 600;">◐ Need To Do</span>
+                                <span class="kpi-label">◐ Need To Do</span>
                                 <div class="kpi-value" style="color: #D97706;">${kpiPendingCount}</div>
-                                <span class="kpi-sub" style="color: #D97706;">${isSubjectScoped ? `${this.selectedSubject} Pending` : 'Pending evaluation'}</span>
+                                <span class="kpi-sub">${isSubjectScoped ? `${this.selectedSubject} Awaiting Marking` : 'Pending evaluation'}</span>
                             </div>
-                            ${this.statusFilter === 'pending' ? '<span class="kpi-active-pill pending">Showing Only</span>' : '<span style="font-size: 0.72rem; color: #D97706; position: absolute; top: 12px; right: 14px; font-weight: 500;">Click to View →</span>'}
+                            ${this.statusFilter === 'pending' ? '<span class="kpi-active-pill pending">Active</span>' : ''}
                         </div>
                     </div>
 
-                    <!-- Filter Toolbar -->
-                    <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 14px; margin-bottom: 14px; padding-bottom: 14px; border-bottom: 1px solid var(--border-color);">
-                        <div>
-                            <!-- Dynamic Filter Status Banner -->
-                            <div>
-                                ${this.statusFilter === 'corrected' ? `
-                                    <span style="color: #16A34A; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem;">
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#16A34A" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
-                                        Showing ${filteredPapers.length} Corrected Papers ${isSubjectScoped ? `for ${this.selectedSubject}` : ''} (${kpiCorrectedCount} Graded)
-                                    </span>
-                                    <button type="button" class="btn-reset-filter-link" data-status="all" style="margin-left: 10px; background: none; border: none; color: #007AFF; font-size: 0.8rem; text-decoration: underline; cursor: pointer;">Show All ${isSubjectScoped ? this.selectedSubject : ''} Papers</button>
-                                ` : (this.statusFilter === 'pending' ? `
-                                    <span style="color: #D97706; font-weight: 600; display: inline-flex; align-items: center; gap: 6px; font-size: 0.9rem;">
-                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#D97706" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                                        Showing ${filteredPapers.length} Papers Needing Evaluation ${isSubjectScoped ? `for ${this.selectedSubject}` : ''} (${kpiPendingCount} Need To Do)
-                                    </span>
-                                    <button type="button" class="btn-reset-filter-link" data-status="all" style="margin-left: 10px; background: none; border: none; color: #007AFF; font-size: 0.8rem; text-decoration: underline; cursor: pointer;">Show All ${isSubjectScoped ? this.selectedSubject : ''} Papers</button>
-                                ` : `
-                                    <span style="color: var(--text-muted); font-size: 0.85rem;">
-                                        Showing ${this.activeTab === 'papers' ? filteredPapers.length : filteredStudents.length} Records ${isSubjectScoped ? `for ${this.selectedSubject}` : ''} (${kpiCorrectedCount} Corrected • ${kpiPendingCount} Need To Do)
-                                    </span>
-                                `)}
-                            </div>
+                    <!-- Search and Secondary Controls Bar -->
+                    <div class="admin-search-controls-bar">
+                        <div class="admin-search-box-wrap">
+                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                            <input type="text" id="admin-papers-search-input" value="${this.searchQuery}" placeholder="Search student name, roll no, or blueprint..." />
+                            ${this.searchQuery ? '<button type="button" id="btn-clear-admin-search" class="btn-clear-search-x">×</button>' : ''}
                         </div>
 
-                        <!-- Search & Dropdown Filters -->
-                        <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                            <input type="text" id="admin-papers-search" placeholder="Search student name or roll..." value="${this.searchQuery}" style="height: 36px; padding: 0 12px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.84rem; background: var(--bg-subtle); width: 210px;" />
-                            
-                            <select id="admin-papers-subject-filter" style="height: 36px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.84rem; background: var(--bg-subtle);">
-                                <option value="all">All Subjects</option>
-                                ${uniqueSubjects.map(sub => `<option value="${sub}" ${this.selectedSubject.toLowerCase() === sub.toLowerCase() ? 'selected' : ''}>${sub}</option>`).join("")}
+                        <div class="admin-filter-dropdowns-group">
+                            <select id="admin-papers-class-filter" class="admin-filter-select">
+                                <option value="all" ${this.selectedClass === 'all' ? 'selected' : ''}>All Classes</option>
+                                <option value="Class 12-A" ${this.selectedClass === 'Class 12-A' ? 'selected' : ''}>Class 12-A</option>
+                                <option value="Class 12-B" ${this.selectedClass === 'Class 12-B' ? 'selected' : ''}>Class 12-B</option>
+                                <option value="Class 12-C" ${this.selectedClass === 'Class 12-C' ? 'selected' : ''}>Class 12-C</option>
+                                <option value="Class 12-D" ${this.selectedClass === 'Class 12-D' ? 'selected' : ''}>Class 12-D</option>
                             </select>
 
-                            <select id="admin-papers-class-filter" style="height: 36px; padding: 0 10px; border: 1px solid var(--border-color); border-radius: 10px; font-size: 0.84rem; background: var(--bg-subtle);">
-                                <option value="all">All Classes</option>
-                                ${uniqueClasses.map(cls => `<option value="${cls}" ${this.selectedClass === cls ? 'selected' : ''}>${cls}</option>`).join("")}
+                            <select id="admin-papers-subject-filter" class="admin-filter-select">
+                                <option value="all" ${!isSubjectScoped ? 'selected' : ''}>All Subjects</option>
+                                ${subjectsData.map(s => `<option value="${s.name}" ${isSubjectScoped && this.selectedSubject.toLowerCase() === s.name.toLowerCase() ? 'selected' : ''}>${s.name}</option>`).join("")}
                             </select>
                         </div>
                     </div>
 
-                    <!-- Tab View 1: Papers Evaluation View -->
+                    <!-- Active Filter Context Tag Pill -->
+                    ${(isSubjectScoped || this.statusFilter !== 'all' || this.selectedClass !== 'all' || this.searchQuery || isBatchScoped) ? `
+                        <div class="admin-active-filter-banner">
+                            <span style="font-weight: 500;">Filter active:</span>
+                            ${isSubjectScoped ? `<span class="active-filter-badge">Subject: ${this.selectedSubject}</span>` : ''}
+                            ${isBatchScoped ? `<span class="active-filter-badge">Batch: ${activeBatchTitle}</span>` : ''}
+                            ${this.statusFilter !== 'all' ? `<span class="active-filter-badge">Status: ${this.statusFilter === 'corrected' ? '✓ Corrected Only' : '◐ Need To Do Only'}</span>` : ''}
+                            ${this.selectedClass !== 'all' ? `<span class="active-filter-badge">Class: ${this.selectedClass}</span>` : ''}
+                            ${this.searchQuery ? `<span class="active-filter-badge">Query: "${this.searchQuery}"</span>` : ''}
+                            <button type="button" class="btn-reset-filter-link">Reset all</button>
+                        </div>
+                    ` : ''}
+
+                    <!-- Tab View 1: Detailed Papers Oversight Table -->
                     ${this.activeTab === 'papers' ? `
                         <div style="overflow-x: auto; border: 1px solid var(--border-color); border-radius: 14px;">
                             <table style="width: 100%; border-collapse: collapse; text-align: left; font-size: 0.86rem;">
@@ -592,37 +746,33 @@ class AdminPanelManager {
                                         <th style="padding: 12px 14px;">Student Name</th>
                                         <th style="padding: 12px 14px;">Class</th>
                                         <th style="padding: 12px 14px;">Subject</th>
+                                        <th style="padding: 12px 14px;">Exam Blueprint</th>
                                         <th style="padding: 12px 14px; text-align: center;">Score</th>
-                                        <th style="padding: 12px 14px; text-align: center;">Percentage</th>
+                                        <th style="padding: 12px 14px; text-align: center;">%</th>
                                         <th style="padding: 12px 14px; text-align: center;">Grade</th>
                                         <th style="padding: 12px 14px; text-align: center;">Status</th>
                                         <th style="padding: 12px 14px;">Last Corrected</th>
-                                        <th style="padding: 12px 14px;">Faculty</th>
+                                        <th style="padding: 12px 14px;">Faculty Evaluator</th>
                                         <th style="padding: 12px 14px; text-align: center;">Admin Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     ${filteredPapers.length === 0 ? `
                                         <tr>
-                                            <td colspan="11" style="padding: 40px; text-align: center; color: var(--text-muted);">
-                                                No evaluation papers matching current filter criteria.
+                                            <td colspan="12" style="padding: 40px; text-align: center; color: var(--text-muted);">
+                                                No evaluation records found matching the active criteria. Try adjusting your subject or status filters.
                                             </td>
                                         </tr>
                                     ` : filteredPapers.map(p => `
-                                        <tr class="admin-paper-row" data-roll="${p.rollNo}" data-name="${p.studentName}" style="border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s ease;" title="Click to view all subjects' marks for ${p.studentName}">
-                                            <td style="padding: 11px 14px; font-weight: 500; color: var(--text-main); font-family: 'JetBrains Mono', monospace;">${p.rollNo}</td>
-                                            <td style="padding: 11px 14px; color: var(--text-main); font-weight: 500;">
-                                                <div style="display: flex; align-items: center; gap: 8px;">
-                                                    <span>${p.studentName}</span>
-                                                </div>
-                                            </td>
+                                        <tr class="admin-paper-row" data-roll="${p.rollNo}" data-name="${p.studentName}" style="border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s ease;">
+                                            <td style="padding: 11px 14px; font-weight: 500; font-family: monospace;">${p.rollNo}</td>
+                                            <td style="padding: 11px 14px; font-weight: 500; color: var(--text-main);">${p.studentName}</td>
                                             <td style="padding: 11px 14px; color: var(--text-muted);">${p.className}-${p.section}</td>
                                             <td style="padding: 11px 14px;">
-                                                <span style="padding: 2px 8px; border-radius: 6px; background: rgba(0, 122, 255, 0.08); color: #007AFF; font-size: 0.8rem; font-weight: 500;">
-                                                    ${p.subject}
-                                                </span>
+                                                <span style="font-weight: 500; color: #007AFF;">${p.subject}</span>
                                             </td>
-                                            <td style="padding: 11px 14px; text-align: center; font-weight: 600; color: ${p.isCorrected ? '#16A34A' : 'var(--text-muted)'};">
+                                            <td style="padding: 11px 14px; color: var(--text-muted); font-size: 0.82rem;">${p.examName}</td>
+                                            <td style="padding: 11px 14px; text-align: center; font-weight: 600; color: ${p.isCorrected ? '#16A34A' : '#D97706'};">
                                                 ${p.isCorrected ? `${p.obtainedMarks} / ${p.maxMarks}` : '—'}
                                             </td>
                                             <td style="padding: 11px 14px; text-align: center; font-weight: 500;">
@@ -673,30 +823,28 @@ class AdminPanelManager {
                                     ${filteredStudents.length === 0 ? `
                                         <tr>
                                             <td colspan="${4 + Math.min(5, subjectsData.length) + 4}" style="padding: 40px; text-align: center; color: var(--text-muted);">
-                                                No student records matching current search criteria.
+                                                No student marks found for current search.
                                             </td>
                                         </tr>
                                     ` : filteredStudents.map(s => `
-                                        <tr class="admin-paper-row admin-matrix-row" data-roll="${s.rollNo}" data-name="${s.studentName}" style="border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s ease;" title="Click to view full marks scorecard across all subjects">
-                                            <td style="padding: 11px 14px; font-weight: 500; font-family: 'JetBrains Mono', monospace;">${s.rollNo}</td>
+                                        <tr class="admin-paper-row" data-roll="${s.rollNo}" data-name="${s.studentName}" style="border-bottom: 1px solid var(--border-color); cursor: pointer; transition: background 0.15s ease;">
+                                            <td style="padding: 11px 14px; font-weight: 500; font-family: monospace;">${s.rollNo}</td>
                                             <td style="padding: 11px 14px; font-weight: 500; color: var(--text-main);">${s.studentName}</td>
-                                            <td style="padding: 11px 14px; color: var(--text-muted);">${s.class}</td>
+                                            <td style="padding: 11px 14px; color: var(--text-muted);">${s.className}-${s.section}</td>
                                             ${subjectsData.slice(0, 5).map(sub => {
-                                                const ev = s.subjectsMap[sub.name] || Object.values(s.subjectsMap).find(e => (e.subject || "").toLowerCase() === sub.name.toLowerCase());
-                                                if (!ev) return `<td style="padding: 11px 14px; text-align: center; color: var(--text-muted); font-size: 0.8rem;">—</td>`;
-                                                const isCorr = this.isEvaluationCorrected(ev);
-                                                return `
-                                                    <td style="padding: 11px 14px; text-align: center; font-size: 0.82rem;">
-                                                        ${isCorr 
-                                                            ? `<span style="font-weight: 600; color: #16A34A;">${ev.obtainedMarks}/${ev.maxMarks || 70}</span>`
-                                                            : `<span style="color: #D97706; font-size: 0.76rem;">◐ Pending</span>`}
-                                                    </td>
-                                                `;
+                                                const sc = s.subjects[sub.name];
+                                                if (sc && sc.isCorrected) {
+                                                    return `<td style="padding: 11px 14px; text-align: center; font-weight: 600; color: #16A34A;">${sc.obtainedMarks} <span style="font-size: 0.74rem; color: var(--text-muted); font-weight: normal;">(${sc.grade})</span></td>`;
+                                                } else {
+                                                    return `<td style="padding: 11px 14px; text-align: center; color: var(--text-muted);">—</td>`;
+                                                }
                                             }).join("")}
-                                            <td style="padding: 11px 14px; text-align: center; font-weight: 600;">${s.totalObtained} / ${s.totalMax}</td>
-                                            <td style="padding: 11px 14px; text-align: center; font-weight: 500;">${s.percentage}%</td>
+                                            <td style="padding: 11px 14px; text-align: center; font-weight: 700; color: var(--text-main);">
+                                                ${s.totalObtained} / ${s.totalMax}
+                                            </td>
+                                            <td style="padding: 11px 14px; text-align: center; font-weight: 600;">${s.overallPercentage}%</td>
                                             <td style="padding: 11px 14px; text-align: center;">
-                                                <span style="padding: 2px 7px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #16A34A; font-weight: 600; font-size: 0.78rem;">${s.grade}</span>
+                                                <span style="padding: 2px 7px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #16A34A; font-weight: 600; font-size: 0.78rem;">${s.overallGrade}</span>
                                             </td>
                                             <td style="padding: 11px 14px; text-align: center;">
                                                 <button type="button" class="btn-student-360-pill" data-roll="${s.rollNo}" data-name="${s.studentName}" title="Inspect full marks across all subjects for ${s.studentName}">
@@ -726,6 +874,7 @@ class AdminPanelManager {
                 const subName = card.getAttribute("data-subject");
                 if (subName) {
                     this.selectedSubject = (this.selectedSubject.toLowerCase() === subName.toLowerCase()) ? "all" : subName;
+                    this.selectedBatchKey = "all";
                     this.render();
                     const sec = document.getElementById("admin-oversight-section");
                     if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -733,24 +882,77 @@ class AdminPanelManager {
             });
         });
 
-        // 2. Clickable Subject Filter Pills (Section 2)
+        // 2. Clickable Subject Filter Pills (Section 3)
         this.container.querySelectorAll(".admin-subject-pill").forEach(pill => {
             pill.addEventListener("click", () => {
                 const targetSub = pill.getAttribute("data-subject") || "all";
                 this.selectedSubject = targetSub;
+                this.selectedBatchKey = "all";
                 this.render();
             });
         });
 
-        // 3. Clear Subject Filter Button
+        // 3. Clear Subject / Reset Filters Button
         this.container.querySelectorAll(".btn-clear-subject-pill").forEach(btn => {
             btn.addEventListener("click", () => {
                 this.selectedSubject = "all";
+                this.selectedBatchKey = "all";
+                this.statusFilter = "all";
+                this.selectedClass = "all";
+                this.searchQuery = "";
                 this.render();
             });
         });
 
-        // 4. View Switcher (Papers vs Student Matrix)
+        // 4. Batch Card Clicks & View Batch Records Button (Section 2)
+        this.container.querySelectorAll(".admin-batch-card, .btn-admin-filter-batch").forEach(el => {
+            el.addEventListener("click", (e) => {
+                if (e.target.closest(".btn-admin-batch-share")) return;
+                const batchKey = el.getAttribute("data-batch-key");
+                const subject = el.getAttribute("data-subject");
+                if (this.selectedBatchKey === batchKey) {
+                    this.selectedBatchKey = "all";
+                } else {
+                    this.selectedBatchKey = batchKey;
+                    if (subject) this.selectedSubject = subject;
+                }
+                this.render();
+                const sec = document.getElementById("admin-oversight-section");
+                if (sec) sec.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+        });
+
+        // 4.5. Clear Batch Filter Button
+        this.container.querySelectorAll(".btn-admin-clear-batch").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.selectedBatchKey = "all";
+                this.render();
+            });
+        });
+
+        // 4.6. Batch WhatsApp Share Button
+        this.container.querySelectorAll(".btn-admin-batch-share").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const key = btn.getAttribute("data-batch-key");
+                const subject = btn.getAttribute("data-subject");
+                const className = btn.getAttribute("data-class");
+                const templateName = btn.getAttribute("data-template");
+                const paperCount = btn.getAttribute("data-total");
+                if (window.ShareManager) {
+                    window.ShareManager.shareSubject({
+                        subject,
+                        className,
+                        templateName,
+                        paperCount,
+                        batchKey: key
+                    });
+                }
+            });
+        });
+
+        // 5. View Switcher (Papers vs Student Matrix)
         this.container.querySelectorAll(".admin-view-toggle-btn").forEach(btn => {
             btn.addEventListener("click", () => {
                 const view = btn.getAttribute("data-view") || "papers";
@@ -759,7 +961,7 @@ class AdminPanelManager {
             });
         });
 
-        // 5. Clickable Oversight KPI filter cards (Total, ✓ Corrected, ◐ Need To Do)
+        // 6. Clickable Oversight KPI filter cards (Total, ✓ Corrected, ◐ Need To Do)
         this.container.querySelectorAll(".admin-oversight-card").forEach(card => {
             card.addEventListener("click", () => {
                 const targetStatus = card.getAttribute("data-status");
@@ -770,33 +972,51 @@ class AdminPanelManager {
             });
         });
 
-        // 6. Reset Filters Link in banner
+        // 7. Reset Filters Link in banner
         this.container.querySelectorAll(".btn-reset-filter-link").forEach(btn => {
             btn.addEventListener("click", () => {
+                this.selectedSubject = "all";
+                this.selectedBatchKey = "all";
                 this.statusFilter = "all";
+                this.selectedClass = "all";
+                this.searchQuery = "";
                 this.render();
             });
         });
 
-        // 7. Live Search Input
-        const searchInput = this.container.querySelector("#admin-papers-search");
+        // 8. Search Input
+        const searchInput = this.container.querySelector("#admin-papers-search-input");
         if (searchInput) {
             searchInput.addEventListener("input", (e) => {
-                this.searchQuery = e.target.value.toLowerCase();
+                this.searchQuery = e.target.value;
+                this.render();
+                const refreshed = this.container.querySelector("#admin-papers-search-input");
+                if (refreshed) {
+                    refreshed.focus();
+                    refreshed.setSelectionRange(refreshed.value.length, refreshed.value.length);
+                }
+            });
+        }
+
+        const clearSearchBtn = this.container.querySelector("#btn-clear-admin-search");
+        if (clearSearchBtn) {
+            clearSearchBtn.addEventListener("click", () => {
+                this.searchQuery = "";
                 this.render();
             });
         }
 
-        // 8. Subject Select Filter Dropdown
+        // 9. Subject Filter Dropdown
         const subSelect = this.container.querySelector("#admin-papers-subject-filter");
         if (subSelect) {
             subSelect.addEventListener("change", (e) => {
                 this.selectedSubject = e.target.value;
+                this.selectedBatchKey = "all";
                 this.render();
             });
         }
 
-        // 9. Class Filter Dropdown
+        // 10. Class Filter Dropdown
         const classSelect = this.container.querySelector("#admin-papers-class-filter");
         if (classSelect) {
             classSelect.addEventListener("change", (e) => {
@@ -805,7 +1025,7 @@ class AdminPanelManager {
             });
         }
 
-        // 9.5. Manage Users & Faculty Desk
+        // 11. Manage Users & Faculty Desk
         const manageUsersBtn = this.container.querySelector("#btn-admin-manage-users");
         if (manageUsersBtn) {
             manageUsersBtn.addEventListener("click", () => {
@@ -817,19 +1037,19 @@ class AdminPanelManager {
             });
         }
 
-        // 10. Print Report
+        // 12. Print Report
         const printBtn = this.container.querySelector("#btn-admin-print-report");
         if (printBtn) {
             printBtn.addEventListener("click", () => window.print());
         }
 
-        // 11. Export Excel
+        // 13. Export Excel
         const exportBtn = this.container.querySelector("#btn-admin-export-excel");
         if (exportBtn) {
             exportBtn.addEventListener("click", () => this.exportExcelMatrix());
         }
 
-        // 12. Student 360 trigger buttons and row clicks
+        // 14. Student 360 trigger buttons and row clicks
         this.container.querySelectorAll(".btn-student-360-pill").forEach(btn => {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();
@@ -840,7 +1060,8 @@ class AdminPanelManager {
         });
 
         this.container.querySelectorAll(".admin-paper-row").forEach(row => {
-            row.addEventListener("click", () => {
+            row.addEventListener("click", (e) => {
+                if (e.target.closest("button") || e.target.closest("a")) return;
                 const roll = row.getAttribute("data-roll");
                 const name = row.getAttribute("data-name");
                 this.openStudent360(roll, name);
@@ -849,12 +1070,10 @@ class AdminPanelManager {
     }
 
     // --- Student 360 All-Subjects Modal (Only for Admin) ---
-
     openStudent360(rollNo, studentName) {
         const modal = document.getElementById("modal-admin-student-profile");
         if (!modal) return;
 
-        // Group all evaluations belonging to this student across subjects
         const normRoll = (rollNo || "").toString().trim().toLowerCase();
         const normName = (studentName || "").toString().trim().toLowerCase();
         const cleanRollDigits = normRoll.replace(/\D/g, "");
@@ -864,13 +1083,11 @@ class AdminPanelManager {
             const evName = (ev.studentName || "").toString().trim().toLowerCase();
             const evDigits = evRoll.replace(/\D/g, "");
 
-            // 1. Roll number matches exactly or numeric parts match (e.g. 101 == "Roll 101")
             if (normRoll && normRoll !== "—" && evRoll && evRoll !== "—") {
                 if (evRoll === normRoll) return true;
                 if (cleanRollDigits && evDigits && cleanRollDigits === evDigits) return true;
             }
 
-            // 2. Student name matches
             if (normName && evName && normName !== "student paper" && evName !== "student paper") {
                 if (evName === normName) return true;
                 if (normName.length >= 3 && evName.length >= 3) {
@@ -884,13 +1101,11 @@ class AdminPanelManager {
             return false;
         });
 
-        // Derive metadata
         const refEval = studentEvals[0] || {};
         const displayName = refEval.studentName || studentName || "Student Paper";
         const displayRoll = refEval.rollNo || rollNo || "101";
         const displayClass = `${refEval.className || refEval.class || "Class 12"}-${refEval.section || "A"}`;
 
-        // Avatar initials
         const initials = displayName
             .split(" ")
             .filter(Boolean)
@@ -898,15 +1113,12 @@ class AdminPanelManager {
             .map(w => w[0].toUpperCase())
             .join("") || "ST";
 
-        // Map evaluations by subject
         const evalBySubject = new Map();
         studentEvals.forEach(ev => {
             const sub = (ev.subject || "General").trim();
             evalBySubject.set(sub.toLowerCase(), ev);
         });
 
-        // Determine all curriculum subjects:
-        // Always include core subjects + all subjects present across all evaluations in the system + catalog subjects
         const allSubjectNames = new Set([
             "Physics",
             "Chemistry",
@@ -931,13 +1143,22 @@ class AdminPanelManager {
             }
         });
 
-        // Build subject rows & calculate cumulative totals
+        const sortedSubjectList = Array.from(allSubjectNames).sort((a, b) => {
+            const priority = ["physics", "chemistry", "mathematics", "biology", "english"];
+            const pA = priority.indexOf(a.toLowerCase());
+            const pB = priority.indexOf(b.toLowerCase());
+            if (pA !== -1 && pB !== -1) return pA - pB;
+            if (pA !== -1) return -1;
+            if (pB !== -1) return 1;
+            return a.localeCompare(b);
+        });
+
         let totalObtained = 0;
         let totalMax = 0;
         let gradedCount = 0;
-        let teacherRemarks = [];
+        const teacherRemarks = [];
 
-        const subjectRowsHtml = Array.from(allSubjectNames).map(subName => {
+        const rowsHtml = sortedSubjectList.map(subName => {
             const ev = evalBySubject.get(subName.toLowerCase());
             if (ev) {
                 const isCorr = this.isEvaluationCorrected(ev);
@@ -1006,11 +1227,9 @@ class AdminPanelManager {
             }
         }).join("");
 
-        // Set KPIs
         const overallPct = totalMax > 0 ? Math.round((totalObtained / totalMax) * 100) : 0;
         const overallGrade = totalMax > 0 ? (window.calculateGradeScale ? window.calculateGradeScale(totalObtained, totalMax).grade : (overallPct >= 80 ? "A1" : overallPct >= 60 ? "B1" : "C")) : "—";
 
-        // Populate modal DOM
         const elAvatar = document.getElementById("s360-avatar");
         const elName = document.getElementById("s360-name");
         const elMeta = document.getElementById("s360-meta");
@@ -1024,30 +1243,24 @@ class AdminPanelManager {
 
         if (elAvatar) elAvatar.textContent = initials;
         if (elName) elName.textContent = displayName;
-        if (elMeta) elMeta.textContent = `Roll No: ${displayRoll} • Class: ${displayClass} • Central Institutional Examination Cell`;
-        if (elTotalScore) elTotalScore.textContent = `${totalObtained} / ${totalMax > 0 ? totalMax : 70} M`;
+        if (elMeta) elMeta.textContent = `Roll No: ${displayRoll} • Class: ${displayClass} • All Curriculum Subjects`;
+        if (elTotalScore) elTotalScore.textContent = `${totalObtained} / ${totalMax}`;
         if (elOverallPct) elOverallPct.textContent = `${overallPct}%`;
         if (elGrade) elGrade.textContent = overallGrade;
-        if (elRatio) elRatio.textContent = `${gradedCount} of ${allSubjectNames.size} Subjects Evaluated`;
-        if (elTbody) elTbody.innerHTML = subjectRowsHtml;
+        if (elRatio) elRatio.textContent = `${gradedCount} of ${sortedSubjectList.length} Subjects Evaluated`;
+        if (elTbody) elTbody.innerHTML = rowsHtml;
 
         if (elFeedbackBox && elFeedbackText) {
             if (teacherRemarks.length > 0) {
                 elFeedbackBox.style.display = "block";
-                elFeedbackText.innerHTML = teacherRemarks.join(" • ");
+                elFeedbackText.innerHTML = teacherRemarks.join("<br/><br/>");
             } else {
                 elFeedbackBox.style.display = "none";
             }
         }
 
-        // Show modal
         modal.style.display = "flex";
-        requestAnimationFrame(() => modal.classList.add("active"));
-
-        const closeModal = () => {
-            modal.classList.remove("active");
-            setTimeout(() => { modal.style.display = "none"; }, 200);
-        };
+        const closeModal = () => { modal.style.display = "none"; };
 
         const btnClose = document.getElementById("btn-close-s360-modal");
         const btnDone = document.getElementById("btn-done-s360-modal");
@@ -1061,66 +1274,6 @@ class AdminPanelManager {
             btnPrint.onclick = () => {
                 window.print();
             };
-        }
-    }
-
-    renderStaticMode(subjectsData, studentMatrix, allPapers) {
-        // Fallback for standalone admin.html static DOM
-        const subTbody = document.getElementById("admin-subject-tracker-tbody");
-        if (subTbody) {
-            subTbody.innerHTML = subjectsData.map(sub => `
-                <tr style="border-bottom: 1px solid var(--border-color);">
-                    <td style="padding: 12px 16px; font-weight: 600; color: var(--text-main);">
-                        ${sub.name}
-                        <div style="font-size: 0.72rem; color: #AF52DE;">${sub.code}</div>
-                    </td>
-                    <td style="padding: 12px 16px; color: var(--text-muted);">${sub.teacher}</td>
-                    <td style="padding: 12px 16px; font-weight: 500;">${sub.uploaded}</td>
-                    <td style="padding: 12px 16px; color: #16A34A; font-weight: 600;">${sub.corrected}</td>
-                    <td style="padding: 12px 16px; color: #D97706; font-weight: 500;">${sub.pending}</td>
-                    <td style="padding: 12px 16px; font-size: 0.8rem; color: var(--text-muted);">${sub.lastCorrectedFormatted}</td>
-                </tr>
-            `).join("");
-        }
-
-        const studentTbody = document.getElementById("admin-student-matrix-tbody");
-        if (studentTbody) {
-            studentTbody.innerHTML = allPapers.map(p => `
-                <tr class="admin-paper-row" data-roll="${p.rollNo}" data-name="${p.studentName}" style="border-bottom: 1px solid var(--border-color); cursor: pointer;">
-                    <td style="padding: 12px 14px; font-weight: 500;">${p.rollNo}</td>
-                    <td style="padding: 12px 14px; color: var(--text-main);">${p.studentName}</td>
-                    <td style="padding: 12px 14px; color: var(--text-muted);">${p.className}-${p.section}</td>
-                    <td style="padding: 12px 14px; font-weight: 500; color: #007AFF;">${p.subject}</td>
-                    <td style="padding: 12px 14px; text-align: center; font-weight: 600;">${p.isCorrected ? `${p.obtainedMarks}/${p.maxMarks}` : '—'}</td>
-                    <td style="padding: 12px 14px; text-align: center;">${p.isCorrected ? `${p.percentage}%` : '—'}</td>
-                    <td style="padding: 12px 14px; text-align: center;">
-                        <span style="padding: 2px 8px; border-radius: 6px; background: ${p.isCorrected ? 'rgba(52,199,89,0.12)' : 'rgba(255,149,0,0.12)'}; color: ${p.isCorrected ? '#16A34A' : '#D97706'}; font-size: 0.78rem;">
-                            ${p.isCorrected ? '✓ Corrected' : '◐ Pending'}
-                        </span>
-                    </td>
-                    <td style="padding: 12px 14px; font-size: 0.8rem; color: var(--text-muted);">${p.lastCorrectedFormatted}</td>
-                    <td style="padding: 12px 14px; text-align: center;">
-                        <button type="button" class="btn-student-360-pill" data-roll="${p.rollNo}" data-name="${p.studentName}">
-                            Student 360
-                        </button>
-                    </td>
-                </tr>
-            `).join("");
-        }
-    }
-
-    bindStaticEvents() {
-        const studentTbody = document.getElementById("admin-student-matrix-tbody");
-        if (studentTbody && !studentTbody.dataset.bound) {
-            studentTbody.dataset.bound = "true";
-            studentTbody.addEventListener("click", (e) => {
-                const target = e.target.closest(".btn-student-360-pill") || e.target.closest(".admin-paper-row");
-                if (target) {
-                    const roll = target.getAttribute("data-roll");
-                    const name = target.getAttribute("data-name");
-                    this.openStudent360(roll, name);
-                }
-            });
         }
     }
 

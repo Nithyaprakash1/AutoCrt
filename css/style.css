@@ -13941,3 +13941,35 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     border-color: #007AFF;
     color: #007AFF;
 }
+
+/* Admin Panel Class & Blueprint Batches */
+.admin-batch-card {
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.admin-batch-card.active {
+    border-color: #AF52DE !important;
+    background: #FFFFFF !important;
+    box-shadow: 0 0 0 2px rgba(175, 82, 222, 0.25), 0 8px 24px rgba(175, 82, 222, 0.12) !important;
+}
+
+.btn-admin-clear-batch {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    border: 1px solid #0071E3;
+    background: rgba(0, 113, 227, 0.08);
+    color: #0071E3;
+    font-size: 0.78rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-admin-clear-batch:hover {
+    background: rgba(0, 113, 227, 0.16);
+    border-color: #005BB5;
+    color: #005BB5;
+}
