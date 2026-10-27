@@ -4639,7 +4639,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         if (barEl) barEl.style.width = `${percent}%`;
     }
 
-    setPublishDialogComplete(publishedCount) {
+    setPublishDialogComplete(publishedCount, meta = {}) {
         const iconWrap = document.getElementById("publish-dialog-icon");
         const titleEl = document.getElementById("publish-dialog-title");
         const subEl = document.getElementById("publish-dialog-subtitle");
@@ -4647,39 +4647,137 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         const percentEl = document.getElementById("publish-dialog-percent");
         const barEl = document.getElementById("publish-dialog-bar");
         const actionsEl = document.getElementById("publish-dialog-actions");
+        const loadingCard = document.getElementById("publish-loading-card");
 
         if (iconWrap) {
             iconWrap.innerHTML = `
-                <div style="width: 58px; height: 58px; border-radius: 50%; background: #34C759; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(52, 199, 89, 0.4);">
+                <div style="width: 58px; height: 58px; border-radius: 50%; background: #25D366; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 16px rgba(37, 211, 102, 0.4);">
                     <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                 </div>
             `;
         }
 
-        if (titleEl) titleEl.textContent = "✓ Published to Evaluator Desk!";
-        if (subEl) subEl.textContent = `All ${publishedCount} answer sheet(s) have been compressed, optimized, and published successfully.`;
-        if (statusEl) statusEl.textContent = "✓ Ingestion and synchronization complete.";
+        const subName = meta.subjectName || "Physics";
+        const clsName = meta.className || "Class 12-A";
+        const tplName = meta.templateName || "";
+        const batchKey = meta.batchKey || null;
+        const singlePaper = (publishedCount === 1 && meta.singleItem) ? meta.singleItem : null;
+
+        if (titleEl) titleEl.textContent = "✓ Ingestion & Publishing Complete!";
+        if (subEl) subEl.textContent = `Successfully published ${publishedCount} answer sheet(s) for ${subName} (${clsName}) to the Evaluator Desk.`;
+        if (statusEl) statusEl.textContent = "✓ Synchronization complete • Ready for faculty correction.";
         if (percentEl) percentEl.textContent = "100%";
         if (barEl) {
             barEl.style.width = "100%";
-            barEl.style.background = "#34C759";
+            barEl.style.background = "#25D366";
         }
-        if (actionsEl) {
-            actionsEl.style.display = "flex";
-            const doneBtn = actionsEl.querySelector("#btn-dialog-done");
-            if (doneBtn) {
-                doneBtn.addEventListener("click", () => {
-                    const backdrop = document.getElementById("modal-publish-loading-dialog");
-                    if (backdrop) backdrop.remove();
+
+        // Inject WhatsApp Direct Share Section inside the card
+        let shareCard = document.getElementById("publish-dialog-share-card");
+        if (!shareCard && loadingCard) {
+            shareCard = document.createElement("div");
+            shareCard.id = "publish-dialog-share-card";
+            shareCard.className = "publish-share-card";
+            
+            const directUrl = singlePaper 
+                ? (window.ShareManager ? window.ShareManager.buildPaperUrl(singlePaper.id) : `?paperId=${singlePaper.id}`)
+                : (window.ShareManager ? window.ShareManager.buildSubjectUrl(subName, batchKey) : `?view=uploaded-papers&subject=${encodeURIComponent(subName)}`);
+
+            shareCard.innerHTML = `
+                <div class="publish-share-title-row">
+                    <span class="publish-share-badge">
+                        ${(window.Icons && window.Icons.whatsapp) || ''}
+                        <span>Share Direct Access via WhatsApp</span>
+                    </span>
+                    <span style="font-size: 0.74rem; color: #16A34A; font-weight: 600;">Direct Link Ready</span>
+                </div>
+                <p style="font-size: 0.84rem; color: var(--text-muted, #475569); margin: 0 0 10px 0; line-height: 1.4;">
+                    Send this link to the evaluating faculty on WhatsApp. Clicking it takes them directly to ${singlePaper ? `${singlePaper.studentName}'s paper` : `${subName} papers`} with no misleading steps.
+                </p>
+                <div class="publish-share-actions-row">
+                    <button type="button" class="publish-btn-whatsapp" id="btn-publish-share-wa">
+                        ${(window.Icons && window.Icons.whatsapp) || ''}
+                        <span>Share on WhatsApp</span>
+                    </button>
+                    <button type="button" class="publish-btn-copy-link" id="btn-publish-copy-link">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                        <span>Copy Link</span>
+                    </button>
+                </div>
+            `;
+
+            const progressSec = loadingCard.querySelector(".publish-progress-section");
+            if (progressSec) {
+                progressSec.parentNode.insertBefore(shareCard, progressSec.nextSibling);
+            } else {
+                loadingCard.appendChild(shareCard);
+            }
+
+            // Bind WhatsApp Share Button
+            shareCard.querySelector("#btn-publish-share-wa")?.addEventListener("click", () => {
+                if (window.ShareManager) {
+                    if (singlePaper) {
+                        window.ShareManager.sharePaper({
+                            paperId: singlePaper.id,
+                            studentName: singlePaper.studentName,
+                            rollNo: singlePaper.rollNo,
+                            subject: subName,
+                            className: clsName
+                        });
+                    } else {
+                        window.ShareManager.shareSubject({
+                            subject: subName,
+                            className: clsName,
+                            templateName: tplName,
+                            paperCount: publishedCount,
+                            batchKey: batchKey
+                        });
+                    }
+                }
+            });
+
+            // Bind Copy Link Button
+            const copyBtn = shareCard.querySelector("#btn-publish-copy-link");
+            if (copyBtn) {
+                copyBtn.addEventListener("click", () => {
+                    if (window.ShareManager) {
+                        window.ShareManager.copyToClipboard(directUrl, copyBtn);
+                    }
                 });
             }
         }
 
-        // Auto-dismiss after 800ms if user doesn't click
-        setTimeout(() => {
-            const backdrop = document.getElementById("modal-publish-loading-dialog");
-            if (backdrop) backdrop.remove();
-        }, 800);
+        if (actionsEl) {
+            actionsEl.style.display = "flex";
+            actionsEl.style.justifyContent = "center";
+            actionsEl.style.gap = "10px";
+            actionsEl.innerHTML = `
+                <button type="button" class="publish-btn-primary" id="btn-dialog-goto-papers" style="background: #007AFF;">
+                    <span>View Uploaded Papers (${subName})</span>
+                </button>
+                <button type="button" class="publish-btn-secondary" id="btn-dialog-done">
+                    <span>Close</span>
+                </button>
+            `;
+
+            actionsEl.querySelector("#btn-dialog-goto-papers")?.addEventListener("click", async () => {
+                const backdrop = document.getElementById("modal-publish-loading-dialog");
+                if (backdrop) backdrop.remove();
+                if (window.app) {
+                    await window.app.switchView("uploaded-papers");
+                    if (window.app.uploadedPapersPageManager) {
+                        window.app.uploadedPapersPageManager.selectedSubject = subName;
+                        if (batchKey) window.app.uploadedPapersPageManager.selectedBatchKey = batchKey;
+                        window.app.uploadedPapersPageManager.render();
+                    }
+                }
+            });
+
+            actionsEl.querySelector("#btn-dialog-done")?.addEventListener("click", () => {
+                const backdrop = document.getElementById("modal-publish-loading-dialog");
+                if (backdrop) backdrop.remove();
+            });
+        }
     }
 
     // --- Publish to Storage & Evaluator Desk ---
@@ -4864,7 +4962,19 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 this.updatePublishDialogProgress(i + 1, total, finishPct, `✓ Saved paper ${i + 1} of ${total}: ${item.studentName}`);
             }
 
-            this.setPublishDialogComplete(publishedCount);
+            const singleItemInfo = (readyItems.length === 1 && readyItems[0]) ? {
+                id: (readyItems[0].evaluationId || readyItems[0].id),
+                studentName: readyItems[0].studentName,
+                rollNo: readyItems[0].rollNo
+            } : null;
+
+            this.setPublishDialogComplete(publishedCount, {
+                subjectName: subject?.name || "Physics",
+                className: cls?.label || cls?.name || "Class 12-A",
+                templateName: template?.name || "",
+                batchKey: `${cls?.label || cls?.name || "Class 12-A"}:::${template?.name || "Exam Blueprint"}`,
+                singleItem: singleItemInfo
+            });
 
             // Remove published items from active queue
             this.fileQueue = this.fileQueue.filter(item => !readyItems.includes(item));
@@ -4952,10 +5062,14 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                                     </span>
                                 </td>
                                 <td>${p.status === 'Completed' ? `${p.obtainedMarks} / ${p.maxMarks}` : '—'}</td>
-                                 <td style="display: flex; gap: 8px; align-items: center;">
+                                 <td style="display: flex; gap: 6px; align-items: center;">
                                     <button type="button" class="btn-action-view btn-portal-open-ws" data-id="${p.id}">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                         Evaluate
+                                    </button>
+                                    <button type="button" class="btn-paper-action btn-action-share btn-portal-share-paper" data-id="${p.id}" data-name="${p.studentName || ''}" data-roll="${p.rollNo || ''}" data-subject="${p.subject || ''}" data-class="${p.className || p.class || ''}" title="Share direct link to this paper via WhatsApp">
+                                        ${(window.Icons && window.Icons.whatsapp) || ''}
+                                        Share
                                     </button>
                                     <button type="button" class="btn-action-delete btn-portal-delete-paper" data-id="${p.id}" title="Delete Uploaded Paper" style="background: rgba(220, 38, 38, 0.1); border: 1px solid rgba(220, 38, 38, 0.3); color: #DC2626; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>

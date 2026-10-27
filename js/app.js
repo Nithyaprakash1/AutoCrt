@@ -70,20 +70,69 @@ class AppController {
         await this.enforceLicenseGate();
         setInterval(() => this.enforceLicenseGate(), 60000);
 
-        // If no user is logged in and not a standalone portal page, show login overlay
-        if (!currentUser && !pageDefaultPortal) {
-            this.showPortalLoginScreen();
-        }
-
-        // Check for direct workspace load via URL query param (e.g. ?evalId=eval-123)
+        // Check for direct workspace or shared subject load via URL query param (e.g. ?paperId=eval-123, ?subject=Physics)
         const urlParams = new URLSearchParams(window.location.search);
-        const evalId = urlParams.get("evalId");
-        if (evalId) {
-            const ev = await window.appStorage.getEvaluationById(evalId);
-            if (ev) {
-                await this.openWorkspace(ev);
+        const evalId = urlParams.get("evalId") || urlParams.get("paperId") || urlParams.get("id");
+        const targetSubject = urlParams.get("subject");
+        const targetBatch = urlParams.get("batch");
+        const targetView = urlParams.get("view");
+
+        const hasSharedTarget = Boolean(evalId || targetSubject || targetBatch || targetView === "uploaded-papers");
+
+        if (hasSharedTarget) {
+            sessionStorage.setItem("niprak_shared_target", JSON.stringify({
+                evalId,
+                targetSubject,
+                targetBatch,
+                targetView
+            }));
+
+            // Direct Shared Access: Ensure recipient is not blocked by a misleading login screen
+            if (!currentUser && !pageDefaultPortal) {
+                const guestUser = {
+                    id: "usr_shared_guest",
+                    name: "Faculty Evaluator",
+                    role: "evaluator",
+                    roleLabel: "Teacher Desk",
+                    status: "active"
+                };
+                window.appStorage.setCurrentUser(guestUser);
+            }
+            this.hidePortalLoginScreen();
+
+            // 1. Single Paper Direct Navigation
+            if (evalId) {
+                const ev = await window.appStorage.getEvaluationById(evalId);
+                if (ev) {
+                    await this.openWorkspace(ev);
+                    if (this.showToast) {
+                        this.showToast(`✓ Opened ${ev.studentName || 'Student'}'s ${ev.subject || 'paper'} via WhatsApp link`);
+                    }
+                } else {
+                    // Fall back to uploaded papers repository
+                    await this.switchView("uploaded-papers");
+                    if (this.showToast) {
+                        this.showToast("Paper not found locally, showing all uploaded papers.");
+                    }
+                }
+            } 
+            // 2. Subject or Batch Direct Navigation
+            else if (targetSubject || targetBatch || targetView === "uploaded-papers") {
+                await this.switchView("uploaded-papers");
+                if (this.uploadedPapersPageManager) {
+                    if (targetSubject) this.uploadedPapersPageManager.selectedSubject = targetSubject;
+                    if (targetBatch) this.uploadedPapersPageManager.selectedBatchKey = targetBatch;
+                    this.uploadedPapersPageManager.render();
+                }
+                if (this.showToast) {
+                    this.showToast(`✓ Viewing ${targetSubject || 'shared'} papers via WhatsApp link`);
+                }
             }
         } else {
+            // Normal startup routing
+            if (!currentUser && !pageDefaultPortal) {
+                this.showPortalLoginScreen();
+            }
             this.switchView(targetPortal === "super_admin" ? "super-admin" : (targetPortal === "uploader" ? "upload-portal" : (targetPortal === "admin" ? "admin-panel" : "dashboard")));
         }
 
@@ -1274,6 +1323,33 @@ class AppController {
                 this.triggerIOSLoginBurst(e.clientX, e.clientY);
                 this.showToast(`Authenticated as ${userAccount.name} (${activeRole.toUpperCase()})`);
                 this.setPortal(destinationPortal, true);
+
+                // Check if user came from a direct WhatsApp shared link
+                const rawShared = sessionStorage.getItem("niprak_shared_target");
+                if (rawShared) {
+                    try {
+                        const sharedTarget = JSON.parse(rawShared);
+                        sessionStorage.removeItem("niprak_shared_target");
+                        if (sharedTarget.evalId) {
+                            const ev = await window.appStorage.getEvaluationById(sharedTarget.evalId);
+                            if (ev) {
+                                await this.openWorkspace(ev);
+                                return;
+                            }
+                        }
+                        if (sharedTarget.targetSubject || sharedTarget.targetBatch || sharedTarget.targetView === "uploaded-papers") {
+                            await this.switchView("uploaded-papers");
+                            if (this.uploadedPapersPageManager) {
+                                if (sharedTarget.targetSubject) this.uploadedPapersPageManager.selectedSubject = sharedTarget.targetSubject;
+                                if (sharedTarget.targetBatch) this.uploadedPapersPageManager.selectedBatchKey = sharedTarget.targetBatch;
+                                this.uploadedPapersPageManager.render();
+                            }
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn("Shared target post-auth error:", e);
+                    }
+                }
             });
         }
 

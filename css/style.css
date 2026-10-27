@@ -13527,3 +13527,417 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     color: #FFFFFF;
 }
 
+
+/* WhatsApp Direct Share Dialog & Actions */
+.share-modal-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    animation: shareFadeIn 0.22s ease-out;
+}
+
+@keyframes shareFadeIn {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+.share-modal-card {
+    background: #FFFFFF;
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    border-radius: 24px;
+    width: 520px;
+    max-width: 96vw;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.22), 0 4px 16px rgba(0, 0, 0, 0.06);
+    overflow: hidden;
+    animation: shareSlideUp 0.26s cubic-bezier(0.16, 1, 0.3, 1);
+    display: flex;
+    flex-direction: column;
+}
+
+@keyframes shareSlideUp {
+    from { transform: translateY(18px) scale(0.97); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+}
+
+.share-modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border-color, #E2E8F0);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: var(--bg-card, #FFFFFF);
+}
+
+.share-modal-icon-badge {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+    background: #25D366;
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.35);
+    flex-shrink: 0;
+}
+
+.share-modal-title {
+    font-size: 1.15rem;
+    font-weight: 600;
+    color: var(--text-main, #0F172A);
+    margin: 0;
+    line-height: 1.25;
+}
+
+.share-modal-meta-tag {
+    display: inline-block;
+    font-size: 0.74rem;
+    font-weight: 500;
+    color: #128C7E;
+    background: rgba(37, 211, 102, 0.1);
+    padding: 2px 8px;
+    border-radius: 6px;
+    margin-top: 4px;
+}
+
+.btn-share-modal-close {
+    background: transparent;
+    border: none;
+    font-size: 1.5rem;
+    line-height: 1;
+    color: var(--text-muted, #64748B);
+    cursor: pointer;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    transition: all 0.15s ease;
+}
+
+.btn-share-modal-close:hover {
+    background: var(--bg-subtle, #F1F5F9);
+    color: var(--text-main, #0F172A);
+}
+
+.share-modal-body {
+    padding: 20px 24px;
+    overflow-y: auto;
+    max-height: 60vh;
+}
+
+.share-modal-desc {
+    font-size: 0.86rem;
+    color: var(--text-muted, #475569);
+    margin: 0 0 16px 0;
+    line-height: 1.45;
+}
+
+.share-url-box {
+    margin-bottom: 16px;
+}
+
+.share-url-label {
+    display: block;
+    font-size: 0.76rem;
+    font-weight: 600;
+    color: var(--text-muted, #64748B);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 6px;
+}
+
+.share-url-input-wrap {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.share-direct-url-input {
+    flex: 1;
+    height: 38px;
+    padding: 0 12px;
+    border-radius: 10px;
+    border: 1px solid var(--border-color, #CBD5E1);
+    background: var(--bg-subtle, #F8FAFC);
+    color: var(--text-main, #0F172A);
+    font-size: 0.82rem;
+    font-family: var(--font-mono, monospace);
+    outline: none;
+    cursor: text;
+}
+
+.share-direct-url-input:focus {
+    border-color: #25D366;
+    background: #FFFFFF;
+}
+
+.btn-copy-share-url {
+    height: 38px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: #007AFF;
+    color: #FFFFFF;
+    font-size: 0.82rem;
+    font-weight: 500;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+    transition: all 0.15s ease;
+}
+
+.btn-copy-share-url:hover {
+    background: #0062cc;
+}
+
+.share-preview-box {
+    border: 1px solid var(--border-color, #E2E8F0);
+    border-radius: 14px;
+    overflow: hidden;
+    background: #ECE5DD;
+}
+
+.share-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 14px;
+    background: #075E54;
+    color: #FFFFFF;
+}
+
+.share-preview-label {
+    font-size: 0.76rem;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+}
+
+.btn-copy-preview-text {
+    background: rgba(255, 255, 255, 0.18);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    color: #FFFFFF;
+    font-size: 0.72rem;
+    padding: 2px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-copy-preview-text:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.share-preview-bubble {
+    padding: 12px 14px;
+}
+
+.share-preview-pre {
+    background: #FFFFFF;
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin: 0;
+    font-family: inherit;
+    font-size: 0.82rem;
+    line-height: 1.5;
+    color: #111827;
+    white-space: pre-wrap;
+    word-break: break-word;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.share-modal-footer {
+    padding: 16px 24px;
+    border-top: 1px solid var(--border-color, #E2E8F0);
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 10px;
+    background: var(--bg-card, #FFFFFF);
+}
+
+.btn-share-whatsapp-primary {
+    height: 42px;
+    padding: 0 20px;
+    border-radius: 12px;
+    background: #25D366;
+    color: #FFFFFF;
+    font-size: 0.88rem;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 14px rgba(37, 211, 102, 0.32);
+    transition: all 0.15s ease;
+}
+
+.btn-share-whatsapp-primary:hover {
+    background: #1EBE5D;
+    transform: translateY(-1px);
+}
+
+.btn-share-modal-dismiss {
+    height: 42px;
+    padding: 0 18px;
+    border-radius: 12px;
+    background: var(--bg-subtle, #F1F5F9);
+    color: var(--text-main, #334155);
+    font-size: 0.88rem;
+    font-weight: 500;
+    border: 1px solid var(--border-color, #CBD5E1);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-share-modal-dismiss:hover {
+    background: #E2E8F0;
+}
+
+/* Action Share Buttons in Tables & Batches */
+.btn-paper-action.btn-action-share {
+    color: #128C7E;
+    border-color: rgba(37, 211, 102, 0.35);
+    background: rgba(37, 211, 102, 0.08);
+}
+
+.btn-paper-action.btn-action-share:hover {
+    color: #FFFFFF;
+    background: #25D366;
+    border-color: #25D366;
+}
+
+.btn-batch-share {
+    font-size: 0.76rem;
+    font-weight: 400 !important;
+    border-radius: 6px;
+    padding: 6px 10px;
+    border: 1px solid rgba(37, 211, 102, 0.35);
+    background: rgba(37, 211, 102, 0.08);
+    color: #128C7E;
+    cursor: pointer;
+    transition: all 0.15s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    flex: 0.9;
+}
+
+.btn-batch-share:hover {
+    background: #25D366;
+    color: #FFFFFF;
+    border-color: #25D366;
+}
+
+.btn-papers-secondary.btn-batch-share-active {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    cursor: pointer;
+    background: rgba(37, 211, 102, 0.08);
+    color: #128C7E;
+    border: 1px solid rgba(37, 211, 102, 0.35);
+    transition: all 0.15s ease;
+}
+
+.btn-papers-secondary.btn-batch-share-active:hover {
+    background: #25D366;
+    color: #FFFFFF;
+    border-color: #25D366;
+}
+
+/* Upload Portal Post-Publish WhatsApp Card */
+.publish-share-card {
+    background: linear-gradient(135deg, rgba(37, 211, 102, 0.08), rgba(0, 122, 255, 0.04));
+    border: 1.5px solid rgba(37, 211, 102, 0.35);
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin: 16px 0;
+    text-align: left;
+}
+
+.publish-share-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.publish-share-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #128C7E;
+}
+
+.publish-share-actions-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    align-items: center;
+}
+
+.publish-btn-whatsapp {
+    height: 40px;
+    padding: 0 16px;
+    border-radius: 10px;
+    background: #25D366;
+    color: #FFFFFF;
+    font-weight: 600;
+    font-size: 0.86rem;
+    border: none;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    box-shadow: 0 4px 12px rgba(37, 211, 102, 0.28);
+    transition: all 0.18s ease;
+}
+
+.publish-btn-whatsapp:hover {
+    background: #1EBE5D;
+    transform: translateY(-1px);
+}
+
+.publish-btn-copy-link {
+    height: 40px;
+    padding: 0 14px;
+    border-radius: 10px;
+    background: #FFFFFF;
+    color: var(--text-main, #1E293B);
+    font-weight: 500;
+    font-size: 0.84rem;
+    border: 1px solid var(--border-color, #CBD5E1);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    transition: all 0.18s ease;
+}
+
+.publish-btn-copy-link:hover {
+    background: var(--bg-subtle, #F8FAFC);
+    border-color: #007AFF;
+    color: #007AFF;
+}

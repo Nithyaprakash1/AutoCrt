@@ -380,7 +380,11 @@ class UploadedPapersPageManager {
                                         <div class="batch-actions-row">
                                             <button type="button" class="btn-batch-view" data-batch-key="${b.key}" title="View papers in this batch">
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                                <span>View Papers (${b.total})</span>
+                                                <span>View (${b.total})</span>
+                                            </button>
+                                            <button type="button" class="btn-batch-share" data-batch-key="${b.key}" data-subject="${b.subject}" data-class="${b.className}" data-template="${b.templateName}" data-total="${b.total}" title="Share this subject batch via WhatsApp">
+                                                ${(window.Icons && window.Icons.whatsapp) || ''}
+                                                <span>Share</span>
                                             </button>
                                             ${isCompleted ? `
                                                 <button type="button" class="btn-batch-cleanup-scans" data-batch-key="${b.key}" title="Optimize storage by clearing heavy raw PDF scans while preserving marks">
@@ -413,6 +417,10 @@ class UploadedPapersPageManager {
                                 </div>
                             </div>
                             <div class="active-batch-right" style="display: flex; gap: 8px; align-items: center;">
+                                <button type="button" class="btn-papers-secondary btn-batch-share-active" data-batch-key="${activeBatchObj.key}" data-subject="${activeBatchObj.subject}" data-class="${activeBatchObj.className}" data-template="${activeBatchObj.templateName}" data-total="${activeBatchObj.total}" title="Share this batch via WhatsApp">
+                                    ${(window.Icons && window.Icons.whatsapp) || ''}
+                                    <span>Share WhatsApp</span>
+                                </button>
                                 ${this.selectedIds.size > 0 ? `
                                     <button type="button" class="btn-papers-secondary btn-papers-bulk-delete" id="btn-papers-bulk-delete" title="Delete selected papers" style="color: #DC2626; border-color: #DC2626;">
                                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -523,6 +531,10 @@ class UploadedPapersPageManager {
                                                         <button type="button" class="btn-paper-action btn-action-eval" data-paper-id="${p.id}" title="${isPurged ? 'View Student Scorecard' : 'Open evaluation workspace'}">
                                                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                                             <span>${isPurged ? 'Scorecard' : 'Evaluate'}</span>
+                                                        </button>
+                                                        <button type="button" class="btn-paper-action btn-action-share" data-paper-id="${p.id}" data-name="${p.studentName || ''}" data-roll="${p.rollNo || ''}" data-subject="${p.subject || ''}" data-class="${p.className || p.class || ''}" title="Share direct link to this paper via WhatsApp">
+                                                            ${(window.Icons && window.Icons.whatsapp) || ''}
+                                                            <span>Share</span>
                                                         </button>
                                                         <button type="button" class="btn-paper-action btn-action-delete" data-paper-id="${p.id}" title="Delete paper" aria-label="Delete paper">
                                                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
@@ -792,6 +804,47 @@ class UploadedPapersPageManager {
                 const tr = cb.closest("tr");
                 if (tr) {
                     tr.style.backgroundColor = e.target.checked ? "rgba(220, 38, 38, 0.04)" : "";
+                }
+            });
+        });
+
+        // Action: Share Batch via WhatsApp
+        this.container.querySelectorAll(".btn-batch-share, .btn-batch-share-active").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const key = btn.getAttribute("data-batch-key");
+                const subject = btn.getAttribute("data-subject");
+                const className = btn.getAttribute("data-class");
+                const templateName = btn.getAttribute("data-template");
+                const paperCount = btn.getAttribute("data-total");
+                if (window.ShareManager) {
+                    window.ShareManager.shareSubject({
+                        subject,
+                        className,
+                        templateName,
+                        paperCount,
+                        batchKey: key
+                    });
+                }
+            });
+        });
+
+        // Action: Share Single Paper via WhatsApp
+        this.container.querySelectorAll(".btn-action-share").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const paperId = btn.getAttribute("data-paper-id");
+                const studentName = btn.getAttribute("data-name");
+                const rollNo = btn.getAttribute("data-roll");
+                const subject = btn.getAttribute("data-subject");
+                const className = btn.getAttribute("data-class");
+                if (window.ShareManager) {
+                    window.ShareManager.sharePaper({
+                        paperId,
+                        studentName,
+                        rollNo,
+                        subject,
+                        className
+                    });
                 }
             });
         });
