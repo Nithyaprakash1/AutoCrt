@@ -505,9 +505,56 @@ class UploadPortalManager {
                 id: "bio",
                 name: "Biology",
                 code: "BIO-101",
-                badge: "Official Blueprint",
-                description: "Grade 10 Science Biology Assessment (MCQ 15 + Subjective 15 / 30 Marks)",
+                badge: "4 Templates",
+                description: "Grade 12 & 10 Biology Assessments (Revision 1 Subjective 13 Qs, Board 33 Qs, Grade 10)",
                 templates: [
+                    window.MockData && window.MockData.biologyRevision1SubjectiveTemplate ? window.MockData.biologyRevision1SubjectiveTemplate : {
+                        id: "bio-rev1-sub-13",
+                        name: "Grade 12 Biology Revision 1 Subjective (13 Qs / 35 Marks)",
+                        examName: "Grade 12 Biology Revision 1 Subjective Assessment 2026",
+                        subject: "Biology",
+                        maxMarks: 35,
+                        duration: "2 Hours",
+                        badge: "Revision 1 Blueprint (13 Qs)",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Short Answer I (6 × 2 = 12 Marks)", qStartNo: 1, qEndNo: 6, qCount: 6, marksPerQ: 2, maxMarks: 12, secTotal: 12 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Short Answer II (6 × 3 = 18 Marks)", qStartNo: 7, qEndNo: 12, qCount: 6, marksPerQ: 3, maxMarks: 18, secTotal: 18 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Case-Based / Long Answer (1 × 5 = 5 Marks)", qStartNo: 13, qEndNo: 13, qCount: 1, marksPerQ: 5, maxMarks: 5, secTotal: 5, hasChoice: true }
+                        ],
+                        questions: []
+                    },
+                    window.MockData && window.MockData.biologyRevision1Subjective40Template ? window.MockData.biologyRevision1Subjective40Template : {
+                        id: "bio-rev1-sub-40",
+                        name: "Grade 12 Biology Revision 1 Subjective (13 Qs / 40 Marks)",
+                        examName: "Grade 12 Biology Revision 1 Subjective Assessment 2026 (40M)",
+                        subject: "Biology",
+                        maxMarks: 40,
+                        duration: "2 Hours",
+                        badge: "Revision 1 Blueprint (40M)",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Short Answer I (5 × 2 = 10 Marks)", qStartNo: 1, qEndNo: 5, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Short Answer II (6 × 3 = 18 Marks)", qStartNo: 6, qEndNo: 11, qCount: 6, marksPerQ: 3, maxMarks: 18, secTotal: 18 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Long Answer (2 × 6 = 12 Marks)", qStartNo: 12, qEndNo: 13, qCount: 2, marksPerQ: 6, maxMarks: 12, secTotal: 12, hasChoice: true }
+                        ],
+                        questions: []
+                    },
+                    window.MockData && window.MockData.biologyClass12BoardTemplate ? window.MockData.biologyClass12BoardTemplate : {
+                        id: "bio-cbse-12",
+                        name: "CBSE Class 12 Biology Board Examination (33 Qs / 70 Marks)",
+                        examName: "CBSE Class 12 Biology Board Examination 2026",
+                        subject: "Biology",
+                        maxMarks: 70,
+                        duration: "3 Hours",
+                        badge: "Board Exam (33 Qs / 70 Marks)",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Multiple Choice Questions (Q1 to Q16)", qStartNo: 1, qEndNo: 16, qCount: 16, marksPerQ: 1, maxMarks: 16, secTotal: 16 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Very Short Answer Questions (Q17 to Q21)", qStartNo: 17, qEndNo: 21, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Short Answer Questions (Q22 to Q28)", qStartNo: 22, qEndNo: 28, qCount: 7, marksPerQ: 3, maxMarks: 21, secTotal: 21 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Case-Based Questions with Subparts (Q29 & Q30)", qStartNo: 29, qEndNo: 30, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8, hasSubQuestions: true },
+                            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Long Answer Questions with Choice (Q31 to Q33)", qStartNo: 31, qEndNo: 33, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15, hasChoice: true }
+                        ],
+                        questions: []
+                    },
                     window.MockData && window.MockData.scienceGrade10BiologyTemplate ? window.MockData.scienceGrade10BiologyTemplate : {
                         id: "bio-x-30",
                         name: "Grade 10 Biology (30 Marks)",
@@ -530,9 +577,41 @@ class UploadPortalManager {
                 id: "chem",
                 name: "Chemistry",
                 code: "CHE-101",
-                badge: "Official Blueprint",
-                description: "Grade 10 Science Chemistry Assessment (MCQ 13 + Subjective 13 / 26 Marks)",
+                badge: "3 Templates",
+                description: "Grade 12 & 10 Chemistry Assessments (Revision 1 Subjective 13 Qs, Board 33 Qs, Grade 10)",
                 templates: [
+                    window.MockData && window.MockData.chemistryRevision1SubjectiveTemplate ? window.MockData.chemistryRevision1SubjectiveTemplate : {
+                        id: "che-rev1-sub-13",
+                        name: "Grade 12 Chemistry Revision 1 Subjective (13 Qs / 35 Marks)",
+                        examName: "Grade 12 Chemistry Revision 1 Subjective Assessment 2026",
+                        subject: "Chemistry",
+                        maxMarks: 35,
+                        duration: "2 Hours",
+                        badge: "Revision 1 Blueprint (13 Qs)",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Short Answer I (6 × 2 = 12 Marks)", qStartNo: 1, qEndNo: 6, qCount: 6, marksPerQ: 2, maxMarks: 12, secTotal: 12 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Short Answer II (6 × 3 = 18 Marks)", qStartNo: 7, qEndNo: 12, qCount: 6, marksPerQ: 3, maxMarks: 18, secTotal: 18 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Case-Based / Long Answer (1 × 5 = 5 Marks)", qStartNo: 13, qEndNo: 13, qCount: 1, marksPerQ: 5, maxMarks: 5, secTotal: 5, hasChoice: true }
+                        ],
+                        questions: []
+                    },
+                    window.MockData && window.MockData.chemistryClass12BoardTemplate ? window.MockData.chemistryClass12BoardTemplate : {
+                        id: "che-cbse-70",
+                        name: "CBSE Class 12 Chemistry Board Examination (33 Qs / 70 Marks)",
+                        examName: "CBSE Class 12 Chemistry Board Examination 2026",
+                        subject: "Chemistry",
+                        maxMarks: 70,
+                        duration: "3 Hours",
+                        badge: "Board Exam (33 Qs / 70 Marks)",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Multiple Choice Questions (Q1 to Q16)", qStartNo: 1, qEndNo: 16, qCount: 16, marksPerQ: 1, maxMarks: 16, secTotal: 16 },
+                            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Very Short Answer Questions (Q17 to Q21)", qStartNo: 17, qEndNo: 21, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+                            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Short Answer Questions (Q22 to Q28)", qStartNo: 22, qEndNo: 28, qCount: 7, marksPerQ: 3, maxMarks: 21, secTotal: 21 },
+                            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Case Study-Based Questions (Q29 & Q30)", qStartNo: 29, qEndNo: 30, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8 },
+                            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Long Answer Questions (Q31 to Q33)", qStartNo: 31, qEndNo: 33, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15 }
+                        ],
+                        questions: []
+                    },
                     window.MockData && window.MockData.scienceGrade10ChemistryTemplate ? window.MockData.scienceGrade10ChemistryTemplate : {
                         id: "che-x-26",
                         name: "Grade 10 Chemistry (26 Marks)",
@@ -744,6 +823,15 @@ class UploadPortalManager {
                                     existingSub.templates[tplIndex].badge = "Revision 1 Blueprint";
                                     existingSub.templates[tplIndex].sections = JSON.parse(JSON.stringify(defTpl.sections));
                                     existingSub.templates[tplIndex].questions = JSON.parse(JSON.stringify(defTpl.questions));
+                                } else if (defTpl.id === "bio-rev1-sub-13" || defTpl.id === "che-rev1-sub-13") {
+                                    // Ensure Biology & Chemistry Revision 1 Subjective have official 13 Qs
+                                    existingSub.templates[tplIndex].id = defTpl.id;
+                                    existingSub.templates[tplIndex].name = defTpl.name;
+                                    existingSub.templates[tplIndex].maxMarks = defTpl.maxMarks || 35;
+                                    existingSub.templates[tplIndex].sections = JSON.parse(JSON.stringify(defTpl.sections));
+                                    if (defTpl.questions && defTpl.questions.length > 0) {
+                                        existingSub.templates[tplIndex].questions = JSON.parse(JSON.stringify(defTpl.questions));
+                                    }
                                 } else {
                                     // Keep blueprint sections and questions updated if existing is empty
                                     if ((!existingSub.templates[tplIndex].questions || existingSub.templates[tplIndex].questions.length === 0) && defTpl.questions && defTpl.questions.length > 0) {

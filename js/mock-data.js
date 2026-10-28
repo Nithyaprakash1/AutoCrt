@@ -2071,6 +2071,559 @@ const MockData = {
         })()
     },
 
+    // Grade 12 Biology Revision 1 Subjective Blueprint (13 Qs / 35 Marks: Sec A 6x2=12M, Sec B 6x3=18M, Sec C 1x5=5M)
+    biologyRevision1SubjectiveTemplate: {
+        id: "bio-rev1-sub-13",
+        name: "Grade 12 Biology Revision 1 Subjective (13 Qs / 35 Marks)",
+        examName: "Grade 12 Biology Revision 1 Subjective Assessment 2026",
+        subject: "Biology",
+        maxMarks: 35,
+        duration: "2 Hours",
+        badge: "Revision 1 Blueprint (13 Qs)",
+        generalInstructions: [
+            "This question paper contains 13 questions divided into three sections: Section A, Section B and Section C carrying 35 Marks total.",
+            "Section A: Questions 1 to 6 are Short Answer type I questions of 2 marks each (12 Marks).",
+            "Section B: Questions 7 to 12 are Short Answer type II questions of 3 marks each (18 Marks).",
+            "Section C: Question 13 is a Case-based / Long Answer question of 5 marks with internal choice (5 Marks)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A - Short Answer I (6 × 2 = 12 Marks)",
+                qStartNo: 1,
+                qEndNo: 6,
+                qCount: 6,
+                marksPerQ: 2,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B - Short Answer II (6 × 3 = 18 Marks)",
+                qStartNo: 7,
+                qEndNo: 12,
+                qCount: 6,
+                marksPerQ: 3,
+                maxMarks: 18,
+                secTotal: 18,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C - Case-Based / Long Answer (1 × 5 = 5 Marks)",
+                qStartNo: 13,
+                qEndNo: 13,
+                qCount: 1,
+                marksPerQ: 5,
+                maxMarks: 5,
+                secTotal: 5,
+                hasChoice: true,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            const topicsA = [
+                "Microsporogenesis & Tapetum Function in Pollen Development",
+                "Spermatogenesis vs Oogenesis & Hormonal Feedback (LH / FSH)",
+                "Contraceptive Barrier Devices & Medical Termination of Pregnancy (MTP)",
+                "Incomplete Dominance & Multiple Allelism in ABO Blood Groups",
+                "Central Dogma & Properties of the Genetic Code",
+                "Adaptive Radiation & Darwin's Finches in Galapagos"
+            ];
+            for (let i = 1; i <= 6; i++) {
+                qs.push({
+                    id: `bio_rev1_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 2,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: topicsA[i - 1] || `Short Answer Question ${i}`
+                });
+            }
+            const topicsB = [
+                "Innate vs Acquired Immunity & Structure of Antibody Molecule",
+                "Biological Oxygen Demand (BOD) & Microbes in Sewage Treatment",
+                "Recombinant DNA Technology Tools (Restriction Enzymes & Plasmids)",
+                "Transgenic Bt Cotton & RNA Interference (RNAi) Mechanism",
+                "Population Interactions: Mutualism, Commensalism & Parasitism",
+                "Trophic Levels & Ecological Pyramids of Energy & Biomass"
+            ];
+            for (let i = 1; i <= 6; i++) {
+                const qNum = 6 + i;
+                qs.push({
+                    id: `bio_rev1_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 3,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: topicsB[i - 1] || `Short Answer Question ${qNum}`
+                });
+            }
+            qs.push({
+                id: "bio_rev1_q13",
+                qNo: 13,
+                qNumber: "Q13",
+                label: "Q13",
+                maxMarks: 5,
+                section: "Section C",
+                sectionId: "sec_c",
+                topic: "Case-based / Long Answer in Molecular Genetics & Gene Regulation",
+                isChoice: true,
+                choices: [
+                    "Option 1: Lac Operon model in E. coli in presence and absence of inducer",
+                    "Option 2: Human Genome Project salient features and DNA Fingerprinting methodology"
+                ],
+                selectedChoice: "Option 1: Lac Operon model in E. coli in presence and absence of inducer"
+            });
+            return qs;
+        })()
+    },
+
+    // Grade 12 Biology Revision 1 Subjective (40 Marks Variant: 13 Qs - Sec A 5x2=10M, Sec B 6x3=18M, Sec C 2x6=12M)
+    biologyRevision1Subjective40Template: {
+        id: "bio-rev1-sub-40",
+        name: "Grade 12 Biology Revision 1 Subjective (13 Qs / 40 Marks)",
+        examName: "Grade 12 Biology Revision 1 Subjective Assessment 2026 (40M)",
+        subject: "Biology",
+        maxMarks: 40,
+        duration: "2 Hours",
+        badge: "Revision 1 Blueprint (40M)",
+        generalInstructions: [
+            "This question paper contains 13 questions divided into three sections: Section A, Section B and Section C carrying 40 Marks total.",
+            "Section A: Questions 1 to 5 are Short Answer type I questions of 2 marks each (10 Marks).",
+            "Section B: Questions 6 to 11 are Short Answer type II questions of 3 marks each (18 Marks).",
+            "Section C: Questions 12 and 13 are Long Answer / Case-based questions of 6 marks each (12 Marks)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A - Short Answer I (5 × 2 = 10 Marks)",
+                qStartNo: 1,
+                qEndNo: 5,
+                qCount: 5,
+                marksPerQ: 2,
+                maxMarks: 10,
+                secTotal: 10,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B - Short Answer II (6 × 3 = 18 Marks)",
+                qStartNo: 6,
+                qEndNo: 11,
+                qCount: 6,
+                marksPerQ: 3,
+                maxMarks: 18,
+                secTotal: 18,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C - Long Answer (2 × 6 = 12 Marks)",
+                qStartNo: 12,
+                qEndNo: 13,
+                qCount: 2,
+                marksPerQ: 6,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: true,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 5; i++) {
+                qs.push({
+                    id: `bio_rev1_40_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 2,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `Short Answer Question ${i} (2 Marks)`
+                });
+            }
+            for (let i = 1; i <= 6; i++) {
+                const qNum = 5 + i;
+                qs.push({
+                    id: `bio_rev1_40_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 3,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Short Answer Question ${qNum} (3 Marks)`
+                });
+            }
+            for (let i = 1; i <= 2; i++) {
+                const qNum = 11 + i;
+                qs.push({
+                    id: `bio_rev1_40_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 6,
+                    section: "Section C",
+                    sectionId: "sec_c",
+                    topic: `Long Answer Question ${qNum} (6 Marks)`
+                });
+            }
+            return qs;
+        })()
+    },
+
+    // CBSE Class 12 Biology Board Blueprint (33 Qs / 70 Marks)
+    biologyClass12BoardTemplate: {
+        id: "bio-cbse-12",
+        name: "CBSE Class 12 Biology Board Examination (33 Qs / 70 Marks)",
+        examName: "CBSE Class 12 Biology Board Examination 2026",
+        subject: "Biology",
+        maxMarks: 70,
+        duration: "3 Hours",
+        badge: "Board Exam (33 Qs / 70 Marks)",
+        sections: [
+            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Multiple Choice Questions (Q1 to Q16)", qStartNo: 1, qEndNo: 16, qCount: 16, marksPerQ: 1, maxMarks: 16, secTotal: 16 },
+            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Very Short Answer Questions (Q17 to Q21)", qStartNo: 17, qEndNo: 21, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Short Answer Questions (Q22 to Q28)", qStartNo: 22, qEndNo: 28, qCount: 7, marksPerQ: 3, maxMarks: 21, secTotal: 21 },
+            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Case-Based Questions with Subparts (Q29 & Q30)", qStartNo: 29, qEndNo: 30, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8, hasSubQuestions: true },
+            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Long Answer Questions with Choice (Q31 to Q33)", qStartNo: 31, qEndNo: 33, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15, hasChoice: true }
+        ],
+        questions: (function() {
+            const qs = [];
+            // Section A: Q1 - Q16 (16 MCQs, 1M each)
+            for (let i = 1; i <= 16; i++) {
+                qs.push({
+                    id: `bio_cbse_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `Biology MCQ ${i}`
+                });
+            }
+            // Section B: Q17 - Q21 (5 VSA, 2M each)
+            for (let i = 1; i <= 5; i++) {
+                const qNum = 16 + i;
+                qs.push({
+                    id: `bio_cbse_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 2,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Biology VSA ${qNum}`
+                });
+            }
+            // Section C: Q22 - Q28 (7 SA, 3M each)
+            for (let i = 1; i <= 7; i++) {
+                const qNum = 21 + i;
+                qs.push({
+                    id: `bio_cbse_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 3,
+                    section: "Section C",
+                    sectionId: "sec_c",
+                    topic: `Biology SA ${qNum}`
+                });
+            }
+            // Section D: Q29 & Q30 (2 Case Studies, 4M each)
+            qs.push({
+                id: "bio_cbse_q29",
+                qNo: 29,
+                qNumber: "Q29",
+                label: "Q29",
+                maxMarks: 4,
+                section: "Section D",
+                sectionId: "sec_d",
+                topic: "Case Study on Genetically Modified Crops & Cry Proteins",
+                hasSubQuestions: true,
+                subQuestions: [
+                    { subId: "a", label: "29(a)", maxMarks: 1, awardedMarks: 0 },
+                    { subId: "b", label: "29(b)", maxMarks: 1, awardedMarks: 0 },
+                    { subId: "c", label: "29(c)", maxMarks: 2, awardedMarks: 0 }
+                ]
+            });
+            qs.push({
+                id: "bio_cbse_q30",
+                qNo: 30,
+                qNumber: "Q30",
+                label: "Q30",
+                maxMarks: 4,
+                section: "Section D",
+                sectionId: "sec_d",
+                topic: "Case Study on Human Spermatogenesis and Hormonal Feedback Loops",
+                hasSubQuestions: true,
+                subQuestions: [
+                    { subId: "a", label: "30(a)", maxMarks: 1, awardedMarks: 0 },
+                    { subId: "b", label: "30(b)", maxMarks: 1, awardedMarks: 0 },
+                    { subId: "c", label: "30(c)", maxMarks: 2, awardedMarks: 0 }
+                ]
+            });
+            // Section E: Q31 - Q33 (3 Long Answer, 5M each)
+            for (let i = 1; i <= 3; i++) {
+                const qNum = 30 + i;
+                qs.push({
+                    id: `bio_cbse_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 5,
+                    section: "Section E",
+                    sectionId: "sec_e",
+                    topic: `Biology Long Answer ${qNum}`,
+                    isChoice: true
+                });
+            }
+            return qs;
+        })()
+    },
+
+    // Grade 12 Chemistry Revision 1 Subjective Blueprint (13 Qs / 35 Marks: Sec A 6x2=12M, Sec B 6x3=18M, Sec C 1x5=5M)
+    chemistryRevision1SubjectiveTemplate: {
+        id: "che-rev1-sub-13",
+        name: "Grade 12 Chemistry Revision 1 Subjective (13 Qs / 35 Marks)",
+        examName: "Grade 12 Chemistry Revision 1 Subjective Assessment 2026",
+        subject: "Chemistry",
+        maxMarks: 35,
+        duration: "2 Hours",
+        badge: "Revision 1 Blueprint (13 Qs)",
+        generalInstructions: [
+            "This question paper contains 13 questions divided into three sections: Section A, Section B and Section C carrying 35 Marks total.",
+            "Section A: Questions 1 to 6 are Short Answer type I questions of 2 marks each (12 Marks).",
+            "Section B: Questions 7 to 12 are Short Answer type II questions of 3 marks each (18 Marks).",
+            "Section C: Question 13 is a Case-based / Long Answer question of 5 marks with internal choice (5 Marks)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Section A - Short Answer I (6 × 2 = 12 Marks)",
+                qStartNo: 1,
+                qEndNo: 6,
+                qCount: 6,
+                marksPerQ: 2,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Section B - Short Answer II (6 × 3 = 18 Marks)",
+                qStartNo: 7,
+                qEndNo: 12,
+                qCount: 6,
+                marksPerQ: 3,
+                maxMarks: 18,
+                secTotal: 18,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_c",
+                letter: "C",
+                name: "Section C",
+                title: "Section C - Case-Based / Long Answer (1 × 5 = 5 Marks)",
+                qStartNo: 13,
+                qEndNo: 13,
+                qCount: 1,
+                marksPerQ: 5,
+                maxMarks: 5,
+                secTotal: 5,
+                hasChoice: true,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            const topicsA = [
+                "Solutions: Raoult's Law & Colligative Properties (Vapour Pressure Depression)",
+                "Electrochemistry: Nernst Equation & Kohlrausch's Law of Independent Migration",
+                "Chemical Kinetics: Pseudo First-Order Reaction & Rate Constant Calculations",
+                "d- and f-Block Elements: Transition Metal Oxidation States & Coloured Ions",
+                "Coordination Compounds: Werner's Theory & Crystal Field Splitting in Octahedral Fields",
+                "Haloalkanes & Haloarenes: SN1 vs SN2 Nucleophilic Substitution Mechanism"
+            ];
+            for (let i = 1; i <= 6; i++) {
+                qs.push({
+                    id: `che_rev1_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 2,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: topicsA[i - 1] || `Short Answer Question ${i}`
+                });
+            }
+            const topicsB = [
+                "Alcohols, Phenols and Ethers: Reimer-Tiemann Reaction & Kolbe's Synthesis",
+                "Aldehydes, Ketones & Carboxylic Acids: Aldol Condensation & Cannizzaro Reaction",
+                "Amines: Gabriel Phthalimide Synthesis & Diazotization Reactions",
+                "Biomolecules: Peptide Bond, Primary & Secondary Structure of Proteins",
+                "Electrochemistry: Faraday's Laws & Fuel Cell Anode/Cathode Reactions",
+                "Chemical Kinetics: Arrhenius Equation & Activation Energy Determination"
+            ];
+            for (let i = 1; i <= 6; i++) {
+                const qNum = 6 + i;
+                qs.push({
+                    id: `che_rev1_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 3,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: topicsB[i - 1] || `Short Answer Question ${qNum}`
+                });
+            }
+            qs.push({
+                id: "che_rev1_q13",
+                qNo: 13,
+                qNumber: "Q13",
+                label: "Q13",
+                maxMarks: 5,
+                section: "Section C",
+                sectionId: "sec_c",
+                topic: "Long Answer in Organic Synthesis, Reaction Mechanisms & Conversions",
+                isChoice: true,
+                choices: [
+                    "Option 1: Carbonyl compounds multi-step organic conversions and distinguishing chemical tests",
+                    "Option 2: Coordination complexes isomerism, VBT hybridization and magnetic moment calculations"
+                ],
+                selectedChoice: "Option 1: Carbonyl compounds multi-step organic conversions and distinguishing chemical tests"
+            });
+            return qs;
+        })()
+    },
+
+    // CBSE Class 12 Chemistry Board Blueprint (33 Qs / 70 Marks)
+    chemistryClass12BoardTemplate: {
+        id: "che-cbse-70",
+        name: "CBSE Class 12 Chemistry Board Examination (33 Qs / 70 Marks)",
+        examName: "CBSE Class 12 Chemistry Board Examination 2026",
+        subject: "Chemistry",
+        maxMarks: 70,
+        duration: "3 Hours",
+        badge: "Board Exam (33 Qs / 70 Marks)",
+        sections: [
+            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Multiple Choice Questions (Q1 to Q16)", qStartNo: 1, qEndNo: 16, qCount: 16, marksPerQ: 1, maxMarks: 16, secTotal: 16 },
+            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Very Short Answer Questions (Q17 to Q21)", qStartNo: 17, qEndNo: 21, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Short Answer Questions (Q22 to Q28)", qStartNo: 22, qEndNo: 28, qCount: 7, marksPerQ: 3, maxMarks: 21, secTotal: 21 },
+            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Case Study-Based Questions (Q29 & Q30)", qStartNo: 29, qEndNo: 30, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8 },
+            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Long Answer Questions (Q31 to Q33)", qStartNo: 31, qEndNo: 33, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15 }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 16; i++) {
+                qs.push({
+                    id: `che_cbse_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `Chemistry MCQ ${i}`
+                });
+            }
+            for (let i = 1; i <= 5; i++) {
+                const qNum = 16 + i;
+                qs.push({
+                    id: `che_cbse_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 2,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Chemistry VSA ${qNum}`
+                });
+            }
+            for (let i = 1; i <= 7; i++) {
+                const qNum = 21 + i;
+                qs.push({
+                    id: `che_cbse_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 3,
+                    section: "Section C",
+                    sectionId: "sec_c",
+                    topic: `Chemistry SA ${qNum}`
+                });
+            }
+            for (let i = 1; i <= 2; i++) {
+                const qNum = 28 + i;
+                qs.push({
+                    id: `che_cbse_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 4,
+                    section: "Section D",
+                    sectionId: "sec_d",
+                    topic: `Chemistry Case Study ${i}`
+                });
+            }
+            for (let i = 1; i <= 3; i++) {
+                const qNum = 30 + i;
+                qs.push({
+                    id: `che_cbse_q${qNum}`,
+                    qNo: qNum,
+                    qNumber: `Q${qNum}`,
+                    label: `Q${qNum}`,
+                    maxMarks: 5,
+                    section: "Section E",
+                    sectionId: "sec_e",
+                    topic: `Chemistry Long Answer ${i}`
+                });
+            }
+            return qs;
+        })()
+    },
+
     // Grade 10 Science Chemistry Blueprint (MCQ Test 1: 13x1=13 + Subjective Test 1: 1x2=2 [choice], 2x3=6, 1x5=5 [choice] = 26 Marks Total)
     scienceGrade10ChemistryTemplate: {
         id: "che-x-26",

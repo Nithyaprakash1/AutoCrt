@@ -3477,3 +3477,82 @@ p, span, div, strong, b, th, td, label, a,
     color: #2563EB;
 }
 
+
+/* ==========================================================================
+   Interactive Blueprint / Template Switcher Dropdown in Workspace Top Bar
+   ========================================================================== */
+.ws-template-selector-wrap {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(15, 23, 42, 0.7);
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 8px;
+    padding: 3px 8px;
+    margin-left: 6px;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.ws-template-selector-wrap:hover {
+    background: rgba(30, 41, 59, 0.9);
+    border-color: rgba(56, 189, 248, 0.5);
+    box-shadow: 0 2px 6px rgba(56, 189, 248, 0.15);
+}
+
+.ws-tpl-select-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    color: #38bdf8;
+    flex-shrink: 0;
+}
+
+.ws-tpl-select-label {
+    font-size: 0.7rem;
+    color: #94a3b8;
+    font-weight: 500;
+    margin: 0;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.ws-template-dropdown {
+    background: transparent;
+    color: #f8fafc;
+    font-size: 0.75rem;
+    font-weight: 600;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    max-width: 210px;
+    text-overflow: ellipsis;
+    padding: 2px 4px;
+    border-radius: 4px;
+    transition: background-color 0.15s ease;
+}
+
+.ws-template-dropdown:focus {
+    background: rgba(51, 65, 85, 0.7);
+    color: #ffffff;
+}
+
+.ws-template-dropdown option,
+.ws-template-dropdown optgroup {
+    background: #0f172a;
+    color: #f8fafc;
+    font-size: 0.8rem;
+    padding: 4px 6px;
+}
+
+.ws-template-dropdown optgroup {
+    font-weight: 700;
+    color: #38bdf8;
+    background: #020617;
+}
+
+@media (max-width: 900px) {
+    .ws-template-selector-wrap {
+        display: none !important;
+    }
+}
