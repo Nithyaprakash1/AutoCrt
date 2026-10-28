@@ -391,7 +391,7 @@ class DashboardManager {
         const batchMap = new Map();
         evalsForBatches.forEach(e => {
             const cls = e.classLabel || e.className || e.class || "Class 12-A";
-            const sub = activePanelSubject || e.subject || displaySubject;
+            const sub = e.subject || activePanelSubject || displaySubject;
             const rawTpl = e.templateName || e.examName || "Mid-Term Exam";
             const tpl = window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, sub) : rawTpl;
             const batchKey = `${cls}:::${tpl}`;

@@ -641,20 +641,20 @@ class StorageService {
     canonicalizeSubject(sub) {
         if (!sub) return '';
         const s = String(sub).toLowerCase().trim();
+        if (s.includes('entrepreneur')) return 'entrepreneurship';
+        if (s.includes('business') || s.includes('bst')) return 'business_studies';
+        if (s.includes('account')) return 'accountancy';
         if (s.includes('social') || s.includes('sst') || s.includes('soc sci') || s.includes('soc-x') || s.includes('soc-')) return 'social_science';
         if (s.includes('politic') || s.includes('civic') || s.includes('pol sci') || s.includes('pol. sci') || s.includes('pol science') || s.includes('polity') || s === 'pol' || s.startsWith('pol ') || s.endsWith(' pol') || s.includes('pol-') || s === 'ps') return 'political_science';
         if (s.includes('computer') || s.includes('info prac') || s.includes('ip') || s === 'cs') return 'computer_science';
         if (s.includes('bio') || s.includes('botany') || s.includes('zoology') || s.includes('life sci') || s.includes('bio-')) return 'biology';
         if (s.includes('chem') || s.includes('che-')) return 'chemistry';
         if (s.includes('physic') || s === 'phy' || s.startsWith('phy ') || s.includes('phy-')) return 'physics';
-        if (s.includes('math') || s.includes('10th revision') || s.includes('10 revision') || s.includes('revision 2') || s.includes('revision - 2') || s.includes('revision-2') || s.includes('mat-x') || s.includes('mat-xii') || s.includes('mat x') || s.includes('mat xii') || s.includes('10th math') || s.includes('10 math')) return 'mathematics';
+        if (s.includes('math') || s.includes('mat-x') || s.includes('mat-xii') || s.includes('mat x') || s.includes('mat xii') || s.includes('10th math') || s.includes('10 math')) return 'mathematics';
         if (s.includes('english') || s.includes('eng') || s.includes('eng-')) return 'english';
         if (s.includes('econom')) return 'economics';
         if (s.includes('histor')) return 'history';
         if (s.includes('geograph')) return 'geography';
-        if (s.includes('business') || s.includes('bst')) return 'business_studies';
-        if (s.includes('account')) return 'accountancy';
-        if (s.includes('entrepreneur')) return 'entrepreneurship';
         if (s.includes('tamil') || s === 'tam' || s.startsWith('tam ') || s.includes('tam-')) return 'tamil';
         if (s.includes('hindi') || s === 'hin' || s.startsWith('hin ') || s.includes('hin-')) return 'hindi';
         if (s.includes('french')) return 'french';
@@ -681,20 +681,26 @@ class StorageService {
         const cTarget = this.canonicalizeSubject(tSub);
         if (!cTarget) return false;
 
-        // 1. Direct canonical match from paperSubject
+        // 1. Direct canonical match from paperSubject: If paper has a distinct recognized subject, it MUST match cTarget
         const pSub = (paperSubject || '').toLowerCase().trim();
         const cPaper = this.canonicalizeSubject(pSub);
-        if (cPaper && cPaper === cTarget) return true;
+        if (cPaper) {
+            return cPaper === cTarget;
+        }
 
         // 2. Canonical match from examName
         const pExam = (paperExamName || '').toLowerCase().trim();
         const cExam = this.canonicalizeSubject(pExam);
-        if (cExam && cExam === cTarget) return true;
+        if (cExam) {
+            return cExam === cTarget;
+        }
 
         // 3. Canonical match from templateName
         const pTpl = (paperTemplateName || '').toLowerCase().trim();
         const cTpl = this.canonicalizeSubject(pTpl);
-        if (cTpl && cTpl === cTarget) return true;
+        if (cTpl) {
+            return cTpl === cTarget;
+        }
 
         // 4. Combined text scan fallback
         const combined = `${pSub} ${pExam} ${pTpl}`.toLowerCase();
@@ -714,7 +720,7 @@ class StorageService {
             return combined.includes('physic') || combined.includes('phy-') || combined.startsWith('phy ') || combined.endsWith(' phy');
         }
         if (cTarget === 'mathematics') {
-            return combined.includes('math') || combined.includes('10th revision') || combined.includes('10 revision') || combined.includes('revision 2') || combined.includes('revision - 2') || combined.includes('revision-2') || combined.includes('mat-x') || combined.includes('mat-xii') || combined.includes('mat x') || combined.includes('mat xii') || combined.includes('10th math') || combined.includes('10 math');
+            return combined.includes('math') || combined.includes('mat-x') || combined.includes('mat-xii') || combined.includes('mat x') || combined.includes('mat xii') || combined.includes('10th math') || combined.includes('10 math');
         }
         if (cTarget === 'tamil') {
             return combined.includes('tamil') || combined.includes('tam-') || combined.startsWith('tam ') || combined.endsWith(' tam');
@@ -793,20 +799,20 @@ class StorageService {
         const filtered = list.filter(e => {
             if (!e) return false;
 
+            // 1. SUBJECT MATCH: Always strictly enforce Authorized Subjects from User Management
+            if (!allowsAllSubjects) {
+                const subjectMatches = assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+                if (!subjectMatches) return false;
+            }
+
             // Direct teacher assignment takes priority if specifically assigned to this teacher
             if (e.assignedTeacherId && teacherUid && String(e.assignedTeacherId) === String(teacherUid)) {
                 return true;
             }
 
-            // User-uploaded real answer scripts are NEVER stripped or hidden from the evaluation workflow
+            // User-uploaded real answer scripts of authorized subjects are not blocked by class mismatch
             if (e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)))) {
                 return true;
-            }
-
-            // 1. SUBJECT MATCH
-            if (!allowsAllSubjects) {
-                const subjectMatches = assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName, s, e.templateName));
-                if (!subjectMatches) return false;
             }
 
             // 2. CLASS MATCH (if teacher has specific class restrictions)
