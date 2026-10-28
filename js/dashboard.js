@@ -1717,21 +1717,44 @@ class DashboardManager {
 
     triggerExcelExport() {
         let targets = [];
-        if (this.selectedIds.size > 0) {
+        if (this.selectedIds && this.selectedIds.size > 0) {
             targets = this.evaluations.filter(e => this.selectedIds.has(String(e.id)));
-        } else {
-            targets = this.filteredEvaluations;
+        } else if (this.filteredEvaluations && this.filteredEvaluations.length > 0) {
+            targets = [...this.filteredEvaluations];
+        } else if (this.activeBatchKey) {
+            const parts = this.activeBatchKey.split(":::");
+            const targetCls = (parts[0] || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            const targetTpl = (parts[1] || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            targets = this.evaluations.filter(e => {
+                const eCls = (e.classLabel || e.className || e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const rawTpl = (e.templateName || e.examName || "").toLowerCase().trim();
+                const harmTpl = (window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, e.subject) : rawTpl).toLowerCase().trim();
+                const normRaw = rawTpl.replace(/[^a-z0-9]/g, '');
+                const normHarm = harmTpl.replace(/[^a-z0-9]/g, '');
+
+                const clsMatch = !targetCls || eCls === targetCls || eCls.includes(targetCls) || targetCls.includes(eCls);
+                const tplMatch = !targetTpl || normRaw === targetTpl || normHarm === targetTpl || normRaw.includes(targetTpl) || targetTpl.includes(normRaw);
+                return clsMatch && tplMatch;
+            });
+        }
+
+        if (targets.length === 0 && this.evaluations && this.evaluations.length > 0) {
+            targets = [...this.evaluations];
         }
 
         if (targets.length === 0) {
             if (window.appInstance && window.appInstance.showToast) {
-                window.appInstance.showToast("No student evaluation records to export.", "error");
+                window.appInstance.showToast("No student evaluation records found to export.", "error");
+            } else if (window.app && window.app.showToast) {
+                window.app.showToast("No student evaluation records found to export.", "error");
             }
             return;
         }
 
-        if (this.options.onExportExcel) {
+        if (this.options && typeof this.options.onExportExcel === "function") {
             this.options.onExportExcel(targets);
+        } else if (window.app && typeof window.app.exportEvaluationsAsExcel === "function") {
+            window.app.exportEvaluationsAsExcel(targets);
         } else if (window.appInstance && typeof window.appInstance.exportEvaluationsAsExcel === "function") {
             window.appInstance.exportEvaluationsAsExcel(targets);
         }

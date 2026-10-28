@@ -1291,20 +1291,38 @@ class AdminPanelManager {
 
     exportExcelMatrix() {
         const papers = this.computeDetailedPapers();
-        let csvContent = "data:text/csv;charset=utf-8,";
-        csvContent += "Roll No,Student Name,Class,Subject,Max Marks,Obtained Marks,Percentage,Grade,Status,Last Corrected,Faculty Evaluator\n";
+        const headers = ["Roll No", "Student Name", "Class", "Subject", "Max Marks", "Obtained Marks", "Percentage", "Grade", "Status", "Last Corrected", "Faculty Evaluator"];
+        const rows = papers.map(p => [
+            p.rollNo || "",
+            p.studentName || "",
+            `${p.className || ""}-${p.section || ""}`,
+            p.subject || "",
+            p.maxMarks || 0,
+            p.obtainedMarks || 0,
+            `${p.percentage || 0}%`,
+            p.grade || "--",
+            p.status || "",
+            p.lastCorrectedFormatted || "",
+            p.teacherName || ""
+        ]);
 
-        papers.forEach(p => {
-            csvContent += `"${p.rollNo}","${p.studentName}","${p.className}-${p.section}","${p.subject}","${p.maxMarks}","${p.obtainedMarks}","${p.percentage}%","${p.grade}","${p.status}","${p.lastCorrectedFormatted}","${p.teacherName}"\n`;
-        });
+        const csvContent = [headers, ...rows]
+            .map(row => row.map(cell => `"${String(cell !== undefined && cell !== null ? cell : '').replace(/"/g, '""')}"`).join(","))
+            .join("\r\n");
 
-        const encodedUri = encodeURI(csvContent);
+        const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.setAttribute("href", encodedUri);
+        link.setAttribute("href", url);
         link.setAttribute("download", `Admin_Master_Evaluation_Audit_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        setTimeout(() => {
+            try {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (e) {}
+        }, 2000);
     }
 }
 

@@ -5313,29 +5313,37 @@ class AppController {
                 }
             }
 
-            let allEvaluations = Array.isArray(evaluationsList) && evaluationsList.length > 0 ? [...evaluationsList] : null;
-            if (!allEvaluations) {
+            let allEvaluations = null;
+            if (Array.isArray(evaluationsList) && evaluationsList.length > 0) {
+                // If caller provided an explicit list (e.g. selected checkboxes or batch papers), respect it directly!
+                allEvaluations = [...evaluationsList];
+                if (!activeSubject && allEvaluations[0]?.subject) {
+                    activeSubject = allEvaluations[0].subject;
+                }
+            } else {
                 allEvaluations = await window.appStorage.getAllEvaluations();
                 if ((!allEvaluations || allEvaluations.length === 0) && this.activeEvaluation) {
                     allEvaluations = [this.activeEvaluation];
                 } else if (this.activeEvaluation && !allEvaluations.some(e => e.id === this.activeEvaluation.id)) {
                     allEvaluations.unshift(this.activeEvaluation);
                 }
-            }
 
-            // CRITICAL: Strictly isolate to that particular subject alone if in a subject panel (e.g. English)
-            if (activeSubject) {
-                const sLow = activeSubject.toLowerCase().trim();
-                allEvaluations = allEvaluations.filter(ev => {
-                    const sub = (ev.subject || "").toLowerCase().trim();
-                    const exam = (ev.examName || ev.templateName || "").toLowerCase().trim();
-                    return sub === sLow || sub.includes(sLow) || sLow.includes(sub) || exam.includes(sLow);
-                });
+                // Only filter by activeSubject if allEvaluations was loaded globally from storage
+                if (activeSubject && activeSubject !== "all" && activeSubject !== "All Subjects") {
+                    const filtered = allEvaluations.filter(ev => {
+                        return window.appStorage 
+                            ? window.appStorage.isSubjectMatch(ev.subject, ev.examName, activeSubject, ev.templateName)
+                            : ((ev.subject || "").toLowerCase().includes(activeSubject.toLowerCase()));
+                    });
+                    if (filtered.length > 0) {
+                        allEvaluations = filtered;
+                    }
+                }
             }
 
             if (!allEvaluations || allEvaluations.length === 0) {
                 this.closeActionProgressModal();
-                this.showToast(`No evaluation records found for ${activeSubject || 'selected criteria'}.`, "warning");
+                this.showToast(`No evaluation records found to export.`, "warning");
                 return;
             }
 
@@ -5434,17 +5442,22 @@ class AppController {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            const safeSub = (activeSubject || "Total_Marks").replace(/[^a-zA-Z0-9_-]/g, "_");
+            const safeSub = (activeSubject || allEvaluations[0]?.subject || "Class").replace(/[^a-zA-Z0-9_-]/g, "_");
+            const firstCls = (allEvaluations[0]?.classLabel || allEvaluations[0]?.className || allEvaluations[0]?.class || "Marks").replace(/[^a-zA-Z0-9_-]/g, "_");
             const date = new Date().toISOString().slice(0, 10);
-            a.download = `${safeSub}_Marks_Report_${date}.csv`;
+            a.download = `${safeSub}_${firstCls}_Marks_Report_${date}.csv`;
             document.body.appendChild(a);
             a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            setTimeout(() => {
+                try {
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                } catch (e) {}
+            }, 2000);
 
             this.setActionProgressModalSuccess({
                 title: "✓ Excel Spreadsheet Ready!",
-                subtitle: `Exported ${allEvaluations.length} student total marks records for ${activeSubject || 'selected subject'}.`,
+                subtitle: `Exported ${allEvaluations.length} student total marks records.`,
                 statusText: "Downloaded CSV/Excel marks file.",
                 delayMs: 1100
             });

@@ -1130,18 +1130,36 @@ class SuperAdminManager {
     }
 
     exportAuditExcel(matrix) {
-        let csv = "data:text/csv;charset=utf-8,";
-        csv += "Roll No,Student Name,Class,Subject,Obtained Marks,Max Marks,Percentage,Grade,Status\n";
-        matrix.forEach(row => {
-            csv += `"${row.rollNo}","${row.studentName}","${row.class}","${row.subject}","${row.totalObtained}","${row.totalMax}","${row.percentage}%","${row.grade}","${row.status}"\n`;
-        });
-        const encoded = encodeURI(csv);
+        const headers = ["Roll No", "Student Name", "Class", "Subject", "Obtained Marks", "Max Marks", "Percentage", "Grade", "Status"];
+        const rows = (matrix || []).map(row => [
+            row.rollNo || "",
+            row.studentName || "",
+            row.class || "",
+            row.subject || "",
+            row.totalObtained || 0,
+            row.totalMax || 0,
+            `${row.percentage || 0}%`,
+            row.grade || "--",
+            row.status || ""
+        ]);
+
+        const csvContent = [headers, ...rows]
+            .map(row => row.map(cell => `"${String(cell !== undefined && cell !== null ? cell : '').replace(/"/g, '""')}"`).join(","))
+            .join("\r\n");
+
+        const blob = new Blob(["\uFEFF" + csvContent], { type: "text/csv;charset=utf-8;" });
+        const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        a.setAttribute("href", encoded);
+        a.setAttribute("href", url);
         a.setAttribute("download", `Student_Master_Score_Matrix_${new Date().toISOString().split('T')[0]}.csv`);
         document.body.appendChild(a);
         a.click();
-        a.remove();
+        setTimeout(() => {
+            try {
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {}
+        }, 2000);
     }
 
     // ==========================================

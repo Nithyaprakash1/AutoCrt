@@ -438,7 +438,12 @@ class BulkReportManager {
         link.setAttribute("download", `${subName}_Total_Marks_Report_${new Date().toISOString().split("T")[0]}.csv`);
         document.body.appendChild(link);
         link.click();
-        document.body.removeChild(link);
+        setTimeout(() => {
+            try {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } catch (e) {}
+        }, 2000);
     }
 
     async generateLandscapePDF() {
