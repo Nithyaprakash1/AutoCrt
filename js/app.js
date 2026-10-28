@@ -360,7 +360,7 @@ class AppController {
                     tplLower.includes("std 10 maths") ||
                     tplLower.includes("maths") ||
                     ev.templateId === "mat-x-rev1-40";
-                if (!isMathSubject || subLower.includes("tamil")) continue;
+                if (!isMathSubject || subLower.includes("tamil") || ev.templateId === "mat-x-10th-rev-40" || tplLower === "10th revision") continue;
 
                 const isTarget = (
                     ev.templateId === "mat-x-rev1-40" ||
@@ -3209,7 +3209,28 @@ class AppController {
             matchedTemplate = window.MockData.tamilGrade10Revision1Template;
         }
 
-        // 2. MATHS Grade 10 Revision 1 Blueprint (2 Sections: Sec A 28 Qs x 1M, Sec B 3 Qs x 4M = 40 Marks)
+        // 2a. MATHS Grade 10 - 10th Revision Blueprint (10th Revision / 10 Revision - 2 Objective: 31 Qs / 40M)
+        const isMath10thRevision = (!evalSubLower.includes("tamil")) && (
+            evalSubLower.includes("math") ||
+            evaluation.templateId === "mat-x-10th-rev-40" ||
+            evaluation.templateId === "mat-x-rev2-40" ||
+            evalTplLower.includes("math") ||
+            evalExamLower.includes("math")
+        ) && (
+            evaluation.templateId === "mat-x-10th-rev-40" ||
+            evaluation.templateId === "mat-x-rev2-40" ||
+            evalTplLower === "10th revision" ||
+            evalTplLower.includes("10th revision") ||
+            evalExamLower.includes("10th revision") ||
+            evalTplLower.includes("10 revision") ||
+            evalExamLower.includes("10 revision") ||
+            evalExamLower.includes("revision 2") ||
+            evalExamLower.includes("revision - 2") ||
+            evalTplLower.includes("revision 2") ||
+            evalTplLower.includes("revision - 2")
+        );
+
+        // 2b. MATHS Grade 10 Revision 1 Blueprint (2 Sections: Sec A 28 Qs x 1M, Sec B 3 Qs x 4M = 40 Marks)
         const isMath10Revision1 = (!evalSubLower.includes("tamil")) && (
             evalSubLower.includes("math") ||
             evaluation.templateId === "mat-x-rev1-40" ||
@@ -3228,11 +3249,15 @@ class AppController {
             ((evalClassLower.includes("10") || evalClassLower.includes("x")) && (evalTplLower.includes("revision") || evalExamLower.includes("revision") || evalTplLower.includes("40") || evalExamLower.includes("40") || (evaluation.questions && (evaluation.questions.length === 40 || evaluation.questions.length === 31))))
         );
 
-        if (isMath10Revision1 && window.MockData && window.MockData.mathGrade10Revision1Template) {
+        if (isMath10thRevision && window.MockData && window.MockData.mathGrade10Revision2Template) {
+            matchedTemplate = window.MockData.mathGrade10Revision2Template;
+        } else if (isMath10Revision1 && window.MockData && window.MockData.mathGrade10Revision1Template) {
             matchedTemplate = window.MockData.mathGrade10Revision1Template;
         }
 
-        if (matchedTemplate && matchedTemplate.id === "mat-x-rev1-40" && window.MockData && window.MockData.mathGrade10Revision1Template) {
+        if (matchedTemplate && (matchedTemplate.id === "mat-x-10th-rev-40" || matchedTemplate.id === "mat-x-rev2-40") && window.MockData && window.MockData.mathGrade10Revision2Template) {
+            matchedTemplate = window.MockData.mathGrade10Revision2Template;
+        } else if (matchedTemplate && matchedTemplate.id === "mat-x-rev1-40" && window.MockData && window.MockData.mathGrade10Revision1Template) {
             matchedTemplate = window.MockData.mathGrade10Revision1Template;
         }
 
@@ -3341,7 +3366,10 @@ class AppController {
                                 letter: sq.letter || sq.label || String(sqIdx + 1),
                                 label: sq.label ? (String(sq.label).startsWith("(") ? sq.label : `(${sq.label})`) : `(${sq.subId || sqIdx + 1})`,
                                 maxMarks: Number(sq.maxMarks !== undefined ? sq.maxMarks : sq.marks) || 1,
-                                awardedMarks: 0
+                                awardedMarks: 0,
+                                hasChoice: !!(sq.hasChoice || sq.isChoice),
+                                isChoice: !!(sq.hasChoice || sq.isChoice),
+                                choiceLabel: sq.choiceLabel || ""
                             }))
                             : [];
                         tplQuestions.push({
@@ -3751,6 +3779,7 @@ class AppController {
                 // Tamil
                 { t: window.MockData.tamilGrade10Revision1Template, s: "Tamil" },
                 // Mathematics
+                { t: window.MockData.mathGrade10Revision2Template, s: "Mathematics" },
                 { t: window.MockData.mathGrade10Revision1Template, s: "Mathematics" },
                 { t: window.MockData.mathGrade12Template, s: "Mathematics" },
                 { t: window.MockData.mathGrade10Template, s: "Mathematics" },
@@ -3835,7 +3864,9 @@ class AppController {
 
         // Locate blueprint from catalog or MockData
         let foundTpl = null;
-        if (newTemplateId === "mat-x-rev1-40" && window.MockData?.mathGrade10Revision1Template) {
+        if ((newTemplateId === "mat-x-10th-rev-40" || newTemplateId === "mat-x-rev2-40") && window.MockData?.mathGrade10Revision2Template) {
+            foundTpl = window.MockData.mathGrade10Revision2Template;
+        } else if (newTemplateId === "mat-x-rev1-40" && window.MockData?.mathGrade10Revision1Template) {
             foundTpl = window.MockData.mathGrade10Revision1Template;
         } else if (newTemplateId === "tam-x-rev1-40" && window.MockData?.tamilGrade10Revision1Template) {
             foundTpl = window.MockData.tamilGrade10Revision1Template;
@@ -3900,7 +3931,10 @@ class AppController {
                             letter: sq.letter || sq.label || String(sqIdx + 1),
                             label: sq.label ? (String(sq.label).startsWith("(") ? sq.label : `(${sq.label})`) : `(${sq.subId || sqIdx + 1})`,
                             maxMarks: Number(sq.maxMarks !== undefined ? sq.maxMarks : sq.marks) || 1,
-                            awardedMarks: 0
+                            awardedMarks: 0,
+                            hasChoice: !!(sq.hasChoice || sq.isChoice),
+                            isChoice: !!(sq.hasChoice || sq.isChoice),
+                            choiceLabel: sq.choiceLabel || ""
                         }))
                         : [];
                     tplQuestions.push({

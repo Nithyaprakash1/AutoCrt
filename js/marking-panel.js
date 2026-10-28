@@ -181,10 +181,15 @@ class MarkingPanel {
             let subQs = null;
             if (q.hasSubQuestions && Array.isArray(q.subQuestions) && q.subQuestions.length > 0) {
                 subQs = q.subQuestions.map(sq => ({
+                    id: sq.id || sq.subId || sq.letter || "a",
                     subId: sq.subId || sq.letter || "a",
+                    letter: sq.letter || sq.subId || "a",
                     label: sq.label ? (String(sq.label).startsWith("(") ? sq.label : `(${sq.label})`) : `(${sq.subId || sq.letter || "a"})`,
                     maxMarks: Number(sq.maxMarks !== undefined ? sq.maxMarks : sq.marks) || 1,
-                    awardedMarks: sq.awardedMarks !== undefined ? Number(sq.awardedMarks) : 0
+                    awardedMarks: sq.awardedMarks !== undefined ? Number(sq.awardedMarks) : 0,
+                    isChoice: !!(sq.isChoice || sq.hasChoice),
+                    hasChoice: !!(sq.hasChoice || sq.isChoice),
+                    choiceLabel: sq.choiceLabel || ""
                 }));
             }
 

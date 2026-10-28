@@ -1718,6 +1718,99 @@ const MockData = {
         })()
     },
 
+    // Grade 10 Mathematics - 10th Revision Blueprint (10th Revision - 2 Objective: 31 Qs / 40 Marks Total)
+    // Section A: Q1 to Q28 carry 1 mark each = 28 Marks
+    // Section B: Q29 to Q31 carry 4 marks each = 12 Marks, with 3 subparts: (i) 1M, (ii) 1M, (iii) 2M [Either (a) or (b) choice]
+    mathGrade10Revision2Template: {
+        id: "mat-x-10th-rev-40",
+        name: "10th Revision",
+        examName: "10th Revision - 2 Objective",
+        subject: "Mathematics",
+        maxMarks: 40,
+        duration: "1 Hour",
+        badge: "10th Revision",
+        generalInstructions: [
+            "This question paper consists of 31 questions carrying 40 marks in total.",
+            "Section A: Q1 to Q28 carry 1 mark each (28 Marks).",
+            "Section B: Q29 to Q31 carry 4 marks each (12 Marks), divided into 3 internal sub-questions: (i) 1 mark, (ii) 1 mark, (iii) 2 marks with internal choice: either (a) or (b)."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Sec A: 28 Qs (28M)",
+                qStartNo: 1,
+                qEndNo: 28,
+                qCount: 28,
+                marksPerQ: 1,
+                maxMarks: 28,
+                secTotal: 28,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Sec B: 3 Qs (12M)",
+                qStartNo: 29,
+                qEndNo: 31,
+                qCount: 3,
+                marksPerQ: 4,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: true,
+                subQuestionNumbers: "Q29, Q30, Q31",
+                subQuestions: [
+                    { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
+                    { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
+                    { id: "iii", subId: "iii", letter: "iii", label: "(iii) [Either (a) or (b)]", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: true, isChoice: true, choiceLabel: "Either (a) or (b)" }
+                ]
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            // Section A: Q1 to Q28 (each 1 mark = 28M)
+            for (let i = 1; i <= 28; i++) {
+                qs.push({
+                    id: `mat_x_rev2_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `MCQ & Objective ${i}`,
+                    hasSubQuestions: false,
+                    subQuestions: []
+                });
+            }
+            // Section B: Q29 to Q31 (each 4 marks = 12M, subparts: (i) 1M, (ii) 1M, (iii) 2M with Either (a) or (b) choice)
+            for (let i = 29; i <= 31; i++) {
+                qs.push({
+                    id: `mat_x_rev2_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 4,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Case Study (${i})`,
+                    hasSubQuestions: true,
+                    subQuestions: [
+                        { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
+                        { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
+                        { id: "iii", subId: "iii", letter: "iii", label: "(iii) [Either (a) or (b)]", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: true, isChoice: true, choiceLabel: "Either (a) or (b)" }
+                    ]
+                });
+            }
+            return qs;
+        })()
+    },
+
     // Grade 10 Tamil Revision 1 Objective Blueprint (40 Qs / 40 Marks Total)
     // 1 Section: Section A: 40 Qs × 1 Mark = 40 Marks
     tamilGrade10Revision1Template: {
