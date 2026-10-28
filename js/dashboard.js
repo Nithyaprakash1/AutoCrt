@@ -65,10 +65,6 @@ class DashboardManager {
                 ? [...user.assignedSubjects]
                 : (user.subject ? [user.subject] : []);
 
-            // Evaluator / Teacher must NEVER inherit "All Subjects" bypass — strictly their own subjects!
-            if (isTeacher) {
-                assignedSubs = assignedSubs.filter(s => s && s !== "all" && s !== "All Subjects");
-            }
             this.teacherSubjects = assignedSubs;
             this.teacherSubject = assignedSubs[0] || "";
 
@@ -96,28 +92,9 @@ class DashboardManager {
         try { sessionStorage.removeItem("niprak_shared_target"); } catch (e) {}
 
         if (sharedSub && sharedSub !== "all") {
-            if (isAdmin) {
-                this.teacherSubject = sharedSub;
-                this.teacherSubjects = [sharedSub];
-                this.selectedSubjectFilter = sharedSub;
-            } else if (isTeacher) {
-                // If user is a teacher, strictly verify that sharedSub matches their assigned subjects
-                const matchesAssigned = this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(sharedSub, '', s));
-                if (matchesAssigned) {
-                    this.teacherSubject = sharedSub;
-                    this.selectedSubjectFilter = sharedSub;
-                } else {
-                    console.warn(`Teacher ${this.teacherName} is not authorized for shared subject ${sharedSub}`);
-                    if (window.app && window.app.showToast) {
-                        window.app.showToast(`Access Restricted: Shared link is for ${sharedSub}. You are assigned to ${this.teacherSubjects.join(", ") || "another subject"}.`, "error");
-                    }
-                    sharedBatch = null;
-                }
-            } else {
-                this.teacherSubject = sharedSub;
-                this.teacherSubjects = [sharedSub];
-                this.selectedSubjectFilter = sharedSub;
-            }
+            this.teacherSubject = sharedSub;
+            this.teacherSubjects = [sharedSub];
+            this.selectedSubjectFilter = sharedSub;
         }
 
         if (sharedBatch && sharedBatch !== "all") {
@@ -176,45 +153,15 @@ class DashboardManager {
     }
 
     getSubjectEvals() {
-        const user = window.appStorage.getCurrentUser();
-        const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
-        const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
-        const isUploader = user && user.role === 'uploader';
-        const allowsAll = isAdmin || isUploader || !user || !isTeacher;
-
         // If specific subject filter is active, return all matching papers immediately!
         if (this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all') {
             const matched = this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName));
-            if (matched.length > 0 || allowsAll) {
+            if (matched.length > 0) {
                 return matched;
             }
         }
 
-        // Admin, Uploader, or unauthenticated/guest users have master oversight across all subjects
-        if (allowsAll) {
-            return this.evaluations;
-        }
-
-        let subjects = this.teacherSubjects && this.teacherSubjects.length > 0
-            ? [...this.teacherSubjects]
-            : (this.teacherSubject ? [this.teacherSubject] : []);
-
-        subjects = subjects.filter(s => s && s !== "all" && s !== "All Subjects");
-
-        if (subjects.length === 0) {
-            return this.evaluations;
-        }
-
-        const teacherMatched = this.evaluations.filter(e => {
-            return subjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
-        });
-
-        // If teacher assigned subjects match evaluations, use them.
-        // Otherwise, fallback to all evaluations so uploaded papers are never hidden!
-        if (teacherMatched.length > 0) {
-            return teacherMatched;
-        }
-
+        // Default or "all" view: return all evaluations so all uploaded batch cards are displayed
         return this.evaluations;
     }
 
@@ -226,27 +173,12 @@ class DashboardManager {
         this.filteredEvaluations = this.evaluations.filter(e => {
             const isCorr = this.isPaperCorrected(e);
 
-            // 0. Teacher / Subject isolation
+            // 0. Subject Filter (when selected)
             if (this.activeBatchKey) {
-                // When drilled down into a specific batch card, never filter out batch papers
+                // When drilled down into a specific batch card, batch class and template matching handles filtering
             } else if (this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all') {
                 const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName);
                 if (!subMatch) return false;
-            } else if (isTeacher) {
-                let subjects = this.teacherSubjects && this.teacherSubjects.length > 0
-                    ? [...this.teacherSubjects]
-                    : (this.teacherSubject ? [this.teacherSubject] : []);
-                subjects = subjects.filter(s => s && s !== "all" && s !== "All Subjects");
-                if (subjects.length > 0) {
-                    const matches = subjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
-                    const hasAnyAssignedPapers = this.evaluations.some(ev => subjects.some(s => window.appStorage.isSubjectMatch(ev.subject, ev.examName, s, ev.templateName)));
-                    if (hasAnyAssignedPapers && !matches) return false;
-                }
-            } else if (!isAdmin && this.teacherSubjects && this.teacherSubjects.length > 0) {
-                if (!this.teacherSubjects.some(s => s === "all" || s === "All Subjects")) {
-                    const matches = this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
-                    if (!matches) return false;
-                }
             }
 
             // Active Batch filter: When drilled down into a specific batch card
@@ -419,15 +351,12 @@ class DashboardManager {
         }
 
         // Compute Class & Template Batches for Teacher Desk
-        let evalsForBatches = subjectEvals;
+        let evalsForBatches = this.evaluations;
         if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all") {
             const filteredBySub = this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName));
             if (filteredBySub.length > 0) {
                 evalsForBatches = filteredBySub;
             }
-        }
-        if (evalsForBatches.length === 0 && this.evaluations.length > 0 && (!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all')) {
-            evalsForBatches = this.evaluations;
         }
 
         const batchMap = new Map();
@@ -573,11 +502,11 @@ class DashboardManager {
                                     <span class="teacher-batches-count-pill">${this.batches.length} ${this.batches.length === 1 ? 'Batch' : 'Batches'}</span>
                                 </h3>
                                 <p class="teacher-batches-desc" style="margin: 2px 0 0;">Click any card to view its student answer sheets or start marking directly.</p>
-                                ${(subjectList.length > 1 || (allowsAll && subjectList.length > 0)) ? `
+                                ${(subjectList.length > 0) ? `
                                     <div class="teacher-subject-pills-row" style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
-                                        <button type="button" class="btn-sub-pill ${this.selectedSubjectFilter === 'all' ? 'active-sub-pill' : ''}" data-subject="all" style="padding: 5px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 500; border: 1.5px solid ${this.selectedSubjectFilter === 'all' ? '#0071E3' : '#CBD5E1'}; background: ${this.selectedSubjectFilter === 'all' ? 'rgba(0, 113, 227, 0.1)' : '#FFFFFF'}; color: ${this.selectedSubjectFilter === 'all' ? '#0071E3' : '#475569'}; cursor: pointer;">All ${allowsAll ? 'Subjects' : 'My Subjects'} (${allowsAll ? this.evaluations.length : totalCount})</button>
+                                        <button type="button" class="btn-sub-pill ${this.selectedSubjectFilter === 'all' ? 'active-sub-pill' : ''}" data-subject="all" style="padding: 5px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 500; border: 1.5px solid ${this.selectedSubjectFilter === 'all' ? '#0071E3' : '#CBD5E1'}; background: ${this.selectedSubjectFilter === 'all' ? 'rgba(0, 113, 227, 0.1)' : '#FFFFFF'}; color: ${this.selectedSubjectFilter === 'all' ? '#0071E3' : '#475569'}; cursor: pointer;">All Subjects (${this.evaluations.length})</button>
                                         ${subjectList.map(sub => {
-                                            const countForSub = (allowsAll ? this.evaluations : subjectEvals).filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, sub, e.templateName)).length;
+                                            const countForSub = this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, sub, e.templateName)).length;
                                             const isActive = this.selectedSubjectFilter === sub;
                                             return `<button type="button" class="btn-sub-pill ${isActive ? 'active-sub-pill' : ''}" data-subject="${sub}" style="padding: 5px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 500; border: 1.5px solid ${isActive ? '#0071E3' : '#CBD5E1'}; background: ${isActive ? 'rgba(0, 113, 227, 0.1)' : '#FFFFFF'}; color: ${isActive ? '#0071E3' : '#475569'}; cursor: pointer;">
                                                 ${sub} (${countForSub})

@@ -144,30 +144,17 @@ class AppController {
                 await this.switchView("dashboard");
                 if (this.dashboardManager) {
                     const activeUser = window.appStorage.getCurrentUser();
-                    const isTeacher = activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher');
                     const isAdmin = activeUser && (activeUser.role === 'admin' || activeUser.role === 'super_admin');
                     
-                    let canAccessSubject = true;
-                    if (isTeacher && targetSubject) {
-                        const assigned = (activeUser.assignedSubjects || []).filter(s => s && s !== 'all' && s !== 'All Subjects');
-                        canAccessSubject = assigned.length === 0 || assigned.some(s => window.appStorage.isSubjectMatch(targetSubject, '', s));
+                    if (targetSubject) {
+                        this.dashboardManager.teacherSubject = targetSubject;
+                        if (isAdmin) {
+                            this.dashboardManager.teacherSubjects = [targetSubject];
+                        }
+                        this.dashboardManager.selectedSubjectFilter = targetSubject;
                     }
-
-                    if (canAccessSubject) {
-                        if (targetSubject) {
-                            this.dashboardManager.teacherSubject = targetSubject;
-                            if (isAdmin) {
-                                this.dashboardManager.teacherSubjects = [targetSubject];
-                            }
-                            this.dashboardManager.selectedSubjectFilter = targetSubject;
-                        }
-                        if (targetBatch) {
-                            this.dashboardManager.highlightBatchKey = targetBatch;
-                        }
-                    } else {
-                        if (this.showToast) {
-                            this.showToast(`Access Restricted: Shared link is for ${targetSubject}. Your assigned subjects are ${(activeUser.assignedSubjects || []).join(', ')}.`, "error");
-                        }
+                    if (targetBatch) {
+                        this.dashboardManager.highlightBatchKey = targetBatch;
                     }
                     this.dashboardManager.activeBatchKey = null; // Always display CARDS overview mode
                     this.dashboardManager.applyFilters();
@@ -341,7 +328,7 @@ class AppController {
     async migrateMathGrade10Evaluations() {
         if (!window.appStorage) return;
         try {
-            const all = await window.appStorage.getAllEvaluations();
+            const all = await window.appStorage.getAllEvaluations(false, true);
             if (!Array.isArray(all) || all.length === 0) return;
 
             const tpl = window.MockData?.mathGrade10Revision1Template;
@@ -435,7 +422,7 @@ class AppController {
     async migrateTamilGrade10Evaluations() {
         if (!window.appStorage) return;
         try {
-            const all = await window.appStorage.getAllEvaluations();
+            const all = await window.appStorage.getAllEvaluations(false, true);
             if (!Array.isArray(all) || all.length === 0) return;
 
             const tpl = window.MockData?.tamilGrade10Revision1Template;
@@ -523,7 +510,7 @@ class AppController {
     async migrateBiologyRevision1Evaluations() {
         if (!window.appStorage) return;
         try {
-            const allEvals = await window.appStorage.getAllEvaluations();
+            const allEvals = await window.appStorage.getAllEvaluations(false, true);
             if (!allEvals || !Array.isArray(allEvals) || allEvals.length === 0) return;
 
             const tpl = window.MockData?.biologyRevision1SubjectiveTemplate;
@@ -2054,7 +2041,7 @@ class AppController {
     async checkAndSendSubjectCompletedNotification(currentEval) {
         if (!currentEval || !window.appStorage) return;
         try {
-            const allEvaluations = await window.appStorage.getAllEvaluations();
+            const allEvaluations = await window.appStorage.getAllEvaluations(false, true);
             if (!Array.isArray(allEvaluations) || allEvaluations.length === 0) return;
 
             const sub = (currentEval.subject || "General").trim();
@@ -4917,7 +4904,7 @@ class AppController {
 
         // 2. Scan queue for next paper
         this.updateActionProgressModal(70, "Scanning evaluation queue for next uncorrected paper...");
-        const allEvaluations = await window.appStorage.getAllEvaluations();
+        const allEvaluations = await window.appStorage.getAllEvaluations(false, true);
 
         // Match current class/exam/subject or all assigned papers
         const currentClass = this.activeEvaluation?.class || this.activeEvaluation?.className;
@@ -5319,7 +5306,7 @@ class AppController {
         try {
             let targetList = Array.isArray(evaluations) && evaluations.length > 0 ? evaluations : null;
             if (!targetList) {
-                targetList = await window.appStorage.getAllEvaluations();
+                targetList = await window.appStorage.getAllEvaluations(false, true);
             }
 
             if (!targetList || targetList.length === 0) {
@@ -5418,7 +5405,7 @@ class AppController {
                     activeSubject = allEvaluations[0].subject;
                 }
             } else {
-                allEvaluations = await window.appStorage.getAllEvaluations();
+                allEvaluations = await window.appStorage.getAllEvaluations(false, true);
                 if ((!allEvaluations || allEvaluations.length === 0) && this.activeEvaluation) {
                     allEvaluations = [this.activeEvaluation];
                 } else if (this.activeEvaluation && !allEvaluations.some(e => e.id === this.activeEvaluation.id)) {
@@ -6323,12 +6310,12 @@ class AppController {
 
     async loadEvaluations() {
         if (this.currentView === "dashboard" && this.dashboardManager) {
-            this.dashboardManager.evaluations = await window.appStorage.getAllEvaluations();
+            this.dashboardManager.evaluations = await window.appStorage.getAllEvaluations(false, true);
             this.dashboardManager.applyFilters();
             this.dashboardManager.render();
             this.dashboardManager.bindEvents();
         } else if (this.currentView === "history" && this.historyManager) {
-            this.historyManager.evaluations = await window.appStorage.getAllEvaluations();
+            this.historyManager.evaluations = await window.appStorage.getAllEvaluations(false, true);
             this.historyManager.init();
         } else if (this.currentView === "admin-panel" && this.adminPanelManager) {
             this.adminPanelManager.init();

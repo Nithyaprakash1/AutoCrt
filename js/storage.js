@@ -611,7 +611,15 @@ class StorageService {
     getCurrentUser() {
         try {
             const raw = localStorage.getItem("niprak_active_user") || localStorage.getItem("onespace_active_user");
-            if (raw) return JSON.parse(raw);
+            if (raw) {
+                const u = JSON.parse(raw);
+                if (u && (u.role === 'evaluator' || u.role === 'teacher')) {
+                    if (!Array.isArray(u.assignedSubjects) || u.assignedSubjects.length === 0 || u.assignedSubjects.includes('All Subjects') || u.assignedSubjects.includes('all')) {
+                        u.assignedSubjects = ["All Subjects"];
+                    }
+                }
+                return u;
+            }
         } catch (e) {}
         return this.currentUser || null;
     }
@@ -787,6 +795,11 @@ class StorageService {
 
             // Direct teacher assignment takes priority if specifically assigned to this teacher
             if (e.assignedTeacherId && teacherUid && String(e.assignedTeacherId) === String(teacherUid)) {
+                return true;
+            }
+
+            // User-uploaded real answer scripts are NEVER stripped or hidden from the evaluation workflow
+            if (e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)))) {
                 return true;
             }
 
