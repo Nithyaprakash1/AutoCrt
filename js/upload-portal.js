@@ -4665,7 +4665,8 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
     // --- 1-Click Sample Student Paper Generator ---
     addSampleStudentPaper() {
-        alert("Please browse or drop your actual Physics PDF answer sheet file to upload.");
+        const subName = this.selectedSubject?.name || "Political Science";
+        alert(`Please browse or drop your actual ${subName} PDF answer sheet file to upload.`);
     }
 
     // --- File Size Limit Modal ---
@@ -5113,11 +5114,11 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     rawFile: item.file || null,
                     studentName: item.studentName || (existingMatch ? existingMatch.studentName : "Unnamed Student"),
                     rollNo: item.rollNo || (existingMatch ? existingMatch.rollNo : String(100 + publishedCount)),
-                    class: cls.name || cls.label,
-                    className: cls.name || cls.label,
-                    section: cls.section || "A",
-                    classLabel: cls.label || `${cls.name}-${cls.section}`,
-                    subject: subject.name,
+                    class: cls.label || cls.name || "Class 12-A",
+                    className: cls.label || cls.name || "Class 12-A",
+                    section: cls.section || (cls.label && cls.label.includes("-") ? cls.label.split("-")[1] : "A"),
+                    classLabel: cls.label || (cls.section ? `${cls.name}-${cls.section}` : cls.name),
+                    subject: subject.name || "Political Science",
                     examName: template.examName || template.name,
                     templateName: template.name,
                     templateId: template.id,
@@ -5231,13 +5232,33 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         const countBadge = this.container.querySelector("#existing-count-badge");
         if (!wrap || !this.selectedClass || !this.selectedSubject || !this.selectedTemplate) return;
 
-        const all = await window.appStorage.getAllEvaluations();
-        const matches = all.filter(e =>
-            (e.className === this.selectedClass.name || e.className === this.selectedClass.label) &&
-            e.section === this.selectedClass.section &&
-            e.subject === this.selectedSubject.name &&
-            (e.templateId === this.selectedTemplate.id || e.examName === this.selectedTemplate.examName || e.templateName === this.selectedTemplate.name)
-        );
+        const all = await window.appStorage.getAllEvaluations(false, true);
+        const targetCls = String(this.selectedClass.label || this.selectedClass.name || this.selectedClass.id || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+        const targetSub = this.selectedSubject.name || this.selectedSubject.id || "Political Science";
+        const targetTplId = String(this.selectedTemplate.id || "").toLowerCase();
+        const targetTplName = String(this.selectedTemplate.name || this.selectedTemplate.examName || "").toLowerCase();
+
+        const matches = all.filter(e => {
+            if (!e) return false;
+            // 1. Flexible class matching
+            const eCls = String(e.className || e.classLabel || e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+            const classMatches = !targetCls || eCls === targetCls || (targetCls && eCls.includes(targetCls)) || (eCls && targetCls.includes(eCls));
+            if (!classMatches) return false;
+
+            // 2. Canonical Subject matching
+            const subMatches = window.appStorage
+                ? window.appStorage.isSubjectMatch(e.subject || '', e.examName || '', targetSub, e.templateName || '')
+                : (String(e.subject || '').toLowerCase().includes('politic'));
+            if (!subMatches) return false;
+
+            // 3. Template matching
+            const eTplId = String(e.templateId || "").toLowerCase();
+            const eTplName = String(e.templateName || e.examName || "").toLowerCase();
+            if (targetTplId && eTplId && targetTplId === eTplId) return true;
+            if (targetTplName && eTplName && (targetTplName.includes(eTplName) || eTplName.includes(targetTplName))) return true;
+            // If same subject and class, treat as existing paper
+            return true;
+        });
 
         this.existingPapers = matches;
         if (countBadge) countBadge.textContent = `${matches.length} Paper(s) In Class`;

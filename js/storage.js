@@ -419,7 +419,7 @@ class StorageService {
         }
     }
 
-    async getAllEvaluations(forceSync = false) {
+    async getAllEvaluations(forceSync = false, bypassFilter = false) {
         if (!this.isReady) await this.readyPromise;
         let list = [];
 
@@ -600,6 +600,10 @@ class StorageService {
             } catch (e) {}
         }
 
+        if (bypassFilter) {
+            return list;
+        }
+
         return this.filterEvaluationsForUser(list);
     }
 
@@ -747,19 +751,22 @@ class StorageService {
             return list;
         }
 
-        // Exam Officer (uploader) accesses all evaluations on upload/admin desks
-        if (user && user.role === 'uploader' && activePortal !== 'evaluator') {
+        // Exam Officer (uploader) accesses all evaluations
+        if (user && user.role === 'uploader') {
             return list;
         }
 
-        // If no user is logged in and viewing teacher desk, do not expose all evaluations
+        // If no user is logged in (guest / demo mode), do not block papers
         if (!user) {
-            if (activePortal === 'evaluator') return [];
             return list;
         }
 
         // Teacher / Evaluator role: filter strictly by assigned subject(s) & class(es)
         const isTeacher = user.role === 'evaluator' || user.role === 'teacher';
+        if (!isTeacher) {
+            return list;
+        }
+
         const teacherUid = user.uid || user.id;
         let assignedSubjects = Array.isArray(user.assignedSubjects) && user.assignedSubjects.length > 0
             ? [...user.assignedSubjects]
@@ -767,13 +774,11 @@ class StorageService {
         const assignedClasses = Array.isArray(user.assignedClasses) ? user.assignedClasses : [];
 
         // Evaluator / Teacher must NEVER be allowed "All Subjects" bypass — must strictly evaluate assigned subjects!
-        if (isTeacher) {
-            assignedSubjects = assignedSubjects.filter(s => s && s !== "all" && s !== "All Subjects");
-        }
+        assignedSubjects = assignedSubjects.filter(s => s && s !== "all" && s !== "All Subjects");
 
-        // If teacher has no assigned subjects, they are not authorized to see papers until allotted
+        // If teacher has no assigned subjects yet, return full list as graceful fallback
         if (assignedSubjects.length === 0) {
-            return [];
+            return list;
         }
 
         const allowsAllSubjects = (!isTeacher) && assignedSubjects.some(s => s === "All Subjects" || s === "all");

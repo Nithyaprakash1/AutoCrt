@@ -31,37 +31,44 @@ class UploadedPapersPageManager {
 
     async loadData() {
         if (window.appStorage) {
-            const allPapers = await window.appStorage.getAllEvaluations();
-            this.papers = typeof window.appStorage.filterEvaluationsForUser === "function"
-                ? window.appStorage.filterEvaluationsForUser(allPapers)
-                : allPapers;
-            if (typeof window.appStorage.getStorageUsage === "function") {
-                await window.appStorage.getStorageUsage();
-            }
-            const savedCatalog = await window.appStorage.getSubjectCatalog();
-            if (savedCatalog) {
-                const names = savedCatalog.map(s => s.name);
-                if (!names.some(n => n.toLowerCase().includes('politic'))) {
-                    names.push("Political Science");
-                }
-                this.subjects = names;
-            } else {
-                this.subjects = ["Physics", "English", "Political Science", "Economics", "History", "Social Science", "Mathematics", "Biology", "Chemistry", "Tamil"];
-            }
-
+            const allPapers = await window.appStorage.getAllEvaluations(false, true);
             const currentUser = window.appStorage.getCurrentUser();
             const isTeacher = Boolean(currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher'));
             this.currentUser = currentUser;
             this.isTeacher = isTeacher;
-            if (isTeacher) {
-                let assigned = Array.isArray(currentUser.assignedSubjects) && currentUser.assignedSubjects.length > 0
-                    ? [...currentUser.assignedSubjects]
-                    : (currentUser.subject ? [currentUser.subject] : []);
-                assigned = assigned.filter(s => s && s !== 'all' && s !== 'All Subjects');
+
+            let assigned = isTeacher && Array.isArray(currentUser.assignedSubjects) && currentUser.assignedSubjects.length > 0
+                ? [...currentUser.assignedSubjects]
+                : (isTeacher && currentUser.subject ? [currentUser.subject] : []);
+            assigned = assigned.filter(s => s && s !== 'all' && s !== 'All Subjects');
+
+            if (isTeacher && assigned.length > 0) {
+                this.papers = window.appStorage.filterEvaluationsForUser(allPapers);
                 this.subjects = assigned;
                 if (this.selectedSubject === "all" || !assigned.some(s => window.appStorage.isSubjectMatch(this.selectedSubject, '', s))) {
                     this.selectedSubject = assigned[0] || "";
                 }
+            } else {
+                this.papers = allPapers;
+                const savedCatalog = await window.appStorage.getSubjectCatalog();
+                const subjectSet = new Set(["Political Science", "Physics", "English", "Economics", "History", "Social Science", "Mathematics", "Biology", "Chemistry", "Tamil"]);
+                if (savedCatalog && Array.isArray(savedCatalog)) {
+                    savedCatalog.forEach(s => { if (s && s.name) subjectSet.add(s.name); });
+                }
+                allPapers.forEach(p => {
+                    if (p && p.subject) {
+                        if (window.appStorage.isSubjectMatch(p.subject, '', 'Political Science')) {
+                            subjectSet.add("Political Science");
+                        } else {
+                            subjectSet.add(p.subject);
+                        }
+                    }
+                });
+                this.subjects = Array.from(subjectSet);
+            }
+
+            if (typeof window.appStorage.getStorageUsage === "function") {
+                await window.appStorage.getStorageUsage();
             }
 
             const savedClasses = await window.appStorage.getClassesList();
@@ -72,7 +79,9 @@ class UploadedPapersPageManager {
                     { id: "cls_12a", name: "Class 12-A" },
                     { id: "cls_12b", name: "Class 12-B" },
                     { id: "cls_12c", name: "Class 12-C" },
-                    { id: "cls_12d", name: "Class 12-D" }
+                    { id: "cls_12d", name: "Class 12-D" },
+                    { id: "cls_10a", name: "Class 10-A" },
+                    { id: "cls_10b", name: "Class 10-B" }
                 ];
             }
         }
@@ -81,7 +90,7 @@ class UploadedPapersPageManager {
     computeBatches() {
         const batchMap = new Map();
         this.papers.forEach(p => {
-            const cls = p.className || p.class || "Class 12-A";
+            const cls = p.classLabel || p.className || p.class || "Class 12-A";
             const sub = p.subject || "General";
             const rawTpl = p.templateName || p.examName || "Exam Blueprint";
             const tpl = window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, sub) : rawTpl;
@@ -135,7 +144,9 @@ class UploadedPapersPageManager {
 
             if (this.selectedSubject !== "all" && !window.appStorage.isSubjectMatch(b.subject, '', this.selectedSubject, b.templateName)) return false;
             if (this.selectedClass !== "all") {
-                const clsMatch = b.className === this.selectedClass || b.className.includes(this.selectedClass);
+                const targetCls = this.selectedClass.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const bCls = (b.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const clsMatch = bCls === targetCls || (targetCls && bCls.includes(targetCls)) || (bCls && targetCls.includes(bCls));
                 if (!clsMatch) return false;
             }
             if (this.selectedStatus !== "all") {
@@ -163,7 +174,7 @@ class UploadedPapersPageManager {
             ? this.isTeacher
             : Boolean(currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher'));
         return this.papers.filter(p => {
-            const pCls = p.className || p.class || "Class 12-A";
+            const pCls = p.classLabel || p.className || p.class || "Class 12-A";
             const rawTpl = p.templateName || p.examName || "Exam Blueprint";
             const pTpl = window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, p.subject) : rawTpl;
             const pKey = `${pCls}:::${pTpl}`;
@@ -177,7 +188,9 @@ class UploadedPapersPageManager {
             if (this.selectedBatchKey !== "all" && pKey !== this.selectedBatchKey) return false;
             if (this.selectedSubject !== "all" && !window.appStorage.isSubjectMatch(p.subject, p.examName, this.selectedSubject, p.templateName)) return false;
             if (this.selectedClass !== "all") {
-                const clsMatch = pCls === this.selectedClass || pCls.includes(this.selectedClass);
+                const targetCls = this.selectedClass.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const pClsNorm = (pCls || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const clsMatch = pClsNorm === targetCls || (targetCls && pClsNorm.includes(targetCls)) || (pClsNorm && targetCls.includes(pClsNorm));
                 if (!clsMatch) return false;
             }
             if (this.selectedStatus !== "all") {

@@ -3298,7 +3298,8 @@ class AppController {
         }
 
         // 7. Humanities & Commerce Blueprints
-        if (!matchedTemplate && evalSubLower.includes("politic") && window.MockData?.politicalScienceTemplate) {
+        const isPolSci = evalSubLower.includes("politic") || evalSubLower.includes("pol sci") || evalSubLower === "pol" || evalSubLower.includes("polity") || evalTplLower.includes("political") || evaluation.templateId === "pol-cbse-80";
+        if (!matchedTemplate && isPolSci && window.MockData?.politicalScienceTemplate) {
             matchedTemplate = window.MockData.politicalScienceTemplate;
         } else if (!matchedTemplate && evalSubLower.includes("econom") && window.MockData?.economicsTemplate) {
             matchedTemplate = window.MockData.economicsTemplate;
