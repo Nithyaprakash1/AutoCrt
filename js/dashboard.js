@@ -133,7 +133,7 @@ class DashboardManager {
 
         // Background Cloud Sync: Pull fresh papers from Firebase quietly without tearing down DOM
         if (window.firebaseManager) {
-            window.appStorage.getAllEvaluations(true).then((freshList) => {
+            window.appStorage.getAllEvaluations(true, true).then((freshList) => {
                 if (Array.isArray(freshList) && freshList.length > 0 && freshList.length !== this.evaluations.length) {
                     this.evaluations = freshList;
                     this.applyFilters();
@@ -182,11 +182,16 @@ class DashboardManager {
         const isUploader = user && user.role === 'uploader';
         const allowsAll = isAdmin || isUploader || !user || !isTeacher;
 
+        // If specific subject filter is active, return all matching papers immediately!
+        if (this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all') {
+            const matched = this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName));
+            if (matched.length > 0 || allowsAll) {
+                return matched;
+            }
+        }
+
         // Admin, Uploader, or unauthenticated/guest users have master oversight across all subjects
         if (allowsAll) {
-            if (this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all') {
-                return this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName));
-            }
             return this.evaluations;
         }
 
@@ -197,22 +202,20 @@ class DashboardManager {
         subjects = subjects.filter(s => s && s !== "all" && s !== "All Subjects");
 
         if (subjects.length === 0) {
-            if (this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all') {
-                return this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName));
-            }
             return this.evaluations;
         }
 
-        if (this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all') {
-            return this.evaluations.filter(e =>
-                subjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName)) &&
-                window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName)
-            );
-        }
-
-        return this.evaluations.filter(e => {
+        const teacherMatched = this.evaluations.filter(e => {
             return subjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
         });
+
+        // If teacher assigned subjects match evaluations, use them.
+        // Otherwise, fallback to all evaluations so uploaded papers are never hidden!
+        if (teacherMatched.length > 0) {
+            return teacherMatched;
+        }
+
+        return this.evaluations;
     }
 
     applyFilters() {
@@ -223,16 +226,22 @@ class DashboardManager {
         this.filteredEvaluations = this.evaluations.filter(e => {
             const isCorr = this.isPaperCorrected(e);
 
-            // 0. MANDATORY: Teacher subject isolation
-            // If this is a teacher, they ONLY see their assigned subjects' papers
-            if (isTeacher) {
+            // 0. Teacher / Subject isolation
+            if (this.activeBatchKey) {
+                // When drilled down into a specific batch card, never filter out batch papers
+            } else if (this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all') {
+                const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName);
+                if (!subMatch) return false;
+            } else if (isTeacher) {
                 let subjects = this.teacherSubjects && this.teacherSubjects.length > 0
                     ? [...this.teacherSubjects]
                     : (this.teacherSubject ? [this.teacherSubject] : []);
                 subjects = subjects.filter(s => s && s !== "all" && s !== "All Subjects");
-                if (subjects.length === 0) return false;
-                const matches = subjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
-                if (!matches) return false;
+                if (subjects.length > 0) {
+                    const matches = subjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+                    const hasAnyAssignedPapers = this.evaluations.some(ev => subjects.some(s => window.appStorage.isSubjectMatch(ev.subject, ev.examName, s, ev.templateName)));
+                    if (hasAnyAssignedPapers && !matches) return false;
+                }
             } else if (!isAdmin && this.teacherSubjects && this.teacherSubjects.length > 0) {
                 if (!this.teacherSubjects.some(s => s === "all" || s === "All Subjects")) {
                     const matches = this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
@@ -371,11 +380,33 @@ class DashboardManager {
             if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Political Science', e.templateName)) {
                 subjectSet.add('Political Science');
             }
+            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Mathematics', e.templateName)) {
+                subjectSet.add('Mathematics');
+            }
+            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Science', e.templateName)) {
+                subjectSet.add('Science');
+            }
+            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Social Science', e.templateName)) {
+                subjectSet.add('Social Science');
+            }
+            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Physics', e.templateName)) {
+                subjectSet.add('Physics');
+            }
+            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Chemistry', e.templateName)) {
+                subjectSet.add('Chemistry');
+            }
+            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Biology', e.templateName)) {
+                subjectSet.add('Biology');
+            }
+            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'English', e.templateName)) {
+                subjectSet.add('English');
+            }
+            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Tamil', e.templateName)) {
+                subjectSet.add('Tamil');
+            }
         });
         const allSubjectsList = Array.from(subjectSet).filter(Boolean);
-        const subjectList = allowsAll
-            ? allSubjectsList
-            : (teacherAssigned.length > 0 ? teacherAssigned : allSubjectsList);
+        const subjectList = Array.from(new Set([...allSubjectsList, ...teacherAssigned])).filter(Boolean);
 
         const ic = window.Icons || {};
         const greetingStr = this.getGreeting();
@@ -390,7 +421,13 @@ class DashboardManager {
         // Compute Class & Template Batches for Teacher Desk
         let evalsForBatches = subjectEvals;
         if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all") {
-            evalsForBatches = subjectEvals.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName));
+            const filteredBySub = this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName));
+            if (filteredBySub.length > 0) {
+                evalsForBatches = filteredBySub;
+            }
+        }
+        if (evalsForBatches.length === 0 && this.evaluations.length > 0 && (!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all')) {
+            evalsForBatches = this.evaluations;
         }
 
         const batchMap = new Map();
@@ -1475,7 +1512,7 @@ class DashboardManager {
                 modal.remove();
 
                 // Refresh evaluations smoothly without jarring screen flicker
-                this.evaluations = await window.appStorage.getAllEvaluations();
+                this.evaluations = await window.appStorage.getAllEvaluations(false, true);
                 this.applyFilters();
                 this.renderTableRows();
                 this.updateCountsInUI();
@@ -1632,7 +1669,7 @@ class DashboardManager {
             modal.remove();
 
             // Refresh UI
-            this.evaluations = await window.appStorage.getAllEvaluations();
+            this.evaluations = await window.appStorage.getAllEvaluations(false, true);
             this.applyFilters();
             this.render();
             this.bindEvents();

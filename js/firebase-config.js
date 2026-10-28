@@ -130,8 +130,8 @@ class FirebaseManager {
                             name: user.displayName || targetEmail.split("@")[0],
                             email: targetEmail,
                             role: "evaluator",
-                            assignedSubjects: ["Physics"],
-                            assignedClasses: ["Class 12-A"],
+                            assignedSubjects: ["All Subjects"],
+                            assignedClasses: ["All Classes"],
                             status: "active",
                             createdAt: new Date().toISOString()
                         };
@@ -173,8 +173,8 @@ class FirebaseManager {
             name,
             username,
             role = "evaluator",
-            assignedSubjects = ["Physics"],
-            assignedClasses = ["Class 12-A"],
+            assignedSubjects = ["All Subjects"],
+            assignedClasses = ["All Classes"],
             status = "active",
             extraData = {}
         } = teacherData;
@@ -334,8 +334,8 @@ class FirebaseManager {
             password,
             name,
             role,
-            assignedSubjects: extraData.assignedSubjects || ["Physics"],
-            assignedClasses: extraData.assignedClasses || ["Class 12-A"],
+            assignedSubjects: extraData.assignedSubjects || ["All Subjects"],
+            assignedClasses: extraData.assignedClasses || ["All Classes"],
             extraData
         });
     }

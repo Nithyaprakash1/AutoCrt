@@ -43,10 +43,15 @@ class UploadedPapersPageManager {
             assigned = assigned.filter(s => s && s !== 'all' && s !== 'All Subjects');
 
             if (isTeacher && assigned.length > 0) {
-                this.papers = window.appStorage.filterEvaluationsForUser(allPapers);
-                this.subjects = assigned;
-                if (this.selectedSubject === "all" || !assigned.some(s => window.appStorage.isSubjectMatch(this.selectedSubject, '', s))) {
-                    this.selectedSubject = assigned[0] || "";
+                const filtered = window.appStorage.filterEvaluationsForUser(allPapers);
+                this.papers = (filtered && filtered.length > 0) ? filtered : allPapers;
+                const subjectSet = new Set(assigned);
+                allPapers.forEach(p => {
+                    if (p && p.subject) subjectSet.add(p.subject);
+                });
+                this.subjects = Array.from(subjectSet);
+                if (this.selectedSubject !== "all" && !this.subjects.some(s => window.appStorage.isSubjectMatch(this.selectedSubject, '', s))) {
+                    this.selectedSubject = "all";
                 }
             } else {
                 this.papers = allPapers;
@@ -345,7 +350,7 @@ class UploadedPapersPageManager {
                             <div class="filter-select-item">
                                 <label>Subject:</label>
                                 <select id="select-papers-subject" class="form-select-sm">
-                                    ${!isTeacher ? `<option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All</option>` : (this.subjects.length > 1 ? `<option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All My Subjects</option>` : '')}
+                                    <option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All Subjects</option>
                                     ${this.subjects.map(s => `
                                         <option value="${s}" ${this.selectedSubject === s ? 'selected' : ''}>${s}</option>
                                     `).join('')}

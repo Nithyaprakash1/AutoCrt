@@ -1467,6 +1467,153 @@ class UploadPortalManager {
         };
     }
 
+    renderReconciliationCardHtml() {
+        if (!this.selectedClass) return '';
+        const recon = this.computeReconciliation();
+        let filteredStudents = recon.students;
+        if (this.rosterFilter === 'missing') {
+            filteredStudents = recon.students.filter(s => !s.isPresent);
+        } else if (this.rosterFilter === 'present') {
+            filteredStudents = recon.students.filter(s => s.isPresent);
+        }
+
+        return `
+            <div class="reconciliation-header">
+                <div>
+                    <div class="reconciliation-badge-row">
+                        <span class="reconciliation-tag">Submission Attendance & Checklist</span>
+                        <span class="reconciliation-status-pill ${recon.missingCount === 0 ? 'status-all-present' : 'status-has-missing'}">
+                            ${recon.missingCount === 0 ? 'All 100% Papers Present' : `${recon.missingCount} Paper(s) Missing`}
+                        </span>
+                    </div>
+                    <h4 class="reconciliation-title">${this.selectedClass.label} Answer Sheet Submission Checklist</h4>
+                    <p class="reconciliation-subtitle">Check off students to confirm all answer papers are present or identify who has not yet submitted.</p>
+                </div>
+            </div>
+
+            <!-- Reconciliation KPI summary strip -->
+            <div class="reconciliation-kpi-row">
+                <div class="recon-kpi-chip">
+                    <span class="recon-chip-label">Total Enrolled</span>
+                    <span class="recon-chip-val">${recon.totalEnrolled}</span>
+                </div>
+                <div class="recon-kpi-chip chip-present">
+                    <span class="recon-chip-dot"></span>
+                    <span class="recon-chip-label">Papers Present</span>
+                    <span class="recon-chip-val">${recon.presentCount}</span>
+                </div>
+                <div class="recon-kpi-chip chip-missing">
+                    <span class="recon-chip-dot"></span>
+                    <span class="recon-chip-label">Missing Papers</span>
+                    <span class="recon-chip-val">${recon.missingCount}</span>
+                </div>
+                <div class="recon-filter-group">
+                    <button type="button" class="btn-recon-filter ${this.rosterFilter === 'all' ? 'active' : ''}" data-filter="all">All (${recon.totalEnrolled})</button>
+                    <button type="button" class="btn-recon-filter ${this.rosterFilter === 'missing' ? 'active' : ''}" data-filter="missing">Missing (${recon.missingCount})</button>
+                    <button type="button" class="btn-recon-filter ${this.rosterFilter === 'present' ? 'active' : ''}" data-filter="present">Present (${recon.presentCount})</button>
+                </div>
+            </div>
+
+            <!-- Interactive Verification Table -->
+            <div class="reconciliation-table-wrap">
+                <table class="reconciliation-table">
+                    <thead>
+                        <tr>
+                            <th style="width: 54px; text-align: center;">Verify</th>
+                            <th style="width: 90px;">Roll No</th>
+                            <th>Student Name</th>
+                            <th>Submission & PDF Attachment</th>
+                            <th style="width: 140px; text-align: right;">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody class="recon-table-body">
+                        ${filteredStudents.map(student => `
+                            <tr class="${student.isPresent ? 'row-present' : 'row-missing'}">
+                                <td style="text-align: center;">
+                                    <input type="checkbox" class="recon-check-box" data-roll="${student.rollNo}" ${student.isPresent ? 'checked' : ''} title="Tick to verify student paper presence" />
+                                </td>
+                                <td class="font-mono">${student.rollNo}</td>
+                                <td><span class="student-name-text">${student.studentName}</span></td>
+                                <td>
+                                    ${student.matchedFile ? `
+                                        <div class="file-matched-chip ${student.matchedFile.isUploaded ? 'chip-saved' : ''}">
+                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                            <span class="matched-filename">${student.matchedFile.fileName}</span>
+                                            <span class="matched-pages">(${student.matchedFile.pages.length} Pages • ${student.matchedFile.isUploaded ? 'Saved' : 'In Queue'})</span>
+                                        </div>
+                                    ` : (student.isManuallyTicked ? `
+                                        <span class="badge-manually-verified">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+                                            Manually Verified Present
+                                        </span>
+                                    ` : `
+                                        <span class="badge-missing-alert">
+                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                                            Missing File
+                                        </span>
+                                    `)}
+                                </td>
+                                <td style="text-align: right;">
+                                    ${student.isPresent ? `
+                                        <span class="tag-ready-check">Present</span>
+                                    ` : `
+                                        <button type="button" class="btn-attach-single-pdf" data-roll="${student.rollNo}" data-name="${student.studentName}">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                            Attach PDF
+                                        </button>
+                                    `}
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    refreshReconciliationCard() {
+        const card = this.container.querySelector("#reconciliation-checklist-card");
+        if (!card) return;
+        card.innerHTML = this.renderReconciliationCardHtml();
+        this.bindReconciliationEvents();
+    }
+
+    bindReconciliationEvents() {
+        const card = this.container.querySelector("#reconciliation-checklist-card");
+        if (!card) return;
+
+        card.querySelectorAll(".btn-recon-filter").forEach(btn => {
+            btn.addEventListener("click", () => {
+                this.rosterFilter = btn.getAttribute("data-filter");
+                this.refreshReconciliationCard();
+            });
+        });
+
+        card.querySelectorAll(".recon-check-box").forEach(cb => {
+            cb.addEventListener("change", (e) => {
+                const roll = String(cb.getAttribute("data-roll") || "").trim();
+                if (e.target.checked) {
+                    this.manualCheckedRolls.add(roll);
+                } else {
+                    this.manualCheckedRolls.delete(roll);
+                }
+                this.saveManualChecks();
+                this.refreshReconciliationCard();
+            });
+        });
+
+        const inpSinglePdf = this.container.querySelector("#inp-single-student-pdf-file");
+        card.querySelectorAll(".btn-attach-single-pdf").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const roll = btn.getAttribute("data-roll");
+                const name = btn.getAttribute("data-name");
+                this.activeTargetStudentForUpload = { rollNo: roll, studentName: name };
+                if (inpSinglePdf) inpSinglePdf.click();
+            });
+        });
+    }
+
     generateDemoCsvContent() {
         return '"Roll No","Student Name"';
     }
@@ -1650,96 +1797,7 @@ class UploadPortalManager {
 
                 <!-- Student Submission Reconciliation & Missing Check Table -->
                 <div class="reconciliation-card" id="reconciliation-checklist-card">
-                    <div class="reconciliation-header">
-                        <div>
-                            <div class="reconciliation-badge-row">
-                                <span class="reconciliation-tag">Submission Attendance & Checklist</span>
-                                <span class="reconciliation-status-pill ${recon.missingCount === 0 ? 'status-all-present' : 'status-has-missing'}">
-                                    ${recon.missingCount === 0 ? 'All 100% Papers Present' : `${recon.missingCount} Paper(s) Missing`}
-                                </span>
-                            </div>
-                            <h4 class="reconciliation-title">${this.selectedClass.label} Answer Sheet Submission Checklist</h4>
-                            <p class="reconciliation-subtitle">Check off students to confirm all answer papers are present or identify who has not yet submitted.</p>
-                        </div>
-                    </div>
-
-                    <!-- Reconciliation KPI summary strip -->
-                    <div class="reconciliation-kpi-row">
-                        <div class="recon-kpi-chip">
-                            <span class="recon-chip-label">Total Enrolled</span>
-                            <span class="recon-chip-val">${recon.totalEnrolled}</span>
-                        </div>
-                        <div class="recon-kpi-chip chip-present">
-                            <span class="recon-chip-dot"></span>
-                            <span class="recon-chip-label">Papers Present</span>
-                            <span class="recon-chip-val">${recon.presentCount}</span>
-                        </div>
-                        <div class="recon-kpi-chip chip-missing">
-                            <span class="recon-chip-dot"></span>
-                            <span class="recon-chip-label">Missing Papers</span>
-                            <span class="recon-chip-val">${recon.missingCount}</span>
-                        </div>
-                        <div class="recon-filter-group">
-                            <button type="button" class="btn-recon-filter ${this.rosterFilter === 'all' ? 'active' : ''}" data-filter="all">All (${recon.totalEnrolled})</button>
-                            <button type="button" class="btn-recon-filter ${this.rosterFilter === 'missing' ? 'active' : ''}" data-filter="missing">Missing (${recon.missingCount})</button>
-                            <button type="button" class="btn-recon-filter ${this.rosterFilter === 'present' ? 'active' : ''}" data-filter="present">Present (${recon.presentCount})</button>
-                        </div>
-                    </div>
-
-                    <!-- Interactive Verification Table -->
-                    <div class="reconciliation-table-wrap">
-                        <table class="reconciliation-table">
-                            <thead>
-                                <tr>
-                                    <th style="width: 54px; text-align: center;">Verify</th>
-                                    <th style="width: 90px;">Roll No</th>
-                                    <th>Student Name</th>
-                                    <th>Submission & PDF Attachment</th>
-                                    <th style="width: 140px; text-align: right;">Action</th>
-                                </tr>
-                            </thead>
-                            <tbody class="recon-table-body">
-                                ${filteredStudents.map(student => `
-                                    <tr class="${student.isPresent ? 'row-present' : 'row-missing'}">
-                                        <td style="text-align: center;">
-                                            <input type="checkbox" class="recon-check-box" data-roll="${student.rollNo}" ${student.isPresent ? 'checked' : ''} title="Tick to verify student paper presence" />
-                                        </td>
-                                        <td class="font-mono">${student.rollNo}</td>
-                                        <td><span class="student-name-text">${student.studentName}</span></td>
-                                        <td>
-                                            ${student.matchedFile ? `
-                                                <div class="file-matched-chip ${student.matchedFile.isUploaded ? 'chip-saved' : ''}">
-                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#34C759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                                    <span class="matched-filename">${student.matchedFile.fileName}</span>
-                                                    <span class="matched-pages">(${student.matchedFile.pages.length} Pages • ${student.matchedFile.isUploaded ? 'Saved' : 'In Queue'})</span>
-                                                </div>
-                                            ` : (student.isManuallyTicked ? `
-                                                <span class="badge-manually-verified">
-                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-                                                    Manually Verified Present
-                                                </span>
-                                            ` : `
-                                                <span class="badge-missing-alert">
-                                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#FF3B30" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-                                                    Missing File
-                                                </span>
-                                            `)}
-                                        </td>
-                                        <td style="text-align: right;">
-                                            ${student.isPresent ? `
-                                                <span class="tag-ready-check">Present</span>
-                                            ` : `
-                                                <button type="button" class="btn-attach-single-pdf" data-roll="${student.rollNo}" data-name="${student.studentName}">
-                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                                                    Attach PDF
-                                                </button>
-                                            `}
-                                        </td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
+                    ${this.renderReconciliationCardHtml()}
                 </div>
 
                 <!-- Existing Uploaded Papers for this Class -->
@@ -3916,8 +3974,8 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     this.selectedClass = this.classes.find(c => c.id === clsId) || null;
                     this.currentStep = 4;
                     await this.loadClassRoster();
+                    await this.loadExistingClassPapers();
                     this.updateStepView();
-                    this.loadExistingClassPapers();
                 });
             });
 
@@ -5294,9 +5352,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
     // --- Load Existing Papers for Selected Class ---
     async loadExistingClassPapers() {
-        const wrap = this.container.querySelector("#existing-papers-tbody-wrap");
-        const countBadge = this.container.querySelector("#existing-count-badge");
-        if (!wrap || !this.selectedClass || !this.selectedSubject || !this.selectedTemplate) return;
+        if (!this.selectedClass || !this.selectedSubject || !this.selectedTemplate) return [];
 
         const all = await window.appStorage.getAllEvaluations(false, true);
         const targetCls = String(this.selectedClass.label || this.selectedClass.name || this.selectedClass.id || "").toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -5327,7 +5383,14 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         });
 
         this.existingPapers = matches;
+
+        // Also refresh reconciliation checklist if present in DOM
+        this.refreshReconciliationCard();
+
+        const wrap = this.container.querySelector("#existing-papers-tbody-wrap");
+        const countBadge = this.container.querySelector("#existing-count-badge");
         if (countBadge) countBadge.textContent = `${matches.length} Paper(s) In Class`;
+        if (!wrap) return matches;
 
         if (matches.length === 0) {
             wrap.innerHTML = `

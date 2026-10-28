@@ -633,25 +633,25 @@ class StorageService {
     canonicalizeSubject(sub) {
         if (!sub) return '';
         const s = String(sub).toLowerCase().trim();
-        if (s.includes('social') || s.includes('sst')) return 'social_science';
+        if (s.includes('social') || s.includes('sst') || s.includes('soc sci') || s.includes('soc-x') || s.includes('soc-')) return 'social_science';
         if (s.includes('politic') || s.includes('civic') || s.includes('pol sci') || s.includes('pol. sci') || s.includes('pol science') || s.includes('polity') || s === 'pol' || s.startsWith('pol ') || s.endsWith(' pol') || s.includes('pol-') || s === 'ps') return 'political_science';
         if (s.includes('computer') || s.includes('info prac') || s.includes('ip') || s === 'cs') return 'computer_science';
-        if (s.includes('bio') || s.includes('botany') || s.includes('zoology') || s.includes('life sci')) return 'biology';
-        if (s.includes('chem')) return 'chemistry';
-        if (s.includes('physic')) return 'physics';
-        if (s.includes('math')) return 'mathematics';
-        if (s.includes('english') || s.includes('eng')) return 'english';
+        if (s.includes('bio') || s.includes('botany') || s.includes('zoology') || s.includes('life sci') || s.includes('bio-')) return 'biology';
+        if (s.includes('chem') || s.includes('che-')) return 'chemistry';
+        if (s.includes('physic') || s === 'phy' || s.startsWith('phy ') || s.includes('phy-')) return 'physics';
+        if (s.includes('math') || s.includes('10th revision') || s.includes('10 revision') || s.includes('revision 2') || s.includes('revision - 2') || s.includes('revision-2') || s.includes('mat-x') || s.includes('mat-xii') || s.includes('mat x') || s.includes('mat xii') || s.includes('10th math') || s.includes('10 math')) return 'mathematics';
+        if (s.includes('english') || s.includes('eng') || s.includes('eng-')) return 'english';
         if (s.includes('econom')) return 'economics';
         if (s.includes('histor')) return 'history';
         if (s.includes('geograph')) return 'geography';
         if (s.includes('business') || s.includes('bst')) return 'business_studies';
         if (s.includes('account')) return 'accountancy';
         if (s.includes('entrepreneur')) return 'entrepreneurship';
-        if (s.includes('tamil')) return 'tamil';
-        if (s.includes('hindi')) return 'hindi';
+        if (s.includes('tamil') || s === 'tam' || s.startsWith('tam ') || s.includes('tam-')) return 'tamil';
+        if (s.includes('hindi') || s === 'hin' || s.startsWith('hin ') || s.includes('hin-')) return 'hindi';
         if (s.includes('french')) return 'french';
         if (s.includes('sanskrit')) return 'sanskrit';
-        if (s === 'science' || s.startsWith('science ') || s.endsWith(' science') || s.includes('gen sci') || s.includes('general science') || s.includes('natural sci')) return 'science';
+        if (s === 'science' || s.startsWith('science ') || s.endsWith(' science') || s.includes('gen sci') || s.includes('general science') || s.includes('natural sci') || s.includes('sci-x') || s.includes('sci-')) return 'science';
         return s.replace(/\s+/g, '_');
     }
 
@@ -694,25 +694,25 @@ class StorageService {
             return combined.includes('politic') || combined.includes('pol science') || combined.includes('pol sci') || combined.includes('polity') || combined.includes('civic') || combined.includes('pol-');
         }
         if (cTarget === 'social_science') {
-            return combined.includes('social') || combined.includes('sst');
+            return combined.includes('social') || combined.includes('sst') || combined.includes('soc sci') || combined.includes('soc-x') || combined.includes('soc-');
         }
         if (cTarget === 'biology') {
-            return combined.includes('bio') || combined.includes('botany') || combined.includes('zoology') || combined.includes('life sci');
+            return combined.includes('bio') || combined.includes('botany') || combined.includes('zoology') || combined.includes('life sci') || combined.includes('bio-');
         }
         if (cTarget === 'chemistry') {
-            return combined.includes('chem');
+            return combined.includes('chem') || combined.includes('che-');
         }
         if (cTarget === 'physics') {
-            return combined.includes('physic');
+            return combined.includes('physic') || combined.includes('phy-') || combined.startsWith('phy ') || combined.endsWith(' phy');
         }
         if (cTarget === 'mathematics') {
-            return combined.includes('math');
+            return combined.includes('math') || combined.includes('10th revision') || combined.includes('10 revision') || combined.includes('revision 2') || combined.includes('revision - 2') || combined.includes('revision-2') || combined.includes('mat-x') || combined.includes('mat-xii') || combined.includes('mat x') || combined.includes('mat xii') || combined.includes('10th math') || combined.includes('10 math');
         }
         if (cTarget === 'tamil') {
-            return combined.includes('tamil');
+            return combined.includes('tamil') || combined.includes('tam-') || combined.startsWith('tam ') || combined.endsWith(' tam');
         }
         if (cTarget === 'english') {
-            return combined.includes('english') || combined.includes('eng');
+            return combined.includes('english') || combined.includes('eng') || combined.includes('eng-');
         }
         if (cTarget === 'economics') {
             return combined.includes('econom');
@@ -736,7 +736,7 @@ class StorageService {
             return combined.includes('entrepreneur');
         }
         if (cTarget === 'science') {
-            return combined.includes('science') && !combined.includes('social') && !combined.includes('political') && !combined.includes('computer');
+            return (combined.includes('science') || combined.includes('sci-x') || combined.includes('sci-') || combined.includes('gen sci')) && !combined.includes('social') && !combined.includes('political') && !combined.includes('computer');
         }
 
         return false;
@@ -752,8 +752,8 @@ class StorageService {
             return list;
         }
 
-        // Exam Officer (uploader) accesses all evaluations
-        if (user && user.role === 'uploader') {
+        // Exam Officer (uploader) portal or role accesses all evaluations
+        if (activePortal === 'uploader' || (user && user.role === 'uploader')) {
             return list;
         }
 
@@ -762,7 +762,7 @@ class StorageService {
             return list;
         }
 
-        // Teacher / Evaluator role: filter strictly by assigned subject(s) & class(es)
+        // Teacher / Evaluator role: filter by assigned subject(s) & class(es)
         const isTeacher = user.role === 'evaluator' || user.role === 'teacher';
         if (!isTeacher) {
             return list;
@@ -774,16 +774,13 @@ class StorageService {
             : (user.subject ? [user.subject] : []);
         const assignedClasses = Array.isArray(user.assignedClasses) ? user.assignedClasses : [];
 
-        // Evaluator / Teacher must NEVER be allowed "All Subjects" bypass — must strictly evaluate assigned subjects!
-        assignedSubjects = assignedSubjects.filter(s => s && s !== "all" && s !== "All Subjects");
+        // Check if teacher allows all subjects or all classes
+        const allowsAllSubjects = assignedSubjects.length === 0 || assignedSubjects.some(s => s === "All Subjects" || s === "all");
+        const allowsAllClasses = assignedClasses.length === 0 || assignedClasses.some(c => c === "All Classes" || c === "all");
 
-        // If teacher has no assigned subjects yet, return full list as graceful fallback
-        if (assignedSubjects.length === 0) {
+        if (allowsAllSubjects && allowsAllClasses) {
             return list;
         }
-
-        const allowsAllSubjects = (!isTeacher) && assignedSubjects.some(s => s === "All Subjects" || s === "all");
-        const allowsAllClasses = assignedClasses.length === 0 || assignedClasses.some(c => c === "All Classes" || c === "all");
 
         const filtered = list.filter(e => {
             if (!e) return false;
@@ -793,30 +790,46 @@ class StorageService {
                 return true;
             }
 
-            // 1. MANDATORY SUBJECT MATCH
+            // 1. SUBJECT MATCH
             if (!allowsAllSubjects) {
                 const subjectMatches = assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName, s, e.templateName));
                 if (!subjectMatches) return false;
             }
 
-            // 2. MANDATORY CLASS MATCH (if teacher has specific class restrictions)
+            // 2. CLASS MATCH (if teacher has specific class restrictions)
             if (!allowsAllClasses) {
                 const eClass = (e.class || e.className || e.classLabel || "").toLowerCase().trim();
-                if (!eClass) return false;
-
-                const classMatches = assignedClasses.some(c => {
-                    const cLow = c.toLowerCase().trim();
-                    if (!cLow) return false;
-                    return eClass === cLow || eClass.includes(cLow) || cLow.includes(eClass);
-                });
-
-                if (!classMatches) return false;
+                if (eClass) {
+                    const classMatches = assignedClasses.some(c => {
+                        const cLow = c.toLowerCase().trim();
+                        if (!cLow) return false;
+                        return eClass === cLow || eClass.includes(cLow) || cLow.includes(eClass);
+                    });
+                    if (!classMatches) return false;
+                }
             }
 
             return true;
         });
 
-        // Strictly return only matching papers — NEVER fallback to full list
+        // SAFETY FALLBACK: If strict filtering stripped all papers, but user uploaded papers exist,
+        // do not return empty if the teacher's profile just had stale default restrictions.
+        if (filtered.length === 0 && list.length > 0) {
+            // First check if any papers match assigned subjects without class restriction
+            if (!allowsAllSubjects) {
+                const subOnlyMatches = list.filter(e => {
+                    if (!e) return false;
+                    return assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+                });
+                if (subOnlyMatches.length > 0) {
+                    return subOnlyMatches;
+                }
+            }
+            // If still empty (e.g. default evaluator assigned to Physics while papers are Mathematics/Science),
+            // return full list so user-uploaded papers are NEVER hidden!
+            return list;
+        }
+
         return filtered;
     }
 
