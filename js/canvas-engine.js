@@ -123,7 +123,7 @@ class CanvasEngine {
         this.container.appendChild(this.wrapper);
     }
 
-    static generateDefaultLinedPageDataUrl(titleText = "Student Answer Sheet", rollNo = "101", subjectText = "Examination") {
+    static generateDefaultLinedCanvas(titleText = "Student Answer Sheet", rollNo = "101", subjectText = "Examination") {
         const canvas = document.createElement("canvas");
         canvas.width = 1200;
         canvas.height = 1650;
@@ -139,8 +139,8 @@ class CanvasEngine {
         ctx.strokeRect(0, 0, 1200, 140);
 
         ctx.fillStyle = "#0F172A";
-        ctx.font = "400 24px system-ui, -apple-system, sans-serif";
-        ctx.fillText(`${titleText} (Roll: ${rollNo})`, 40, 55);
+        ctx.font = "bold 24px system-ui, -apple-system, sans-serif";
+        ctx.fillText(`${titleText} (Roll: ${rollNo || '—'})`, 40, 55);
 
         ctx.fillStyle = "#64748B";
         ctx.font = "400 16px system-ui, -apple-system, sans-serif";
@@ -163,6 +163,11 @@ class CanvasEngine {
             ctx.stroke();
         }
 
+        return canvas;
+    }
+
+    static generateDefaultLinedPageDataUrl(titleText = "Student Answer Sheet", rollNo = "101", subjectText = "Examination") {
+        const canvas = CanvasEngine.generateDefaultLinedCanvas(titleText, rollNo, subjectText);
         return canvas.toDataURL("image/jpeg", 0.92);
     }
 
@@ -343,33 +348,46 @@ class CanvasEngine {
                 return true;
             });
 
-            // If no valid images remain (e.g. cloud PDF was 404), generate digital answer sheet
+            // If no valid images remain (e.g. cloud PDF was 404), generate digital answer sheet canvas directly
             if (validPageImages.length === 0) {
                 const sName = options.studentName || this.options?.studentName || "Student";
                 const rNo = options.rollNo || this.options?.rollNo || "";
                 const sub = options.subject || this.options?.subject || "";
-                validPageImages = [CanvasEngine.generateDefaultLinedPageDataUrl(sName, rNo, sub)];
-                
-                if (window.app && window.app.showToast) {
-                    window.app.showToast(`Displaying digital answer sheet for ${sName} (Roll ${rNo || '—'}).`, 4000);
-                }
-            }
+                const linedCanvas = CanvasEngine.generateDefaultLinedCanvas(sName, rNo, sub);
 
-            this.pages = validPageImages.map((src, idx) => {
-                const pageAnn = savedAnnotations.filter(a => a.pageIndex === idx);
-                return {
-                    pageIndex: idx,
+                this.pages = [{
+                    pageIndex: 0,
                     pdfPageNum: null,
-                    imageSrc: src,
-                    imgObj: null,
+                    imageSrc: null,
+                    imgObj: linedCanvas,
                     origWidth: 1200,
                     origHeight: 1650,
-                    isLoaded: false,
-                    annotations: JSON.parse(JSON.stringify(pageAnn)),
+                    isLoaded: true,
+                    annotations: JSON.parse(JSON.stringify(savedAnnotations)),
                     undoStack: [],
                     redoStack: []
-                };
-            });
+                }];
+
+                if (window.app && window.app.showToast) {
+                    window.app.showToast(`Displaying digital answer sheet for ${sName} (Roll ${rNo || '—'}). PDF missing on server.`, 4500);
+                }
+            } else {
+                this.pages = validPageImages.map((src, idx) => {
+                    const pageAnn = savedAnnotations.filter(a => a.pageIndex === idx);
+                    return {
+                        pageIndex: idx,
+                        pdfPageNum: null,
+                        imageSrc: src,
+                        imgObj: null,
+                        origWidth: 1200,
+                        origHeight: 1650,
+                        isLoaded: false,
+                        annotations: JSON.parse(JSON.stringify(pageAnn)),
+                        undoStack: [],
+                        redoStack: []
+                    };
+                });
+            }
         }
 
         this.currentPageIndex = 0;
@@ -460,7 +478,9 @@ class CanvasEngine {
                     }
 
                     const img = new Image();
-                    img.crossOrigin = "anonymous";
+                    if (typeof srcToLoad === "string" && !srcToLoad.startsWith("data:")) {
+                        img.crossOrigin = "anonymous";
+                    }
                     await new Promise((resolve) => {
                         img.onload = () => {
                             page.imgObj = img;
@@ -474,51 +494,26 @@ class CanvasEngine {
                             const sName = this.options?.studentName || "Student";
                             const rNo = this.options?.rollNo || "";
                             const sub = this.options?.subject || "";
-                            const fbData = CanvasEngine.generateDefaultLinedPageDataUrl(sName, rNo, sub);
-                            const fbImg = new Image();
-                            fbImg.onload = () => {
-                                page.imgObj = fbImg;
-                                page.origWidth = fbImg.naturalWidth || 1200;
-                                page.origHeight = fbImg.naturalHeight || 1650;
-                                page.isLoaded = true;
-                                resolve();
-                            };
-                            fbImg.onerror = () => {
-                                page.origWidth = 1200;
-                                page.origHeight = 1650;
-                                page.isLoaded = true;
-                                resolve();
-                            };
-                            fbImg.src = fbData;
+                            page.imgObj = CanvasEngine.generateDefaultLinedCanvas(sName, rNo, sub);
+                            page.origWidth = 1200;
+                            page.origHeight = 1650;
+                            page.isLoaded = true;
+                            resolve();
                         };
                         img.src = srcToLoad;
                     });
                 }
             }
 
-            // Fallback: If still no image, generate lined page
+            // Fallback: If still no image, generate lined page directly
             if (!page.imgObj) {
                 const sName = this.options?.studentName || "Student";
                 const rNo = this.options?.rollNo || "";
                 const sub = this.options?.subject || "";
-                const fbData = CanvasEngine.generateDefaultLinedPageDataUrl(sName, rNo, sub);
-                const fbImg = new Image();
-                await new Promise((resolve) => {
-                    fbImg.onload = () => {
-                        page.imgObj = fbImg;
-                        page.origWidth = fbImg.naturalWidth || 1200;
-                        page.origHeight = fbImg.naturalHeight || 1650;
-                        page.isLoaded = true;
-                        resolve();
-                    };
-                    fbImg.onerror = () => {
-                        page.origWidth = 1200;
-                        page.origHeight = 1650;
-                        page.isLoaded = true;
-                        resolve();
-                    };
-                    fbImg.src = fbData;
-                });
+                page.imgObj = CanvasEngine.generateDefaultLinedCanvas(sName, rNo, sub);
+                page.origWidth = 1200;
+                page.origHeight = 1650;
+                page.isLoaded = true;
             }
         }
 
@@ -528,6 +523,7 @@ class CanvasEngine {
             this.updateCanvasDimensions();
             this.renderAll();
         }
+        this.renderAll();
 
         if (this.options.onPageChange) {
             this.options.onPageChange(this.currentPageIndex, this.pages.length);

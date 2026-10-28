@@ -3614,53 +3614,67 @@ class AppController {
         });
 
         // Load evaluation data into canvas & marking panel
-        const pdfFallbackUrl = evaluation.pdfStorageUrl || evaluation.pdfDataUrl || null;
-        await this.canvasEngine.setPages(
-            evaluation.pages || [],
-            evaluation.annotations || [],
-            pdfFallbackUrl,
-            {
-                studentName: evaluation.studentName,
-                rollNo: evaluation.rollNo,
-                subject: evaluation.subject
+        try {
+            const pdfFallbackUrl = evaluation.pdfStorageUrl || evaluation.pdfDataUrl || null;
+            await this.canvasEngine.setPages(
+                evaluation.pages || [],
+                evaluation.annotations || [],
+                pdfFallbackUrl,
+                {
+                    studentName: evaluation.studentName,
+                    rollNo: evaluation.rollNo,
+                    subject: evaluation.subject
+                }
+            );
+            this.markingPanel.setEvaluationData(evaluation.questions || [], evaluation.maxMarks || 20, evaluation.feedback || "", evaluation.sections || []);
+
+            // Sync initial Top HUD with Q1
+            const initialQ = this.markingPanel.getActiveQuestion();
+            if (initialQ) this.updateTopHud(initialQ);
+            this.updatePageTotalDisplay();
+            this.renderScorecardTable();
+
+            // Update pager UI
+            const pagerText = document.getElementById("ws-pager-text");
+            if (pagerText && this.canvasEngine && this.canvasEngine.pages) {
+                pagerText.textContent = `Page 1 of ${this.canvasEngine.pages.length}`;
             }
-        );
-        this.markingPanel.setEvaluationData(evaluation.questions || [], evaluation.maxMarks || 20, evaluation.feedback || "", evaluation.sections || []);
 
-        // Sync initial Top HUD with Q1
-        const initialQ = this.markingPanel.getActiveQuestion();
-        if (initialQ) this.updateTopHud(initialQ);
-        this.updatePageTotalDisplay();
-        this.renderScorecardTable();
+            // Set default tool
+            this.selectTool("tick");
 
-        // Update pager UI
-        const pagerText = document.getElementById("ws-pager-text");
-        if (pagerText && this.canvasEngine && this.canvasEngine.pages) {
-            pagerText.textContent = `Page 1 of ${this.canvasEngine.pages.length}`;
+            // Fit to page initially & redraw canvas
+            if (this.canvasEngine) {
+                this.canvasEngine.fitToPage();
+                this.canvasEngine.renderAll();
+                requestAnimationFrame(() => {
+                    this.canvasEngine?.fitToPage();
+                    this.canvasEngine?.renderAll();
+                    setTimeout(() => {
+                        this.canvasEngine?.fitToPage();
+                        this.canvasEngine?.renderAll();
+                    }, 100);
+                    setTimeout(() => {
+                        this.canvasEngine?.fitToPage();
+                        this.canvasEngine?.renderAll();
+                    }, 300);
+                });
+            }
+
+            // Start autosave cycle
+            this.startAutosave();
+            this.setAutosaveBadge("saved");
+        } catch (openErr) {
+            console.error("Error opening evaluation in workspace:", openErr);
+            this.showToast("Note: Student paper could not be loaded from cloud. Displaying digital scorecard.", 4000);
+        } finally {
+            if (wsOverlay) {
+                wsOverlay.style.opacity = "0";
+                setTimeout(() => {
+                    wsOverlay.style.display = "none";
+                }, 150);
+            }
         }
-
-        // Set default tool
-        this.selectTool("tick");
-
-        // Fit to page initially & hide loader
-        if (this.canvasEngine) {
-            this.canvasEngine.fitToPage();
-            requestAnimationFrame(() => {
-                this.canvasEngine?.fitToPage();
-                setTimeout(() => this.canvasEngine?.fitToPage(), 100);
-                setTimeout(() => this.canvasEngine?.fitToPage(), 300);
-            });
-        }
-        if (wsOverlay) {
-            wsOverlay.style.opacity = "0";
-            setTimeout(() => {
-                wsOverlay.style.display = "none";
-            }, 250);
-        }
-
-        // Start autosave cycle
-        this.startAutosave();
-        this.setAutosaveBadge("saved");
     }
 
     async populateWorkspaceTemplateSelector(evaluation) {
