@@ -245,9 +245,35 @@ class DashboardManager {
                 const parts = this.activeBatchKey.split(":::");
                 const targetCls = (parts[0] || "").toLowerCase().trim();
                 const targetTpl = (parts[1] || "").toLowerCase().trim();
-                const eCls = (e.class || e.className || e.classLabel || "").toLowerCase().trim();
-                const eTpl = (e.templateName || e.examName || "Standard Assessment").toLowerCase().trim();
-                if (eCls !== targetCls || eTpl !== targetTpl) return false;
+                
+                // Flexible normalized class matching (strip punctuation/spaces: "class 10-b" == "10-b")
+                const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
+                const eCls1 = (e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const eCls2 = (e.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const eCls3 = (e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const clsMatches = !normTargetCls || 
+                    eCls1 === normTargetCls || eCls2 === normTargetCls || eCls3 === normTargetCls ||
+                    (eCls1 && (eCls1.includes(normTargetCls) || normTargetCls.includes(eCls1))) ||
+                    (eCls2 && (eCls2.includes(normTargetCls) || normTargetCls.includes(eCls2))) ||
+                    (eCls3 && (eCls3.includes(normTargetCls) || normTargetCls.includes(eCls3)));
+
+                if (!clsMatches) return false;
+
+                // Flexible template matching (harmonized + raw name)
+                const rawTpl = (e.templateName || e.examName || "").toLowerCase().trim();
+                const harmTpl = (window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, e.subject) : rawTpl).toLowerCase().trim();
+                const normTargetTpl = targetTpl.replace(/[^a-z0-9]/g, '');
+                const normRaw = rawTpl.replace(/[^a-z0-9]/g, '');
+                const normHarm = harmTpl.replace(/[^a-z0-9]/g, '');
+
+                const tplMatches = !normTargetTpl ||
+                    normRaw === normTargetTpl || normHarm === normTargetTpl ||
+                    (normRaw && (normRaw.includes(normTargetTpl) || normTargetTpl.includes(normRaw))) ||
+                    (normHarm && (normHarm.includes(normTargetTpl) || normTargetTpl.includes(normHarm))) ||
+                    rawTpl.includes(targetTpl) || targetTpl.includes(rawTpl) ||
+                    harmTpl.includes(targetTpl) || targetTpl.includes(harmTpl);
+
+                if (!tplMatches) return false;
             }
 
             // 1. Status Tab filter
@@ -256,9 +282,16 @@ class DashboardManager {
 
             // 2. Class filter (flexible matching when on overview)
             if (!this.activeBatchKey && this.selectedClassFilter && this.selectedClassFilter !== "all") {
-                const fCls = this.selectedClassFilter.toLowerCase().trim();
-                const eCls = (e.class || e.className || e.classLabel || "").toLowerCase().trim();
-                if (eCls !== fCls && !eCls.includes(fCls) && !fCls.includes(eCls)) return false;
+                const normFilter = this.selectedClassFilter.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const eCls1 = (e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const eCls2 = (e.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const eCls3 = (e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const classMatch = !normFilter || 
+                    eCls1 === normFilter || eCls2 === normFilter || eCls3 === normFilter ||
+                    (eCls1 && (eCls1.includes(normFilter) || normFilter.includes(eCls1))) ||
+                    (eCls2 && (eCls2.includes(normFilter) || normFilter.includes(eCls2))) ||
+                    (eCls3 && (eCls3.includes(normFilter) || normFilter.includes(eCls3)));
+                if (!classMatch) return false;
             }
 
             // 2b. Subject filter dropdown (secondary — within the teacher's own subject)
@@ -1016,7 +1049,16 @@ class DashboardManager {
                 e.stopPropagation();
                 const cls = btn.getAttribute("data-class");
                 const tpl = btn.getAttribute("data-template");
-                const batch = (this.batches || []).find(b => b.className === cls && b.templateName === tpl);
+                const normCls = (cls || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const normTpl = (tpl || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+
+                const batch = (this.batches || []).find(b => {
+                    const bCls = (b.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const bTpl = (b.templateName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return (bCls === normCls || bCls.includes(normCls) || normCls.includes(bCls)) &&
+                           (bTpl === normTpl || bTpl.includes(normTpl) || normTpl.includes(bTpl));
+                }) || (this.batches || []).find(b => b.className === cls && b.templateName === tpl);
+
                 if (batch) {
                     const targetPaper = batch.firstPendingPaper || (batch.papers && batch.papers[0]);
                     if (targetPaper && this.options.onOpenEvaluation) {
@@ -1026,6 +1068,8 @@ class DashboardManager {
                     } else if (window.app) {
                         window.app.showToast("No papers found in this batch.", "warning");
                     }
+                } else if (window.app) {
+                    window.app.showToast("Opening evaluation workspace...", "info");
                 }
             });
         });

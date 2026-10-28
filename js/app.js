@@ -4684,6 +4684,12 @@ class AppController {
         this.setAutosaveBadge("saving");
         if (this.canvasEngine) {
             this.activeEvaluation.annotations = this.canvasEngine.getAllAnnotations();
+            if ((!this.activeEvaluation.pages || this.activeEvaluation.pages.length === 0) && this.canvasEngine.pages && this.canvasEngine.pages.length > 0) {
+                const cePages = this.canvasEngine.pages.map(p => p.imageSrc).filter(src => src && typeof src === "string" && !src.includes("evaluations_pdf"));
+                if (cePages.length > 0) {
+                    this.activeEvaluation.pages = cePages;
+                }
+            }
         }
         if (this.markingPanel) {
             const summary = this.markingPanel.getScoreSummary();

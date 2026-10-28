@@ -410,7 +410,7 @@ class StorageService {
             const store = tx.objectStore("evaluations");
             const cleanRecord = Object.assign({}, evaluation);
             if (cleanRecord.rawFile) delete cleanRecord.rawFile;
-            if (cleanRecord.pdfDataUrl) delete cleanRecord.pages;
+            // CRITICAL: Preserve cleanRecord.pages in IndexedDB so rendered scans are never stripped!
             store.put(cleanRecord);
         } catch (e) {
             console.warn("Error caching evaluation into IndexedDB:", e);
@@ -504,6 +504,9 @@ class StorageService {
                                 const merged = Object.assign({}, existing, fbItem, {
                                     // Retain local annotations if paper is actively being corrected here
                                     annotations: (existing.annotations && existing.annotations.length > 0) ? existing.annotations : (fbItem.annotations || []),
+                                    // Retain local pages and pdfDataUrl so cloud sync never strips local scans
+                                    pages: (existing.pages && existing.pages.length > 0) ? existing.pages : (fbItem.pages || []),
+                                    pdfDataUrl: existing.pdfDataUrl || fbItem.pdfDataUrl || null,
                                     obtainedMarks: (Number(existing.obtainedMarks) > 0) ? existing.obtainedMarks : fbItem.obtainedMarks
                                 });
                                 const idx = list.findIndex(e => String(e.id) === sId);
@@ -1087,10 +1090,7 @@ class StorageService {
                 const store = tx.objectStore("evaluations");
                 const cleanRecord = Object.assign({}, evaluation);
                 if (cleanRecord.rawFile) delete cleanRecord.rawFile;
-                // If PDF is present, do not store redundant rendered pages array in IndexedDB
-                if (cleanRecord.pdfDataUrl) {
-                    delete cleanRecord.pages;
-                }
+                // CRITICAL: Preserve cleanRecord.pages so local rendered scans are never stripped
                 const req = store.put(cleanRecord); // store.put strictly overwrites existing key
                 req.onsuccess = () => resolve(evaluation);
                 req.onerror = (e) => {
