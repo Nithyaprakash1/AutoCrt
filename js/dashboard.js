@@ -500,7 +500,6 @@ class DashboardManager {
             `;
             return;
         }
-        }
 
         // =========================================================================
         // VIEW 2: Batch Drill-Down Mode (When teacher clicked a specific batch)
