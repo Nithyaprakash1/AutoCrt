@@ -123,7 +123,7 @@ class CanvasEngine {
         this.container.appendChild(this.wrapper);
     }
 
-    static generateDefaultLinedPageDataUrl(titleText = "Student Answer Sheet", rollNo = "101") {
+    static generateDefaultLinedPageDataUrl(titleText = "Student Answer Sheet", rollNo = "101", subjectText = "Examination") {
         const canvas = document.createElement("canvas");
         canvas.width = 1200;
         canvas.height = 1650;
@@ -144,7 +144,8 @@ class CanvasEngine {
 
         ctx.fillStyle = "#64748B";
         ctx.font = "400 16px system-ui, -apple-system, sans-serif";
-        ctx.fillText("Niprak OSM Platform • Official Physics Examination Answer Sheet", 40, 95);
+        const subLabel = subjectText ? `${subjectText} Examination Answer Sheet` : "Examination Answer Sheet";
+        ctx.fillText(`Niprak OSM Platform • Official ${subLabel}`, 40, 95);
 
         ctx.strokeStyle = "rgba(220, 38, 38, 0.4)";
         ctx.lineWidth = 2.5;
@@ -207,67 +208,81 @@ class CanvasEngine {
             }
         }
 
-        // 2. HTTP/HTTPS URL:
-        // Priority 1: Direct Native Fetch (works universally across origins with Firebase CORS headers)
-        // Priority 2: Universal local Node server proxy (/proxy?url=...)
-        // Priority 3: Fallback Public CORS Proxies (if accessed on external static host without server.js)
-        const candidates = [url];
-
-        if (typeof window !== "undefined" && window.location && window.location.protocol.startsWith("http")) {
-            candidates.push(`/proxy?url=${encodeURIComponent(url)}`);
-        }
-        candidates.push(`https://corsproxy.io/?url=${encodeURIComponent(url)}`);
-        candidates.push(`https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`);
-
-        for (const targetUrl of candidates) {
+        // 2. Blob URL
+        if (url.startsWith("blob:")) {
             try {
-                const resp = await fetch(targetUrl, { mode: "cors" });
+                const resp = await fetch(url);
                 if (resp.ok) {
                     const buf = await resp.arrayBuffer();
-                    if (buf && buf.byteLength > 100) {
-                        const uint8 = new Uint8Array(buf);
-                        // Validate PDF signature: %PDF anywhere in the first 1024 bytes
-                        let isPdf = false;
-                        const checkLen = Math.min(uint8.byteLength - 4, 1024);
-                        for (let b = 0; b <= checkLen; b++) {
-                            if (uint8[b] === 0x25 && uint8[b+1] === 0x50 && uint8[b+2] === 0x44 && uint8[b+3] === 0x46) {
-                                isPdf = true;
-                                break;
-                            }
-                        }
-                        if (isPdf) {
-                            return uint8;
-                        } else {
-                            console.warn("Fetched response was not a valid PDF binary (%PDF signature missing) from", targetUrl);
+                    return new Uint8Array(buf);
+                }
+            } catch (e) {}
+        }
+
+        // 3. HTTP/HTTPS URL:
+        // Direct Native Fetch with fast 404 guard
+        try {
+            const resp = await fetch(url, { mode: "cors" });
+            if (resp.status === 404) {
+                console.warn("Remote PDF file does not exist on server (404):", url);
+                return null; // Stop immediately - proxies cannot resolve a 404 file!
+            }
+            if (resp.ok) {
+                const buf = await resp.arrayBuffer();
+                if (buf && buf.byteLength > 100) {
+                    const uint8 = new Uint8Array(buf);
+                    let isPdf = false;
+                    const checkLen = Math.min(uint8.byteLength - 4, 1024);
+                    for (let b = 0; b <= checkLen; b++) {
+                        if (uint8[b] === 0x25 && uint8[b+1] === 0x50 && uint8[b+2] === 0x44 && uint8[b+3] === 0x46) {
+                            isPdf = true;
+                            break;
                         }
                     }
+                    if (isPdf) return uint8;
                 }
-            } catch (err) {
-                // Try next candidate
+            }
+        } catch (err) {
+            // Only try proxy if direct fetch failed due to CORS/network, NOT on a 404 status
+            if (typeof window !== "undefined" && window.location && window.location.protocol.startsWith("http")) {
+                try {
+                    const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
+                    const pResp = await fetch(proxyUrl, { mode: "cors" });
+                    if (pResp.ok) {
+                        const buf = await pResp.arrayBuffer();
+                        if (buf && buf.byteLength > 100) {
+                            return new Uint8Array(buf);
+                        }
+                    }
+                } catch (pe) {}
             }
         }
 
         return null;
     }
 
-    async setPages(pageImages, savedAnnotations = [], pdfFallbackUrl = null) {
+    async setPages(pageImages, savedAnnotations = [], pdfFallbackUrl = null, options = {}) {
         let expandedPages = Array.isArray(pageImages) ? [...pageImages] : [];
         this.pdfDoc = null;
+        if (options && typeof options === "object") {
+            this.options = Object.assign(this.options || {}, options);
+        }
 
-        // Check if pages contains a PDF (either Base64 or Firebase Storage / HTTP URL)
-        let pdfSource = pdfFallbackUrl;
-        const firstPage = expandedPages.length > 0 ? expandedPages[0] : null;
-        if (!pdfSource && typeof firstPage === "string") {
-            const low = firstPage.toLowerCase();
-            if (
-                firstPage.startsWith("data:application/pdf") ||
-                firstPage.includes("evaluations_pdf") ||
-                low.includes(".pdf") ||
-                firstPage.includes("alt=media") ||
-                firstPage.includes("firebasestorage") ||
-                firstPage.includes("/proxy?url=")
-            ) {
-                pdfSource = firstPage;
+        // Determine candidate PDF sources in priority order:
+        // Priority 1: Direct Base64 / Blob data URL from pageImages or pdfFallbackUrl (always 100% reliable)
+        // Priority 2: Remote HTTP/HTTPS URL
+        let pdfSource = null;
+        const candidates = [pdfFallbackUrl, ...expandedPages].filter(Boolean);
+        
+        const localPdf = candidates.find(c => typeof c === "string" && (c.startsWith("data:application/pdf") || c.startsWith("blob:")));
+        if (localPdf) {
+            pdfSource = localPdf;
+        } else {
+            const remotePdf = candidates.find(c => typeof c === "string" && (
+                c.startsWith("http://") || c.startsWith("https://")
+            ) && (c.includes(".pdf") || c.includes("evaluations_pdf") || c.includes("alt=media") || c.includes("firebasestorage")));
+            if (remotePdf) {
+                pdfSource = remotePdf;
             }
         }
 
@@ -295,16 +310,6 @@ class CanvasEngine {
                 } catch (e) {
                     console.warn("Could not load PDF document via bytes in setPages:", e);
                 }
-
-                // Direct URL streaming fallback in case fetchPdfBytes failed or was intercepted
-                if (!this.pdfDoc && typeof pdfSource === "string" && (pdfSource.startsWith("http://") || pdfSource.startsWith("https://"))) {
-                    try {
-                        const loadingTask = window.pdfjsLib.getDocument({ url: pdfSource, withCredentials: false });
-                        this.pdfDoc = await loadingTask.promise;
-                    } catch (urlErr) {
-                        console.warn("Direct URL streaming with pdfjsLib failed:", urlErr);
-                    }
-                }
             }
         }
 
@@ -328,14 +333,29 @@ class CanvasEngine {
                 });
             }
         } else {
-            if (!expandedPages || expandedPages.length === 0) {
-                if (pdfSource) {
-                    expandedPages = [pdfSource];
-                } else {
-                    expandedPages = [CanvasEngine.generateDefaultLinedPageDataUrl()];
+            // PDF could not be loaded or was not a PDF.
+            // Filter expandedPages: remove any failed remote PDF URLs
+            let validPageImages = expandedPages.filter(p => {
+                if (typeof p !== "string") return false;
+                if (p.startsWith("data:image/") || p.startsWith("blob:")) return true;
+                if (pdfSource && p === pdfSource) return false;
+                if ((p.startsWith("http://") || p.startsWith("https://")) && (p.includes(".pdf") || p.includes("evaluations_pdf"))) return false;
+                return true;
+            });
+
+            // If no valid images remain (e.g. cloud PDF was 404), generate digital answer sheet
+            if (validPageImages.length === 0) {
+                const sName = options.studentName || this.options?.studentName || "Student";
+                const rNo = options.rollNo || this.options?.rollNo || "";
+                const sub = options.subject || this.options?.subject || "";
+                validPageImages = [CanvasEngine.generateDefaultLinedPageDataUrl(sName, rNo, sub)];
+                
+                if (window.app && window.app.showToast) {
+                    window.app.showToast(`Displaying digital answer sheet for ${sName} (Roll ${rNo || '—'}).`, 4000);
                 }
             }
-            this.pages = expandedPages.map((src, idx) => {
+
+            this.pages = validPageImages.map((src, idx) => {
                 const pageAnn = savedAnnotations.filter(a => a.pageIndex === idx);
                 return {
                     pageIndex: idx,
@@ -391,14 +411,10 @@ class CanvasEngine {
             if (!page.imgObj && page.imageSrc) {
                 let srcToLoad = page.imageSrc;
 
-                // Handle PDF Data URL or Remote PDF URL fallback
+                // Handle PDF Data URL or Blob fallback
                 const isItemPdf = typeof srcToLoad === "string" && (
                     srcToLoad.startsWith("data:application/pdf") ||
-                    srcToLoad.includes("evaluations_pdf") ||
-                    srcToLoad.toLowerCase().includes(".pdf") ||
-                    srcToLoad.includes("firebasestorage") ||
-                    srcToLoad.includes("/proxy?url=") ||
-                    srcToLoad.includes("alt=media")
+                    srcToLoad.startsWith("blob:")
                 );
 
                 if (isItemPdf) {
@@ -455,7 +471,10 @@ class CanvasEngine {
                         };
                         img.onerror = () => {
                             console.warn("Failed to load page image, generating default lined page:", srcToLoad);
-                            const fbData = CanvasEngine.generateDefaultLinedPageDataUrl();
+                            const sName = this.options?.studentName || "Student";
+                            const rNo = this.options?.rollNo || "";
+                            const sub = this.options?.subject || "";
+                            const fbData = CanvasEngine.generateDefaultLinedPageDataUrl(sName, rNo, sub);
                             const fbImg = new Image();
                             fbImg.onload = () => {
                                 page.imgObj = fbImg;
@@ -479,7 +498,10 @@ class CanvasEngine {
 
             // Fallback: If still no image, generate lined page
             if (!page.imgObj) {
-                const fbData = CanvasEngine.generateDefaultLinedPageDataUrl();
+                const sName = this.options?.studentName || "Student";
+                const rNo = this.options?.rollNo || "";
+                const sub = this.options?.subject || "";
+                const fbData = CanvasEngine.generateDefaultLinedPageDataUrl(sName, rNo, sub);
                 const fbImg = new Image();
                 await new Promise((resolve) => {
                     fbImg.onload = () => {

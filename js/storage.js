@@ -340,12 +340,10 @@ class StorageService {
         if (!id || !pdfPayload) return;
         const targetId = String(id);
 
-        // Store ONLY ONE format: if pdfDataUrl is present, do not store duplicate pages
-        const payloadToStore = pdfPayload.pdfDataUrl ? {
-            pdfDataUrl: pdfPayload.pdfDataUrl,
-            pdfStorageUrl: pdfPayload.pdfStorageUrl || null
-        } : {
-            pages: pdfPayload.pages || []
+        const payloadToStore = {
+            pdfDataUrl: pdfPayload.pdfDataUrl || null,
+            pdfStorageUrl: pdfPayload.pdfStorageUrl || null,
+            pages: Array.isArray(pdfPayload.pages) && pdfPayload.pages.length > 0 ? pdfPayload.pages : []
         };
 
         // 1. High-speed in-memory cache
@@ -881,19 +879,30 @@ class StorageService {
                 if (draft.status !== undefined) evalObj.status = draft.status;
             }
 
-            if (!evalObj.pages || evalObj.pages.length === 0) {
-                const cached = await this.getPdfCache(id);
-                if (cached) {
-                    if (cached.pages && cached.pages.length > 0) evalObj.pages = cached.pages;
-                    if (cached.pdfDataUrl) evalObj.pdfDataUrl = cached.pdfDataUrl;
+            // 1. Recover pages and pdfDataUrl from CacheStorage / Memory Cache if missing
+            const cached = await this.getPdfCache(id);
+            if (cached) {
+                if ((!evalObj.pages || evalObj.pages.length === 0) && cached.pages && cached.pages.length > 0) {
+                    evalObj.pages = cached.pages;
+                }
+                if (!evalObj.pdfDataUrl && cached.pdfDataUrl) {
+                    evalObj.pdfDataUrl = cached.pdfDataUrl;
                 }
             }
-            if (evalObj.pdfStorageUrl) {
-                const hasMultiplePages = Array.isArray(evalObj.pages) && evalObj.pages.length > 1;
-                if (!hasMultiplePages) {
+
+            // 2. Only use remote pdfStorageUrl if we do NOT have local pages or local data URL
+            const hasLocalPages = Array.isArray(evalObj.pages) && evalObj.pages.length > 0 && evalObj.pages.some(p => p && typeof p === 'string' && (p.startsWith('data:') || p.startsWith('blob:')));
+            const hasLocalPdf = evalObj.pdfDataUrl && typeof evalObj.pdfDataUrl === 'string' && (evalObj.pdfDataUrl.startsWith('data:') || evalObj.pdfDataUrl.startsWith('blob:'));
+
+            if (!hasLocalPages && !hasLocalPdf && evalObj.pdfStorageUrl) {
+                if (!evalObj.pages || evalObj.pages.length === 0) {
                     evalObj.pages = [evalObj.pdfStorageUrl];
                 }
-                if (!evalObj.pdfDataUrl) evalObj.pdfDataUrl = evalObj.pdfStorageUrl;
+                if (!evalObj.pdfDataUrl) {
+                    evalObj.pdfDataUrl = evalObj.pdfStorageUrl;
+                }
+            } else if (hasLocalPdf && (!evalObj.pages || evalObj.pages.length === 0)) {
+                evalObj.pages = [evalObj.pdfDataUrl];
             }
             if (!evalObj.pages) evalObj.pages = evalObj.pdfDataUrl ? [evalObj.pdfDataUrl] : [];
         } else {
@@ -983,18 +992,15 @@ class StorageService {
             evaluation.fileSizeBytes = measuredBytes;
         }
 
-        // Save ONLY ONE format: if paper is a PDF, store only the single PDF document (no redundant rendered JPEG page copies)
-        const isPdf = !!(evaluation.pdfDataUrl || (evaluation.pages && evaluation.pages.length === 1 && typeof evaluation.pages[0] === 'string' && evaluation.pages[0].startsWith('data:application/pdf')));
-        if (isPdf) {
-            if (!evaluation.pdfDataUrl && evaluation.pages && evaluation.pages[0]) {
-                evaluation.pdfDataUrl = evaluation.pages[0];
-            }
-            delete evaluation.pages;
+        if (!evaluation.pdfDataUrl && evaluation.pages && evaluation.pages.length === 1 && typeof evaluation.pages[0] === 'string' && evaluation.pages[0].startsWith('data:application/pdf')) {
+            evaluation.pdfDataUrl = evaluation.pages[0];
         }
 
-        const cachePayload = evaluation.pdfDataUrl 
-            ? { pdfDataUrl: evaluation.pdfDataUrl, pdfStorageUrl: evaluation.pdfStorageUrl || null }
-            : { pages: evaluation.pages || [] };
+        const cachePayload = {
+            pdfDataUrl: evaluation.pdfDataUrl || null,
+            pdfStorageUrl: evaluation.pdfStorageUrl || null,
+            pages: Array.isArray(evaluation.pages) && evaluation.pages.length > 0 ? evaluation.pages : []
+        };
 
         await this.storePdfCache(evaluation.id, cachePayload);
 

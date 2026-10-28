@@ -3123,26 +3123,34 @@ class AppController {
             }
         }
 
-        if ((!evaluation.pages || evaluation.pages.length === 0) && window.appStorage) {
+        if (window.appStorage) {
             const cached = await window.appStorage.getPdfCache(evaluation.id);
             if (cached) {
-                if (cached.pages && cached.pages.length > 0) evaluation.pages = cached.pages;
-                if (cached.pdfDataUrl) evaluation.pdfDataUrl = cached.pdfDataUrl;
+                if ((!evaluation.pages || evaluation.pages.length === 0) && cached.pages && cached.pages.length > 0) {
+                    evaluation.pages = cached.pages;
+                }
+                if (!evaluation.pdfDataUrl && cached.pdfDataUrl) {
+                    evaluation.pdfDataUrl = cached.pdfDataUrl;
+                }
             }
         }
 
-        // Prioritize authentic Cloud PDF Storage URL over single-page placeholder
-        if (evaluation.pdfStorageUrl) {
-            const hasMultipleRealPages = Array.isArray(evaluation.pages) && evaluation.pages.length > 1;
-            if (!hasMultipleRealPages) {
+        const hasLocalPages = Array.isArray(evaluation.pages) && evaluation.pages.length > 0 && evaluation.pages.some(p => p && typeof p === 'string' && (p.startsWith('data:') || p.startsWith('blob:')));
+        const hasLocalPdf = evaluation.pdfDataUrl && typeof evaluation.pdfDataUrl === 'string' && (evaluation.pdfDataUrl.startsWith('data:') || evaluation.pdfDataUrl.startsWith('blob:'));
+
+        if (!hasLocalPages && !hasLocalPdf && evaluation.pdfStorageUrl) {
+            if (!evaluation.pages || evaluation.pages.length === 0) {
                 evaluation.pages = [evaluation.pdfStorageUrl];
             }
-            if (!evaluation.pdfDataUrl) evaluation.pdfDataUrl = evaluation.pdfStorageUrl;
-        } else if (evaluation.pdfDataUrl && (!evaluation.pages || evaluation.pages.length <= 1)) {
+            if (!evaluation.pdfDataUrl) {
+                evaluation.pdfDataUrl = evaluation.pdfStorageUrl;
+            }
+        } else if (hasLocalPdf && (!evaluation.pages || evaluation.pages.length === 0)) {
             evaluation.pages = [evaluation.pdfDataUrl];
         }
+
         if (!evaluation.pages || evaluation.pages.length === 0) {
-            evaluation.pages = [CanvasEngine.generateDefaultLinedPageDataUrl(evaluation.studentName, evaluation.rollNo)];
+            evaluation.pages = [CanvasEngine.generateDefaultLinedPageDataUrl(evaluation.studentName, evaluation.rollNo, evaluation.subject)];
         }
 
         // Retrieve fresh custom subject catalog if available to find active template definition
@@ -3607,7 +3615,16 @@ class AppController {
 
         // Load evaluation data into canvas & marking panel
         const pdfFallbackUrl = evaluation.pdfStorageUrl || evaluation.pdfDataUrl || null;
-        await this.canvasEngine.setPages(evaluation.pages || [], evaluation.annotations || [], pdfFallbackUrl);
+        await this.canvasEngine.setPages(
+            evaluation.pages || [],
+            evaluation.annotations || [],
+            pdfFallbackUrl,
+            {
+                studentName: evaluation.studentName,
+                rollNo: evaluation.rollNo,
+                subject: evaluation.subject
+            }
+        );
         this.markingPanel.setEvaluationData(evaluation.questions || [], evaluation.maxMarks || 20, evaluation.feedback || "", evaluation.sections || []);
 
         // Sync initial Top HUD with Q1
@@ -4242,6 +4259,28 @@ class AppController {
             });
         }
 
+        // Replace / Upload Student PDF Paper
+        const btnReplacePdf = document.getElementById("ws-btn-replace-pdf");
+        const inputReplacePdf = document.getElementById("ws-input-replace-pdf");
+        if (btnReplacePdf && inputReplacePdf) {
+            btnReplacePdf.addEventListener("click", () => {
+                inputReplacePdf.click();
+            });
+            inputReplacePdf.addEventListener("change", async (e) => {
+                const file = e.target.files && e.target.files[0];
+                if (!file || !this.activeEvaluation) return;
+                try {
+                    this.showToast(`Ingesting ${file.name}...`);
+                    await this.loadStudentFileIntoWorkspace(file);
+                } catch (err) {
+                    console.error("Error loading PDF:", err);
+                    this.showToast("Failed to load PDF: " + err.message);
+                } finally {
+                    inputReplacePdf.value = "";
+                }
+            });
+        }
+
         // Delete Current Paper
         const btnDeletePaper = document.getElementById("ws-btn-delete-paper");
         if (btnDeletePaper) {
@@ -4649,15 +4688,27 @@ class AppController {
         this.activeEvaluation.lastUpdated = new Date().toISOString();
         this.activeEvaluation.updatedAt = new Date().toISOString();
 
+        const currentEval = this.activeEvaluation;
+        if (!currentEval || !currentEval.id) return;
+
         // Save to IndexedDB / local storage
-        await window.appStorage.saveEvaluation(this.activeEvaluation);
-        window.appStorage.saveDraft(this.activeEvaluation.id, this.activeEvaluation);
+        try {
+            await window.appStorage.saveEvaluation(currentEval);
+        } catch (saveErr) {
+            console.warn("Storage save warning:", saveErr);
+        }
+
+        if (this.activeEvaluation && this.activeEvaluation.id) {
+            window.appStorage.saveDraft(this.activeEvaluation.id, this.activeEvaluation);
+        } else if (currentEval && currentEval.id) {
+            window.appStorage.saveDraft(currentEval.id, currentEval);
+        }
 
         this.hasUnsavedChanges = false;
         this.setAutosaveBadge("saved");
         if (notify) {
             console.log("Evaluation state persisted successfully.");
-            this.checkAndSendSubjectCompletedNotification(this.activeEvaluation);
+            this.checkAndSendSubjectCompletedNotification(currentEval);
         }
     }
 
@@ -5668,6 +5719,78 @@ class AppController {
                 resetText.textContent = "Reset Paper";
             }
         });
+    }
+
+    async loadStudentFileIntoWorkspace(file) {
+        if (!file || !this.activeEvaluation) return;
+
+        await CanvasEngine.ensurePdfJs();
+        let pdfDataUrl = null;
+        let compressedPages = [];
+
+        if (file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf")) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await window.pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+            const numPages = pdf.numPages;
+
+            for (let p = 1; p <= numPages; p++) {
+                const page = await pdf.getPage(p);
+                const viewport = page.getViewport({ scale: 1.5 });
+                const canvas = document.createElement("canvas");
+                canvas.width = Math.round(viewport.width);
+                canvas.height = Math.round(viewport.height);
+                const ctx = canvas.getContext("2d");
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                await page.render({ canvasContext: ctx, viewport }).promise;
+                compressedPages.push(canvas.toDataURL("image/jpeg", 0.78));
+            }
+
+            pdfDataUrl = await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = ev => resolve(ev.target.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(file);
+            });
+        } else {
+            const dataUrl = await new Promise(resolve => {
+                const reader = new FileReader();
+                reader.onload = ev => resolve(ev.target.result);
+                reader.onerror = () => resolve(null);
+                reader.readAsDataURL(file);
+            });
+            if (dataUrl) compressedPages.push(dataUrl);
+        }
+
+        if (compressedPages.length === 0 && !pdfDataUrl) {
+            throw new Error("Could not parse file pages.");
+        }
+
+        this.activeEvaluation.pages = compressedPages.length > 0 ? compressedPages : [pdfDataUrl];
+        if (pdfDataUrl) this.activeEvaluation.pdfDataUrl = pdfDataUrl;
+        this.activeEvaluation.pdfStorageUrl = null;
+        this.activeEvaluation.rawFile = file;
+        this.activeEvaluation.pageCount = compressedPages.length || 1;
+
+        await window.appStorage.saveEvaluation(this.activeEvaluation);
+
+        await this.canvasEngine.setPages(
+            this.activeEvaluation.pages,
+            this.activeEvaluation.annotations || [],
+            this.activeEvaluation.pdfDataUrl,
+            {
+                studentName: this.activeEvaluation.studentName,
+                rollNo: this.activeEvaluation.rollNo,
+                subject: this.activeEvaluation.subject
+            }
+        );
+
+        const pagerText = document.getElementById("ws-pager-text");
+        if (pagerText && this.canvasEngine && this.canvasEngine.pages) {
+            pagerText.textContent = `Page 1 of ${this.canvasEngine.pages.length}`;
+        }
+        this.canvasEngine.fitToPage();
+        this.showToast(`✓ Loaded ${this.activeEvaluation.pageCount} page(s) from ${file.name}`);
     }
 
     async resetActivePaperFully() {
