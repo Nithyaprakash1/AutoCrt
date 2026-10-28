@@ -831,22 +831,16 @@ class StorageService {
             return true;
         });
 
-        // SAFETY FALLBACK: If strict filtering stripped all papers, but user uploaded papers exist,
-        // do not return empty if the teacher's profile just had stale default restrictions.
+        // Strict Subject Enforcement: If teacher has assigned subjects, never leak unauthorized subjects!
         if (filtered.length === 0 && list.length > 0) {
-            // First check if any papers match assigned subjects without class restriction
             if (!allowsAllSubjects) {
                 const subOnlyMatches = list.filter(e => {
                     if (!e) return false;
                     return assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName, s, e.templateName));
                 });
-                if (subOnlyMatches.length > 0) {
-                    return subOnlyMatches;
-                }
+                return subOnlyMatches;
             }
-            // If still empty (e.g. default evaluator assigned to Physics while papers are Mathematics/Science),
-            // return full list so user-uploaded papers are NEVER hidden!
-            return list;
+            return [];
         }
 
         return filtered;
