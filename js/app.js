@@ -1203,6 +1203,18 @@ class AppController {
             if (adminNav) adminNav.style.display = "none";
             if (uploaderNav) uploaderNav.style.display = "none";
             if (teacherNav) teacherNav.style.display = "block";
+
+            const sideTamilWrap = document.getElementById("side-nav-tamil-test-wrap");
+            if (sideTamilWrap) {
+                const activeUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
+                const userSub = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
+                    ? activeUser.assignedSubjects[0]
+                    : (activeUser?.subject || "");
+                const isTamilUser = (userSub && userSub.toLowerCase().includes("tamil")) ||
+                    (activeUser?.assignedSubjects && activeUser.assignedSubjects.some(s => s && s.toLowerCase().includes("tamil")));
+                sideTamilWrap.style.display = isTamilUser ? "block" : "none";
+            }
+
             if (doSwitchView) this.switchView("dashboard");
         }
     }
@@ -1667,6 +1679,10 @@ class AppController {
         const btnTeacherSettings = document.getElementById("side-nav-teacher-settings");
         if (btnTeacherSettings) {
             btnTeacherSettings.addEventListener("click", () => this.switchView("settings"));
+        }
+        const btnSideTamilTest = document.getElementById("side-nav-tamil-test");
+        if (btnSideTamilTest) {
+            btnSideTamilTest.addEventListener("click", () => this.launchTamilTestCorrection());
         }
 
         // Mobile Sidebar Drawer Toggle
@@ -2324,6 +2340,13 @@ class AppController {
                 sideAvatarEl.style.color = "";
                 sideAvatarEl.style.fontWeight = "";
             }
+        }
+
+        const sideTamilWrap = document.getElementById("side-nav-tamil-test-wrap");
+        if (sideTamilWrap) {
+            const isTamilUser = (userSub && userSub.toLowerCase().includes("tamil")) ||
+                (user?.assignedSubjects && user.assignedSubjects.some(s => s && s.toLowerCase().includes("tamil")));
+            sideTamilWrap.style.display = isTeacher && isTamilUser ? "block" : "none";
         }
     }
 
@@ -3261,6 +3284,13 @@ class AppController {
         const subEl = document.getElementById("ws-exam-subtitle-text");
         if (subEl) subEl.textContent = `${evaluation.subject || ""} • ${evaluation.examName || ""}`;
 
+        // Save & Report Button visibility (shown for Tamil / test evaluations)
+        const btnSaveReport = document.getElementById("ws-btn-save-report");
+        if (btnSaveReport) {
+            const isTamil = (evaluation.subject || "").toLowerCase().includes("tamil");
+            btnSaveReport.style.display = isTamil ? "inline-flex" : "none";
+        }
+
         // Clear canvas container root to prevent duplicate stacked canvases when opening paper second time!
         const canvasContainer = document.getElementById("canvas-container-root");
         if (canvasContainer) {
@@ -3725,6 +3755,17 @@ class AppController {
             btnPdf.addEventListener("click", async () => {
                 await this.saveActiveEvaluation(false);
                 await this.downloadEvaluationPDF(this.activeEvaluation);
+            });
+        }
+
+        // Save & Report Button (Tamil / Instant Report)
+        const btnSaveReport = document.getElementById("ws-btn-save-report");
+        if (btnSaveReport) {
+            btnSaveReport.addEventListener("click", async () => {
+                if (!this.activeEvaluation) return;
+                await this.saveActiveEvaluation(true);
+                this.showToast("✓ Evaluation saved! Displaying report card...", "success");
+                this.showTamilReportCardModal(this.activeEvaluation);
             });
         }
 
@@ -4336,6 +4377,310 @@ class AppController {
 
     async goToNextStudentInQueue() {
         return this.saveAndGoNextStudent();
+    }
+
+    // --- Tamil "Test Me!" Interactive Evaluation Engine ---
+
+    generateTamilTestPage(pageNum = 1, rollNo = "TAM-TEST-01", studentName = "Tamil Demo Student (Test Me)") {
+        const canvas = document.createElement("canvas");
+        canvas.width = 1200;
+        canvas.height = 1650;
+        const ctx = canvas.getContext("2d");
+
+        // Cream paper background
+        ctx.fillStyle = "#FAFBFD";
+        ctx.fillRect(0, 0, 1200, 1650);
+
+        // Header Card Banner
+        ctx.fillStyle = "#F8FAFC";
+        ctx.fillRect(40, 30, 1120, 130);
+        ctx.strokeStyle = "#CBD5E1";
+        ctx.lineWidth = 1.5;
+        ctx.strokeRect(40, 30, 1120, 130);
+
+        // Institution & Exam Title
+        ctx.fillStyle = "#0F172A";
+        ctx.font = "bold 22px system-ui, -apple-system, sans-serif";
+        ctx.fillText("ADWAITH THOUGHT ACADEMY • DIGITAL EXAMINATION SYSTEM", 60, 68);
+
+        ctx.fillStyle = "#0071E3";
+        ctx.font = "600 16px system-ui, -apple-system, sans-serif";
+        ctx.fillText("வகுப்பு 10 • தமிழ் (Class 10 Tamil) • Revision 1 Objective 2026", 60, 100);
+
+        // Student Info sub-row
+        ctx.fillStyle = "#475569";
+        ctx.font = "14px system-ui, -apple-system, sans-serif";
+        ctx.fillText(`Student: ${studentName}  |  Roll No: ${rollNo}  |  Class: 10-A  |  Max Marks: 40M  |  Page ${pageNum} of 2`, 60, 132);
+
+        // Section Title Banner
+        ctx.fillStyle = "#E0F2FE";
+        ctx.fillRect(40, 175, 1120, 40);
+        ctx.strokeStyle = "#BAE6FD";
+        ctx.strokeRect(40, 175, 1120, 40);
+        ctx.fillStyle = "#0369A1";
+        ctx.font = "bold 15px system-ui, -apple-system, sans-serif";
+        const secSub = pageNum === 1
+            ? "பகுதி - அ (Section A) - புறவய வினாக்கள் (Q1 முதல் Q20 வரை - 1 மதிப்பெண்)"
+            : "பகுதி - அ (Section A) - தொடர்ச்சி (Q21 முதல் Q40 வரை - 1 மதிப்பெண்)";
+        ctx.fillText(secSub, 60, 201);
+
+        // Margin Column Line (Red vertical line)
+        ctx.strokeStyle = "rgba(225, 29, 72, 0.4)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(140, 225);
+        ctx.lineTo(140, 1600);
+        ctx.stroke();
+
+        // Column Titles
+        ctx.fillStyle = "#94A3B8";
+        ctx.font = "bold 13px system-ui, -apple-system, sans-serif";
+        ctx.fillText("வினா", 70, 248);
+        ctx.fillText("மாணவர் விடை (Student Answer Sheet)", 165, 248);
+
+        // Horizontal Lined Rulings
+        ctx.strokeStyle = "rgba(0, 113, 227, 0.08)";
+        ctx.lineWidth = 1;
+        for (let y = 265; y <= 1580; y += 65) {
+            ctx.beginPath();
+            ctx.moveTo(40, y);
+            ctx.lineTo(1160, y);
+            ctx.stroke();
+        }
+
+        // 20 Sample Questions & Realistic Student Answers per page
+        const startQ = pageNum === 1 ? 1 : 21;
+        const endQ = pageNum === 1 ? 20 : 40;
+
+        const sampleAnswers = [
+            "அ) பாவலரேறு பெருஞ்சித்திரனார்",
+            "ஆ) குறிஞ்சிப்பாட்டு",
+            "இ) க. சச்சிதானந்தன்",
+            "ஈ) பன்னாடு தந்த மாறன் வழுதி",
+            "அ) வணிகக் கப்பல்களும் ஐம்பெரும் காப்பியங்களும்",
+            "ஆ) மதுரை மாநகரம்",
+            "இ) எட்டுத்தொகை நூல்கள்",
+            "ஈ) உ.வே. சாமிநாதையர்",
+            "அ) சிலப்பதிகாரம்",
+            "ஆ) முல்லைப்பாட்டு",
+            "இ) கம்பர்",
+            "ஈ) திருவள்ளுவர்",
+            "அ) நற்றிணை",
+            "ஆ) குறுந்தொகை",
+            "இ) ஐங்குறுநூறு",
+            "ஈ) பதிற்றுப்பத்து",
+            "அ) பரிபாடல்",
+            "ஆ) கலித்தொகை",
+            "இ) அகநானூறு",
+            "ஈ) புறநானூறு"
+        ];
+
+        let qIndex = 0;
+        for (let qNo = startQ; qNo <= endQ; qNo++) {
+            const y = 295 + (qIndex * 65);
+
+            // Q Number in margin column
+            ctx.fillStyle = "#0F172A";
+            ctx.font = "bold 18px system-ui, -apple-system, sans-serif";
+            ctx.fillText(`Q${qNo}`, 65, y);
+
+            // Student written answer (realistic ink style)
+            const ansText = sampleAnswers[qIndex % sampleAnswers.length];
+            ctx.fillStyle = "#1E3A8A";
+            ctx.font = "18px 'Courier New', monospace, system-ui";
+            ctx.fillText(`விடை:  ${ansText}`, 170, y);
+
+            // Marks badge placeholder in right margin
+            ctx.fillStyle = "#94A3B8";
+            ctx.font = "12px system-ui, -apple-system, sans-serif";
+            ctx.fillText("[ 1M ]", 1090, y);
+
+            qIndex++;
+        }
+
+        // Bottom Footer
+        ctx.fillStyle = "#94A3B8";
+        ctx.font = "13px system-ui, -apple-system, sans-serif";
+        ctx.fillText(`Adwaith Thought Academy • On-Screen Marking • Page ${pageNum} of 2`, 60, 1625);
+
+        return canvas.toDataURL("image/jpeg", 0.92);
+    }
+
+    async launchTamilTestCorrection() {
+        if (!window.appStorage) return;
+
+        // Ensure portal is in evaluator/teacher mode
+        this.setPortal("evaluator", false);
+
+        const testPaperId = "eval_tamil_test_me_sample";
+
+        // Generate 2-page realistic Tamil exam answer sheet
+        const page1 = this.generateTamilTestPage(1, "TAM-TEST-01", "Tamil Demo Student (Test Me)");
+        const page2 = this.generateTamilTestPage(2, "TAM-TEST-01", "Tamil Demo Student (Test Me)");
+
+        const tpl = window.MockData?.tamilGrade10Revision1Template || {
+            id: "tam-x-rev1-40",
+            name: "10 TAMIL - Revision 1 Objective",
+            examName: "Revision 1 Objective 2026",
+            subject: "Tamil",
+            maxMarks: 40,
+            sections: [
+                { id: "sec_a", letter: "A", name: "Section A", title: "Sec A: 40 Qs (40M)", qStartNo: 1, qEndNo: 40, qCount: 40, marksPerQ: 1, maxMarks: 40, secTotal: 40, hasChoice: false, hasSubQuestions: false, subQuestions: [] }
+            ],
+            questions: []
+        };
+
+        const questions = [];
+        for (let i = 1; i <= 40; i++) {
+            questions.push({
+                id: `tam_test_q${i}`,
+                qNo: i,
+                qNumber: `Q${i}`,
+                label: `Q${i}`,
+                maxMarks: 1,
+                awardedMarks: 0,
+                status: "unmarked",
+                section: "Section A",
+                sectionId: "sec_a",
+                topic: `Objective Question ${i}`,
+                hasSubQuestions: false,
+                subQuestions: []
+            });
+        }
+
+        const testEvaluation = {
+            id: testPaperId,
+            studentName: "Tamil Demo Student (Test Me)",
+            rollNo: "TAM-TEST-01",
+            class: "Class 10-A",
+            className: "Class 10-A",
+            classLabel: "Class 10-A",
+            subject: "Tamil",
+            templateId: "tam-x-rev1-40",
+            templateName: "10 TAMIL - Revision 1 Objective",
+            examName: "Revision 1 Objective 2026",
+            maxMarks: 40,
+            obtainedMarks: 0,
+            percentage: 0,
+            grade: "--",
+            status: "Pending",
+            pageCount: 2,
+            totalPages: 2,
+            pages: [page1, page2],
+            annotations: [],
+            feedback: "",
+            sections: JSON.parse(JSON.stringify(tpl.sections)),
+            questions: questions,
+            date: new Date().toISOString(),
+            isTestMePaper: true
+        };
+
+        // Save to IndexedDB so it's persistent across reloads
+        await window.appStorage.saveEvaluation(testEvaluation);
+
+        // Open directly in the workspace!
+        await this.openWorkspace(testEvaluation);
+
+        if (this.showToast) {
+            this.showToast("✍️ Test Me! paper loaded (40 Qs, 1M each). Draw markings, evaluate, click Save & Report!", "success");
+        }
+    }
+
+    showTamilReportCardModal(evaluation) {
+        const modalId = "tamil-report-card-modal-overlay";
+        const old = document.getElementById(modalId);
+        if (old) old.remove();
+
+        const ev = evaluation || this.activeEvaluation || {};
+        const obt = ev.obtainedMarks || 0;
+        const max = ev.maxMarks || 40;
+        const pct = max > 0 ? Math.round((obt / max) * 100) : 0;
+        const grade = ev.grade || (pct >= 90 ? "A+" : pct >= 75 ? "A" : pct >= 60 ? "B" : pct >= 40 ? "C" : "F");
+
+        const modal = document.createElement("div");
+        modal.id = modalId;
+        modal.className = "apple-dialog-overlay";
+        modal.style.cssText = "position: fixed; inset: 0; background: rgba(0,0,0,0.55); backdrop-filter: blur(8px); display: flex; align-items: center; justify-content: center; z-index: 99999; padding: 20px;";
+
+        modal.innerHTML = `
+            <div style="background: #FFFFFF; border-radius: 18px; width: 100%; max-width: 640px; box-shadow: 0 24px 50px rgba(0,0,0,0.25); border: 1px solid rgba(0,0,0,0.08); overflow: hidden; display: flex; flex-direction: column; max-height: 90vh;">
+                <!-- Modal Header -->
+                <div style="background: linear-gradient(135deg, #0F172A, #1E293B); color: #FFFFFF; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span style="font-size: 0.75rem; text-transform: uppercase; color: #10B981; font-weight: 700; letter-spacing: 0.5px;">✓ Evaluation Report Generated</span>
+                        <h3 style="margin: 4px 0 0; font-size: 1.25rem; font-weight: 500; color: #FFFFFF;">Tamil Evaluation Scorecard</h3>
+                    </div>
+                    <button type="button" id="btn-close-tamil-report-modal" style="background: rgba(255,255,255,0.12); border: none; color: #FFFFFF; width: 32px; height: 32px; border-radius: 50%; cursor: pointer; font-size: 1.1rem; display: flex; align-items: center; justify-content: center;">&times;</button>
+                </div>
+
+                <!-- Modal Body -->
+                <div style="padding: 24px; overflow-y: auto; flex: 1;">
+                    <!-- Student Meta Box -->
+                    <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                        <div>
+                            <h4 style="margin: 0; font-size: 1.05rem; color: #0F172A; font-weight: 600;">${ev.studentName || 'Student'}</h4>
+                            <p style="margin: 4px 0 0; font-size: 0.82rem; color: #64748B;">Roll: <strong>${ev.rollNo || '-'}</strong> • Class: <strong>${ev.className || ev.class || 'Class 10-A'}</strong> • Subject: <strong>Tamil</strong></p>
+                            <p style="margin: 2px 0 0; font-size: 0.78rem; color: #0071E3;">Blueprint: ${ev.templateName || '10 TAMIL - Revision 1 Objective'}</p>
+                        </div>
+                        <div style="text-align: right;">
+                            <div style="font-size: 2rem; font-weight: 700; color: ${pct >= 75 ? '#10B981' : pct >= 40 ? '#0071E3' : '#DC2626'};">${obt} <span style="font-size: 1.1rem; color: #94A3B8;">/ ${max}</span></div>
+                            <span style="font-size: 0.82rem; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: rgba(16, 185, 129, 0.12); color: #10B981;">${pct}% • Grade ${grade}</span>
+                        </div>
+                    </div>
+
+                    <!-- Questions 1-40 Breakdown Grid -->
+                    <div style="margin-bottom: 20px;">
+                        <h4 style="font-size: 0.88rem; font-weight: 600; color: #0F172A; margin: 0 0 10px; display: flex; justify-content: space-between;">
+                            <span>Section A: 40 Questions Breakdown (1M each)</span>
+                            <span style="color: #64748B; font-weight: 400; font-size: 0.78rem;">Status: ${ev.status || 'Completed'}</span>
+                        </h4>
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(48px, 1fr)); gap: 6px;">
+                            ${(ev.questions || []).map(q => {
+                                const marks = Number(q.awardedMarks) || 0;
+                                const isFull = marks >= q.maxMarks;
+                                const isZero = marks === 0 && (q.status === 'wrong' || q.status === 'marked');
+                                const bg = isFull ? 'rgba(16, 185, 129, 0.12)' : (isZero ? 'rgba(220, 38, 38, 0.12)' : '#F1F5F9');
+                                const border = isFull ? '#10B981' : (isZero ? '#DC2626' : '#CBD5E1');
+                                const textColor = isFull ? '#059669' : (isZero ? '#DC2626' : '#64748B');
+                                return `
+                                    <div style="border: 1px solid ${border}; background: ${bg}; border-radius: 8px; padding: 6px 2px; text-align: center;" title="Q${q.qNo}: ${marks}/${q.maxMarks}M">
+                                        <div style="font-size: 0.68rem; color: #64748B;">Q${q.qNo}</div>
+                                        <div style="font-size: 0.88rem; font-weight: 700; color: ${textColor};">${marks}</div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Modal Footer Actions -->
+                <div style="padding: 16px 24px; background: #F8FAFC; border-top: 1px solid #E2E8F0; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" id="btn-tamil-report-back-dash" style="background: transparent; border: 1px solid #CBD5E1; color: #475569; padding: 8px 16px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer;">
+                        ← Back to Teacher Desk
+                    </button>
+                    <div style="display: flex; gap: 10px;">
+                        <button type="button" id="btn-tamil-report-download-pdf" style="background: linear-gradient(135deg, #0071E3, #0056B3); border: none; color: #FFFFFF; padding: 8px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                            <span>📥 Download PDF Report</span>
+                        </button>
+                        <button type="button" id="btn-tamil-report-done" style="background: #10B981; border: none; color: #FFFFFF; padding: 8px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer;">
+                            Done
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        modal.querySelector("#btn-close-tamil-report-modal")?.addEventListener("click", () => modal.remove());
+        modal.querySelector("#btn-tamil-report-done")?.addEventListener("click", () => modal.remove());
+        modal.querySelector("#btn-tamil-report-back-dash")?.addEventListener("click", async () => {
+            modal.remove();
+            await this.switchView("dashboard");
+        });
+        modal.querySelector("#btn-tamil-report-download-pdf")?.addEventListener("click", async () => {
+            await this.downloadEvaluationPDF(ev);
+        });
     }
 
     // --- Bulk PDF Download ---
@@ -5185,6 +5530,13 @@ class AppController {
 
         const wsSchoolImg = document.getElementById("ws-school-logo-img");
         if (wsSchoolImg && schoolLogoMark) wsSchoolImg.src = schoolLogoMark;
+
+        const sideTamilWrap = document.getElementById("side-nav-tamil-test-wrap");
+        if (sideTamilWrap) {
+            const isTamilUser = (userSub && userSub.toLowerCase().includes("tamil")) ||
+                (activeUser?.assignedSubjects && activeUser.assignedSubjects.some(s => s && s.toLowerCase().includes("tamil")));
+            sideTamilWrap.style.display = isTeacher && isTamilUser ? "block" : "none";
+        }
     }
 
     // --- Toast Notifications ---

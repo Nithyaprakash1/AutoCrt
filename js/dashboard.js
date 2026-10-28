@@ -381,6 +381,11 @@ class DashboardManager {
             });
         }
 
+        // Check if currently viewing Tamil desk
+        const isTamilDesk = (displaySubject && displaySubject.toLowerCase().includes('tamil')) ||
+            (this.teacherSubject && this.teacherSubject.toLowerCase().includes('tamil')) ||
+            teacherAssigned.some(s => s && s.toLowerCase().includes('tamil'));
+
         // =========================================================================
         // VIEW 1: Batches Overview Mode (Default)
         // Renders Welcome Banner + KPI Metric Cards + Class-Template Batches Grid ONLY.
@@ -396,7 +401,12 @@ class DashboardManager {
                             <h2 class="welcome-headline">${displaySubject} Evaluation Desk</h2>
                             <p class="welcome-sub">Streamlined examination batches. Click into any class card below to view its student answer sheets, evaluate marks, and export results.</p>
                         </div>
-                        <div class="welcome-action-col" style="display: flex; gap: 10px; flex-wrap: wrap;">
+                        <div class="welcome-action-col" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                            ${isTamilDesk ? `
+                                <button type="button" class="btn-primary btn-large btn-tamil-test-me" id="dash-btn-test-me" style="background: linear-gradient(135deg, #10B981, #059669); border-color: #059669; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); font-weight: 500; display: inline-flex; align-items: center; gap: 8px;" title="Test correct a sample Tamil paper with the 40-mark blueprint">
+                                    <span class="btn-icon">✍️</span> Test Me!
+                                </button>
+                            ` : ''}
                             <button type="button" class="btn-primary btn-large" id="dash-btn-start-correction" title="Open first pending paper to evaluate">
                                 <span class="btn-icon">${ic.lightning || '⚡'}</span> Start Correction
                             </button>
@@ -545,6 +555,11 @@ class DashboardManager {
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                                                 <span>${isCompleted ? 'Review' : 'Start Marking'}</span>
                                             </button>
+                                            ${b.subject && b.subject.toLowerCase().includes('tamil') ? `
+                                                <button type="button" class="btn-batch-view btn-batch-test-me" data-class="${b.className}" data-template="${b.templateName}" style="border-color: #10B981; color: #059669; font-weight: 500;" title="Test correct a sample Tamil paper">
+                                                    ✍️ Test Me!
+                                                </button>
+                                            ` : ''}
                                             <button type="button" class="btn-batch-share btn-dash-batch-share" data-class="${b.className}" data-template="${b.templateName}" data-subject="${b.subject}" data-total="${b.total}" title="Share this batch via WhatsApp">
                                                 ${(window.Icons && window.Icons.whatsapp) || ''}
                                                 <span>Share</span>
@@ -587,10 +602,15 @@ class DashboardManager {
                             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
                             <span>Back to All Batches</span>
                         </button>
-                        <div style="display: flex; align-items: center; gap: 10px;">
+                        <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                             <span style="font-size: 0.78rem; font-weight: 400 !important; padding: 4px 12px; border-radius: 999px; background: ${batchIsDone ? 'rgba(52, 199, 89, 0.2)' : 'rgba(0, 122, 255, 0.2)'}; color: ${batchIsDone ? '#34C759' : '#60A5FA'}; border: 1px solid ${batchIsDone ? 'rgba(52, 199, 89, 0.4)' : 'rgba(96, 165, 250, 0.4)'};">
                                 ${batchIsDone ? '✓ All Papers Evaluated' : `${currentBatch.uncorrected} Pending Evaluation`}
                             </span>
+                            ${((currentBatch.subject && currentBatch.subject.toLowerCase().includes('tamil')) || isTamilDesk) ? `
+                                <button type="button" class="btn-primary btn-tamil-test-me" id="btn-batch-test-me" style="background: linear-gradient(135deg, #10B981, #059669); border-color: #059669; padding: 7px 16px; font-size: 0.82rem; border-radius: 999px; font-weight: 500; display: inline-flex; align-items: center; gap: 6px;" title="Test correct a sample Tamil paper">
+                                    <span>✍️ Test Me!</span>
+                                </button>
+                            ` : ''}
                             <button type="button" class="btn-primary" id="btn-batch-start-marking" style="padding: 7px 16px; font-size: 0.82rem; border-radius: 999px; font-weight: 400 !important; display: inline-flex; align-items: center; gap: 6px;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                                 ${currentBatch.uncorrected === 0 ? 'Review Papers' : 'Start Marking'}
@@ -1050,6 +1070,16 @@ class DashboardManager {
                 btnClearBatch.remove();
             });
         }
+
+        // Test Me! button for Tamil panel
+        this.container.querySelectorAll("#dash-btn-test-me, #btn-batch-test-me, .btn-batch-test-me").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                if (window.app && typeof window.app.launchTamilTestCorrection === "function") {
+                    window.app.launchTamilTestCorrection();
+                }
+            });
+        });
 
         // Start Correction Queue button (Banner)
         const startBtn = this.container.querySelector("#dash-btn-start-correction");
