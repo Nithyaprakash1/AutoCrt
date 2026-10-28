@@ -105,10 +105,18 @@ class SettingsPageManager {
         if (!this.container) return;
 
         const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
-        const teacherName = this.settings.teacher?.name || currentUser?.name || "";
+        const currentSub = (currentUser && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0)
+            ? currentUser.assignedSubjects[0]
+            : (currentUser?.subject || "");
+        const isTeacherRole = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
+
+        let teacherName = this.settings.teacher?.name || "";
+        if (isTeacherRole || !teacherName || teacherName.includes("Nithya Prakash") || teacherName === "Faculty Evaluator") {
+            teacherName = currentSub || (currentUser?.name && !currentUser.name.includes("Nithya Prakash") ? currentUser.name : "Subject Evaluator");
+        }
         const instName = this.settings.institution?.name || "Adwaith Thought Academy";
-        const teacherRole = this.settings.teacher?.role || currentUser?.roleLabel || "";
-        const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || "NP";
+        const teacherRole = this.settings.teacher?.role || currentUser?.roleLabel || (isTeacherRole && currentSub ? `${currentSub} Evaluator` : "Evaluator");
+        const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || (currentSub ? currentSub.substring(0, 2).toUpperCase() : "SE");
 
         const usage = this.storageUsage || {};
         const isTeacher = usage.isTeacher !== false;
@@ -189,7 +197,7 @@ class SettingsPageManager {
                                     <div class="form-row-two-col">
                                         <div class="form-group">
                                             <label>Evaluator Full Name *</label>
-                                            <input type="text" id="input-full-teacher-name" class="form-input" value="${teacherName}" placeholder="e.g. Mrs. Nithya Prakash" />
+                                            <input type="text" id="input-full-teacher-name" class="form-input" value="${teacherName}" placeholder="e.g. ${currentSub || 'Tamil'}" />
                                             <span class="form-help-text">Appears in header, sidebar badge, and digital certificates.</span>
                                         </div>
 
@@ -505,6 +513,11 @@ class SettingsPageManager {
             this.settings = newSettings;
             if (window.appStorage) {
                 await window.appStorage.saveSettings(newSettings);
+                const curUser = window.appStorage.getCurrentUser();
+                if (curUser && (curUser.role === 'evaluator' || curUser.role === 'teacher')) {
+                    curUser.name = tName;
+                    window.appStorage.setCurrentUser(curUser);
+                }
             }
             if (window.app) {
                 window.app.applySettingsToUI(newSettings);

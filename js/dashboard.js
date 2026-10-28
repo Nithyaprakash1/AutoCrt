@@ -61,7 +61,6 @@ class DashboardManager {
         const isAdmin = user && (user.role === 'admin' || user.role === 'super_admin');
 
         if (user) {
-            this.teacherName = user.name || "";
             let assignedSubs = (user.assignedSubjects && user.assignedSubjects.length > 0)
                 ? [...user.assignedSubjects]
                 : (user.subject ? [user.subject] : []);
@@ -72,6 +71,11 @@ class DashboardManager {
             }
             this.teacherSubjects = assignedSubs;
             this.teacherSubject = assignedSubs[0] || "";
+
+            this.teacherName = user.name || "";
+            if (isTeacher && (!this.teacherName || this.teacherName.includes("Nithya Prakash") || this.teacherName === "Faculty Evaluator")) {
+                this.teacherName = this.teacherSubject || "Subject Evaluator";
+            }
         }
 
         // Check URL parameters or direct shared target (e.g. ?view=dashboard&subject=Physics&batch=Class 12-A:::Physics...)
@@ -317,10 +321,13 @@ class DashboardManager {
 
         const ic = window.Icons || {};
         const greetingStr = this.getGreeting();
-        const displayName = this.teacherName || "Teacher";
         const displaySubject = (this.teacherSubject && this.teacherSubject !== 'all') 
             ? this.teacherSubject 
             : (teacherAssigned.length === 1 ? teacherAssigned[0] : (teacherAssigned.length > 1 ? teacherAssigned.join(' & ') : 'Evaluation'));
+        let displayName = this.teacherName || "";
+        if (!displayName || displayName.includes("Nithya Prakash")) {
+            displayName = (displaySubject && displaySubject !== 'Evaluation') ? displaySubject : "Teacher";
+        }
 
         // Compute Class & Template Batches for Teacher Desk
         let evalsForBatches = subjectEvals;
@@ -331,8 +338,9 @@ class DashboardManager {
         const batchMap = new Map();
         evalsForBatches.forEach(e => {
             const cls = e.className || e.class || e.classLabel || "Class 12-A";
-            const tpl = e.templateName || e.examName || "Mid-Term Exam";
             const sub = e.subject || displaySubject;
+            const rawTpl = e.templateName || e.examName || "Mid-Term Exam";
+            const tpl = window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, sub) : rawTpl;
             const batchKey = `${cls}:::${tpl}`;
             if (!batchMap.has(batchKey)) {
                 batchMap.set(batchKey, {

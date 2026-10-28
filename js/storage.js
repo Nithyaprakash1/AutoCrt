@@ -556,6 +556,17 @@ class StorageService {
                     }
                 }
 
+                // Harmonize template and exam name if contradictory to the actual paper subject
+                if (merged.subject) {
+                    const originalTpl = merged.templateName;
+                    const originalExam = merged.examName;
+                    merged.templateName = this.harmonizeTemplateForSubject(merged.templateName, merged.subject);
+                    merged.examName = this.harmonizeTemplateForSubject(merged.examName, merged.subject);
+                    if (merged.templateName !== originalTpl || merged.examName !== originalExam) {
+                        try { this._saveEvaluationToIndexedDB(merged); } catch (e) {}
+                    }
+                }
+
                 return merged;
             });
         }
@@ -637,6 +648,16 @@ class StorageService {
         if (s.includes('sanskrit')) return 'sanskrit';
         if (s === 'science' || s.startsWith('science ') || s.endsWith(' science') || s.includes('gen sci') || s.includes('general science') || s.includes('natural sci')) return 'science';
         return s.replace(/\s+/g, '_');
+    }
+
+    harmonizeTemplateForSubject(templateName, subject) {
+        if (!templateName || !subject) return templateName || '';
+        const cleanSub = String(subject).trim();
+        const canon = this.canonicalizeSubject(cleanSub);
+        if (canon !== 'mathematics' && /mathematics|maths|math\b/i.test(templateName)) {
+            return templateName.replace(/\b(10th\s+|10\s+|Grade\s+10\s+|STD\s+10\s+)?(MATHEMATICS|MATHS|MATH)\b/gi, (match, prefix) => (prefix || "") + cleanSub.toUpperCase());
+        }
+        return templateName;
     }
 
     isSubjectMatch(paperSubject, paperExamName, targetSubject) {
@@ -821,6 +842,11 @@ class StorageService {
             if (!evalObj.pages) evalObj.pages = evalObj.pdfDataUrl ? [evalObj.pdfDataUrl] : [];
         } else {
             evalObj = this.getDraft(id);
+        }
+
+        if (evalObj && evalObj.subject) {
+            evalObj.templateName = this.harmonizeTemplateForSubject(evalObj.templateName, evalObj.subject);
+            evalObj.examName = this.harmonizeTemplateForSubject(evalObj.examName, evalObj.subject);
         }
 
         return evalObj ? JSON.parse(JSON.stringify(evalObj)) : null;
@@ -1248,13 +1274,19 @@ class StorageService {
 
     async getSettings() {
         await this.readyPromise;
+        const activeUser = this.getCurrentUser();
+        const activeSub = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
+            ? activeUser.assignedSubjects[0]
+            : (activeUser?.subject || "");
+        const defaultTeacherName = activeSub || (activeUser?.name && !activeUser.name.includes("Nithya Prakash") ? activeUser.name : "Subject Evaluator");
+
         const defaultSettings = {
             institution: {
                 name: "",
                 logo: "assets/school_logo.jpg",
                 fullLogo: "assets/school_fulllogo.jpg"
             },
-            teacher: { name: "Mr. Nithya Prakash" },
+            teacher: { name: defaultTeacherName },
             firebaseConfig: {
                 apiKey: "",
                 authDomain: "",
@@ -1266,25 +1298,34 @@ class StorageService {
             storageMode: "local" // "local" or "firebase"
         };
 
+        let result = defaultSettings;
         if (window.firebaseManager && window.firebaseManager.isConnected && typeof window.firebaseManager.getSettings === "function") {
             try {
                 const fbSettings = await window.firebaseManager.getSettings();
-                if (fbSettings) return { ...defaultSettings, ...fbSettings };
+                if (fbSettings) result = { ...defaultSettings, ...fbSettings };
             } catch (e) {
                 console.warn("Firebase getSettings fallback warning:", e);
             }
+        } else {
+            try {
+                const raw = localStorage.getItem("niprak_settings") || localStorage.getItem("onespace_settings");
+                if (raw) {
+                    const parsed = JSON.parse(raw);
+                    result = { ...defaultSettings, ...parsed };
+                }
+            } catch (e) {
+                console.error("Error reading settings", e);
+            }
         }
 
-        try {
-            const raw = localStorage.getItem("niprak_settings") || localStorage.getItem("onespace_settings");
-            if (raw) {
-                const parsed = JSON.parse(raw);
-                return { ...defaultSettings, ...parsed };
-            }
-        } catch (e) {
-            console.error("Error reading settings", e);
+        // Evaluator Full Name should be subject name as requested: no need of Mr. Nithya Prakash
+        const isTeacherRole = activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher');
+        if (isTeacherRole || !result.teacher?.name || result.teacher.name.includes("Nithya Prakash")) {
+            result.teacher = Object.assign({}, result.teacher, {
+                name: activeSub || (activeUser?.name && !activeUser.name.includes("Nithya Prakash") ? activeUser.name : "Subject Evaluator")
+            });
         }
-        return defaultSettings;
+        return result;
     }
 
     async saveSettings(settings) {
@@ -1849,5 +1890,8 @@ window.canonicalizeSubject = function(sub) {
 };
 window.isSubjectMatch = function(paperSub, paperExam, targetSub) {
     return window.appStorage ? window.appStorage.isSubjectMatch(paperSub, paperExam, targetSub) : false;
+};
+window.harmonizeTemplateForSubject = function(tpl, sub) {
+    return window.appStorage ? window.appStorage.harmonizeTemplateForSubject(tpl, sub) : (tpl || '');
 };
 

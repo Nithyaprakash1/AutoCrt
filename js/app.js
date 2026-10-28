@@ -2181,12 +2181,23 @@ class AppController {
         const sideAvatarEl = document.getElementById("side-user-avatar");
         const sideRoleEl = document.querySelector(".user-role-label");
 
-        const name = user ? user.name : "";
+        let name = user ? user.name : "";
         const isSuper = user && (user.role === 'super_admin' || (user.email && user.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
-        const roleLabel = user ? (isSuper ? '👑 Super Admin (Owner)' : (user.role === 'admin' ? 'Admin' : (user.role === 'uploader' ? 'Exam Officer' : 'Teacher Evaluator'))) : "";
+        const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
+        const userSub = (user && user.assignedSubjects && user.assignedSubjects.length > 0)
+            ? user.assignedSubjects[0]
+            : (user?.subject || "");
+
+        if (isTeacher) {
+            if (!name || name.includes("Nithya Prakash") || name === "Faculty Evaluator") {
+                name = userSub || "Subject Evaluator";
+            }
+        }
+
+        const roleLabel = user ? (isSuper ? '👑 Super Admin (Owner)' : (user.role === 'admin' ? 'Admin' : (user.role === 'uploader' ? 'Exam Officer' : (userSub ? `${userSub} Evaluator` : 'Teacher Evaluator')))) : "";
         const initials = isSuper ? "NP" : (name
             ? name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase()
-            : "--");
+            : (userSub ? userSub.substring(0, 2).toUpperCase() : "--"));
 
         if (nameEl) nameEl.textContent = name || "Sign In";
         if (navNameEl) navNameEl.textContent = name || "Sign In";
@@ -4998,19 +5009,45 @@ class AppController {
         }
 
         // 2. Teacher Profile Name across sidebars and previews
-        const teacherName = settings.teacher?.name || "Mrs. Nithya Prakash";
+        const activeUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        const userSub = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
+            ? activeUser.assignedSubjects[0]
+            : (activeUser?.subject || "");
+        const isTeacher = activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher');
+
+        let teacherName = settings.teacher?.name || "";
+        if (isTeacher || !teacherName || teacherName.includes("Nithya Prakash") || teacherName === "Faculty Evaluator") {
+            teacherName = userSub || (activeUser?.name && !activeUser.name.includes("Nithya Prakash") ? activeUser.name : "Subject Evaluator");
+        }
         const sideUserName = document.getElementById("side-user-name");
         if (sideUserName) sideUserName.textContent = teacherName;
 
-        const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || "NP";
+        const navUserName = document.getElementById("navbar-user-name");
+        if (navUserName) navUserName.textContent = teacherName;
+
+        const dropUserName = document.getElementById("dropdown-user-name");
+        if (dropUserName) dropUserName.textContent = teacherName;
+
+        const dropUserRole = document.getElementById("dropdown-user-role");
+        if (dropUserRole) dropUserRole.textContent = isTeacher && userSub ? `${userSub} Evaluator` : (activeUser?.roleLabel || "Evaluator");
+
+        const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || (userSub ? userSub.substring(0, 2).toUpperCase() : "SE");
         const sideAvatar = document.getElementById("side-user-avatar");
         if (sideAvatar) sideAvatar.textContent = initials;
+
+        const navAvatar = document.getElementById("navbar-user-avatar");
+        if (navAvatar) navAvatar.textContent = initials;
 
         const previewAvatar = document.getElementById("settings-avatar-preview");
         if (previewAvatar) previewAvatar.textContent = initials;
 
         const previewName = document.getElementById("settings-preview-name");
         if (previewName) previewName.textContent = teacherName;
+
+        const logoutUserName = document.getElementById("logout-user-name");
+        if (logoutUserName) logoutUserName.textContent = teacherName;
+        const logoutUserRole = document.getElementById("logout-user-role");
+        if (logoutUserRole) logoutUserRole.textContent = isTeacher && userSub ? `${userSub} Evaluator` : (activeUser?.roleLabel || "Evaluator");
 
         // 3. Institution Logos
         const schoolLogoMark = settings.institution?.logo || "assets/school_logo.jpg";

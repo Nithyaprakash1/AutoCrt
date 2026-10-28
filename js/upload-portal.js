@@ -404,6 +404,48 @@ class UploadPortalManager {
                 ]
             },
             {
+                id: "tam",
+                name: "Tamil",
+                code: "TAM-101",
+                badge: "Revision 1 Blueprint",
+                description: "Class 10 Tamil Board Assessment & Revision 1",
+                templates: [
+                    window.MockData && window.MockData.tamilGrade10Revision1Template ? window.MockData.tamilGrade10Revision1Template : {
+                        id: "tam-x-rev1-40",
+                        name: "10 TAMIL - Revision 1 Objective",
+                        examName: "STD 10 Tamil Revision 1 - 40 marks",
+                        subject: "Tamil",
+                        maxMarks: 40,
+                        duration: "1 Hour",
+                        badge: "Revision 1 Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Sec A: 28 Qs (28M)", qStartNo: 1, qEndNo: 28, qCount: 28, marksPerQ: 1, maxMarks: 28, secTotal: 28, hasChoice: false, hasSubQuestions: false, subQuestions: [] },
+                            {
+                                id: "sec_b",
+                                letter: "B",
+                                name: "Section B",
+                                title: "Sec B: 3 Qs (12M)",
+                                qStartNo: 29,
+                                qEndNo: 31,
+                                qCount: 3,
+                                marksPerQ: 4,
+                                maxMarks: 12,
+                                secTotal: 12,
+                                hasChoice: false,
+                                hasSubQuestions: true,
+                                subQuestionNumbers: "Q29, Q30, Q31",
+                                subQuestions: [
+                                    { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                                    { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                                    { id: "iii", subId: "iii", letter: "iii", label: "(iii)", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: false }
+                                ]
+                            }
+                        ],
+                        questions: []
+                    }
+                ]
+            },
+            {
                 id: "mat",
                 name: "Mathematics",
                 code: "MAT-301",

@@ -1718,6 +1718,97 @@ const MockData = {
         })()
     },
 
+    // Grade 10 Tamil Revision 1 Objective Blueprint (31 Qs / 40 Marks Total)
+    // Section A: 28 Qs × 1 Mark = 28 Marks
+    // Section B: 3 Qs × 4 Marks = 12 Marks (subparts: (i) 1 Mark, (ii) 1 Mark, (iii) 2 Marks)
+    tamilGrade10Revision1Template: {
+        id: "tam-x-rev1-40",
+        name: "10 TAMIL - Revision 1 Objective",
+        examName: "STD 10 Tamil Revision 1 - 40 marks",
+        subject: "Tamil",
+        maxMarks: 40,
+        duration: "1 Hour",
+        badge: "Revision 1 Blueprint",
+        generalInstructions: [
+            "This question paper consists of 31 questions carrying 40 marks in total.",
+            "Section A: Q1 to Q28 carry 1 mark each (28 Marks).",
+            "Section B: Q29 to Q31 carry 4 marks each (12 Marks), divided into sub-parts: (i) 1 mark, (ii) 1 mark, (iii) 2 marks."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Sec A: 28 Qs (28M)",
+                qStartNo: 1,
+                qEndNo: 28,
+                qCount: 28,
+                marksPerQ: 1,
+                maxMarks: 28,
+                secTotal: 28,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Sec B: 3 Qs (12M)",
+                qStartNo: 29,
+                qEndNo: 31,
+                qCount: 3,
+                marksPerQ: 4,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: true,
+                subQuestionNumbers: "Q29, Q30, Q31",
+                subQuestions: [
+                    { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                    { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                    { id: "iii", subId: "iii", letter: "iii", label: "(iii)", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: false }
+                ]
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 28; i++) {
+                qs.push({
+                    id: `tam_x_rev1_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `Objective Question ${i}`,
+                    hasSubQuestions: false,
+                    subQuestions: []
+                });
+            }
+            for (let i = 29; i <= 31; i++) {
+                qs.push({
+                    id: `tam_x_rev1_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 4,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Case Study / Objective II (${i})`,
+                    hasSubQuestions: true,
+                    subQuestions: [
+                        { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                        { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                        { id: "iii", subId: "iii", letter: "iii", label: "(iii)", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: false }
+                    ]
+                });
+            }
+            return qs;
+        })()
+    },
+
     // Grade 12 Revision Test 1 Blueprint (Mcq-1: 40x1=40 + Subjective Test 1: 5x2=10, 4x3=12, 2x4=8, 2x5=10 = 80 Marks Total)
     grade12RevisionTest1Template: {
         id: "g12-rev1-80",
