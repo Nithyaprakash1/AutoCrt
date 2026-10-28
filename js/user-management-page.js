@@ -371,6 +371,10 @@ class UserManagementPageManager {
 
                         const isSubjectAdmin = roleMeta.id === "admin" || roleMeta.id === "super_admin";
                         const isSubjectUploader = roleMeta.id === "uploader";
+                        const isSuperAdminUser = roleMeta.id === "super_admin" || 
+                            (u.name && u.name.toLowerCase().includes("nithya prakash")) || 
+                            (u.email && u.email.toLowerCase() === "iamnithyaprakash@gmail.com") ||
+                            u.id === "usr_super_admin";
 
                         return `
                             <tr data-user-id="${u.id}" class="${isYou ? 'user-row-current-session' : ''}">
@@ -395,21 +399,30 @@ class UserManagementPageManager {
                                     </span>
                                 </td>
                                 <td>
-                                    <div class="password-cell-box">
-                                        <span class="password-val ${isRevealed ? 'revealed' : 'masked'}" id="pass-val-${u.id}">
-                                            ${isRevealed ? (u.password || '••••••••') : '••••••••••••'}
-                                        </span>
-                                        <button type="button" class="btn-toggle-pass" data-user-id="${u.id}" title="${isRevealed ? 'Hide Password' : 'Show Password'}">
-                                            ${isRevealed ? `
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
-                                            ` : `
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                            `}
-                                        </button>
-                                        <button type="button" class="btn-copy-pass" data-password="${u.password || ''}" data-user-name="${u.name}" title="Copy Password">
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                        </button>
-                                    </div>
+                                    ${isSuperAdminUser ? `
+                                        <div class="password-cell-box">
+                                            <span style="display:inline-flex; align-items:center; gap:6px; padding:4px 10px; border-radius:6px; background:rgba(239, 68, 68, 0.12); color:#dc2626; border:1px solid rgba(239, 68, 68, 0.25); font-size:11px; font-weight:600; letter-spacing:0.5px;">
+                                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                                TOP SECRET • ENCRYPTED
+                                            </span>
+                                        </div>
+                                    ` : `
+                                        <div class="password-cell-box">
+                                            <span class="password-val ${isRevealed ? 'revealed' : 'masked'}" id="pass-val-${u.id}">
+                                                ${isRevealed ? (u.password || '••••••••') : '••••••••••••'}
+                                            </span>
+                                            <button type="button" class="btn-toggle-pass" data-user-id="${u.id}" title="${isRevealed ? 'Hide Password' : 'Show Password'}">
+                                                ${isRevealed ? `
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>
+                                                ` : `
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                `}
+                                            </button>
+                                            <button type="button" class="btn-copy-pass" data-password="${u.password || ''}" data-user-name="${u.name}" title="Copy Password">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                            </button>
+                                        </div>
+                                    `}
                                 </td>
                                 <td>
                                     <div class="user-subject-tags-row">
@@ -828,16 +841,27 @@ class UserManagementPageManager {
                                         <label class="form-label" for="inp-user-email">Email Address <span class="required-star">*</span></label>
                                         <input type="email" id="inp-user-email" class="form-input" placeholder="e.g. sarah@adwaith.edu" value="${uData.email || ''}" required />
                                     </div>
-                                    <div class="form-group">
-                                        <div class="label-with-action-row">
-                                            <label class="form-label" for="inp-user-pass">Password <span class="required-star">*</span></label>
-                                            <div style="display: flex; gap: 8px;">
-                                                <button type="button" class="btn-label-link" id="btn-gen-pass" title="Generate secure random password">⚡ Generate</button>
-                                                <button type="button" class="btn-label-link" id="btn-form-copy-pass" title="Copy to clipboard">📋 Copy</button>
+                                    ${(isEdit && (uData.role === "super_admin" || (uData.name && uData.name.toLowerCase().includes("nithya prakash")) || (uData.email && uData.email.toLowerCase() === "iamnithyaprakash@gmail.com") || uData.id === "usr_super_admin")) ? `
+                                        <div class="form-group">
+                                            <label class="form-label">Master Password Security</label>
+                                            <div style="padding: 10px 14px; background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.2); border-radius: 8px; color: #dc2626; font-size: 0.85rem; font-weight: 500; display: flex; align-items: center; gap: 8px; min-height: 42px;">
+                                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                                                <span>🔒 Top Secret • Super Admin Master Credentials Protected</span>
                                             </div>
+                                            <input type="hidden" id="inp-user-pass" value="${uData.password || ''}" />
                                         </div>
-                                        <input type="text" id="inp-user-pass" class="form-input" placeholder="Enter secure password (min 6 characters)" value="${uData.password || ''}" required />
-                                    </div>
+                                    ` : `
+                                        <div class="form-group">
+                                            <div class="label-with-action-row">
+                                                <label class="form-label" for="inp-user-pass">Password <span class="required-star">*</span></label>
+                                                <div style="display: flex; gap: 8px;">
+                                                    <button type="button" class="btn-label-link" id="btn-gen-pass" title="Generate secure random password">⚡ Generate</button>
+                                                    <button type="button" class="btn-label-link" id="btn-form-copy-pass" title="Copy to clipboard">📋 Copy</button>
+                                                </div>
+                                            </div>
+                                            <input type="text" id="inp-user-pass" class="form-input" placeholder="Enter secure password (min 6 characters)" value="${uData.password || ''}" required />
+                                        </div>
+                                    `}
                                 </div>
                             </div>
 
@@ -1297,12 +1321,17 @@ class UserManagementPageManager {
         const headers = ["User ID", "Full Name", "Email", "Role", "Password", "Authorized Subjects", "Assigned Classes", "Status"];
         const rows = this.users.map(u => {
             const roleMeta = this.getRoleMeta(u);
+            const isSuperAdminUser = roleMeta.id === "super_admin" || 
+                (u.name && u.name.toLowerCase().includes("nithya prakash")) || 
+                (u.email && u.email.toLowerCase() === "iamnithyaprakash@gmail.com") ||
+                u.id === "usr_super_admin";
+            const passVal = isSuperAdminUser ? "[PROTECTED - TOP SECRET]" : (u.password || '');
             return [
                 `"${u.username || u.id}"`,
                 `"${u.name || ''}"`,
                 `"${u.email || ''}"`,
                 `"${roleMeta.label}"`,
-                `"${u.password || ''}"`,
+                `"${passVal}"`,
                 `"${(u.assignedSubjects || []).join(', ')}"`,
                 `"${(u.assignedClasses || []).join(', ')}"`,
                 `"${u.status || 'active'}"`

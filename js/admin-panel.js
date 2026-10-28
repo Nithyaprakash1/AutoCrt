@@ -83,7 +83,12 @@ class AdminPanelManager {
             { name: "Chemistry", code: "CHEM", teacher: "Prof. Priya Sundaram" },
             { name: "Mathematics", code: "MATH", teacher: "Dr. K. Venkatesh" },
             { name: "Biology", code: "BIO", teacher: "Dr. Meenakshi Iyer" },
-            { name: "English", code: "ENG", teacher: "Mrs. Shanthi Rao" }
+            { name: "English", code: "ENG", teacher: "Mrs. Shanthi Rao" },
+            { name: "Political Science", code: "POL", teacher: "Faculty Evaluator" },
+            { name: "Tamil", code: "TAM", teacher: "Faculty Evaluator" },
+            { name: "Economics", code: "ECO", teacher: "Faculty Evaluator" },
+            { name: "History", code: "HIS", teacher: "Faculty Evaluator" },
+            { name: "Social Science", code: "SST", teacher: "Faculty Evaluator" }
         ];
         standardCore.forEach(sc => {
             subjectMap.set(sc.name.toLowerCase(), {
@@ -122,8 +127,15 @@ class AdminPanelManager {
 
         // 3. Accumulate evaluations
         this.evaluations.forEach(ev => {
-            const subject = (ev.subject || "General").trim();
-            const key = subject.toLowerCase();
+            let matchedKey = null;
+            for (const [k, v] of subjectMap.entries()) {
+                if (window.appStorage && window.appStorage.isSubjectMatch(ev.subject, ev.examName, v.name, ev.templateName)) {
+                    matchedKey = k;
+                    break;
+                }
+            }
+            const subject = matchedKey ? subjectMap.get(matchedKey).name : (ev.subject || "General").trim();
+            const key = matchedKey || subject.toLowerCase();
             if (!subjectMap.has(key)) {
                 subjectMap.set(key, {
                     code: subject.substring(0, 4).toUpperCase(),

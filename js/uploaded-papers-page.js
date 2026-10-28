@@ -40,9 +40,13 @@ class UploadedPapersPageManager {
             }
             const savedCatalog = await window.appStorage.getSubjectCatalog();
             if (savedCatalog) {
-                this.subjects = savedCatalog.map(s => s.name);
+                const names = savedCatalog.map(s => s.name);
+                if (!names.some(n => n.toLowerCase().includes('politic'))) {
+                    names.push("Political Science");
+                }
+                this.subjects = names;
             } else {
-                this.subjects = ["Physics", "English", "Political Science", "Economics", "History", "Social Science"];
+                this.subjects = ["Physics", "English", "Political Science", "Economics", "History", "Social Science", "Mathematics", "Biology", "Chemistry", "Tamil"];
             }
 
             const currentUser = window.appStorage.getCurrentUser();
@@ -125,11 +129,11 @@ class UploadedPapersPageManager {
         return batches.filter(b => {
             // Mandatory Teacher subject guard
             if (isTeacher && this.subjects.length > 0) {
-                const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(b.subject, b.templateName, s));
+                const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(b.subject, '', s, b.templateName));
                 if (!matchesAnyTeacherSub) return false;
             }
 
-            if (this.selectedSubject !== "all" && !window.appStorage.isSubjectMatch(b.subject, b.templateName, this.selectedSubject)) return false;
+            if (this.selectedSubject !== "all" && !window.appStorage.isSubjectMatch(b.subject, '', this.selectedSubject, b.templateName)) return false;
             if (this.selectedClass !== "all") {
                 const clsMatch = b.className === this.selectedClass || b.className.includes(this.selectedClass);
                 if (!clsMatch) return false;
@@ -166,12 +170,12 @@ class UploadedPapersPageManager {
 
             // Mandatory Teacher subject guard
             if (isTeacher && this.subjects.length > 0) {
-                const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(p.subject, p.examName || p.templateName, s));
+                const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(p.subject, p.examName, s, p.templateName));
                 if (!matchesAnyTeacherSub) return false;
             }
 
             if (this.selectedBatchKey !== "all" && pKey !== this.selectedBatchKey) return false;
-            if (this.selectedSubject !== "all" && !window.appStorage.isSubjectMatch(p.subject, p.examName || p.templateName, this.selectedSubject)) return false;
+            if (this.selectedSubject !== "all" && !window.appStorage.isSubjectMatch(p.subject, p.examName, this.selectedSubject, p.templateName)) return false;
             if (this.selectedClass !== "all") {
                 const clsMatch = pCls === this.selectedClass || pCls.includes(this.selectedClass);
                 if (!clsMatch) return false;

@@ -629,7 +629,7 @@ class StorageService {
         if (!sub) return '';
         const s = String(sub).toLowerCase().trim();
         if (s.includes('social') || s.includes('sst')) return 'social_science';
-        if (s.includes('politic') || s.includes('civic')) return 'political_science';
+        if (s.includes('politic') || s.includes('civic') || s.includes('pol sci') || s.includes('pol. sci') || s.includes('pol science') || s.includes('polity') || s === 'pol' || s.startsWith('pol ') || s.endsWith(' pol') || s.includes('pol-') || s === 'ps') return 'political_science';
         if (s.includes('computer') || s.includes('info prac') || s.includes('ip') || s === 'cs') return 'computer_science';
         if (s.includes('bio') || s.includes('botany') || s.includes('zoology') || s.includes('life sci')) return 'biology';
         if (s.includes('chem')) return 'chemistry';
@@ -660,7 +660,7 @@ class StorageService {
         return templateName;
     }
 
-    isSubjectMatch(paperSubject, paperExamName, targetSubject) {
+    isSubjectMatch(paperSubject, paperExamName, targetSubject, paperTemplateName) {
         if (!targetSubject) return false;
         const tSub = String(targetSubject).toLowerCase().trim();
         if (tSub === 'all' || tSub === 'all subjects') return true;
@@ -668,19 +668,70 @@ class StorageService {
         const cTarget = this.canonicalizeSubject(tSub);
         if (!cTarget) return false;
 
+        // 1. Direct canonical match from paperSubject
         const pSub = (paperSubject || '').toLowerCase().trim();
         const cPaper = this.canonicalizeSubject(pSub);
+        if (cPaper && cPaper === cTarget) return true;
 
-        // If paper has an explicit canonical subject, compare directly
-        if (cPaper) {
-            return cPaper === cTarget;
-        }
-
-        // If paper subject was missing or unresolvable, try deriving canonical subject from exam name
+        // 2. Canonical match from examName
         const pExam = (paperExamName || '').toLowerCase().trim();
-        if (pExam) {
-            const cExam = this.canonicalizeSubject(pExam);
-            if (cExam) return cExam === cTarget;
+        const cExam = this.canonicalizeSubject(pExam);
+        if (cExam && cExam === cTarget) return true;
+
+        // 3. Canonical match from templateName
+        const pTpl = (paperTemplateName || '').toLowerCase().trim();
+        const cTpl = this.canonicalizeSubject(pTpl);
+        if (cTpl && cTpl === cTarget) return true;
+
+        // 4. Combined text scan fallback
+        const combined = `${pSub} ${pExam} ${pTpl}`.toLowerCase();
+        if (cTarget === 'political_science') {
+            return combined.includes('politic') || combined.includes('pol science') || combined.includes('pol sci') || combined.includes('polity') || combined.includes('civic') || combined.includes('pol-');
+        }
+        if (cTarget === 'social_science') {
+            return combined.includes('social') || combined.includes('sst');
+        }
+        if (cTarget === 'biology') {
+            return combined.includes('bio') || combined.includes('botany') || combined.includes('zoology') || combined.includes('life sci');
+        }
+        if (cTarget === 'chemistry') {
+            return combined.includes('chem');
+        }
+        if (cTarget === 'physics') {
+            return combined.includes('physic');
+        }
+        if (cTarget === 'mathematics') {
+            return combined.includes('math');
+        }
+        if (cTarget === 'tamil') {
+            return combined.includes('tamil');
+        }
+        if (cTarget === 'english') {
+            return combined.includes('english') || combined.includes('eng');
+        }
+        if (cTarget === 'economics') {
+            return combined.includes('econom');
+        }
+        if (cTarget === 'history') {
+            return combined.includes('histor');
+        }
+        if (cTarget === 'geography') {
+            return combined.includes('geograph');
+        }
+        if (cTarget === 'business_studies') {
+            return combined.includes('business') || combined.includes('bst');
+        }
+        if (cTarget === 'accountancy') {
+            return combined.includes('account');
+        }
+        if (cTarget === 'computer_science') {
+            return combined.includes('computer') || combined.includes('info prac') || combined.includes('ip');
+        }
+        if (cTarget === 'entrepreneurship') {
+            return combined.includes('entrepreneur');
+        }
+        if (cTarget === 'science') {
+            return combined.includes('science') && !combined.includes('social') && !combined.includes('political') && !combined.includes('computer');
         }
 
         return false;
@@ -738,7 +789,7 @@ class StorageService {
 
             // 1. MANDATORY SUBJECT MATCH
             if (!allowsAllSubjects) {
-                const subjectMatches = assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName || e.templateName, s));
+                const subjectMatches = assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName, s, e.templateName));
                 if (!subjectMatches) return false;
             }
 

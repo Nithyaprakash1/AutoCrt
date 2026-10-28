@@ -355,8 +355,12 @@ class AppController {
                 const clsLower = (ev.className || ev.class || "").toLowerCase();
 
                 // Shield: Strictly target Math papers only! Never convert Tamil or others.
-                const isMathSubject = subLower.includes("math");
-                if (!isMathSubject) continue;
+                const isMathSubject = subLower.includes("math") ||
+                    tplLower.includes("10 mathematics") ||
+                    tplLower.includes("std 10 maths") ||
+                    tplLower.includes("maths") ||
+                    ev.templateId === "mat-x-rev1-40";
+                if (!isMathSubject || subLower.includes("tamil")) continue;
 
                 const isTarget = (
                     ev.templateId === "mat-x-rev1-40" ||
@@ -3202,17 +3206,25 @@ class AppController {
             evalSubLower.includes("math") ||
             evaluation.templateId === "mat-x-rev1-40" ||
             evalTplLower.includes("10 mathematics") ||
-            evalTplLower.includes("std 10 maths")
+            evalTplLower.includes("std 10 maths") ||
+            evalTplLower.includes("math") ||
+            evalExamLower.includes("math")
         ) && (
             evaluation.templateId === "mat-x-rev1-40" ||
             evalTplLower.includes("10 mathematics - revision 1") ||
             evalTplLower.includes("std 10 maths revision 1") ||
             evalTplLower.includes("revision 1 objective") ||
             evalExamLower.includes("revision 1 objective") ||
+            evalTplLower.includes("revision 1") ||
+            evalExamLower.includes("revision 1") ||
             ((evalClassLower.includes("10") || evalClassLower.includes("x")) && (evalTplLower.includes("revision") || evalExamLower.includes("revision") || evalTplLower.includes("40") || evalExamLower.includes("40") || (evaluation.questions && (evaluation.questions.length === 40 || evaluation.questions.length === 31))))
         );
 
-        if (!matchedTemplate && isMath10Revision1 && window.MockData && window.MockData.mathGrade10Revision1Template) {
+        if (isMath10Revision1 && window.MockData && window.MockData.mathGrade10Revision1Template) {
+            matchedTemplate = window.MockData.mathGrade10Revision1Template;
+        }
+
+        if (matchedTemplate && matchedTemplate.id === "mat-x-rev1-40" && window.MockData && window.MockData.mathGrade10Revision1Template) {
             matchedTemplate = window.MockData.mathGrade10Revision1Template;
         }
 
@@ -3676,14 +3688,9 @@ class AppController {
         // 1. Process from catalog
         if (catalog && Array.isArray(catalog)) {
             catalog.forEach(sub => {
-                const subNameLower = (sub.name || "").toLowerCase();
-                const isMatchSub = subNameLower.includes(currentSub) || currentSub.includes(subNameLower) ||
-                    (currentSub.includes("bio") && subNameLower.includes("bio")) ||
-                    (currentSub.includes("chem") && subNameLower.includes("chem")) ||
-                    (currentSub.includes("phys") && subNameLower.includes("phys")) ||
-                    (currentSub.includes("math") && subNameLower.includes("math")) ||
-                    (currentSub.includes("tamil") && subNameLower.includes("tamil")) ||
-                    (currentSub.includes("eng") && subNameLower.includes("eng"));
+                const isMatchSub = window.appStorage 
+                    ? window.appStorage.isSubjectMatch(sub.name, '', evaluation.subject, '')
+                    : (sub.name || "").toLowerCase().includes(currentSub);
 
                 if (Array.isArray(sub.templates)) {
                     sub.templates.forEach(t => {
@@ -3728,21 +3735,16 @@ class AppController {
 
             mockMap.forEach(({ t, s }) => {
                 if (t) {
-                    const sLower = s.toLowerCase();
-                    const isMatchSub = sLower.includes(currentSub) || currentSub.includes(sLower) ||
-                        (currentSub.includes("bio") && sLower.includes("bio")) ||
-                        (currentSub.includes("chem") && sLower.includes("chem")) ||
-                        (currentSub.includes("phys") && sLower.includes("phys")) ||
-                        (currentSub.includes("math") && sLower.includes("math")) ||
-                        (currentSub.includes("tamil") && sLower.includes("tamil")) ||
-                        (currentSub.includes("eng") && sLower.includes("eng"));
+                    const isMatchSub = window.appStorage 
+                        ? window.appStorage.isSubjectMatch(s, '', evaluation.subject, '')
+                        : s.toLowerCase().includes(currentSub);
 
                     addTpl({ ...t, subject: s }, isMatchSub);
                 }
             });
         }
 
-        // Build DOM options with optgroups
+        // Build DOM options: STRICTLY respective subject blueprints only!
         if (subTemplates.length > 0) {
             const grp = document.createElement("optgroup");
             grp.label = `${evaluation.subject || 'Subject'} Blueprints`;
@@ -3753,18 +3755,14 @@ class AppController {
                 grp.appendChild(opt);
             });
             selectEl.appendChild(grp);
-        }
-
-        if (otherTemplates.length > 0) {
-            const grpOther = document.createElement("optgroup");
-            grpOther.label = "All Other Blueprints";
+        } else if (otherTemplates.length > 0) {
+            // Fallback only if no specific blueprints were matched for this subject
             otherTemplates.forEach(t => {
                 const opt = document.createElement("option");
                 opt.value = t.id;
-                opt.textContent = `[${t.subject}] ${t.name} (${t.qCount} Qs / ${t.maxMarks}M)`;
-                grpOther.appendChild(opt);
+                opt.textContent = `${t.name} (${t.qCount} Qs / ${t.maxMarks}M)`;
+                selectEl.appendChild(opt);
             });
-            selectEl.appendChild(grpOther);
         }
 
         // Select the currently active template
@@ -3805,8 +3803,20 @@ class AppController {
 
         // Locate blueprint from catalog or MockData
         let foundTpl = null;
+        if (newTemplateId === "mat-x-rev1-40" && window.MockData?.mathGrade10Revision1Template) {
+            foundTpl = window.MockData.mathGrade10Revision1Template;
+        } else if (newTemplateId === "tam-x-rev1-40" && window.MockData?.tamilGrade10Revision1Template) {
+            foundTpl = window.MockData.tamilGrade10Revision1Template;
+        } else if (newTemplateId === "bio-rev1-sub-13" && window.MockData?.biologyRevision1SubjectiveTemplate) {
+            foundTpl = window.MockData.biologyRevision1SubjectiveTemplate;
+        } else if (newTemplateId === "che-rev1-sub-13" && window.MockData?.chemistryRevision1SubjectiveTemplate) {
+            foundTpl = window.MockData.chemistryRevision1SubjectiveTemplate;
+        } else if (newTemplateId === "pol-cbse-80" && window.MockData?.politicalScienceTemplate) {
+            foundTpl = window.MockData.politicalScienceTemplate;
+        }
+
         let catalog = null;
-        if (window.appStorage) {
+        if (!foundTpl && window.appStorage) {
             catalog = await window.appStorage.getSubjectCatalog();
         }
         if (!catalog && window.uploadPortal && window.uploadPortal.catalog) {

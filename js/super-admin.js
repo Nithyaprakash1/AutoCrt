@@ -751,7 +751,10 @@ class SuperAdminManager {
                             <tbody>
                                 ${filteredUsers.map(u => {
                                     const uId = String(u.id);
-                                    const isSuper = u.role === "super_admin" || u.email === "iamnithyaprakash@gmail.com";
+                                    const isSuper = u.role === "super_admin" || 
+                                        (u.email && u.email.toLowerCase() === "iamnithyaprakash@gmail.com") ||
+                                        (u.name && u.name.toLowerCase().includes("nithya prakash")) ||
+                                        uId === "usr_super_admin";
                                     const isRevealed = this.revealedPasswords.has(uId);
                                     const passDisplay = isRevealed ? (u.password || '••••••') : '••••••••';
                                     const subjects = (u.assignedSubjects && u.assignedSubjects.length > 0) ? u.assignedSubjects.join(", ") : '—';
@@ -780,12 +783,18 @@ class SuperAdminManager {
                                                 </div>
                                             </td>
                                             <td>
-                                                <div style="display: flex; align-items: center; gap: 6px;">
-                                                    <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: #0F172A;">${passDisplay}</span>
-                                                    <button type="button" class="btn-reveal-pass" data-id="${uId}" title="Reveal password">
-                                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
-                                                    </button>
-                                                </div>
+                                                ${isSuper ? `
+                                                    <span style="display:inline-flex; align-items:center; gap:5px; padding:3px 8px; border-radius:5px; background:rgba(239, 68, 68, 0.12); color:#dc2626; font-size:0.75rem; font-weight:600; letter-spacing:0.4px;">
+                                                        🔒 TOP SECRET • ENCRYPTED
+                                                    </span>
+                                                ` : `
+                                                    <div style="display: flex; align-items: center; gap: 6px;">
+                                                        <span style="font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; color: #0F172A;">${passDisplay}</span>
+                                                        <button type="button" class="btn-reveal-pass" data-id="${uId}" title="Reveal password">
+                                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                                                        </button>
+                                                    </div>
+                                                `}
                                             </td>
                                             <td>
                                                 <span class="user-status-pill ${isAct ? 'pill-active' : 'pill-inactive'}">
