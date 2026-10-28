@@ -113,7 +113,7 @@ class MarkingPanel {
             }
         });
 
-        if (Array.isArray(sections) && sections.length > 1 && sections.length >= distinctQSecs.size) {
+        if (Array.isArray(sections) && sections.length >= 1 && sections.length >= distinctQSecs.size) {
             this.sections = sections.map((s, idx) => ({
                 id: s.id || `sec_${String.fromCharCode(97 + idx)}`,
                 letter: s.letter || String.fromCharCode(65 + idx),

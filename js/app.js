@@ -32,6 +32,8 @@ class AppController {
 
         // Auto-migrate any 10th Math Revision 1 evaluations to official 31 Qs / 40M blueprint
         await this.migrateMathGrade10Evaluations();
+        // Auto-migrate any 10th Tamil Revision 1 evaluations to official 40 Qs / 40M (1 Section, 40 Qs x 1M) blueprint
+        await this.migrateTamilGrade10Evaluations();
 
         // Load settings & teacher info
         const settings = await window.appStorage.getSettings();
@@ -350,13 +352,17 @@ class AppController {
                 const examLower = (ev.examName || "").toLowerCase();
                 const clsLower = (ev.className || ev.class || "").toLowerCase();
 
+                // Shield: Strictly target Math papers only! Never convert Tamil or others.
+                const isMathSubject = subLower.includes("math");
+                if (!isMathSubject) continue;
+
                 const isTarget = (
                     ev.templateId === "mat-x-rev1-40" ||
                     tplLower.includes("10 mathematics - revision 1") ||
                     tplLower.includes("std 10 maths revision 1") ||
                     tplLower.includes("revision 1 objective") ||
                     examLower.includes("revision 1 objective") ||
-                    (subLower.includes("math") && (clsLower.includes("10") || clsLower.includes("x")) && (tplLower.includes("revision") || examLower.includes("revision") || (ev.questions && (ev.questions.length === 40 || ev.questions.length === 31))))
+                    ((clsLower.includes("10") || clsLower.includes("x")) && (tplLower.includes("revision") || examLower.includes("revision") || (ev.questions && (ev.questions.length === 40 || ev.questions.length === 31))))
                 );
 
                 if (isTarget) {
@@ -369,7 +375,7 @@ class AppController {
                     );
 
                     if (needsRepair) {
-                        console.log(`[Auto-Repair] Migrating evaluation ${ev.studentName || 'Student'} (${ev.id}) to 31 Qs / 40M blueprint...`);
+                        console.log(`[Auto-Repair] Migrating Math evaluation ${ev.studentName || 'Student'} (${ev.id}) to 31 Qs / 40M blueprint...`);
                         ev.templateId = tpl.id;
                         ev.templateName = tpl.name;
                         ev.examName = tpl.examName;
@@ -416,6 +422,94 @@ class AppController {
             }
         } catch (e) {
             console.warn("Auto-repair migration warning:", e);
+        }
+    }
+
+    // Auto-repair & migrate any 10th Tamil Revision 1 evaluations to official 40 Qs / 40M (1 Section, all 1 Mark each) blueprint
+    async migrateTamilGrade10Evaluations() {
+        if (!window.appStorage) return;
+        try {
+            const all = await window.appStorage.getAllEvaluations();
+            if (!Array.isArray(all) || all.length === 0) return;
+
+            const tpl = window.MockData?.tamilGrade10Revision1Template;
+            if (!tpl) return;
+
+            let updatedCount = 0;
+            for (const ev of all) {
+                const subLower = (ev.subject || "").toLowerCase();
+                const tplLower = (ev.templateName || "").toLowerCase();
+                const examLower = (ev.examName || "").toLowerCase();
+                const clsLower = (ev.className || ev.class || "").toLowerCase();
+
+                const isTamilSubject = subLower.includes("tamil");
+                if (!isTamilSubject) continue;
+
+                const isTamil10Revision1 = (
+                    ev.templateId === "tam-x-rev1-40" ||
+                    tplLower.includes("tamil") ||
+                    examLower.includes("tamil") ||
+                    tplLower.includes("revision 1 objective") ||
+                    examLower.includes("revision 1 objective") ||
+                    tplLower.includes("revision 1") ||
+                    examLower.includes("revision 1") ||
+                    clsLower.includes("10") ||
+                    clsLower.includes("x") ||
+                    ev.maxMarks === 40
+                );
+
+                if (isTamil10Revision1) {
+                    const needsRepair = (
+                        ev.questions?.length !== 40 ||
+                        ev.maxMarks !== 40 ||
+                        !ev.sections ||
+                        ev.sections.length !== 1 ||
+                        ev.sections[0]?.qCount !== 40 ||
+                        ev.questions?.some(q => q.maxMarks !== 1 || q.hasSubQuestions)
+                    );
+
+                    if (needsRepair) {
+                        console.log(`[Auto-Repair] Migrating Tamil evaluation ${ev.studentName || 'Student'} (${ev.id}) to 40 Qs / 40M (all 1 Mark) blueprint...`);
+                        ev.templateId = tpl.id;
+                        ev.templateName = tpl.name;
+                        ev.examName = tpl.examName;
+                        ev.maxMarks = 40;
+                        ev.sections = JSON.parse(JSON.stringify(tpl.sections));
+
+                        const oldMarksMap = new Map();
+                        (ev.questions || []).forEach(q => {
+                            if (q.status && q.status !== "unmarked" && q.status !== "pending") {
+                                oldMarksMap.set(q.qNo, q);
+                            }
+                        });
+
+                        ev.questions = JSON.parse(JSON.stringify(tpl.questions)).map(newQ => {
+                            if (oldMarksMap.has(newQ.qNo)) {
+                                const prev = oldMarksMap.get(newQ.qNo);
+                                newQ.awardedMarks = Math.min(Number(prev.awardedMarks) || 0, 1);
+                                newQ.status = prev.status;
+                            }
+                            newQ.hasSubQuestions = false;
+                            newQ.subQuestions = [];
+                            newQ.maxMarks = 1;
+                            return newQ;
+                        });
+
+                        const totalObt = ev.questions.reduce((sum, q) => (q.status !== "unmarked" && q.status !== "pending") ? sum + (Number(q.awardedMarks) || 0) : sum, 0);
+                        ev.obtainedMarks = Math.round(totalObt * 10) / 10;
+                        ev.percentage = Math.round((ev.obtainedMarks / 40) * 100);
+                        ev.grade = ev.percentage >= 90 ? "A+" : ev.percentage >= 75 ? "A" : ev.percentage >= 60 ? "B" : ev.percentage >= 40 ? "C" : "F";
+
+                        await window.appStorage.saveEvaluation(ev);
+                        updatedCount++;
+                    }
+                }
+            }
+            if (updatedCount > 0) {
+                console.log(`[Auto-Repair] Successfully migrated ${updatedCount} evaluation(s) to 10th Tamil Revision 1 Blueprint (40 Qs x 1M).`);
+            }
+        } catch (e) {
+            console.warn("Auto-repair Tamil migration warning:", e);
         }
     }
 
@@ -2967,22 +3061,46 @@ class AppController {
             }
         }
 
-        // Specific alias & fuzzy check for 10th Math Revision 1 (STD 10 Maths REVISION 1 - 40 marks / 10 MATHEMATICS - Revision 1 Objective)
+        // Specific alias & fuzzy check for 10th Tamil & Math Revision 1
         const evalSubLower = (evaluation.subject || "").toLowerCase();
         const evalTplLower = (evaluation.templateName || "").toLowerCase();
         const evalExamLower = (evaluation.examName || "").toLowerCase();
         const evalClassLower = (evaluation.className || evaluation.class || "").toLowerCase();
 
-        const isMath10Revision1 = (
+        // 1. TAMIL Grade 10 Revision 1 Blueprint (1 Section: 40 Qs, all 1 Mark each = 40 Marks)
+        const isTamil10Revision1 = evalSubLower.includes("tamil") && (
+            evaluation.templateId === "tam-x-rev1-40" ||
+            evalTplLower.includes("tamil") ||
+            evalExamLower.includes("tamil") ||
+            evalTplLower.includes("revision 1 objective") ||
+            evalExamLower.includes("revision 1 objective") ||
+            evalTplLower.includes("revision 1") ||
+            evalExamLower.includes("revision 1") ||
+            evalClassLower.includes("10") ||
+            evalClassLower.includes("x") ||
+            evaluation.maxMarks === 40
+        );
+
+        if (isTamil10Revision1 && window.MockData && window.MockData.tamilGrade10Revision1Template) {
+            matchedTemplate = window.MockData.tamilGrade10Revision1Template;
+        }
+
+        // 2. MATHS Grade 10 Revision 1 Blueprint (2 Sections: Sec A 28 Qs x 1M, Sec B 3 Qs x 4M = 40 Marks)
+        const isMath10Revision1 = (!evalSubLower.includes("tamil")) && (
+            evalSubLower.includes("math") ||
+            evaluation.templateId === "mat-x-rev1-40" ||
+            evalTplLower.includes("10 mathematics") ||
+            evalTplLower.includes("std 10 maths")
+        ) && (
             evaluation.templateId === "mat-x-rev1-40" ||
             evalTplLower.includes("10 mathematics - revision 1") ||
             evalTplLower.includes("std 10 maths revision 1") ||
             evalTplLower.includes("revision 1 objective") ||
             evalExamLower.includes("revision 1 objective") ||
-            (evalSubLower.includes("math") && (evalClassLower.includes("10") || evalClassLower.includes("x")) && (evalTplLower.includes("revision") || evalExamLower.includes("revision") || evalTplLower.includes("40") || evalExamLower.includes("40") || (evaluation.questions && (evaluation.questions.length === 40 || evaluation.questions.length === 31))))
+            ((evalClassLower.includes("10") || evalClassLower.includes("x")) && (evalTplLower.includes("revision") || evalExamLower.includes("revision") || evalTplLower.includes("40") || evalExamLower.includes("40") || (evaluation.questions && (evaluation.questions.length === 40 || evaluation.questions.length === 31))))
         );
 
-        if (isMath10Revision1 && window.MockData && window.MockData.mathGrade10Revision1Template) {
+        if (!matchedTemplate && isMath10Revision1 && window.MockData && window.MockData.mathGrade10Revision1Template) {
             matchedTemplate = window.MockData.mathGrade10Revision1Template;
         }
 
