@@ -614,8 +614,8 @@ class StorageService {
             if (raw) {
                 const u = JSON.parse(raw);
                 if (u && (u.role === 'evaluator' || u.role === 'teacher')) {
-                    if (!Array.isArray(u.assignedSubjects) || u.assignedSubjects.length === 0 || u.assignedSubjects.includes('All Subjects') || u.assignedSubjects.includes('all')) {
-                        u.assignedSubjects = ["All Subjects"];
+                    if (u.subject && (!Array.isArray(u.assignedSubjects) || u.assignedSubjects.length === 0)) {
+                        u.assignedSubjects = [u.subject];
                     }
                 }
                 return u;
