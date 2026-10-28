@@ -97,11 +97,12 @@ class AppController {
                     name: "Faculty Evaluator",
                     role: "evaluator",
                     roleLabel: "Teacher Desk",
-                    subject: targetSubject || "Physics",
-                    assignedSubjects: targetSubject ? [targetSubject] : ["Physics"],
+                    subject: targetSubject || "",
+                    assignedSubjects: targetSubject ? [targetSubject] : [],
                     status: "active"
                 };
                 window.appStorage.setCurrentUser(guestUser);
+                currentUser = guestUser;
             }
             this.hidePortalLoginScreen();
 
@@ -138,13 +139,31 @@ class AppController {
                 this.switchPortal("evaluator", false);
                 await this.switchView("dashboard");
                 if (this.dashboardManager) {
-                    if (targetSubject) {
-                        this.dashboardManager.teacherSubject = targetSubject;
-                        this.dashboardManager.teacherSubjects = [targetSubject];
-                        this.dashboardManager.selectedSubjectFilter = targetSubject;
+                    const activeUser = window.appStorage.getCurrentUser();
+                    const isTeacher = activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher');
+                    const isAdmin = activeUser && (activeUser.role === 'admin' || activeUser.role === 'super_admin');
+                    
+                    let canAccessSubject = true;
+                    if (isTeacher && targetSubject) {
+                        const assigned = (activeUser.assignedSubjects || []).filter(s => s && s !== 'all' && s !== 'All Subjects');
+                        canAccessSubject = assigned.length === 0 || assigned.some(s => window.appStorage.isSubjectMatch(targetSubject, '', s));
                     }
-                    if (targetBatch) {
-                        this.dashboardManager.highlightBatchKey = targetBatch;
+
+                    if (canAccessSubject) {
+                        if (targetSubject) {
+                            this.dashboardManager.teacherSubject = targetSubject;
+                            if (isAdmin) {
+                                this.dashboardManager.teacherSubjects = [targetSubject];
+                            }
+                            this.dashboardManager.selectedSubjectFilter = targetSubject;
+                        }
+                        if (targetBatch) {
+                            this.dashboardManager.highlightBatchKey = targetBatch;
+                        }
+                    } else {
+                        if (this.showToast) {
+                            this.showToast(`Access Restricted: Shared link is for ${targetSubject}. Your assigned subjects are ${(activeUser.assignedSubjects || []).join(', ')}.`, "error");
+                        }
                     }
                     this.dashboardManager.activeBatchKey = null; // Always display CARDS overview mode
                     this.dashboardManager.applyFilters();
@@ -2847,6 +2866,23 @@ class AppController {
             if (fresh) evaluation = fresh;
         }
 
+        // Subject Authorization Check: Teachers may ONLY evaluate papers of their assigned subjects
+        const activeUser = window.appStorage.getCurrentUser();
+        if (activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher')) {
+            const assigned = (Array.isArray(activeUser.assignedSubjects) && activeUser.assignedSubjects.length > 0)
+                ? activeUser.assignedSubjects.filter(s => s && s !== 'all' && s !== 'All Subjects')
+                : (activeUser.subject ? [activeUser.subject] : []);
+
+            const isMatch = assigned.some(s => window.appStorage.isSubjectMatch(evaluation.subject, evaluation.examName || evaluation.templateName, s));
+            if (!isMatch) {
+                const msg = `Access Restricted: This paper is for ${evaluation.subject || 'another subject'}. You are assigned to ${assigned.join(', ') || 'no subjects'}.`;
+                if (this.showToast) this.showToast(msg, "error");
+                else alert(msg);
+                await this.switchView("dashboard");
+                return;
+            }
+        }
+
         // If raw PDF scans are purged to preserve storage, open the Student Scorecard directly
         if (evaluation.rawScansPurged) {
             if (this.showToast) {
@@ -4089,13 +4125,13 @@ class AppController {
         let queue = Array.isArray(allEvaluations) ? [...allEvaluations] : [];
 
         if (currentSubject) {
-            const curSubLower = currentSubject.toLowerCase().trim();
-            const sameSub = queue.filter(e => {
-                const s = (e.subject || "").toLowerCase().trim();
-                const exam = (e.examName || e.templateName || "").toLowerCase().trim();
-                return s === curSubLower || s.includes(curSubLower) || curSubLower.includes(s) || exam.includes(curSubLower);
-            });
-            if (sameSub.length > 0) queue = sameSub;
+            queue = queue.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, currentSubject));
+        }
+
+        const currentExam = this.activeEvaluation?.examName || this.activeEvaluation?.templateName;
+        if (currentExam) {
+            const sameExam = queue.filter(e => (e.examName || e.templateName) === currentExam);
+            if (sameExam.length > 0) queue = sameExam;
         }
 
         if (currentClass) {

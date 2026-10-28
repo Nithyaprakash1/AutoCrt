@@ -881,7 +881,7 @@ class UserManagementPageManager {
                                     <p class="form-help-sub">Choose which academic subjects this user is authorized to evaluate:</p>
                                     <div class="checkbox-options-grid" id="subs-checkbox-grid">
                                         ${this.subjectsList.map(s => {
-                                            const isChecked = (uData.assignedSubjects || []).includes(s) || (uData.assignedSubjects || []).includes("All Subjects");
+                                            const isChecked = (uData.assignedSubjects || []).some(sub => window.appStorage ? window.appStorage.isSubjectMatch(sub, '', s) : sub === s);
                                             return `
                                                 <label class="custom-checkbox-card">
                                                     <input type="checkbox" name="assigned_subject" value="${s}" ${isChecked ? 'checked' : ''} />
@@ -1089,6 +1089,10 @@ class UserManagementPageManager {
                     ? "Super Admin (Owner)" 
                     : (role === "admin" ? "Administrator" : (role === "uploader" ? "Exam Officer / Uploader" : "Faculty Evaluator"));
 
+                if (role === "evaluator") {
+                    selectedSubjects = selectedSubjects.filter(s => s !== "All Subjects" && s !== "all");
+                }
+
                 try {
                     if (isEdit && this.editingUser) {
                         this.editingUser.name = name;
@@ -1098,8 +1102,15 @@ class UserManagementPageManager {
                         this.editingUser.role = role;
                         this.editingUser.roleLabel = roleLabel;
                         this.editingUser.assignedSubjects = selectedSubjects;
+                        this.editingUser.subject = selectedSubjects[0] || "";
                         this.editingUser.assignedClasses = selectedClasses;
                         this.editingUser.status = status;
+
+                        // Immediately update active session if current logged-in user is this user
+                        const activeUser = window.appStorage.getCurrentUser();
+                        if (activeUser && (activeUser.id === this.editingUser.id || activeUser.email === this.editingUser.email)) {
+                            window.appStorage.setCurrentUser(Object.assign({}, activeUser, this.editingUser));
+                        }
 
                         // Sync updated profile to Firestore
                         if (window.firebaseManager && window.firebaseManager.firestore) {

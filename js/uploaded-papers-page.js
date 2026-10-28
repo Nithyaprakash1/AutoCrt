@@ -44,10 +44,15 @@ class UploadedPapersPageManager {
             }
 
             const currentUser = window.appStorage.getCurrentUser();
-            if (currentUser && currentUser.role === 'evaluator' && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0 && !currentUser.assignedSubjects.includes("All Subjects")) {
-                this.subjects = currentUser.assignedSubjects;
-                if (this.selectedSubject === "all" && currentUser.assignedSubjects.length === 1) {
-                    this.selectedSubject = currentUser.assignedSubjects[0];
+            const isTeacher = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
+            if (isTeacher) {
+                let assigned = Array.isArray(currentUser.assignedSubjects) && currentUser.assignedSubjects.length > 0
+                    ? [...currentUser.assignedSubjects]
+                    : (currentUser.subject ? [currentUser.subject] : []);
+                assigned = assigned.filter(s => s && s !== 'all' && s !== 'All Subjects');
+                this.subjects = assigned;
+                if (this.selectedSubject === "all" || !assigned.some(s => window.appStorage.isSubjectMatch(this.selectedSubject, '', s))) {
+                    this.selectedSubject = assigned[0] || "";
                 }
             }
 
@@ -107,9 +112,17 @@ class UploadedPapersPageManager {
     }
 
     getFilteredBatches() {
+        const currentUser = window.appStorage.getCurrentUser();
+        const isTeacher = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
         const batches = this.computeBatches();
         return batches.filter(b => {
-            if (this.selectedSubject !== "all" && b.subject !== this.selectedSubject) return false;
+            // Mandatory Teacher subject guard
+            if (isTeacher && this.subjects.length > 0) {
+                const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(b.subject, b.templateName, s));
+                if (!matchesAnyTeacherSub) return false;
+            }
+
+            if (this.selectedSubject !== "all" && !window.appStorage.isSubjectMatch(b.subject, b.templateName, this.selectedSubject)) return false;
             if (this.selectedClass !== "all") {
                 const clsMatch = b.className === this.selectedClass || b.className.includes(this.selectedClass);
                 if (!clsMatch) return false;
@@ -134,13 +147,21 @@ class UploadedPapersPageManager {
     }
 
     getFilteredPapers() {
+        const currentUser = window.appStorage.getCurrentUser();
+        const isTeacher = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
         return this.papers.filter(p => {
             const pCls = p.className || p.class || "Class 12-A";
             const pTpl = p.templateName || p.examName || "Exam Blueprint";
             const pKey = `${pCls}:::${pTpl}`;
 
+            // Mandatory Teacher subject guard
+            if (isTeacher && this.subjects.length > 0) {
+                const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(p.subject, p.examName || p.templateName, s));
+                if (!matchesAnyTeacherSub) return false;
+            }
+
             if (this.selectedBatchKey !== "all" && pKey !== this.selectedBatchKey) return false;
-            if (this.selectedSubject !== "all" && p.subject !== this.selectedSubject) return false;
+            if (this.selectedSubject !== "all" && !window.appStorage.isSubjectMatch(p.subject, p.examName || p.templateName, this.selectedSubject)) return false;
             if (this.selectedClass !== "all") {
                 const clsMatch = pCls === this.selectedClass || pCls.includes(this.selectedClass);
                 if (!clsMatch) return false;
@@ -292,7 +313,7 @@ class UploadedPapersPageManager {
                             <div class="filter-select-item">
                                 <label>Subject:</label>
                                 <select id="select-papers-subject" class="form-select-sm">
-                                    <option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All</option>
+                                    ${!isTeacher ? `<option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All</option>` : (this.subjects.length > 1 ? `<option value="all" ${this.selectedSubject === 'all' ? 'selected' : ''}>All My Subjects</option>` : '')}
                                     ${this.subjects.map(s => `
                                         <option value="${s}" ${this.selectedSubject === s ? 'selected' : ''}>${s}</option>
                                     `).join('')}

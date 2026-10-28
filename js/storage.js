@@ -614,10 +614,71 @@ class StorageService {
         } catch (e) {}
     }
 
+    canonicalizeSubject(sub) {
+        if (!sub) return '';
+        const s = String(sub).toLowerCase().trim();
+        if (s.includes('social') || s.includes('sst')) return 'social_science';
+        if (s.includes('politic') || s.includes('civic')) return 'political_science';
+        if (s.includes('computer') || s.includes('info prac') || s.includes('ip') || s === 'cs') return 'computer_science';
+        if (s.includes('bio') || s.includes('botany') || s.includes('zoology') || s.includes('life sci')) return 'biology';
+        if (s.includes('chem')) return 'chemistry';
+        if (s.includes('physic')) return 'physics';
+        if (s.includes('math')) return 'mathematics';
+        if (s.includes('english') || s.includes('eng')) return 'english';
+        if (s.includes('econom')) return 'economics';
+        if (s.includes('histor')) return 'history';
+        if (s.includes('geograph')) return 'geography';
+        if (s.includes('business') || s.includes('bst')) return 'business_studies';
+        if (s.includes('account')) return 'accountancy';
+        if (s.includes('entrepreneur')) return 'entrepreneurship';
+        if (s.includes('tamil')) return 'tamil';
+        if (s.includes('hindi')) return 'hindi';
+        if (s.includes('french')) return 'french';
+        if (s.includes('sanskrit')) return 'sanskrit';
+        if (s === 'science' || s.startsWith('science ') || s.endsWith(' science') || s.includes('gen sci') || s.includes('general science') || s.includes('natural sci')) return 'science';
+        return s.replace(/\s+/g, '_');
+    }
+
+    isSubjectMatch(paperSubject, paperExamName, targetSubject) {
+        if (!targetSubject) return false;
+        const tSub = String(targetSubject).toLowerCase().trim();
+        if (tSub === 'all' || tSub === 'all subjects') return true;
+
+        const cTarget = this.canonicalizeSubject(tSub);
+        if (!cTarget) return false;
+
+        const pSub = (paperSubject || '').toLowerCase().trim();
+        const cPaper = this.canonicalizeSubject(pSub);
+
+        // If paper has an explicit canonical subject, compare directly
+        if (cPaper) {
+            return cPaper === cTarget;
+        }
+
+        // If paper subject was missing or unresolvable, try deriving canonical subject from exam name
+        const pExam = (paperExamName || '').toLowerCase().trim();
+        if (pExam) {
+            const cExam = this.canonicalizeSubject(pExam);
+            if (cExam) return cExam === cTarget;
+        }
+
+        return false;
+    }
+
     filterEvaluationsForUser(list) {
         if (!Array.isArray(list)) return [];
         const user = this.getCurrentUser();
         const activePortal = localStorage.getItem("niprak_active_portal") || localStorage.getItem("onespace_active_portal") || "evaluator";
+
+        // Admin or Super Admin role accesses all evaluations across portals
+        if (user && (user.role === 'admin' || user.role === 'super_admin')) {
+            return list;
+        }
+
+        // Exam Officer (uploader) accesses all evaluations on upload/admin desks
+        if (user && user.role === 'uploader' && activePortal !== 'evaluator') {
+            return list;
+        }
 
         // If no user is logged in and viewing teacher desk, do not expose all evaluations
         if (!user) {
@@ -625,24 +686,25 @@ class StorageService {
             return list;
         }
 
-        // Admin, Uploader, or Super Admin role accesses all evaluations
-        if (user.role === 'admin' || user.role === 'uploader' || user.role === 'super_admin') {
-            return list;
-        }
-
         // Teacher / Evaluator role: filter strictly by assigned subject(s) & class(es)
+        const isTeacher = user.role === 'evaluator' || user.role === 'teacher';
         const teacherUid = user.uid || user.id;
-        const assignedSubjects = Array.isArray(user.assignedSubjects) && user.assignedSubjects.length > 0
-            ? user.assignedSubjects
+        let assignedSubjects = Array.isArray(user.assignedSubjects) && user.assignedSubjects.length > 0
+            ? [...user.assignedSubjects]
             : (user.subject ? [user.subject] : []);
         const assignedClasses = Array.isArray(user.assignedClasses) ? user.assignedClasses : [];
+
+        // Evaluator / Teacher must NEVER be allowed "All Subjects" bypass — must strictly evaluate assigned subjects!
+        if (isTeacher) {
+            assignedSubjects = assignedSubjects.filter(s => s && s !== "all" && s !== "All Subjects");
+        }
 
         // If teacher has no assigned subjects, they are not authorized to see papers until allotted
         if (assignedSubjects.length === 0) {
             return [];
         }
 
-        const allowsAllSubjects = assignedSubjects.some(s => s === "All Subjects" || s === "all");
+        const allowsAllSubjects = (!isTeacher) && assignedSubjects.some(s => s === "All Subjects" || s === "all");
         const allowsAllClasses = assignedClasses.length === 0 || assignedClasses.some(c => c === "All Classes" || c === "all");
 
         const filtered = list.filter(e => {
@@ -655,16 +717,7 @@ class StorageService {
 
             // 1. MANDATORY SUBJECT MATCH
             if (!allowsAllSubjects) {
-                const subLower = (e.subject || "").toLowerCase().trim();
-                const examLower = (e.examName || e.templateName || "").toLowerCase().trim();
-                if (!subLower && !examLower) return false;
-
-                const subjectMatches = assignedSubjects.some(s => {
-                    const sLow = s.toLowerCase().trim();
-                    if (!sLow) return false;
-                    return subLower === sLow || subLower.includes(sLow) || sLow.includes(subLower) || examLower.includes(sLow);
-                });
-
+                const subjectMatches = assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName || e.templateName, s));
                 if (!subjectMatches) return false;
             }
 
@@ -1791,4 +1844,10 @@ class StorageService {
 }
 
 window.appStorage = new StorageService();
+window.canonicalizeSubject = function(sub) {
+    return window.appStorage ? window.appStorage.canonicalizeSubject(sub) : (sub || '').toLowerCase().trim();
+};
+window.isSubjectMatch = function(paperSub, paperExam, targetSub) {
+    return window.appStorage ? window.appStorage.isSubjectMatch(paperSub, paperExam, targetSub) : false;
+};
 

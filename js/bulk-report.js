@@ -18,14 +18,16 @@ class BulkReportManager {
         if (!this.container) return;
         this.evaluations = await window.appStorage.getAllEvaluations();
 
-        // If teacher is allotted specific subject(s) (e.g. English), scope evaluations strictly to that subject
+        // If teacher is allotted specific subject(s), scope evaluations strictly to that subject
         const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
-        if (currentUser && currentUser.role === 'evaluator' && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0 && !currentUser.assignedSubjects.includes("All Subjects")) {
-            const assigned = currentUser.assignedSubjects.map(s => s.toLowerCase().trim());
+        const isTeacher = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
+        if (isTeacher) {
+            let assigned = Array.isArray(currentUser.assignedSubjects) && currentUser.assignedSubjects.length > 0
+                ? [...currentUser.assignedSubjects]
+                : (currentUser.subject ? [currentUser.subject] : []);
+            assigned = assigned.filter(s => s && s !== 'all' && s !== 'All Subjects');
             this.evaluations = this.evaluations.filter(e => {
-                const sub = (e.subject || "").toLowerCase().trim();
-                const exam = (e.examName || e.templateName || "").toLowerCase().trim();
-                return assigned.some(a => sub === a || sub.includes(a) || a.includes(sub) || exam.includes(a));
+                return assigned.some(a => window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, a));
             });
         }
 
@@ -40,11 +42,15 @@ class BulkReportManager {
         const sections = [...new Set(this.evaluations.map(e => e.section).filter(Boolean))];
 
         const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        const isTeacher = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
         let subjects = [...new Set(this.evaluations.map(e => e.subject).filter(Boolean))];
-        if (currentUser && currentUser.role === 'evaluator' && currentUser.assignedSubjects && currentUser.assignedSubjects.length > 0 && !currentUser.assignedSubjects.includes("All Subjects")) {
-            subjects = currentUser.assignedSubjects;
+        if (isTeacher) {
+            let assigned = Array.isArray(currentUser.assignedSubjects) && currentUser.assignedSubjects.length > 0
+                ? [...currentUser.assignedSubjects]
+                : (currentUser.subject ? [currentUser.subject] : []);
+            subjects = assigned.filter(s => s && s !== 'all' && s !== 'All Subjects');
         } else if (subjects.length === 0) {
-            subjects = ["Physics", "English"];
+            subjects = ["Physics", "English", "Mathematics"];
         }
 
         const ic = window.Icons || {};
@@ -245,7 +251,7 @@ class BulkReportManager {
             if (examFilter !== "all" && e.examName !== examFilter) return false;
             if (classFilter !== "all" && e.class !== classFilter) return false;
             if (sectionFilter !== "all" && e.section !== sectionFilter) return false;
-            if (subjectFilter !== "all" && e.subject !== subjectFilter) return false;
+            if (subjectFilter !== "all" && !window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, subjectFilter)) return false;
             return true;
         });
 
