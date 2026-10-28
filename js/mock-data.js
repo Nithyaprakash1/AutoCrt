@@ -1490,8 +1490,13 @@ const MockData = {
                 maxMarks: 12,
                 secTotal: 12,
                 hasChoice: false,
-                hasSubQuestions: false,
-                subQuestions: []
+                hasSubQuestions: true,
+                subQuestionNumbers: "Q29, Q30, Q31",
+                subQuestions: [
+                    { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                    { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                    { id: "iii", subId: "iii", letter: "iii", label: "(iii)", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: false }
+                ]
             },
             {
                 id: "sec_c",
@@ -1554,7 +1559,7 @@ const MockData = {
                     topic: `MCQ & Assertion-Reason ${i}`
                 });
             }
-            // Section B: Case based 3 x 4 = 12M (Q29 to Q31)
+            // Section B: Case based 3 x 4 = 12M (Q29 to Q31 with sub-parts)
             for (let i = 1; i <= 3; i++) {
                 const qNum = 28 + i;
                 qs.push({
@@ -1565,7 +1570,13 @@ const MockData = {
                     maxMarks: 4,
                     section: "Section B",
                     sectionId: "sec_b",
-                    topic: `Case-based Question (${qNum})`
+                    topic: `Case-based Question (${qNum})`,
+                    hasSubQuestions: true,
+                    subQuestions: [
+                        { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                        { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                        { id: "iii", subId: "iii", letter: "iii", label: "(iii)", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: false }
+                    ]
                 });
             }
             // Section C: 5 x 2 = 10M (Q32 to Q36)
@@ -1608,6 +1619,99 @@ const MockData = {
                     section: "Section E",
                     sectionId: "sec_e",
                     topic: `Long Answer (${qNum})`
+                });
+            }
+            return qs;
+        })()
+    },
+
+    // Grade 10 Mathematics Revision 1 Objective Blueprint (31 Qs / 40 Marks Total)
+    // Section A: 28 Qs × 1 Mark = 28 Marks
+    // Section B: 3 Qs × 4 Marks = 12 Marks (subparts: (i) 1 Mark, (ii) 1 Mark, (iii) 2 Marks)
+    mathGrade10Revision1Template: {
+        id: "mat-x-rev1-40",
+        name: "10 MATHEMATICS - Revision 1 Objective",
+        examName: "Revision 1 Objective 2026",
+        subject: "Mathematics",
+        maxMarks: 40,
+        duration: "1 Hour",
+        badge: "Revision 1 Blueprint",
+        generalInstructions: [
+            "This question paper consists of 31 questions carrying 40 marks in total.",
+            "Section A: Q1 to Q28 carry 1 mark each (28 Marks).",
+            "Section B: Q29 to Q31 carry 4 marks each (12 Marks), divided into sub-parts: (i) 1 mark, (ii) 1 mark, (iii) 2 marks."
+        ],
+        sections: [
+            {
+                id: "sec_a",
+                letter: "A",
+                name: "Section A",
+                title: "Sec A: 28 Qs (28M)",
+                qStartNo: 1,
+                qEndNo: 28,
+                qCount: 28,
+                marksPerQ: 1,
+                maxMarks: 28,
+                secTotal: 28,
+                hasChoice: false,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "sec_b",
+                letter: "B",
+                name: "Section B",
+                title: "Sec B: 3 Qs (12M)",
+                qStartNo: 29,
+                qEndNo: 31,
+                qCount: 3,
+                marksPerQ: 4,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: true,
+                subQuestionNumbers: "Q29, Q30, Q31",
+                subQuestions: [
+                    { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                    { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                    { id: "iii", subId: "iii", letter: "iii", label: "(iii)", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: false }
+                ]
+            }
+        ],
+        questions: (function() {
+            const qs = [];
+            // Section A: Q1 to Q28 (each 1 mark = 28M)
+            for (let i = 1; i <= 28; i++) {
+                qs.push({
+                    id: `mat_x_rev1_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 1,
+                    section: "Section A",
+                    sectionId: "sec_a",
+                    topic: `MCQ & Objective ${i}`,
+                    hasSubQuestions: false,
+                    subQuestions: []
+                });
+            }
+            // Section B: Q29 to Q31 (each 4 marks = 12M, subparts: (i) 1M, (ii) 1M, (iii) 2M)
+            for (let i = 29; i <= 31; i++) {
+                qs.push({
+                    id: `mat_x_rev1_q${i}`,
+                    qNo: i,
+                    qNumber: `Q${i}`,
+                    label: `Q${i}`,
+                    maxMarks: 4,
+                    section: "Section B",
+                    sectionId: "sec_b",
+                    topic: `Case Study / Objective II (${i})`,
+                    hasSubQuestions: true,
+                    subQuestions: [
+                        { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                        { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                        { id: "iii", subId: "iii", letter: "iii", label: "(iii)", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: false }
+                    ]
                 });
             }
             return qs;

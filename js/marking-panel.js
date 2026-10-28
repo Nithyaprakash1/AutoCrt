@@ -182,8 +182,8 @@ class MarkingPanel {
             if (q.hasSubQuestions && Array.isArray(q.subQuestions) && q.subQuestions.length > 0) {
                 subQs = q.subQuestions.map(sq => ({
                     subId: sq.subId || sq.letter || "a",
-                    label: sq.label || `(${sq.subId || sq.letter || "a"})`,
-                    maxMarks: Number(sq.maxMarks) || 1,
+                    label: sq.label ? (String(sq.label).startsWith("(") ? sq.label : `(${sq.label})`) : `(${sq.subId || sq.letter || "a"})`,
+                    maxMarks: Number(sq.maxMarks !== undefined ? sq.maxMarks : sq.marks) || 1,
                     awardedMarks: sq.awardedMarks !== undefined ? Number(sq.awardedMarks) : 0
                 }));
             }
@@ -1036,11 +1036,10 @@ class MarkingPanel {
             }
         }
 
-        // If question has sub-questions, distribute or sync
         if (q.hasSubQuestions && q.subQuestions && q.subQuestions.length > 0) {
-            if (val === q.maxMarks) {
+            if (q.awardedMarks === q.maxMarks) {
                 q.subQuestions.forEach(sq => { sq.awardedMarks = sq.maxMarks; });
-            } else if (val === 0) {
+            } else if (q.awardedMarks === 0) {
                 q.subQuestions.forEach(sq => { sq.awardedMarks = 0; });
             }
         }
@@ -1067,6 +1066,14 @@ class MarkingPanel {
                 if (q.awardedMarks === q.maxMarks) q.status = "correct";
                 else if (q.awardedMarks === 0) q.status = "wrong";
                 else q.status = "partial";
+            }
+        }
+
+        if (q.hasSubQuestions && q.subQuestions && q.subQuestions.length > 0) {
+            if (q.awardedMarks === q.maxMarks) {
+                q.subQuestions.forEach(sq => { sq.awardedMarks = sq.maxMarks; });
+            } else if (q.awardedMarks === 0) {
+                q.subQuestions.forEach(sq => { sq.awardedMarks = 0; });
             }
         }
 

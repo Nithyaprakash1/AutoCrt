@@ -407,9 +407,42 @@ class UploadPortalManager {
                 id: "mat",
                 name: "Mathematics",
                 code: "MAT-301",
-                badge: "2 Templates",
-                description: "Class 10 & 12 Mathematics Assessments (80 Marks)",
+                badge: "3 Templates",
+                description: "Class 10 & 12 Mathematics Assessments & Revision 1",
                 templates: [
+                    window.MockData && window.MockData.mathGrade10Revision1Template ? window.MockData.mathGrade10Revision1Template : {
+                        id: "mat-x-rev1-40",
+                        name: "10 MATHEMATICS - Revision 1 Objective",
+                        examName: "Revision 1 Objective 2026",
+                        subject: "Mathematics",
+                        maxMarks: 40,
+                        duration: "1 Hour",
+                        badge: "Revision 1 Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Sec A: 28 Qs (28M)", qStartNo: 1, qEndNo: 28, qCount: 28, marksPerQ: 1, maxMarks: 28, secTotal: 28, hasChoice: false, hasSubQuestions: false, subQuestions: [] },
+                            {
+                                id: "sec_b",
+                                letter: "B",
+                                name: "Section B",
+                                title: "Sec B: 3 Qs (12M)",
+                                qStartNo: 29,
+                                qEndNo: 31,
+                                qCount: 3,
+                                marksPerQ: 4,
+                                maxMarks: 12,
+                                secTotal: 12,
+                                hasChoice: false,
+                                hasSubQuestions: true,
+                                subQuestionNumbers: "Q29, Q30, Q31",
+                                subQuestions: [
+                                    { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                                    { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
+                                    { id: "iii", subId: "iii", letter: "iii", label: "(iii)", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: false }
+                                ]
+                            }
+                        ],
+                        questions: []
+                    },
                     window.MockData && window.MockData.mathGrade12Template ? window.MockData.mathGrade12Template : {
                         id: "mat-xii-80",
                         name: "Grade 12 Mathematics (80 Marks)",
@@ -666,16 +699,37 @@ class UploadPortalManager {
                     } else if (defaultSub.templates && Array.isArray(defaultSub.templates)) {
                         if (!existingSub.templates) existingSub.templates = [];
                         defaultSub.templates.forEach(defTpl => {
-                            const tplIndex = existingSub.templates.findIndex(t => t.id === defTpl.id || t.name === defTpl.name);
+                            const tplIndex = existingSub.templates.findIndex(t => 
+                                t.id === defTpl.id || 
+                                t.name === defTpl.name ||
+                                (defTpl.id === "mat-x-rev1-40" && (
+                                    t.name === "STD 10 Maths REVISION 1 - 40 marks" ||
+                                    t.name === "10 MATHEMATICS - Revision 1 Objective" ||
+                                    t.examName === "Revision 1 Objective 2026" ||
+                                    (t.name && t.name.toLowerCase().includes("revision 1") && t.name.toLowerCase().includes("math"))
+                                ))
+                            );
                             if (tplIndex === -1) {
                                 existingSub.templates.push(defTpl);
                             } else {
-                                // Keep blueprint sections and questions updated if existing is empty
-                                if ((!existingSub.templates[tplIndex].questions || existingSub.templates[tplIndex].questions.length === 0) && defTpl.questions && defTpl.questions.length > 0) {
-                                    existingSub.templates[tplIndex].questions = defTpl.questions;
-                                }
-                                if ((!existingSub.templates[tplIndex].sections || existingSub.templates[tplIndex].sections.length === 0) && defTpl.sections && defTpl.sections.length > 0) {
-                                    existingSub.templates[tplIndex].sections = defTpl.sections;
+                                // For 10th Math Revision 1, force-upgrade to official 31 Qs / 40M blueprint
+                                if (defTpl.id === "mat-x-rev1-40") {
+                                    existingSub.templates[tplIndex].id = defTpl.id;
+                                    existingSub.templates[tplIndex].name = defTpl.name;
+                                    existingSub.templates[tplIndex].examName = defTpl.examName;
+                                    existingSub.templates[tplIndex].maxMarks = 40;
+                                    existingSub.templates[tplIndex].duration = "1 Hour";
+                                    existingSub.templates[tplIndex].badge = "Revision 1 Blueprint";
+                                    existingSub.templates[tplIndex].sections = JSON.parse(JSON.stringify(defTpl.sections));
+                                    existingSub.templates[tplIndex].questions = JSON.parse(JSON.stringify(defTpl.questions));
+                                } else {
+                                    // Keep blueprint sections and questions updated if existing is empty
+                                    if ((!existingSub.templates[tplIndex].questions || existingSub.templates[tplIndex].questions.length === 0) && defTpl.questions && defTpl.questions.length > 0) {
+                                        existingSub.templates[tplIndex].questions = defTpl.questions;
+                                    }
+                                    if ((!existingSub.templates[tplIndex].sections || existingSub.templates[tplIndex].sections.length === 0) && defTpl.sections && defTpl.sections.length > 0) {
+                                        existingSub.templates[tplIndex].sections = defTpl.sections;
+                                    }
                                 }
                             }
                         });
@@ -2738,6 +2792,19 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     else if (pattern === "a,b,c") labels = ["a", "b", "c"];
                     else if (pattern === "a,b") labels = ["a", "b"];
                     else if (pattern === "1,2,3") labels = ["1", "2", "3"];
+                    else if (pattern === "i,ii,iii") {
+                        if (totalM === 4) {
+                            state.sections[secIdx].subQuestions = [
+                                { label: "i", marks: 1, hasChoice: false },
+                                { label: "ii", marks: 1, hasChoice: false },
+                                { label: "iii", marks: 2, hasChoice: false }
+                            ];
+                            renderSubQuestionsForSection(secIdx);
+                            updateCalculations();
+                            return;
+                        }
+                        labels = ["i", "ii", "iii"];
+                    }
 
                     const eachM = Math.max(0.5, Math.round((totalM / labels.length) * 10) / 10);
                     state.sections[secIdx].subQuestions = labels.map(lbl => ({
@@ -2963,6 +3030,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                                     <button type="button" class="btn-subq-pattern btn-xs" data-sec-idx="${secIdx}" data-pattern="a,b,c">Parts a, b, c</button>
                                     <button type="button" class="btn-subq-pattern btn-xs" data-sec-idx="${secIdx}" data-pattern="a,b">Parts a, b</button>
                                     <button type="button" class="btn-subq-pattern btn-xs" data-sec-idx="${secIdx}" data-pattern="1,2,3">Parts 1, 2, 3</button>
+                                    <button type="button" class="btn-subq-pattern btn-xs" data-sec-idx="${secIdx}" data-pattern="i,ii,iii">Parts (i), (ii), (iii)</button>
                                 </div>
                                 <div class="sec-subq-qno-row">
                                     <label class="qno-prompt-label">Which Question No(s) have sub-parts?</label>
@@ -3135,9 +3203,11 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                         selectedChoice: isChoice ? `${qNumberStr} Option 1 (Theory / Principle)` : null,
                         hasSubQuestions: isSub,
                         subQuestions: isSub ? (sec.subQuestions && sec.subQuestions.length > 0 ? sec.subQuestions.map(sq => ({
-                            subId: sq.label,
-                            label: `${qNo}(${sq.label})`,
-                            maxMarks: Number(sq.marks) || 1,
+                            id: sq.id || sq.subId || sq.letter || sq.label || "1",
+                            subId: sq.subId || sq.letter || sq.label || "1",
+                            letter: sq.letter || sq.label || "1",
+                            label: sq.label ? (String(sq.label).startsWith("(") ? sq.label : `(${sq.label})`) : `(${sq.subId || "1"})`,
+                            maxMarks: Number(sq.maxMarks !== undefined ? sq.maxMarks : sq.marks) || 1,
                             awardedMarks: 0,
                             isChoice: !!sq.hasChoice,
                             choices: sq.hasChoice ? [
@@ -3146,8 +3216,8 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                             ] : null,
                             selectedChoice: sq.hasChoice ? `${qNo}(${sq.label}) Option 1` : null
                         })) : [
-                            { subId: "1", label: `${qNo}(1)`, maxMarks: Math.floor(markEach / 2) || 1, awardedMarks: 0 },
-                            { subId: "2", label: `${qNo}(2)`, maxMarks: Math.ceil(markEach / 2) || 1, awardedMarks: 0 }
+                            { id: "1", subId: "1", label: `${qNo}(1)`, maxMarks: Math.floor(markEach / 2) || 1, awardedMarks: 0 },
+                            { id: "2", subId: "2", label: `${qNo}(2)`, maxMarks: Math.ceil(markEach / 2) || 1, awardedMarks: 0 }
                         ]) : []
                     };
 
@@ -3167,7 +3237,8 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     hasChoice: sec.hasChoice,
                     choiceQuestions: sec.choiceQuestions || '',
                     hasSubQuestions: sec.hasSubQuestions,
-                    subQuestionNumbers: sec.subQuestionNumbers || ''
+                    subQuestionNumbers: sec.subQuestionNumbers || '',
+                    subQuestions: sec.subQuestions ? JSON.parse(JSON.stringify(sec.subQuestions)) : []
                 };
             });
 
@@ -4846,7 +4917,18 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                         const marks = Number(sec.marksPerQ) || 1;
                         const secName = sec.title || sec.name || `Section ${sec.letter || 'A'}`;
                         const secId = sec.id || `sec_${(sec.letter || 'a').toLowerCase()}`;
+                        const isSub = !!sec.hasSubQuestions;
                         for (let qn = start; qn <= end; qn++) {
+                            const subQs = isSub && Array.isArray(sec.subQuestions) && sec.subQuestions.length > 0
+                                ? sec.subQuestions.map((sq, sqIdx) => ({
+                                    id: sq.id || sq.subId || sq.letter || (sq.label ? sq.label.replace(/[()]/g, '') : String(sqIdx + 1)),
+                                    subId: sq.subId || sq.letter || sq.label || String(sqIdx + 1),
+                                    letter: sq.letter || sq.label || String(sqIdx + 1),
+                                    label: sq.label ? (String(sq.label).startsWith("(") ? sq.label : `(${sq.label})`) : `(${sq.subId || sqIdx + 1})`,
+                                    maxMarks: Number(sq.maxMarks !== undefined ? sq.maxMarks : sq.marks) || 1,
+                                    awardedMarks: 0
+                                }))
+                                : [];
                             templateQs.push({
                                 id: `q_${qn}`,
                                 qNo: qn,
@@ -4855,7 +4937,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                                 section: secName,
                                 sectionId: secId,
                                 maxMarks: marks,
-                                isChoice: !!sec.hasChoice
+                                isChoice: !!sec.hasChoice,
+                                hasSubQuestions: isSub && subQs.length > 0,
+                                subQuestions: subQs
                             });
                             syntheticQNo = Math.max(syntheticQNo, qn + 1);
                         }
@@ -4871,6 +4955,15 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     } else if (!sId) {
                         sId = "sec_a";
                     }
+                    const subQs = (q.hasSubQuestions && Array.isArray(q.subQuestions) && q.subQuestions.length > 0)
+                        ? q.subQuestions.map((sq, sqIdx) => ({
+                            id: sq.id || sq.subId || sq.letter || String(sqIdx + 1),
+                            subId: sq.subId || sq.letter || String(sqIdx + 1),
+                            label: sq.label ? (String(sq.label).startsWith("(") ? sq.label : `(${sq.label})`) : `(${sq.subId || sqIdx + 1})`,
+                            maxMarks: Number(sq.maxMarks !== undefined ? sq.maxMarks : sq.marks) || 1,
+                            awardedMarks: Number(sq.awardedMarks) || 0
+                        }))
+                        : [];
                     return {
                         id: q.id || `q${idx + 1}`,
                         qNo: q.qNo !== undefined ? q.qNo : idx + 1,
@@ -4886,13 +4979,8 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                         isChoice: !!q.isChoice,
                         choices: q.choices ? JSON.parse(JSON.stringify(q.choices)) : null,
                         selectedChoice: q.selectedChoice || (q.choices ? (typeof q.choices[0] === 'string' ? q.choices[0] : q.choices[0].label) : null),
-                        hasSubQuestions: !!q.hasSubQuestions,
-                        subQuestions: q.subQuestions ? q.subQuestions.map(sq => ({
-                            subId: sq.subId || sq.letter,
-                            label: sq.label || `(${sq.subId || sq.letter})`,
-                            maxMarks: Number(sq.maxMarks) || 1,
-                            awardedMarks: 0
-                        })) : []
+                        hasSubQuestions: subQs.length > 0,
+                        subQuestions: subQs
                     };
                 });
 
@@ -4944,9 +5032,34 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     sections: (template.sections && template.sections.length > 0)
                         ? JSON.parse(JSON.stringify(template.sections))
                         : (window.MockData?.physicsTemplate?.sections ? JSON.parse(JSON.stringify(window.MockData.physicsTemplate.sections)) : []),
-                    questions: (existingMatch && existingMatch.templateId === template.id && existingMatch.questions && existingMatch.questions.length === questions.length) 
-                        ? existingMatch.questions 
-                        : JSON.parse(JSON.stringify(questions)),
+                    questions: (function() {
+                        const cloned = JSON.parse(JSON.stringify(questions));
+                        if (existingMatch && existingMatch.questions && existingMatch.questions.length > 0) {
+                            const oldMap = new Map();
+                            existingMatch.questions.forEach(oq => {
+                                if (oq.status && oq.status !== "unmarked" && oq.status !== "pending") {
+                                    oldMap.set(oq.qNo, oq);
+                                }
+                            });
+                            cloned.forEach(cq => {
+                                if (oldMap.has(cq.qNo)) {
+                                    const prev = oldMap.get(cq.qNo);
+                                    cq.awardedMarks = Math.min(Number(prev.awardedMarks) || 0, cq.maxMarks);
+                                    cq.status = prev.status;
+                                    if (cq.hasSubQuestions && Array.isArray(cq.subQuestions)) {
+                                        if (prev.subQuestions && prev.subQuestions.length === cq.subQuestions.length) {
+                                            cq.subQuestions.forEach((sq, sIdx) => {
+                                                sq.awardedMarks = Math.min(Number(prev.subQuestions[sIdx].awardedMarks) || 0, sq.maxMarks);
+                                            });
+                                        } else if (cq.awardedMarks === cq.maxMarks) {
+                                            cq.subQuestions.forEach(sq => { sq.awardedMarks = sq.maxMarks; });
+                                        }
+                                    }
+                                }
+                            });
+                        }
+                        return cloned;
+                    })(),
                     createdAt: (existingMatch && existingMatch.createdAt) || new Date().toISOString(),
                     updatedAt: new Date().toISOString()
                 };
