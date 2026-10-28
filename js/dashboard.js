@@ -364,39 +364,6 @@ class DashboardManager {
             teacherAssigned = teacherAssigned.filter(s => s && s !== 'all' && s !== 'All Subjects');
         }
 
-        const subjectSet = new Set(this.evaluations.map(e => e.subject).filter(Boolean));
-        this.evaluations.forEach(e => {
-            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Political Science', e.templateName)) {
-                subjectSet.add('Political Science');
-            }
-            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Mathematics', e.templateName)) {
-                subjectSet.add('Mathematics');
-            }
-            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Science', e.templateName)) {
-                subjectSet.add('Science');
-            }
-            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Social Science', e.templateName)) {
-                subjectSet.add('Social Science');
-            }
-            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Physics', e.templateName)) {
-                subjectSet.add('Physics');
-            }
-            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Chemistry', e.templateName)) {
-                subjectSet.add('Chemistry');
-            }
-            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Biology', e.templateName)) {
-                subjectSet.add('Biology');
-            }
-            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'English', e.templateName)) {
-                subjectSet.add('English');
-            }
-            if (window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, 'Tamil', e.templateName)) {
-                subjectSet.add('Tamil');
-            }
-        });
-        const allSubjectsList = Array.from(subjectSet).filter(Boolean);
-        const subjectList = Array.from(new Set([...allSubjectsList, ...teacherAssigned])).filter(Boolean);
-
         const ic = window.Icons || {};
         const greetingStr = this.getGreeting();
         const activeSub = this.getActiveSubject();
@@ -567,20 +534,6 @@ class DashboardManager {
                                     <span class="teacher-batches-count-pill">${this.batches.length} ${this.batches.length === 1 ? 'Batch' : 'Batches'}</span>
                                 </h3>
                                 <p class="teacher-batches-desc" style="margin: 2px 0 0;">Click any card to view its student answer sheets or start marking directly.</p>
-                                ${(subjectList.length > 0) ? `
-                                    <div class="teacher-subject-pills-row" style="display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap;">
-                                        ${(isAdmin || !isTeacher || (this.teacherSubjects && this.teacherSubjects.includes("All Subjects"))) ? `
-                                            <button type="button" class="btn-sub-pill ${(!activePanelSubject) ? 'active-sub-pill' : ''}" data-subject="all" style="padding: 5px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 500; border: 1.5px solid ${(!activePanelSubject) ? '#0071E3' : '#CBD5E1'}; background: ${(!activePanelSubject) ? 'rgba(0, 113, 227, 0.1)' : '#FFFFFF'}; color: ${(!activePanelSubject) ? '#0071E3' : '#475569'}; cursor: pointer;">All Subjects (${this.evaluations.length})</button>
-                                        ` : ''}
-                                        ${subjectList.map(sub => {
-                                            const countForSub = this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, sub, e.templateName)).length;
-                                            const isActive = activePanelSubject ? window.appStorage.isSubjectMatch(sub, '', activePanelSubject) : false;
-                                            return `<button type="button" class="btn-sub-pill ${isActive ? 'active-sub-pill' : ''}" data-subject="${sub}" style="padding: 5px 12px; border-radius: 20px; font-size: 0.82rem; font-weight: 500; border: 1.5px solid ${isActive ? '#0071E3' : '#CBD5E1'}; background: ${isActive ? 'rgba(0, 113, 227, 0.1)' : '#FFFFFF'}; color: ${isActive ? '#0071E3' : '#475569'}; cursor: pointer;">
-                                                ${sub} (${countForSub})
-                                            </button>`;
-                                        }).join('')}
-                                    </div>
-                                ` : ''}
                             </div>
                             ${this.highlightBatchKey ? `
                                 <button type="button" class="btn-admin-clear-batch" id="btn-clear-dash-highlight" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid #0071E3; background: rgba(0, 113, 227, 0.08); color: #0071E3; font-size: 0.78rem; font-weight: 500; cursor: pointer;">
@@ -1104,23 +1057,6 @@ class DashboardManager {
                 } else if (window.app) {
                     window.app.showToast("Opening evaluation workspace...", "info");
                 }
-            });
-        });
-
-        // Multi-subject switcher pills for teachers assigned to multiple subjects
-        this.container.querySelectorAll(".btn-sub-pill").forEach(btn => {
-            btn.addEventListener("click", () => {
-                const sub = btn.getAttribute("data-subject");
-                this.selectedSubjectFilter = sub;
-                if (sub && sub !== "all") {
-                    this.teacherSubject = sub;
-                } else {
-                    this.teacherSubject = "All Subjects";
-                }
-                this.activeBatchKey = null; // Reset drill down to show cards for selected subject
-                this.applyFilters();
-                this.render();
-                this.bindEvents();
             });
         });
 
