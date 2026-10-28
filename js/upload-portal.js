@@ -933,6 +933,10 @@ class UploadPortalManager {
                     </div>
 
                     <div class="upload-portal-actions">
+                        <button type="button" class="btn-portal-marks-table" id="btn-goto-marks-table" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(0, 122, 255, 0.1); border: 1.5px solid rgba(0, 122, 255, 0.3); color: #007AFF; padding: 8px 16px; border-radius: 10px; font-size: 0.88rem; font-weight: 600; cursor: pointer; margin-right: 8px;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+                            Correction Marks Table
+                        </button>
                         <button type="button" class="btn-portal-evaluator" id="btn-goto-evaluator">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                             Go to Teacher Evaluator Desk
@@ -972,6 +976,17 @@ class UploadPortalManager {
                                 <div class="step-meta">
                                     <span class="step-meta-label">Upload PDFs</span>
                                     <span class="step-meta-val">Ingestion & Preview</span>
+                                </div>
+                            </li>
+                        </ul>
+
+                        <div class="upload-side-section-title" style="margin-top: 18px;">MARKS & REPORTS</div>
+                        <ul class="upload-side-menu-list">
+                            <li class="upload-side-step" id="side-link-correction-marks" style="cursor: pointer;">
+                                <span class="step-circle" style="background: rgba(0,122,255,0.15); color: #007AFF; font-size: 0.8rem;">📊</span>
+                                <div class="step-meta">
+                                    <span class="step-meta-label">Marks Register</span>
+                                    <span class="step-meta-val">Table & Direct Entry</span>
                                 </div>
                             </li>
                         </ul>
@@ -1894,6 +1909,24 @@ class UploadPortalManager {
             gotoEvalBtn.addEventListener("click", () => {
                 if (this.options.onSwitchToEvaluator) {
                     this.options.onSwitchToEvaluator();
+                }
+            });
+        }
+
+        // "Go to Correction Marks Table" button & sidebar link
+        const gotoMarksBtn = this.container.querySelector("#btn-goto-marks-table");
+        if (gotoMarksBtn) {
+            gotoMarksBtn.addEventListener("click", () => {
+                if (window.app && typeof window.app.switchView === "function") {
+                    window.app.switchView("correction-marks");
+                }
+            });
+        }
+        const sideMarksLink = this.container.querySelector("#side-link-correction-marks");
+        if (sideMarksLink) {
+            sideMarksLink.addEventListener("click", () => {
+                if (window.app && typeof window.app.switchView === "function") {
+                    window.app.switchView("correction-marks");
                 }
             });
         }
@@ -5334,15 +5367,22 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                                 <td class="student-cell"><span class="student-name-text">${p.studentName}</span></td>
                                 <td>${p.pageCount || p.pages?.length || 1} Pages</td>
                                 <td>
-                                    <span class="status-pill ${p.status === 'Completed' ? 'status-completed' : 'status-pending'}">
-                                        ${p.status}
+                                    <span class="status-pill ${p.status === 'Completed' ? 'status-completed' : (Number(p.obtainedMarks) > 0 ? 'status-partial' : 'status-pending')}">
+                                        ${p.status || 'Pending'}
                                     </span>
                                 </td>
-                                <td>${p.status === 'Completed' ? `${p.obtainedMarks} / ${p.maxMarks}` : '—'}</td>
+                                <td>
+                                    ${(Number(p.obtainedMarks) > 0 || p.status === 'Completed') 
+                                        ? `<span style="font-weight: 700; color: #007AFF;">${p.obtainedMarks} / ${p.maxMarks || 40} M</span>` 
+                                        : `<span style="color: #94A3B8;">0 / ${p.maxMarks || 40} M</span>`}
+                                </td>
                                  <td style="display: flex; gap: 6px; align-items: center;">
                                     <button type="button" class="btn-action-view btn-portal-open-ws" data-id="${p.id}">
                                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
                                         Evaluate
+                                    </button>
+                                    <button type="button" class="btn-action-edit-marks btn-portal-quick-marks" data-id="${p.id}" title="Quick enter or edit marks" style="background: rgba(0, 122, 255, 0.1); border: 1px solid rgba(0, 122, 255, 0.3); color: #007AFF; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                        ✏️ Marks
                                     </button>
                                     <button type="button" class="btn-paper-action btn-action-share btn-portal-share-paper" data-id="${p.id}" data-name="${p.studentName || ''}" data-roll="${p.rollNo || ''}" data-subject="${p.subject || ''}" data-class="${p.className || p.class || ''}" title="Share direct link to this paper via WhatsApp">
                                         ${(window.Icons && window.Icons.whatsapp) || ''}
@@ -5453,6 +5493,21 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 const ev = await window.appStorage.getEvaluationById(id);
                 if (ev && this.options.onOpenWorkspace) {
                     this.options.onOpenWorkspace(ev);
+                }
+            });
+        });
+
+        wrap.querySelectorAll(".btn-portal-quick-marks").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const id = btn.getAttribute("data-id");
+                if (window.app && typeof window.app.switchView === "function") {
+                    await window.app.switchView("correction-marks");
+                    if (window.app.correctionMarksPageManager) {
+                        const evalItem = window.app.correctionMarksPageManager.evaluations.find(e => String(e.id) === String(id));
+                        if (evalItem) {
+                            window.app.correctionMarksPageManager.openMarksEntryModal(evalItem);
+                        }
+                    }
                 }
             });
         });

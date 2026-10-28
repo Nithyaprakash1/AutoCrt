@@ -196,7 +196,17 @@ class MarkingPanel {
             let awardedM = Number(q.awardedMarks);
             if (isNaN(awardedM)) awardedM = 0;
             if (subQs && subQs.length > 0) {
-                awardedM = subQs.reduce((sum, sq) => sum + (Number(sq.awardedMarks) || 0), 0);
+                const subSum = subQs.reduce((sum, sq) => sum + (Number(sq.awardedMarks) || 0), 0);
+                if (subSum === 0 && awardedM > 0) {
+                    let rem = awardedM;
+                    subQs.forEach(sq => {
+                        const alloc = Math.min(rem, sq.maxMarks);
+                        sq.awardedMarks = alloc;
+                        rem = Math.max(0, rem - alloc);
+                    });
+                } else {
+                    awardedM = subSum;
+                }
             }
 
             let status = q.status || "unmarked";

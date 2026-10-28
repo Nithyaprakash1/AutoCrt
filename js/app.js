@@ -2707,6 +2707,7 @@ class AppController {
             "bulk-report": "bulk-report-container-root",
             "classes": "classes-container-root",
             "uploaded-papers": "uploaded-papers-container-root",
+            "correction-marks": "correction-marks-container-root",
             "settings": "settings-container-root",
             "user-management": "user-management-container-root",
             "admin-panel": "admin-panel-container-root",
@@ -2765,6 +2766,15 @@ class AppController {
             if (root && window.UploadedPapersPageManager) {
                 this.uploadedPapersPageManager = new UploadedPapersPageManager(root);
                 await Promise.all([this.uploadedPapersPageManager.init(), minSkeletonDelay()]);
+            }
+        } else if (viewName === "correction-marks") {
+            activateSection("view-correction-marks");
+            if (root && window.CorrectionMarksPageManager) {
+                this.correctionMarksPageManager = new CorrectionMarksPageManager(root, {
+                    onOpenEvaluation: (ev) => this.openWorkspace(ev),
+                    onShowToast: (msg, type) => this.showToast(msg, type)
+                });
+                await Promise.all([this.correctionMarksPageManager.init(), minSkeletonDelay()]);
             }
         } else if (viewName === "settings") {
             activateSection("view-settings");
@@ -3395,27 +3405,52 @@ class AppController {
             evaluation.maxMarks = matchedTemplate.maxMarks || evaluation.maxMarks || 40;
             evaluation.sections = JSON.parse(JSON.stringify(matchedTemplate.sections || []));
 
-            // Sync questions: update sections, maxMarks, subQuestions, choices, while keeping awardedMarks
+            // Sync questions: update sections, maxMarks, subQuestions, choices, while rigorously keeping awardedMarks
             const oldMarksMap = new Map();
             (evaluation.questions || []).forEach(q => {
-                if (q.status && q.status !== "unmarked" && q.status !== "pending") {
-                    oldMarksMap.set(q.qNo, q);
+                const numMarks = Number(q.awardedMarks) || 0;
+                const subMarksSum = Array.isArray(q.subQuestions) 
+                    ? q.subQuestions.reduce((sum, sq) => sum + (Number(sq.awardedMarks) || 0), 0) 
+                    : 0;
+                const effectiveMarks = Math.max(numMarks, subMarksSum);
+                const isGraded = (q.status && q.status !== "unmarked" && q.status !== "pending") || effectiveMarks > 0;
+                
+                if (isGraded || q.status === "wrong") {
+                    const qObj = { ...q, awardedMarks: effectiveMarks };
+                    oldMarksMap.set(String(q.qNo), qObj);
+                    oldMarksMap.set(Number(q.qNo), qObj);
+                    if (q.label) {
+                        oldMarksMap.set(String(q.label).toUpperCase().trim(), qObj);
+                        oldMarksMap.set(String(q.label).replace(/[^0-9]/g, ''), qObj);
+                    }
                 }
             });
 
+            const prevEvalObtained = Number(evaluation.obtainedMarks) || 0;
+
             evaluation.questions = tplQuestions.map(tq => {
                 const newQ = JSON.parse(JSON.stringify(tq));
-                if (oldMarksMap.has(newQ.qNo)) {
-                    const prev = oldMarksMap.get(newQ.qNo);
-                    newQ.awardedMarks = Math.min(Number(prev.awardedMarks) || 0, newQ.maxMarks);
-                    newQ.status = prev.status;
-                    if (newQ.hasSubQuestions && Array.isArray(newQ.subQuestions)) {
+                const prev = oldMarksMap.get(String(newQ.qNo)) 
+                    || oldMarksMap.get(Number(newQ.qNo)) 
+                    || oldMarksMap.get(String(newQ.label || '').toUpperCase().trim())
+                    || oldMarksMap.get(String(newQ.label || '').replace(/[^0-9]/g, ''));
+                if (prev) {
+                    const prevAwarded = Math.max(Number(prev.awardedMarks) || 0, (prev.subQuestions || []).reduce((s, sq) => s + (Number(sq.awardedMarks) || 0), 0));
+                    newQ.awardedMarks = Math.min(prevAwarded, newQ.maxMarks);
+                    newQ.status = prev.status || (newQ.awardedMarks === newQ.maxMarks ? "correct" : (newQ.awardedMarks > 0 ? "partial" : "unmarked"));
+                    if (newQ.hasSubQuestions && Array.isArray(newQ.subQuestions) && newQ.subQuestions.length > 0) {
                         if (prev.subQuestions && prev.subQuestions.length === newQ.subQuestions.length) {
                             newQ.subQuestions.forEach((sq, sIdx) => {
                                 sq.awardedMarks = Math.min(Number(prev.subQuestions[sIdx].awardedMarks) || 0, sq.maxMarks);
                             });
-                        } else if (newQ.awardedMarks === newQ.maxMarks) {
-                            newQ.subQuestions.forEach(sq => { sq.awardedMarks = sq.maxMarks; });
+                        } else {
+                            // Distribute awardedMarks across subquestions rather than zeroing!
+                            let rem = newQ.awardedMarks;
+                            newQ.subQuestions.forEach(sq => {
+                                const alloc = Math.min(rem, sq.maxMarks);
+                                sq.awardedMarks = alloc;
+                                rem = Math.max(0, rem - alloc);
+                            });
                         }
                     }
                 }
@@ -3423,11 +3458,13 @@ class AppController {
             });
 
             // Recalculate obtained total
-            const totalObt = evaluation.questions.reduce((sum, q) => (q.status !== "unmarked" && q.status !== "pending") ? sum + (Number(q.awardedMarks) || 0) : sum, 0);
-            evaluation.obtainedMarks = Math.round(totalObt * 10) / 10;
+            const totalObt = evaluation.questions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
+            evaluation.obtainedMarks = Math.round(Math.max(totalObt, prevEvalObtained) * 10) / 10;
             if (evaluation.maxMarks > 0) {
                 evaluation.percentage = Math.round((evaluation.obtainedMarks / evaluation.maxMarks) * 100);
             }
+            evaluation.grade = evaluation.percentage >= 90 ? "A+" : evaluation.percentage >= 75 ? "A" : evaluation.percentage >= 60 ? "B" : evaluation.percentage >= 40 ? "C" : "F";
+            evaluation.status = evaluation.obtainedMarks > 0 ? (evaluation.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending") ? "Completed" : "In Progress") : (evaluation.status || "Pending");
 
             // Persist the synced evaluation to storage
             if (window.appStorage) {
@@ -3954,27 +3991,52 @@ class AppController {
             });
         }
 
-        // Map existing awarded marks
+        // Map existing awarded marks rigorously
         const oldMarksMap = new Map();
         (this.activeEvaluation.questions || []).forEach(q => {
-            if (q.status && q.status !== "unmarked" && q.status !== "pending") {
-                oldMarksMap.set(q.qNo, q);
+            const numMarks = Number(q.awardedMarks) || 0;
+            const subMarksSum = Array.isArray(q.subQuestions) 
+                ? q.subQuestions.reduce((sum, sq) => sum + (Number(sq.awardedMarks) || 0), 0) 
+                : 0;
+            const effectiveMarks = Math.max(numMarks, subMarksSum);
+            const isGraded = (q.status && q.status !== "unmarked" && q.status !== "pending") || effectiveMarks > 0;
+            
+            if (isGraded || q.status === "wrong") {
+                const qObj = { ...q, awardedMarks: effectiveMarks };
+                oldMarksMap.set(String(q.qNo), qObj);
+                oldMarksMap.set(Number(q.qNo), qObj);
+                if (q.label) {
+                    oldMarksMap.set(String(q.label).toUpperCase().trim(), qObj);
+                    oldMarksMap.set(String(q.label).replace(/[^0-9]/g, ''), qObj);
+                }
             }
         });
 
+        const prevEvalObtained = Number(this.activeEvaluation.obtainedMarks) || 0;
+
         const newQuestions = tplQuestions.map(tq => {
             const newQ = JSON.parse(JSON.stringify(tq));
-            if (oldMarksMap.has(newQ.qNo)) {
-                const prev = oldMarksMap.get(newQ.qNo);
-                newQ.awardedMarks = Math.min(Number(prev.awardedMarks) || 0, newQ.maxMarks);
-                newQ.status = prev.status;
-                if (newQ.hasSubQuestions && Array.isArray(newQ.subQuestions)) {
+            const prev = oldMarksMap.get(String(newQ.qNo)) 
+                || oldMarksMap.get(Number(newQ.qNo)) 
+                || oldMarksMap.get(String(newQ.label || '').toUpperCase().trim())
+                || oldMarksMap.get(String(newQ.label || '').replace(/[^0-9]/g, ''));
+            if (prev) {
+                const prevAwarded = Math.max(Number(prev.awardedMarks) || 0, (prev.subQuestions || []).reduce((s, sq) => s + (Number(sq.awardedMarks) || 0), 0));
+                newQ.awardedMarks = Math.min(prevAwarded, newQ.maxMarks);
+                newQ.status = prev.status || (newQ.awardedMarks === newQ.maxMarks ? "correct" : (newQ.awardedMarks > 0 ? "partial" : "unmarked"));
+                if (newQ.hasSubQuestions && Array.isArray(newQ.subQuestions) && newQ.subQuestions.length > 0) {
                     if (prev.subQuestions && prev.subQuestions.length === newQ.subQuestions.length) {
                         newQ.subQuestions.forEach((sq, sIdx) => {
                             sq.awardedMarks = Math.min(Number(prev.subQuestions[sIdx].awardedMarks) || 0, sq.maxMarks);
                         });
-                    } else if (newQ.awardedMarks === newQ.maxMarks) {
-                        newQ.subQuestions.forEach(sq => { sq.awardedMarks = sq.maxMarks; });
+                    } else {
+                        // Distribute awardedMarks across subquestions rather than zeroing!
+                        let rem = newQ.awardedMarks;
+                        newQ.subQuestions.forEach(sq => {
+                            const alloc = Math.min(rem, sq.maxMarks);
+                            sq.awardedMarks = alloc;
+                            rem = Math.max(0, rem - alloc);
+                        });
                     }
                 }
             } else {
@@ -3994,12 +4056,13 @@ class AppController {
         this.activeEvaluation.questions = newQuestions;
 
         // Recalculate obtained total & percentage
-        const totalObt = this.activeEvaluation.questions.reduce((sum, q) => (q.status !== "unmarked" && q.status !== "pending") ? sum + (Number(q.awardedMarks) || 0) : sum, 0);
-        this.activeEvaluation.obtainedMarks = Math.round(totalObt * 10) / 10;
+        const totalObt = this.activeEvaluation.questions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
+        this.activeEvaluation.obtainedMarks = Math.round(Math.max(totalObt, prevEvalObtained) * 10) / 10;
         if (this.activeEvaluation.maxMarks > 0) {
             this.activeEvaluation.percentage = Math.round((this.activeEvaluation.obtainedMarks / this.activeEvaluation.maxMarks) * 100);
         }
         this.activeEvaluation.grade = this.activeEvaluation.percentage >= 90 ? "A+" : this.activeEvaluation.percentage >= 75 ? "A" : this.activeEvaluation.percentage >= 60 ? "B" : this.activeEvaluation.percentage >= 40 ? "C" : "F";
+        this.activeEvaluation.status = this.activeEvaluation.obtainedMarks > 0 ? (this.activeEvaluation.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending") ? "Completed" : "In Progress") : (this.activeEvaluation.status || "Pending");
         this.activeEvaluation.updatedAt = new Date().toISOString();
 
         // Persist to storage
