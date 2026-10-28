@@ -248,18 +248,29 @@ class CanvasEngine {
                 }
             }
         } catch (err) {
-            // Only try proxy if direct fetch failed due to CORS/network, NOT on a 404 status
-            if (typeof window !== "undefined" && window.location && window.location.protocol.startsWith("http")) {
-                try {
-                    const proxyUrl = `/proxy?url=${encodeURIComponent(url)}`;
-                    const pResp = await fetch(proxyUrl, { mode: "cors" });
-                    if (pResp.ok) {
-                        const buf = await pResp.arrayBuffer();
-                        if (buf && buf.byteLength > 100) {
-                            return new Uint8Array(buf);
-                        }
+            console.warn("Direct fetch error for PDF URL:", err);
+        }
+
+        // 4. Firebase Storage SDK fallback for cross-domain / CORS isolation
+        if (typeof window !== "undefined" && window.firebaseManager && window.firebaseManager.storage && (url.includes("firebasestorage") || url.includes("evaluations_pdf"))) {
+            try {
+                let storageRef = null;
+                const match = url.match(/evaluations_pdf%2F([^?]+)/) || url.match(/evaluations_pdf\/([^?]+)/);
+                if (match && match[1]) {
+                    const filename = decodeURIComponent(match[1]);
+                    storageRef = window.firebaseManager.storage.ref(`evaluations_pdf/${filename}`);
+                } else if (url.startsWith("evaluations_pdf/")) {
+                    storageRef = window.firebaseManager.storage.ref(url);
+                }
+                if (storageRef) {
+                    const blob = await storageRef.getBlob();
+                    if (blob) {
+                        const buf = await blob.arrayBuffer();
+                        return new Uint8Array(buf);
                     }
-                } catch (pe) {}
+                }
+            } catch (fbErr) {
+                console.warn("Direct Firebase Storage SDK getBlob fallback notice:", fbErr);
             }
         }
 

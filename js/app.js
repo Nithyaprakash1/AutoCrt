@@ -1194,14 +1194,14 @@ class AppController {
             if (portalName === "evaluator" && pageDefault === "uploader") {
                 localStorage.setItem("niprak_active_portal", "evaluator");
                 localStorage.setItem("onespace_active_portal", "evaluator");
-                window.location.href = "teacher.html";
+                window.location.href = "index.html?portal=evaluator";
                 return;
             }
 
             if (portalName === "uploader" && pageDefault === "evaluator") {
                 localStorage.setItem("niprak_active_portal", "uploader");
                 localStorage.setItem("onespace_active_portal", "uploader");
-                window.location.href = "uploader.html";
+                window.location.href = "index.html?portal=uploader";
                 return;
             }
         }

@@ -5255,6 +5255,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     status: existingMatch ? existingMatch.status : "Pending",
                     isUserUploaded: true,
                     isMock: false,
+                    rawFile: item.file || null,
                     pdfDataUrl: item.pdfDataUrl || (existingMatch ? existingMatch.pdfDataUrl : null),
                     pdfStorageUrl: item.file ? null : (existingMatch ? existingMatch.pdfStorageUrl : null),
                     pageCount: item.pageCount || (existingMatch ? existingMatch.pageCount : 1),
@@ -5550,7 +5551,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 if (pageDefault === "uploader") {
                     localStorage.setItem("niprak_active_portal", "evaluator");
                     localStorage.setItem("onespace_active_portal", "evaluator");
-                    window.location.href = `teacher.html?evalId=${id}`;
+                    window.location.href = `index.html?evalId=${id}`;
                     return;
                 }
                 const ev = await window.appStorage.getEvaluationById(id);

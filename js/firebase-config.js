@@ -403,6 +403,7 @@ class FirebaseManager {
                 // Update evalData with newly uploaded Storage URL
                 if (newUploadUrl) {
                     evalData.pdfStorageUrl = newUploadUrl;
+                    evaluation.pdfStorageUrl = newUploadUrl;
                 }
             }
 
