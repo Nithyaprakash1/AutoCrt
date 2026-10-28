@@ -20,6 +20,8 @@ class UploadedPapersPageManager {
         this.searchQuery = "";
         this.inspectingPaper = null;
         this.selectedIds = new Set();
+        this.currentUser = null;
+        this.isTeacher = false;
     }
 
     async init() {
@@ -44,7 +46,9 @@ class UploadedPapersPageManager {
             }
 
             const currentUser = window.appStorage.getCurrentUser();
-            const isTeacher = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
+            const isTeacher = Boolean(currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher'));
+            this.currentUser = currentUser;
+            this.isTeacher = isTeacher;
             if (isTeacher) {
                 let assigned = Array.isArray(currentUser.assignedSubjects) && currentUser.assignedSubjects.length > 0
                     ? [...currentUser.assignedSubjects]
@@ -74,8 +78,9 @@ class UploadedPapersPageManager {
         const batchMap = new Map();
         this.papers.forEach(p => {
             const cls = p.className || p.class || "Class 12-A";
-            const tpl = p.templateName || p.examName || "Exam Blueprint";
             const sub = p.subject || "General";
+            const rawTpl = p.templateName || p.examName || "Exam Blueprint";
+            const tpl = window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, sub) : rawTpl;
             const batchKey = `${cls}:::${tpl}`;
             if (!batchMap.has(batchKey)) {
                 batchMap.set(batchKey, {
@@ -112,8 +117,10 @@ class UploadedPapersPageManager {
     }
 
     getFilteredBatches() {
-        const currentUser = window.appStorage.getCurrentUser();
-        const isTeacher = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
+        const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : this.currentUser;
+        const isTeacher = (this.isTeacher !== undefined && this.isTeacher !== null)
+            ? this.isTeacher
+            : Boolean(currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher'));
         const batches = this.computeBatches();
         return batches.filter(b => {
             // Mandatory Teacher subject guard
@@ -147,11 +154,14 @@ class UploadedPapersPageManager {
     }
 
     getFilteredPapers() {
-        const currentUser = window.appStorage.getCurrentUser();
-        const isTeacher = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
+        const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : this.currentUser;
+        const isTeacher = (this.isTeacher !== undefined && this.isTeacher !== null)
+            ? this.isTeacher
+            : Boolean(currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher'));
         return this.papers.filter(p => {
             const pCls = p.className || p.class || "Class 12-A";
-            const pTpl = p.templateName || p.examName || "Exam Blueprint";
+            const rawTpl = p.templateName || p.examName || "Exam Blueprint";
+            const pTpl = window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, p.subject) : rawTpl;
             const pKey = `${pCls}:::${pTpl}`;
 
             // Mandatory Teacher subject guard
@@ -193,6 +203,11 @@ class UploadedPapersPageManager {
 
     render() {
         if (!this.container) return;
+
+        const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : this.currentUser;
+        const isTeacher = (this.isTeacher !== undefined && this.isTeacher !== null)
+            ? this.isTeacher
+            : Boolean(currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher'));
 
         const allBatches = this.computeBatches();
         const filteredBatches = this.getFilteredBatches();
