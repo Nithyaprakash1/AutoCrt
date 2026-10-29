@@ -143,11 +143,25 @@ class UploadedPapersPageManager {
             ? this.isTeacher
             : Boolean(currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher'));
         const batches = this.computeBatches();
+        const teacherClasses = (currentUser && currentUser.assignedClasses && currentUser.assignedClasses.length > 0)
+            ? currentUser.assignedClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
+            : (currentUser && currentUser.class && currentUser.class.toLowerCase() !== 'all classes' && currentUser.class.toLowerCase() !== 'all' ? [currentUser.class] : []);
+
         return batches.filter(b => {
             // Mandatory Teacher subject guard
             if (isTeacher && this.subjects.length > 0) {
                 const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(b.subject, '', s, b.templateName));
                 if (!matchesAnyTeacherSub) return false;
+            }
+
+            // Mandatory Teacher class guard (if teacher is assigned specific classes)
+            if (isTeacher && teacherClasses.length > 0) {
+                const bCls = (b.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const matchesCls = teacherClasses.some(tc => {
+                    const normTc = tc.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return !normTc || bCls === normTc || bCls.includes(normTc) || normTc.includes(bCls);
+                });
+                if (!matchesCls) return false;
             }
 
             if (this.selectedSubject !== "all" && !window.appStorage.isSubjectMatch(b.subject, '', this.selectedSubject, b.templateName)) return false;
@@ -181,6 +195,10 @@ class UploadedPapersPageManager {
         const isTeacher = (this.isTeacher !== undefined && this.isTeacher !== null)
             ? this.isTeacher
             : Boolean(currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher'));
+        const teacherClasses = (currentUser && currentUser.assignedClasses && currentUser.assignedClasses.length > 0)
+            ? currentUser.assignedClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
+            : (currentUser && currentUser.class && currentUser.class.toLowerCase() !== 'all classes' && currentUser.class.toLowerCase() !== 'all' ? [currentUser.class] : []);
+
         return this.papers.filter(p => {
             const pCls = p.classLabel || p.className || p.class || "Class 12-A";
             const examTitle = p.examName || p.templateName || "Assessment";
@@ -192,6 +210,16 @@ class UploadedPapersPageManager {
             if (isTeacher && this.subjects.length > 0) {
                 const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(p.subject, p.examName, s, p.templateName));
                 if (!matchesAnyTeacherSub) return false;
+            }
+
+            // Mandatory Teacher class guard (if teacher is assigned specific classes)
+            if (isTeacher && teacherClasses.length > 0) {
+                const pClsNorm = (pCls || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const matchesCls = teacherClasses.some(tc => {
+                    const normTc = tc.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return !normTc || pClsNorm === normTc || pClsNorm.includes(normTc) || normTc.includes(pClsNorm);
+                });
+                if (!matchesCls) return false;
             }
 
             if (this.selectedBatchKey !== "all" && pKey !== this.selectedBatchKey) return false;

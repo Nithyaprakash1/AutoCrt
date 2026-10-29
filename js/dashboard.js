@@ -65,8 +65,13 @@ class DashboardManager {
                 ? [...user.assignedSubjects]
                 : (user.subject ? [user.subject] : []);
 
+            let assignedCls = (user.assignedClasses && user.assignedClasses.length > 0)
+                ? [...user.assignedClasses]
+                : (user.class ? [user.class] : []);
+
             this.teacherSubjects = assignedSubs;
             this.teacherSubject = assignedSubs[0] || user.subject || "";
+            this.teacherClasses = assignedCls;
 
             this.teacherName = user.name || "";
             if (isTeacher && (!this.teacherName || this.teacherName.includes("Nithya Prakash") || this.teacherName === "Faculty Evaluator")) {
@@ -242,41 +247,77 @@ class DashboardManager {
             if (this.activeBatchKey) {
                 const parts = this.activeBatchKey.split(":::");
                 const targetCls = (parts[0] || "").toLowerCase().trim();
-                const targetTpl = (parts[1] || "").toLowerCase().trim();
-                
-                // Flexible normalized class matching (strip punctuation/spaces: "class 10-b" == "10-b")
-                const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
-                const eCls1 = (e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                const eCls2 = (e.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                const eCls3 = (e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                const clsMatches = !normTargetCls || 
-                    eCls1 === normTargetCls || eCls2 === normTargetCls || eCls3 === normTargetCls ||
-                    (eCls1 && (eCls1.includes(normTargetCls) || normTargetCls.includes(eCls1))) ||
-                    (eCls2 && (eCls2.includes(normTargetCls) || normTargetCls.includes(eCls2))) ||
-                    (eCls3 && (eCls3.includes(normTargetCls) || normTargetCls.includes(eCls3)));
+                const targetTpl = (parts.slice(1).join(":::") || "").toLowerCase().trim();
 
-                if (!clsMatches) return false;
+                // 1. Direct batch membership check: If this.batches is already calculated and has this active batch
+                let matchedBatch = null;
+                if (this.batches && this.batches.length > 0) {
+                    matchedBatch = this.batches.find(b => b.key === this.activeBatchKey ||
+                        (b.className && b.className.toLowerCase().trim() === targetCls && b.templateName && b.templateName.toLowerCase().trim() === targetTpl));
+                }
 
-                // Flexible template matching (exam name + date + raw name)
-                const rawTpl = (e.templateName || e.examName || "").toLowerCase().trim();
-                const examDateStr = e.examDate ? ` (${e.examDate})` : '';
-                const displayTpl = `${rawTpl}${examDateStr}`.toLowerCase().trim();
-                const harmTpl = (window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, e.subject) : rawTpl).toLowerCase().trim();
-                const normTargetTpl = targetTpl.replace(/[^a-z0-9]/g, '');
-                const normRaw = rawTpl.replace(/[^a-z0-9]/g, '');
-                const normDisplay = displayTpl.replace(/[^a-z0-9]/g, '');
-                const normHarm = harmTpl.replace(/[^a-z0-9]/g, '');
+                let inBatch = false;
+                if (matchedBatch && matchedBatch.papers && matchedBatch.papers.length > 0) {
+                    inBatch = matchedBatch.papers.some(p => String(p.id) === String(e.id));
+                }
 
-                const tplMatches = !normTargetTpl ||
-                    normRaw === normTargetTpl || normDisplay === normTargetTpl || normHarm === normTargetTpl ||
-                    (normRaw && (normRaw.includes(normTargetTpl) || normTargetTpl.includes(normRaw))) ||
-                    (normDisplay && (normDisplay.includes(normTargetTpl) || normTargetTpl.includes(normDisplay))) ||
-                    (normHarm && (normHarm.includes(normTargetTpl) || normTargetTpl.includes(normHarm))) ||
-                    rawTpl.includes(targetTpl) || targetTpl.includes(rawTpl) ||
-                    displayTpl.includes(targetTpl) || targetTpl.includes(displayTpl) ||
-                    harmTpl.includes(targetTpl) || targetTpl.includes(harmTpl);
+                // 2. Deterministic batch key comparison (exact match)
+                if (!inBatch) {
+                    const eCls = (e.classLabel || e.className || e.class || "Class 12-A").toLowerCase().trim();
+                    const examTitle = (e.examName || e.templateName || "Assessment").toLowerCase().trim();
+                    const dateStr = e.examDate ? ` (${e.examDate})`.toLowerCase().trim() : '';
+                    const eTplFull = `${examTitle}${dateStr}`.trim();
+                    const eBatchKey = `${eCls}:::${eTplFull}`;
 
-                if (!tplMatches) return false;
+                    if (eBatchKey === this.activeBatchKey.toLowerCase().trim()) {
+                        inBatch = true;
+                    }
+                }
+
+                // 3. Flexible normalized fallback (match class AND match template/exam)
+                if (!inBatch) {
+                    const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
+                    const eCls1 = (e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const eCls2 = (e.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const eCls3 = (e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const clsMatches = !normTargetCls || 
+                        eCls1 === normTargetCls || eCls2 === normTargetCls || eCls3 === normTargetCls ||
+                        (eCls1 && (eCls1.includes(normTargetCls) || normTargetCls.includes(eCls1))) ||
+                        (eCls2 && (eCls2.includes(normTargetCls) || normTargetCls.includes(eCls2))) ||
+                        (eCls3 && (eCls3.includes(normTargetCls) || normTargetCls.includes(eCls3)));
+
+                    if (!clsMatches) return false;
+
+                    const examDateStr = e.examDate ? ` (${e.examDate})` : '';
+                    const examNameRaw = (e.examName || "").toLowerCase().trim();
+                    const tplNameRaw = (e.templateName || "").toLowerCase().trim();
+                    const examWithDate = `${examNameRaw}${examDateStr}`.toLowerCase().trim();
+                    const tplWithDate = `${tplNameRaw}${examDateStr}`.toLowerCase().trim();
+                    const harmTpl = (window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(tplNameRaw, e.subject) : tplNameRaw).toLowerCase().trim();
+
+                    const normTargetTpl = targetTpl.replace(/[^a-z0-9]/g, '');
+                    const normExam = examNameRaw.replace(/[^a-z0-9]/g, '');
+                    const normTpl = tplNameRaw.replace(/[^a-z0-9]/g, '');
+                    const normExamDate = examWithDate.replace(/[^a-z0-9]/g, '');
+                    const normTplDate = tplWithDate.replace(/[^a-z0-9]/g, '');
+                    const normHarm = harmTpl.replace(/[^a-z0-9]/g, '');
+
+                    const tplMatches = !normTargetTpl ||
+                        normExam === normTargetTpl || normExamDate === normTargetTpl ||
+                        normTpl === normTargetTpl || normTplDate === normTargetTpl || normHarm === normTargetTpl ||
+                        (normExam && (normExam.includes(normTargetTpl) || normTargetTpl.includes(normExam))) ||
+                        (normExamDate && (normExamDate.includes(normTargetTpl) || normTargetTpl.includes(normExamDate))) ||
+                        (normTpl && (normTpl.includes(normTargetTpl) || normTargetTpl.includes(normTpl))) ||
+                        (normTplDate && (normTplDate.includes(normTargetTpl) || normTargetTpl.includes(normTplDate))) ||
+                        (normHarm && (normHarm.includes(normTargetTpl) || normTargetTpl.includes(normHarm))) ||
+                        (examNameRaw && (examNameRaw.includes(targetTpl) || targetTpl.includes(examNameRaw))) ||
+                        (tplNameRaw && (tplNameRaw.includes(targetTpl) || targetTpl.includes(tplNameRaw))) ||
+                        (examWithDate && (examWithDate.includes(targetTpl) || targetTpl.includes(examWithDate))) ||
+                        (tplWithDate && (tplWithDate.includes(targetTpl) || targetTpl.includes(tplWithDate))) ||
+                        (harmTpl && (harmTpl.includes(targetTpl) || targetTpl.includes(harmTpl)));
+
+                    if (!tplMatches) return false;
+                }
             }
 
             // 1. Status Tab filter
@@ -393,6 +434,16 @@ class DashboardManager {
             evalsForBatches = this.evaluations.filter(e => this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName)));
         }
 
+        if (isTeacher && this.teacherClasses && this.teacherClasses.length > 0 && !this.teacherClasses.includes("All Classes") && !this.teacherClasses.includes("all")) {
+            evalsForBatches = evalsForBatches.filter(e => {
+                const eCls = (e.class || e.className || e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                return this.teacherClasses.some(tc => {
+                    const normTc = tc.toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return !normTc || eCls === normTc || (normTc && eCls.includes(normTc)) || (eCls && normTc.includes(eCls));
+                });
+            });
+        }
+
         const batchMap = new Map();
         evalsForBatches.forEach(e => {
             const cls = e.classLabel || e.className || e.class || "Class 12-A";
@@ -450,6 +501,15 @@ class DashboardManager {
             (this.teacherSubject && this.teacherSubject.toLowerCase().includes('tamil')) ||
             teacherAssigned.some(s => s && s.toLowerCase().includes('tamil'));
 
+        // Welcome Headline with Subject & Class Display
+        const activeClassesList = (this.teacherClasses && this.teacherClasses.length > 0)
+            ? this.teacherClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
+            : [];
+        const displayClasses = activeClassesList.join(', ');
+        const welcomeHeadline = displayClasses
+            ? `${displaySubject} • ${displayClasses} Evaluation Desk`
+            : `${displaySubject} Evaluation Desk`;
+
         // =========================================================================
         // VIEW 1: Batches Overview Mode (Default)
         // Renders Welcome Banner + KPI Metric Cards + Class-Template Batches Grid ONLY.
@@ -462,7 +522,7 @@ class DashboardManager {
                     <div class="dashboard-welcome-banner">
                         <div class="welcome-text-col">
                             <span class="welcome-greeting">${greetingStr}, ${displayName}! 👋</span>
-                            <h2 class="welcome-headline">${displaySubject} Evaluation Desk</h2>
+                            <h2 class="welcome-headline">${welcomeHeadline}</h2>
                             <p class="welcome-sub">Streamlined examination batches. Click into any class card below to view its student answer sheets, evaluate marks, and export results.</p>
                         </div>
                         <div class="welcome-action-col" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
@@ -633,7 +693,7 @@ class DashboardManager {
         // =========================================================================
         const [targetClass, ...restTpl] = this.activeBatchKey.split(":::");
         const targetTemplate = restTpl.join(":::");
-        const currentBatch = (this.batches || []).find(b => b.className === targetClass && b.templateName === targetTemplate) || {
+        const currentBatch = (this.batches || []).find(b => b.key === this.activeBatchKey || (b.className === targetClass && b.templateName === targetTemplate)) || {
             className: targetClass,
             templateName: targetTemplate,
             subject: displaySubject,
@@ -643,6 +703,12 @@ class DashboardManager {
             uncorrected: this.filteredEvaluations.filter(e => !this.isPaperCorrected(e)).length,
             maxMarks: this.filteredEvaluations[0]?.maxMarks || 70
         };
+        if (currentBatch.papers && currentBatch.papers.length === 0 && this.filteredEvaluations && this.filteredEvaluations.length > 0) {
+            currentBatch.papers = this.filteredEvaluations;
+            currentBatch.total = this.filteredEvaluations.length;
+            currentBatch.corrected = this.filteredEvaluations.filter(e => this.isPaperCorrected(e)).length;
+            currentBatch.uncorrected = this.filteredEvaluations.filter(e => !this.isPaperCorrected(e)).length;
+        }
         const batchPct = currentBatch.total > 0 ? Math.round((currentBatch.corrected / currentBatch.total) * 100) : 0;
         const batchIsDone = currentBatch.uncorrected === 0 && currentBatch.total > 0;
 
@@ -1741,19 +1807,32 @@ class DashboardManager {
             targets = [...this.filteredEvaluations];
         } else if (this.activeBatchKey) {
             const parts = this.activeBatchKey.split(":::");
-            const targetCls = (parts[0] || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-            const targetTpl = (parts.slice(1).join(":::") || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-            targets = this.evaluations.filter(e => {
-                const eCls = (e.classLabel || e.className || e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                const rawTpl = (e.templateName || e.examName || "").toLowerCase().trim();
-                const harmTpl = (window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, e.subject) : rawTpl).toLowerCase().trim();
-                const normRaw = rawTpl.replace(/[^a-z0-9]/g, '');
-                const normHarm = harmTpl.replace(/[^a-z0-9]/g, '');
+            const targetCls = (parts[0] || "").toLowerCase().trim();
+            const targetTpl = (parts.slice(1).join(":::") || "").toLowerCase().trim();
+            const matchedBatch = (this.batches || []).find(b => b.key === this.activeBatchKey);
+            if (matchedBatch && matchedBatch.papers && matchedBatch.papers.length > 0) {
+                targets = [...matchedBatch.papers];
+            } else {
+                targets = this.evaluations.filter(e => {
+                    const eCls = (e.classLabel || e.className || e.class || "Class 12-A").toLowerCase().trim();
+                    const examTitle = (e.examName || e.templateName || "Assessment").toLowerCase().trim();
+                    const dateStr = e.examDate ? ` (${e.examDate})`.toLowerCase().trim() : '';
+                    const eBatchKey = `${eCls}:::${examTitle}${dateStr}`.trim();
+                    if (eBatchKey === this.activeBatchKey.toLowerCase().trim()) return true;
 
-                const clsMatch = !targetCls || eCls === targetCls || eCls.includes(targetCls) || targetCls.includes(eCls);
-                const tplMatch = !targetTpl || normRaw === targetTpl || normHarm === targetTpl || normRaw.includes(targetTpl) || targetTpl.includes(normRaw);
-                return clsMatch && tplMatch;
-            });
+                    const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
+                    const eClsNorm = eCls.replace(/[^a-z0-9]/g, '');
+                    const clsMatch = !normTargetCls || eClsNorm === normTargetCls || eClsNorm.includes(normTargetCls) || normTargetCls.includes(eClsNorm);
+                    if (!clsMatch) return false;
+
+                    const normTargetTpl = targetTpl.replace(/[^a-z0-9]/g, '');
+                    const normExam = (e.examName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const normTpl = (e.templateName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    return !normTargetTpl || normExam === normTargetTpl || normTpl === normTargetTpl ||
+                           (normExam && (normExam.includes(normTargetTpl) || normTargetTpl.includes(normExam))) ||
+                           (normTpl && (normTpl.includes(normTargetTpl) || normTargetTpl.includes(normTpl)));
+                });
+            }
         }
 
         if (targets.length === 0 && this.evaluations && this.evaluations.length > 0) {

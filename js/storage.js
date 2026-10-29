@@ -619,9 +619,18 @@ class StorageService {
             const raw = localStorage.getItem("niprak_active_user") || localStorage.getItem("onespace_active_user");
             if (raw) {
                 const u = JSON.parse(raw);
-                if (u && (u.role === 'evaluator' || u.role === 'teacher')) {
+                if (u) {
                     if (u.subject && (!Array.isArray(u.assignedSubjects) || u.assignedSubjects.length === 0)) {
                         u.assignedSubjects = [u.subject];
+                    }
+                    if (Array.isArray(u.assignedSubjects) && u.assignedSubjects.length > 0 && !u.subject) {
+                        u.subject = u.assignedSubjects[0];
+                    }
+                    if (u.class && (!Array.isArray(u.assignedClasses) || u.assignedClasses.length === 0)) {
+                        u.assignedClasses = [u.class];
+                    }
+                    if (Array.isArray(u.assignedClasses) && u.assignedClasses.length > 0 && !u.class) {
+                        u.class = u.assignedClasses[0];
                     }
                 }
                 return u;

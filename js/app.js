@@ -2558,20 +2558,49 @@ class AppController {
         let name = user ? user.name : "";
         const isSuper = user && (user.role === 'super_admin' || (user.email && user.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
         const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
-        const userSub = (user && user.assignedSubjects && user.assignedSubjects.length > 0)
-            ? user.assignedSubjects[0]
-            : (user?.subject || "");
+
+        const userSubs = (user && user.assignedSubjects && user.assignedSubjects.length > 0)
+            ? user.assignedSubjects.filter(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
+            : (user?.subject && user.subject.toLowerCase() !== 'all subjects' && user.subject.toLowerCase() !== 'all' ? [user.subject] : []);
+        const userClasses = (user && user.assignedClasses && user.assignedClasses.length > 0)
+            ? user.assignedClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
+            : (user?.class && user.class.toLowerCase() !== 'all classes' && user.class.toLowerCase() !== 'all' ? [user.class] : []);
+
+        const subLabel = userSubs.length > 0 ? userSubs.join(', ') : (user?.subject || "");
+        const clsLabel = userClasses.length > 0 ? userClasses.join(', ') : (user?.class || "");
+
+        let specTag = "";
+        if (subLabel && clsLabel) {
+            specTag = `${subLabel} • ${clsLabel}`;
+        } else if (subLabel) {
+            specTag = subLabel;
+        } else if (clsLabel) {
+            specTag = clsLabel;
+        }
 
         if (isTeacher) {
             if (!name || name.includes("Nithya Prakash") || name === "Faculty Evaluator") {
-                name = userSub || "Subject Evaluator";
+                name = user?.name || (subLabel ? `${subLabel} Teacher` : "Subject Evaluator");
             }
         }
 
-        const roleLabel = user ? (isSuper ? '👑 Super Admin (Owner)' : (user.role === 'admin' ? 'Admin' : (user.role === 'uploader' ? 'Exam Officer' : (userSub ? `${userSub} Evaluator` : 'Teacher Evaluator')))) : "";
+        let roleLabel = "";
+        if (user) {
+            if (isSuper) {
+                roleLabel = specTag ? `👑 Super Admin (${specTag})` : '👑 Super Admin (Owner)';
+            } else if (user.role === 'admin') {
+                roleLabel = specTag ? `Admin (${specTag})` : 'Admin';
+            } else if (user.role === 'uploader') {
+                roleLabel = specTag ? `Exam Officer (${specTag})` : 'Exam Officer';
+            } else if (isTeacher) {
+                roleLabel = specTag ? `${specTag} Evaluator` : 'Teacher Evaluator';
+            } else {
+                roleLabel = specTag ? `${specTag} Evaluator` : (user.roleLabel || 'Faculty Evaluator');
+            }
+        }
         const initials = isSuper ? "NP" : (name
             ? name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase()
-            : (userSub ? userSub.substring(0, 2).toUpperCase() : "--"));
+            : (subLabel ? subLabel.substring(0, 2).toUpperCase() : "--"));
 
         if (nameEl) nameEl.textContent = name || "Sign In";
         if (navNameEl) navNameEl.textContent = name || "Sign In";
@@ -6076,14 +6105,31 @@ class AppController {
 
         // 2. Teacher Profile Name across sidebars and previews
         const activeUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
-        const userSub = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
-            ? activeUser.assignedSubjects[0]
-            : (activeUser?.subject || "");
         const isTeacher = activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher');
+        const isSuper = activeUser && (activeUser.role === 'super_admin' || (activeUser.email && activeUser.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
+
+        const userSubs = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
+            ? activeUser.assignedSubjects.filter(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
+            : (activeUser?.subject && activeUser.subject.toLowerCase() !== 'all subjects' && activeUser.subject.toLowerCase() !== 'all' ? [activeUser.subject] : []);
+        const userClasses = (activeUser && activeUser.assignedClasses && activeUser.assignedClasses.length > 0)
+            ? activeUser.assignedClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
+            : (activeUser?.class && activeUser.class.toLowerCase() !== 'all classes' && activeUser.class.toLowerCase() !== 'all' ? [activeUser.class] : []);
+
+        const subLabel = userSubs.length > 0 ? userSubs.join(', ') : (activeUser?.subject || "");
+        const clsLabel = userClasses.length > 0 ? userClasses.join(', ') : (activeUser?.class || "");
+
+        let specTag = "";
+        if (subLabel && clsLabel) {
+            specTag = `${subLabel} • ${clsLabel}`;
+        } else if (subLabel) {
+            specTag = subLabel;
+        } else if (clsLabel) {
+            specTag = clsLabel;
+        }
 
         let teacherName = settings.teacher?.name || "";
         if (isTeacher || !teacherName || teacherName.includes("Nithya Prakash") || teacherName === "Faculty Evaluator") {
-            teacherName = userSub || (activeUser?.name && !activeUser.name.includes("Nithya Prakash") ? activeUser.name : "Subject Evaluator");
+            teacherName = activeUser?.name || (subLabel ? `${subLabel} Teacher` : "Subject Evaluator");
         }
         const sideUserName = document.getElementById("side-user-name");
         if (sideUserName) sideUserName.textContent = teacherName;
@@ -6094,10 +6140,28 @@ class AppController {
         const dropUserName = document.getElementById("dropdown-user-name");
         if (dropUserName) dropUserName.textContent = teacherName;
 
-        const dropUserRole = document.getElementById("dropdown-user-role");
-        if (dropUserRole) dropUserRole.textContent = isTeacher && userSub ? `${userSub} Evaluator` : (activeUser?.roleLabel || "Evaluator");
+        let roleLabel = "";
+        if (activeUser) {
+            if (isSuper) {
+                roleLabel = specTag ? `👑 Super Admin (${specTag})` : '👑 Super Admin (Owner)';
+            } else if (activeUser.role === 'admin') {
+                roleLabel = specTag ? `Admin (${specTag})` : 'Admin';
+            } else if (activeUser.role === 'uploader') {
+                roleLabel = specTag ? `Exam Officer (${specTag})` : 'Exam Officer';
+            } else if (isTeacher) {
+                roleLabel = specTag ? `${specTag} Evaluator` : 'Teacher Evaluator';
+            } else {
+                roleLabel = specTag ? `${specTag} Evaluator` : (activeUser.roleLabel || 'Evaluator');
+            }
+        }
 
-        const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || (userSub ? userSub.substring(0, 2).toUpperCase() : "SE");
+        const dropUserRole = document.getElementById("dropdown-user-role");
+        if (dropUserRole) dropUserRole.textContent = roleLabel;
+
+        const sideRole = document.querySelector(".user-role-label");
+        if (sideRole) sideRole.textContent = roleLabel;
+
+        const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || (subLabel ? subLabel.substring(0, 2).toUpperCase() : "SE");
         const sideAvatar = document.getElementById("side-user-avatar");
         if (sideAvatar) sideAvatar.textContent = initials;
 
@@ -6113,7 +6177,7 @@ class AppController {
         const logoutUserName = document.getElementById("logout-user-name");
         if (logoutUserName) logoutUserName.textContent = teacherName;
         const logoutUserRole = document.getElementById("logout-user-role");
-        if (logoutUserRole) logoutUserRole.textContent = isTeacher && userSub ? `${userSub} Evaluator` : (activeUser?.roleLabel || "Evaluator");
+        if (logoutUserRole) logoutUserRole.textContent = roleLabel;
 
         // 3. Institution Logos
         const schoolLogoMark = settings.institution?.logo || "assets/school_logo.jpg";
