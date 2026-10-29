@@ -1142,11 +1142,36 @@ class UploadPortalManager {
                     </div>
                 </div>
 
-                <!-- 2. Class Selector -->
+                <!-- 2. Template Selector -->
                 <div class="portal-setup-section" style="margin-bottom: 24px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                         <label style="font-size: 0.92rem; font-weight: 500; color: #1E293B; margin: 0;">
-                            2. Select Class & Section:
+                            2. Select Blueprint Template (${activeSub ? activeSub.name : 'Subject'}):
+                        </label>
+                        <span style="font-size: 0.78rem; color: #64748B;">Click a template to load questions & marks</span>
+                    </div>
+                    <div class="portal-template-chips-grid" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                        ${(activeSub && activeSub.templates && activeSub.templates.length > 0) ? activeSub.templates.map(tpl => {
+                            const isSel = this.selectedTemplate && (this.selectedTemplate.id === tpl.id || this.selectedTemplate.name === tpl.name);
+                            const qCount = (tpl.questions && tpl.questions.length > 0) ? tpl.questions.length : (tpl.sections ? tpl.sections.reduce((sum, s) => sum + (s.qCount || 0), 0) : (tpl.questionsCount || 31));
+                            return `
+                                <button type="button" class="portal-chip-btn portal-template-chip ${isSel ? 'active' : ''}" data-template-id="${tpl.id}" style="padding: 10px 16px; border-radius: 12px; border: 1.5px solid ${isSel ? '#AF52DE' : '#E2E8F0'}; background: ${isSel ? 'rgba(175, 82, 222, 0.08)' : '#FFFFFF'}; color: ${isSel ? '#AF52DE' : '#334155'}; font-size: 0.88rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s ease;">
+                                    <span>📋 ${tpl.name}</span>
+                                    <span style="font-size: 0.75rem; background: ${isSel ? '#AF52DE' : '#EEF2F6'}; color: ${isSel ? '#FFFFFF' : '#475569'}; padding: 2px 7px; border-radius: 999px;">${tpl.maxMarks || 40}M</span>
+                                    <span style="font-size: 0.75rem; color: #64748B;">(${qCount} Qs)</span>
+                                </button>
+                            `;
+                        }).join('') : `
+                            <span style="font-size: 0.85rem; color: #94A3B8;">No pre-configured templates for this subject. Use custom parameters below.</span>
+                        `}
+                    </div>
+                </div>
+
+                <!-- 3. Class Selector -->
+                <div class="portal-setup-section" style="margin-bottom: 24px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
+                        <label style="font-size: 0.92rem; font-weight: 500; color: #1E293B; margin: 0;">
+                            3. Select Class & Section:
                         </label>
                         <button type="button" id="btn-portal-add-class" style="background: transparent; border: none; color: #10B981; font-size: 0.82rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1166,11 +1191,11 @@ class UploadPortalManager {
                     </div>
                 </div>
 
-                <!-- 3. Exam Details Grid -->
+                <!-- 4. Exam Details Grid -->
                 <div class="portal-setup-card" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 22px; margin-bottom: 28px;">
                     <h4 style="margin: 0 0 16px; font-size: 0.95rem; font-weight: 500; color: #1E293B; display: flex; align-items: center; gap: 8px;">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                        3. Exam Parameters & Scoring
+                        4. Exam Parameters & Scoring
                     </h4>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
                         <div>
@@ -1939,6 +1964,10 @@ class UploadPortalManager {
                             <span class="existing-badge" id="existing-count-badge">Loading papers...</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <button type="button" class="btn-portal-change-template" id="btn-portal-change-template" title="Change or reassign template for existing uploaded papers in this class" style="display: inline-flex; align-items: center; gap: 6px; background: #007AFF; border: 1.5px solid #007AFF; color: #FFFFFF; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; cursor: pointer; transition: all 0.15s ease;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                <span>Change Template</span>
+                            </button>
                             <button type="button" class="btn-existing-bulk-delete" id="btn-existing-bulk-delete" title="Bulk delete selected papers" style="display: inline-flex; align-items: center; gap: 6px; background: ${this.selectedExistingPaperIds.size > 0 ? '#DC2626' : '#FFFFFF'}; border: 1.5px solid #DC2626; color: ${this.selectedExistingPaperIds.size > 0 ? '#FFFFFF' : '#DC2626'}; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                                 <span>Bulk Delete Papers</span>
@@ -3690,7 +3719,52 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 btn.addEventListener("click", () => {
                     const subId = btn.getAttribute("data-subject-id");
                     this.selectedSubject = this.catalog.find(s => s.id === subId) || null;
+                    if (this.selectedSubject && this.selectedSubject.templates && this.selectedSubject.templates.length > 0) {
+                        this.selectedTemplate = this.selectedSubject.templates[0];
+                        this.examName = this.selectedTemplate.name;
+                        this.totalMarks = this.selectedTemplate.maxMarks || 40;
+                        const qCount = (this.selectedTemplate.questions && this.selectedTemplate.questions.length > 0)
+                            ? this.selectedTemplate.questions.length
+                            : (this.selectedTemplate.sections ? this.selectedTemplate.sections.reduce((sum, s) => sum + (s.qCount || 0), 0) : (this.selectedTemplate.questionsCount || 31));
+                        this.totalQuestions = qCount;
+                    }
                     this.updateStepView();
+                });
+            });
+
+            // Template chips selection
+            this.container.querySelectorAll(".portal-template-chip").forEach(btn => {
+                btn.addEventListener("click", () => {
+                    const tplId = btn.getAttribute("data-template-id");
+                    const activeSub = this.selectedSubject || (this.catalog && this.catalog[0]);
+                    const tpl = activeSub?.templates?.find(t => t.id === tplId);
+                    if (tpl) {
+                        this.selectedTemplate = tpl;
+                        this.examName = tpl.examName || tpl.name;
+                        this.totalMarks = tpl.maxMarks || 40;
+                        const qCount = (tpl.questions && tpl.questions.length > 0)
+                            ? tpl.questions.length
+                            : (tpl.sections ? tpl.sections.reduce((sum, s) => sum + (s.qCount || 0), 0) : (tpl.questionsCount || 31));
+                        this.totalQuestions = qCount;
+
+                        const inpName = this.container.querySelector("#inp-portal-exam-name");
+                        const inpMarks = this.container.querySelector("#inp-portal-total-marks");
+                        const inpQs = this.container.querySelector("#inp-portal-total-questions");
+                        if (inpName) inpName.value = this.examName;
+                        if (inpMarks) inpMarks.value = this.totalMarks;
+                        if (inpQs) inpQs.value = this.totalQuestions;
+
+                        this.container.querySelectorAll(".portal-template-chip").forEach(c => {
+                            c.classList.remove("active");
+                            c.style.borderColor = "#E2E8F0";
+                            c.style.background = "#FFFFFF";
+                            c.style.color = "#334155";
+                        });
+                        btn.classList.add("active");
+                        btn.style.borderColor = "#AF52DE";
+                        btn.style.background = "rgba(175, 82, 222, 0.08)";
+                        btn.style.color = "#AF52DE";
+                    }
                 });
             });
 
@@ -3748,14 +3822,23 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     this.totalMarks = Math.max(1, parseFloat(inpMarks ? inpMarks.value : 40) || 40);
                     this.totalQuestions = Math.max(1, parseInt(inpQs ? inpQs.value : 31, 10) || 31);
 
-                    this.selectedTemplate = {
-                        id: `exam-${Date.now()}`,
-                        name: this.examName,
-                        examName: this.examName,
-                        maxMarks: this.totalMarks,
-                        questionsCount: this.totalQuestions,
-                        examDate: this.examDate
-                    };
+                    if (!this.selectedTemplate || this.selectedTemplate.name !== this.examName) {
+                        this.selectedTemplate = {
+                            id: (this.selectedTemplate && this.selectedTemplate.id) || `exam-${Date.now()}`,
+                            name: this.examName,
+                            examName: this.examName,
+                            maxMarks: this.totalMarks,
+                            questionsCount: this.totalQuestions,
+                            examDate: this.examDate,
+                            sections: this.selectedTemplate?.sections || [],
+                            questions: this.selectedTemplate?.questions || []
+                        };
+                    } else {
+                        this.selectedTemplate.examName = this.examName;
+                        this.selectedTemplate.examDate = this.examDate;
+                        this.selectedTemplate.maxMarks = this.totalMarks;
+                        this.selectedTemplate.questionsCount = this.totalQuestions;
+                    }
 
                     this.currentStep = 2;
                     this.loadExistingClassPapers();
@@ -5855,6 +5938,31 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             };
         }
 
+        const btnChangeTpl = this.container.querySelector("#btn-portal-change-template");
+        if (btnChangeTpl) {
+            btnChangeTpl.onclick = async () => {
+                const papers = (this.existingPapers && this.existingPapers.length > 0) ? this.existingPapers : [];
+                if (papers.length === 0) {
+                    if (window.app && window.app.showToast) window.app.showToast("No papers found in this class to change template.", "warning");
+                    return;
+                }
+                const clsLabel = this.selectedClass ? (this.selectedClass.label || this.selectedClass.name) : "Class 12-A";
+                const subName = this.selectedSubject ? this.selectedSubject.name : "Mathematics";
+                const tplName = (this.selectedTemplate && this.selectedTemplate.name) || (this.examName || "Current Template");
+
+                this.openBatchChangeTemplateModal({
+                    className: clsLabel,
+                    subject: subName,
+                    templateName: tplName,
+                    papers: papers,
+                    onUpdated: async () => {
+                        await this.loadExistingClassPapers();
+                        this.updateStepView();
+                    }
+                });
+            };
+        }
+
         wrap.querySelectorAll(".btn-portal-open-ws").forEach(btn => {
             btn.addEventListener("click", async () => {
                 const id = btn.getAttribute("data-id");
@@ -5919,6 +6027,197 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     }
                 );
             });
+        });
+    }
+
+    async openBatchChangeTemplateModal(batch) {
+        if (!batch || !batch.papers || batch.papers.length === 0) return;
+        const catalog = await window.appStorage.getSubjectCatalog();
+        const subObj = catalog.find(s => window.appStorage.isSubjectMatch(s.name, '', batch.subject));
+        const availableTemplates = (subObj && subObj.templates) ? subObj.templates : [];
+
+        const modalId = "portal-change-template-modal-overlay";
+        const oldModal = document.getElementById(modalId);
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement("div");
+        modal.id = modalId;
+        modal.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: fadeInModal 0.2s ease-out;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 520px; box-shadow: 0 20px 45px rgba(0,0,0,0.22); padding: 24px; position: relative;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                    <div>
+                        <h3 style="margin: 0 0 4px; font-size: 1.2rem; font-weight: 500; color: #1E293B;">Change Template in Uploader</h3>
+                        <p style="margin: 0; font-size: 0.84rem; color: #64748B;">Reassign template for <strong>${batch.className} — ${batch.subject}</strong> (${batch.papers.length} Papers)</p>
+                    </div>
+                    <button type="button" id="btn-close-portal-change-tpl" style="background: none; border: none; font-size: 1.4rem; color: #94A3B8; cursor: pointer; line-height: 1;">&times;</button>
+                </div>
+
+                <div style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px;">
+                    <div style="font-size: 0.74rem; font-weight: 500; color: #991B1B; text-transform: uppercase; margin-bottom: 2px;">CURRENT TEMPLATE</div>
+                    <div style="font-size: 0.92rem; font-weight: 500; color: #DC2626;">${batch.templateName}</div>
+                </div>
+
+                <div style="margin-bottom: 18px;">
+                    <label style="display: block; font-size: 0.86rem; font-weight: 500; color: #334155; margin-bottom: 10px;">
+                        Select New Template for ${batch.subject}:
+                    </label>
+                    <div style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;">
+                        ${availableTemplates.map((t, idx) => `
+                            <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 10px; border: 1.5px solid ${idx === 0 ? '#007AFF' : '#E2E8F0'}; background: ${idx === 0 ? 'rgba(0,122,255,0.04)' : '#FFFFFF'}; cursor: pointer; transition: all 0.15s ease;" class="lbl-portal-change-tpl-row">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="radio" name="portal-target-template" value="${t.id}" data-name="${t.name}" data-marks="${t.maxMarks || 40}" ${idx === 0 ? 'checked' : ''} style="cursor: pointer;" />
+                                    <div>
+                                        <div style="font-size: 0.88rem; font-weight: 500; color: #1E293B;">${t.name}</div>
+                                        <div style="font-size: 0.74rem; color: #64748B;">${t.badge || 'Blueprint'} • ${t.sections ? t.sections.length : 1} Section(s)</div>
+                                    </div>
+                                </div>
+                                <span style="font-size: 0.78rem; font-weight: 500; background: #EEF2F6; color: #334155; padding: 2px 8px; border-radius: 6px;">${t.maxMarks || 40}M</span>
+                            </label>
+                        `).join('')}
+                        <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 10px; border: 1.5px solid #E2E8F0; background: #FFFFFF; cursor: pointer;" class="lbl-portal-change-tpl-row">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="radio" name="portal-target-template" value="custom" style="cursor: pointer;" />
+                                <span style="font-size: 0.88rem; font-weight: 500; color: #1E293B;">Custom Template Name & Marks</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="portal-change-tpl-custom-inputs" style="display: none; margin-bottom: 18px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px;">
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: block; font-size: 0.78rem; font-weight: 500; color: #475569; margin-bottom: 4px;">New Template / Exam Name</label>
+                        <input type="text" id="inp-portal-change-custom-name" placeholder="e.g. Grade 10 Mathematics - Revision 2 Objective" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #CBD5E1; font-size: 0.85rem;" />
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.78rem; font-weight: 500; color: #475569; margin-bottom: 4px;">Total Max Marks</label>
+                        <input type="number" id="inp-portal-change-custom-marks" value="40" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #CBD5E1; font-size: 0.85rem;" />
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" id="btn-cancel-portal-change-tpl" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; font-size: 0.85rem; color: #475569; cursor: pointer;">Cancel</button>
+                    <button type="button" id="btn-confirm-portal-apply-template" style="background: #007AFF; color: #FFFFFF; border: none; padding: 8px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>Apply to All ${batch.papers.length} Papers</span>
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Radio change
+        modal.querySelectorAll("input[name='portal-target-template']").forEach(radio => {
+            radio.addEventListener("change", (e) => {
+                const customBox = modal.querySelector("#portal-change-tpl-custom-inputs");
+                modal.querySelectorAll(".lbl-portal-change-tpl-row").forEach(lbl => {
+                    lbl.style.borderColor = "#E2E8F0";
+                    lbl.style.background = "#FFFFFF";
+                });
+                const parentLbl = e.target.closest(".lbl-portal-change-tpl-row");
+                if (parentLbl) {
+                    parentLbl.style.borderColor = "#007AFF";
+                    parentLbl.style.background = "rgba(0,122,255,0.04)";
+                }
+                if (e.target.value === "custom") {
+                    if (customBox) customBox.style.display = "block";
+                } else {
+                    if (customBox) customBox.style.display = "none";
+                }
+            });
+        });
+
+        const closeModal = () => modal.remove();
+        modal.querySelector("#btn-close-portal-change-tpl").addEventListener("click", closeModal);
+        modal.querySelector("#btn-cancel-portal-change-tpl").addEventListener("click", closeModal);
+
+        modal.querySelector("#btn-confirm-portal-apply-template").addEventListener("click", async () => {
+            const selectedRadio = modal.querySelector("input[name='portal-target-template']:checked");
+            if (!selectedRadio) return;
+
+            let newTplName = "";
+            let newTplId = "";
+            let newMaxMarks = 40;
+            let newTplQuestions = [];
+
+            if (selectedRadio.value === "custom") {
+                const customName = modal.querySelector("#inp-portal-change-custom-name").value.trim();
+                const customMarks = parseFloat(modal.querySelector("#inp-portal-change-custom-marks").value) || 40;
+                if (!customName) {
+                    alert("Please enter a custom template name.");
+                    return;
+                }
+                newTplName = customName;
+                newTplId = `tpl_custom_${Date.now()}`;
+                newMaxMarks = customMarks;
+            } else {
+                const matchedTpl = availableTemplates.find(t => t.id === selectedRadio.value);
+                if (matchedTpl) {
+                    newTplName = matchedTpl.name;
+                    newTplId = matchedTpl.id;
+                    newMaxMarks = matchedTpl.maxMarks || 40;
+                    newTplQuestions = matchedTpl.questions || [];
+                }
+            }
+
+            // Update all papers
+            const batchPaperIds = new Set(batch.papers.map(p => String(p.id)));
+            const allEvals = await window.appStorage.getAllEvaluations(false, true);
+
+            allEvals.forEach(p => {
+                if (batchPaperIds.has(String(p.id))) {
+                    p.templateName = newTplName;
+                    p.templateId = newTplId;
+                    p.maxMarks = newMaxMarks;
+                    p.examName = newTplName;
+                    if (newTplQuestions && newTplQuestions.length > 0 && (!p.questions || p.questions.length === 0)) {
+                        p.questions = JSON.parse(JSON.stringify(newTplQuestions));
+                    }
+                }
+            });
+
+            await window.appStorage.saveAllEvaluations(allEvals);
+
+            // Sync to Firestore if online
+            if (window.firebaseManager && window.firebaseManager.firestore) {
+                try {
+                    const batchWriter = window.firebaseManager.firestore.batch();
+                    const evalColl = window.firebaseManager.firestore.collection("evaluations");
+                    allEvals.filter(p => batchPaperIds.has(String(p.id))).forEach(p => {
+                        const docRef = evalColl.doc(String(p.id));
+                        batchWriter.set(docRef, {
+                            templateName: newTplName,
+                            templateId: newTplId,
+                            maxMarks: newMaxMarks,
+                            examName: newTplName,
+                            updatedAt: new Date().toISOString()
+                        }, { merge: true });
+                    });
+                    await batchWriter.commit();
+                } catch (fsErr) {
+                    console.warn("Firestore batch template update notice:", fsErr);
+                }
+            }
+
+            closeModal();
+            if (window.app && typeof window.app.showToast === "function") {
+                window.app.showToast(`✓ Updated template to "${newTplName}" for all ${batch.papers.length} papers!`, "success");
+            }
+            if (batch.onUpdated) {
+                await batch.onUpdated();
+            }
         });
     }
 }

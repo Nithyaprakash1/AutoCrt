@@ -472,6 +472,10 @@ class UploadedPapersPageManager {
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                                 <span>View (${b.total})</span>
                                             </button>
+                                            <button type="button" class="btn-batch-change-template" data-batch-key="${b.key}" data-subject="${b.subject}" data-class="${b.className}" data-template="${b.templateName}" title="Change or reassign exam template for all papers in this batch">
+                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                                <span>Change Template</span>
+                                            </button>
                                             <button type="button" class="btn-batch-share" data-batch-key="${b.key}" data-subject="${b.subject}" data-class="${b.className}" data-template="${b.templateName}" data-total="${b.total}" title="Share this subject batch via WhatsApp">
                                                 ${(window.Icons && window.Icons.whatsapp) || ''}
                                                 <span>Share</span>
@@ -507,6 +511,10 @@ class UploadedPapersPageManager {
                                 </div>
                             </div>
                             <div class="active-batch-right" style="display: flex; gap: 8px; align-items: center;">
+                                <button type="button" class="btn-papers-secondary btn-batch-change-template-active" data-batch-key="${activeBatchObj.key}" title="Change template for this batch">
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                    <span>Change Template</span>
+                                </button>
                                 <button type="button" class="btn-papers-secondary btn-batch-share-active" data-batch-key="${activeBatchObj.key}" data-subject="${activeBatchObj.subject}" data-class="${activeBatchObj.className}" data-template="${activeBatchObj.templateName}" data-total="${activeBatchObj.total}" title="Share this batch via WhatsApp">
                                     ${(window.Icons && window.Icons.whatsapp) || ''}
                                     <span>Share WhatsApp</span>
@@ -830,6 +838,19 @@ class UploadedPapersPageManager {
             });
         });
 
+        // Batch Card: Change Template
+        this.container.querySelectorAll(".btn-batch-change-template, .btn-batch-change-template-active").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const key = btn.getAttribute("data-batch-key");
+                const batches = this.computeBatches();
+                const targetBatch = batches.find(b => b.key === key);
+                if (targetBatch) {
+                    this.openChangeTemplateModal(targetBatch);
+                }
+            });
+        });
+
         // Batch Card: Clean Scans Storage Optimization
         this.container.querySelectorAll(".btn-batch-cleanup-scans").forEach(btn => {
             btn.addEventListener("click", (e) => {
@@ -1081,6 +1102,197 @@ class UploadedPapersPageManager {
                 selectAllBox.indeterminate = false;
             }
         }
+    }
+
+    async openChangeTemplateModal(batch) {
+        if (!batch || !batch.papers || batch.papers.length === 0) return;
+        const catalog = await window.appStorage.getSubjectCatalog();
+        const subObj = catalog.find(s => window.appStorage.isSubjectMatch(s.name, '', batch.subject));
+        const availableTemplates = (subObj && subObj.templates) ? subObj.templates : [];
+
+        const modalId = "batch-change-template-modal-overlay";
+        const oldModal = document.getElementById(modalId);
+        if (oldModal) oldModal.remove();
+
+        const modal = document.createElement("div");
+        modal.id = modalId;
+        modal.style.cssText = `
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(15, 23, 42, 0.6);
+            backdrop-filter: blur(4px);
+            -webkit-backdrop-filter: blur(4px);
+            z-index: 99999;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 16px;
+            animation: fadeInModal 0.2s ease-out;
+        `;
+
+        modal.innerHTML = `
+            <div style="background: #FFFFFF; border-radius: 16px; width: 100%; max-width: 520px; box-shadow: 0 20px 45px rgba(0,0,0,0.22); padding: 24px; position: relative;">
+                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px;">
+                    <div>
+                        <h3 style="margin: 0 0 4px; font-size: 1.2rem; font-weight: 500; color: #1E293B;">Change Batch Template</h3>
+                        <p style="margin: 0; font-size: 0.84rem; color: #64748B;">Reassign template for <strong>${batch.className} — ${batch.subject}</strong> (${batch.total} Papers)</p>
+                    </div>
+                    <button type="button" id="btn-close-change-tpl" style="background: none; border: none; font-size: 1.4rem; color: #94A3B8; cursor: pointer; line-height: 1;">&times;</button>
+                </div>
+
+                <div style="background: #FEF2F2; border: 1px solid #FECACA; border-radius: 10px; padding: 12px 14px; margin-bottom: 18px;">
+                    <div style="font-size: 0.74rem; font-weight: 500; color: #991B1B; text-transform: uppercase; margin-bottom: 2px;">CURRENT (MISMATCHED) TEMPLATE</div>
+                    <div style="font-size: 0.92rem; font-weight: 500; color: #DC2626;">${batch.templateName}</div>
+                </div>
+
+                <div style="margin-bottom: 18px;">
+                    <label style="display: block; font-size: 0.86rem; font-weight: 500; color: #334155; margin-bottom: 10px;">
+                        Select Correct Template for ${batch.subject}:
+                    </label>
+                    <div style="display: flex; flex-direction: column; gap: 8px; max-height: 220px; overflow-y: auto;">
+                        ${availableTemplates.map((t, idx) => `
+                            <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 10px; border: 1.5px solid ${idx === 0 ? '#007AFF' : '#E2E8F0'}; background: ${idx === 0 ? 'rgba(0,122,255,0.04)' : '#FFFFFF'}; cursor: pointer; transition: all 0.15s ease;" class="lbl-change-tpl-row">
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <input type="radio" name="change-target-template" value="${t.id}" data-name="${t.name}" data-marks="${t.maxMarks || 40}" ${idx === 0 ? 'checked' : ''} style="cursor: pointer;" />
+                                    <div>
+                                        <div style="font-size: 0.88rem; font-weight: 500; color: #1E293B;">${t.name}</div>
+                                        <div style="font-size: 0.74rem; color: #64748B;">${t.badge || 'Blueprint'} • ${t.sections ? t.sections.length : 1} Section(s)</div>
+                                    </div>
+                                </div>
+                                <span style="font-size: 0.78rem; font-weight: 500; background: #EEF2F6; color: #334155; padding: 2px 8px; border-radius: 6px;">${t.maxMarks || 40}M</span>
+                            </label>
+                        `).join('')}
+                        <label style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 10px; border: 1.5px solid #E2E8F0; background: #FFFFFF; cursor: pointer;" class="lbl-change-tpl-row">
+                            <div style="display: flex; align-items: center; gap: 10px;">
+                                <input type="radio" name="change-target-template" value="custom" style="cursor: pointer;" />
+                                <span style="font-size: 0.88rem; font-weight: 500; color: #1E293B;">Custom Template Name & Marks</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+
+                <div id="change-tpl-custom-inputs" style="display: none; margin-bottom: 18px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px; padding: 12px;">
+                    <div style="margin-bottom: 8px;">
+                        <label style="display: block; font-size: 0.78rem; font-weight: 500; color: #475569; margin-bottom: 4px;">New Template / Exam Name</label>
+                        <input type="text" id="inp-change-custom-name" placeholder="e.g. Grade 10 Mathematics - Revision 2 Objective" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #CBD5E1; font-size: 0.85rem;" />
+                    </div>
+                    <div>
+                        <label style="display: block; font-size: 0.78rem; font-weight: 500; color: #475569; margin-bottom: 4px;">Total Max Marks</label>
+                        <input type="number" id="inp-change-custom-marks" value="40" style="width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid #CBD5E1; font-size: 0.85rem;" />
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                    <button type="button" id="btn-cancel-change-tpl" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; font-size: 0.85rem; color: #475569; cursor: pointer;">Cancel</button>
+                    <button type="button" id="btn-confirm-apply-template" style="background: #007AFF; color: #FFFFFF; border: none; padding: 8px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+                        <span>Apply to All ${batch.total} Papers</span>
+                    </button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(modal);
+
+        // Radio change
+        modal.querySelectorAll("input[name='change-target-template']").forEach(radio => {
+            radio.addEventListener("change", (e) => {
+                const customBox = modal.querySelector("#change-tpl-custom-inputs");
+                modal.querySelectorAll(".lbl-change-tpl-row").forEach(lbl => {
+                    lbl.style.borderColor = "#E2E8F0";
+                    lbl.style.background = "#FFFFFF";
+                });
+                const parentLbl = e.target.closest(".lbl-change-tpl-row");
+                if (parentLbl) {
+                    parentLbl.style.borderColor = "#007AFF";
+                    parentLbl.style.background = "rgba(0,122,255,0.04)";
+                }
+                if (e.target.value === "custom") {
+                    if (customBox) customBox.style.display = "block";
+                } else {
+                    if (customBox) customBox.style.display = "none";
+                }
+            });
+        });
+
+        const closeModal = () => modal.remove();
+        modal.querySelector("#btn-close-change-tpl").addEventListener("click", closeModal);
+        modal.querySelector("#btn-cancel-change-tpl").addEventListener("click", closeModal);
+
+        modal.querySelector("#btn-confirm-apply-template").addEventListener("click", async () => {
+            const selectedRadio = modal.querySelector("input[name='change-target-template']:checked");
+            if (!selectedRadio) return;
+
+            let newTplName = "";
+            let newTplId = "";
+            let newMaxMarks = 40;
+            let newTplQuestions = [];
+
+            if (selectedRadio.value === "custom") {
+                const customName = modal.querySelector("#inp-change-custom-name").value.trim();
+                const customMarks = parseFloat(modal.querySelector("#inp-change-custom-marks").value) || 40;
+                if (!customName) {
+                    alert("Please enter a custom template name.");
+                    return;
+                }
+                newTplName = customName;
+                newTplId = `tpl_custom_${Date.now()}`;
+                newMaxMarks = customMarks;
+            } else {
+                const matchedTpl = availableTemplates.find(t => t.id === selectedRadio.value);
+                if (matchedTpl) {
+                    newTplName = matchedTpl.name;
+                    newTplId = matchedTpl.id;
+                    newMaxMarks = matchedTpl.maxMarks || 40;
+                    newTplQuestions = matchedTpl.questions || [];
+                }
+            }
+
+            // Update all papers in this batch
+            const batchPaperIds = new Set(batch.papers.map(p => String(p.id)));
+            const allEvals = await window.appStorage.getAllEvaluations(false, true);
+
+            allEvals.forEach(p => {
+                if (batchPaperIds.has(String(p.id))) {
+                    p.templateName = newTplName;
+                    p.templateId = newTplId;
+                    p.maxMarks = newMaxMarks;
+                    p.examName = newTplName;
+                    if (newTplQuestions && newTplQuestions.length > 0 && (!p.questions || p.questions.length === 0)) {
+                        p.questions = JSON.parse(JSON.stringify(newTplQuestions));
+                    }
+                }
+            });
+
+            await window.appStorage.saveAllEvaluations(allEvals);
+
+            // Sync to Firestore if online
+            if (window.firebaseManager && window.firebaseManager.firestore) {
+                try {
+                    const batchWriter = window.firebaseManager.firestore.batch();
+                    const evalColl = window.firebaseManager.firestore.collection("evaluations");
+                    allEvals.filter(p => batchPaperIds.has(String(p.id))).forEach(p => {
+                        const docRef = evalColl.doc(String(p.id));
+                        batchWriter.set(docRef, {
+                            templateName: newTplName,
+                            templateId: newTplId,
+                            maxMarks: newMaxMarks,
+                            examName: newTplName,
+                            updatedAt: new Date().toISOString()
+                        }, { merge: true });
+                    });
+                    await batchWriter.commit();
+                } catch (fsErr) {
+                    console.warn("Firestore batch template update notice:", fsErr);
+                }
+            }
+
+            closeModal();
+            if (window.app && typeof window.app.showToast === "function") {
+                window.app.showToast(`✓ Updated template to "${newTplName}" for all ${batch.total} papers!`, "success");
+            }
+            await this.init();
+            this.selectedBatchKey = "all";
+            this.render();
+        });
     }
 
     showBatchDeleteModal(batch) {
