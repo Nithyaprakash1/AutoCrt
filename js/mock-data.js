@@ -1718,17 +1718,17 @@ const MockData = {
         })()
     },
 
-    // Grade 10 Mathematics - 10th Revision Blueprint (10th Revision - 2 Objective: 31 Qs / 40 Marks Total)
+    // Grade 10 Mathematics - Revision 2 Objective Blueprint (31 Qs / 40 Marks Total)
     // Section A: Q1 to Q28 carry 1 mark each = 28 Marks
     // Section B: Q29 to Q31 carry 4 marks each = 12 Marks, with 3 subparts: (i) 1M, (ii) 1M, (iii) 2M [Either (a) or (b) choice]
     mathGrade10Revision2Template: {
-        id: "mat-x-10th-rev-40",
-        name: "10th Revision",
-        examName: "10th Revision - 2 Objective",
+        id: "mat-x-rev2-40",
+        name: "10 MATHEMATICS - Revision 2 Objective",
+        examName: "Revision 2 - Objective",
         subject: "Mathematics",
         maxMarks: 40,
         duration: "1 Hour",
-        badge: "10th Revision",
+        badge: "Revision 2 Blueprint",
         generalInstructions: [
             "This question paper consists of 31 questions carrying 40 marks in total.",
             "Section A: Q1 to Q28 carry 1 mark each (28 Marks).",
@@ -1767,7 +1767,7 @@ const MockData = {
                 subQuestions: [
                     { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
                     { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
-                    { id: "iii", subId: "iii", letter: "iii", label: "(iii) [Either (a) or (b)]", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: true, isChoice: true, choiceLabel: "Either (a) or (b)" }
+                    { id: "iii", subId: "iii", letter: "iii", label: "(iii) [Either (a) or (b)]", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: true, isChoice: true, choiceLabel: "Either (a) or (b)", choices: ["Option (a)", "Option (b)"], selectedChoice: "Option (a)" }
                 ]
             }
         ],
@@ -1803,7 +1803,7 @@ const MockData = {
                     subQuestions: [
                         { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
                         { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
-                        { id: "iii", subId: "iii", letter: "iii", label: "(iii) [Either (a) or (b)]", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: true, isChoice: true, choiceLabel: "Either (a) or (b)" }
+                        { id: "iii", subId: "iii", letter: "iii", label: "(iii) [Either (a) or (b)]", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: true, isChoice: true, choiceLabel: "Either (a) or (b)", choices: ["Option (a)", "Option (b)"], selectedChoice: "Option (a)" }
                     ]
                 });
             }

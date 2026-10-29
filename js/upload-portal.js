@@ -433,13 +433,13 @@ class UploadPortalManager {
                 description: "Class 10 & 12 Mathematics Assessments & 10th Revision",
                 templates: [
                     window.MockData && window.MockData.mathGrade10Revision2Template ? window.MockData.mathGrade10Revision2Template : {
-                        id: "mat-x-10th-rev-40",
-                        name: "10th Revision",
-                        examName: "10th Revision - 2 Objective",
+                        id: "mat-x-rev2-40",
+                        name: "10 MATHEMATICS - Revision 2 Objective",
+                        examName: "Revision 2 - Objective",
                         subject: "Mathematics",
                         maxMarks: 40,
                         duration: "1 Hour",
-                        badge: "10th Revision",
+                        badge: "Revision 2 Blueprint",
                         sections: [
                             { id: "sec_a", letter: "A", name: "Section A", title: "Sec A: 28 Qs (28M)", qStartNo: 1, qEndNo: 28, qCount: 28, marksPerQ: 1, maxMarks: 28, secTotal: 28, hasChoice: false, hasSubQuestions: false, subQuestions: [] },
                             {
@@ -854,6 +854,15 @@ class UploadPortalManager {
                                     existingSub.templates[tplIndex].maxMarks = 40;
                                     existingSub.templates[tplIndex].duration = "1 Hour";
                                     existingSub.templates[tplIndex].badge = "Revision 1 Blueprint";
+                                    existingSub.templates[tplIndex].sections = JSON.parse(JSON.stringify(defTpl.sections));
+                                    existingSub.templates[tplIndex].questions = JSON.parse(JSON.stringify(defTpl.questions));
+                                } else if (defTpl.id === "mat-x-rev2-40" || defTpl.id === "mat-x-10th-rev-40" || (defTpl.name && defTpl.name.toLowerCase().includes("revision 2"))) {
+                                    existingSub.templates[tplIndex].id = "mat-x-rev2-40";
+                                    existingSub.templates[tplIndex].name = defTpl.name;
+                                    existingSub.templates[tplIndex].examName = defTpl.examName;
+                                    existingSub.templates[tplIndex].maxMarks = 40;
+                                    existingSub.templates[tplIndex].duration = "1 Hour";
+                                    existingSub.templates[tplIndex].badge = "Revision 2 Blueprint";
                                     existingSub.templates[tplIndex].sections = JSON.parse(JSON.stringify(defTpl.sections));
                                     existingSub.templates[tplIndex].questions = JSON.parse(JSON.stringify(defTpl.questions));
                                 } else if (defTpl.id === "bio-rev1-sub-13" || defTpl.id === "che-rev1-sub-13") {
