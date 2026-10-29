@@ -1814,6 +1814,15 @@ class AppController {
                 // Authenticated successfully: Set session and route strictly by user account role
                 const activeRole = userAccount.role || selectedRole || "evaluator";
                 window.appStorage.setCurrentUser(userAccount);
+
+                // Reset any residual dashboard memory from previous user
+                if (this.dashboardManager) {
+                    this.dashboardManager.activeBatchKey = null;
+                    this.dashboardManager.selectedSubjectFilter = null;
+                    this.dashboardManager.selectedClassFilter = "all";
+                    this.dashboardManager.cachedEvaluations = null;
+                }
+
                 this.applySettingsToUI();
 
                 let destinationPortal = "evaluator";
@@ -2459,6 +2468,26 @@ class AppController {
         const modal = document.getElementById("modal-confirm-logout");
         if (!modal) {
             if (window.appStorage) window.appStorage.setCurrentUser(null);
+            try {
+                sessionStorage.removeItem("niprak_active_subject");
+                sessionStorage.removeItem("onespace_active_subject");
+                sessionStorage.removeItem("niprak_shared_target");
+                sessionStorage.removeItem("onespace_shared_target");
+                sessionStorage.removeItem("niprak_last_uploaded_subject");
+                sessionStorage.removeItem("niprak_last_uploaded_class");
+            } catch (e) {}
+            if (this.dashboardManager) {
+                this.dashboardManager.activeBatchKey = null;
+                this.dashboardManager.selectedSubjectFilter = null;
+                this.dashboardManager.selectedClassFilter = "all";
+                this.dashboardManager.teacherSubjects = [];
+                this.dashboardManager.teacherSubject = "";
+                this.dashboardManager.cachedEvaluations = null;
+            }
+            if (window.uploadPortal) {
+                window.uploadPortal.selectedSubject = null;
+                window.uploadPortal.selectedClass = null;
+            }
             this.showPortalLoginScreen();
             return;
         }
@@ -2536,6 +2565,28 @@ class AppController {
                     window.appStorage.setCurrentUser(null);
                 }
 
+                try {
+                    sessionStorage.removeItem("niprak_active_subject");
+                    sessionStorage.removeItem("onespace_active_subject");
+                    sessionStorage.removeItem("niprak_shared_target");
+                    sessionStorage.removeItem("onespace_shared_target");
+                    sessionStorage.removeItem("niprak_last_uploaded_subject");
+                    sessionStorage.removeItem("niprak_last_uploaded_class");
+                } catch (e) {}
+
+                if (this.dashboardManager) {
+                    this.dashboardManager.activeBatchKey = null;
+                    this.dashboardManager.selectedSubjectFilter = null;
+                    this.dashboardManager.selectedClassFilter = "all";
+                    this.dashboardManager.teacherSubjects = [];
+                    this.dashboardManager.teacherSubject = "";
+                    this.dashboardManager.cachedEvaluations = null;
+                }
+                if (window.uploadPortal) {
+                    window.uploadPortal.selectedSubject = null;
+                    window.uploadPortal.selectedClass = null;
+                }
+
                 this.showPortalLoginScreen();
                 this.showToast("Logged out successfully. See you again!", "info");
             };
@@ -2543,41 +2594,65 @@ class AppController {
     }
 
     getActiveSubject() {
-        // 1. Upload Portal active subject
-        if (window.uploadPortal && window.uploadPortal.selectedSubject && window.uploadPortal.selectedSubject.name) {
-            return window.uploadPortal.selectedSubject.name;
-        }
-        // 2. Workspace active evaluation subject
+        const user = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
+        const assignedSubs = user ? (
+            (Array.isArray(user.assignedSubjects) && user.assignedSubjects.length > 0)
+                ? user.assignedSubjects.filter(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
+                : (user.subject && user.subject.toLowerCase() !== 'all subjects' && user.subject.toLowerCase() !== 'all' ? [user.subject] : [])
+        ) : [];
+
+        // 1. Workspace active evaluation subject (if reviewing/evaluating a paper right now)
         if (this.activeEvaluation && this.activeEvaluation.subject) {
             return this.activeEvaluation.subject;
         }
-        // 3. Dashboard active subject
+
+        // 2. Upload Portal active subject (if on uploader portal)
+        if (this.activePortal === 'uploader' && window.uploadPortal && window.uploadPortal.selectedSubject && window.uploadPortal.selectedSubject.name) {
+            return window.uploadPortal.selectedSubject.name;
+        }
+
+        // 3. For Teachers: Strictly lock to their assigned subjects!
+        if (isTeacher && assignedSubs.length > 0) {
+            if (this.dashboardManager && typeof this.dashboardManager.getActiveSubject === "function") {
+                const dSub = this.dashboardManager.getActiveSubject();
+                if (dSub && assignedSubs.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", dSub, "") : s.toLowerCase() === dSub.toLowerCase())) {
+                    return dSub;
+                }
+            }
+            const sessSub = sessionStorage.getItem("niprak_active_subject");
+            if (sessSub && assignedSubs.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", sessSub, "") : s.toLowerCase() === sessSub.toLowerCase())) {
+                return sessSub;
+            }
+            return assignedSubs[0];
+        }
+
+        // 4. Dashboard active subject (for admins/uploaders)
         if (this.dashboardManager && typeof this.dashboardManager.getActiveSubject === "function") {
             const dSub = this.dashboardManager.getActiveSubject();
             if (dSub && dSub !== "all" && dSub !== "All Subjects") return dSub;
         }
-        // 4. Session stored active subject
+
+        // 5. Session stored active subject
         const sessSub = sessionStorage.getItem("niprak_active_subject");
         if (sessSub && sessSub !== "all" && sessSub !== "All Subjects") {
             return sessSub;
         }
-        // 5. User assigned subject (if not generic/all)
-        const user = window.appStorage ? window.appStorage.getCurrentUser() : null;
-        if (user) {
-            const assigned = (user.assignedSubjects && user.assignedSubjects.length > 0)
-                ? user.assignedSubjects.find(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
-                : (user.subject && user.subject.toLowerCase() !== 'all subjects' && user.subject.toLowerCase() !== 'all' ? user.subject : null);
-            if (assigned) return assigned;
+
+        // 6. User assigned subject (fallback)
+        if (assignedSubs.length > 0) {
+            return assignedSubs[0];
         }
+
         return null;
     }
 
     getActiveClass() {
-        if (window.uploadPortal && window.uploadPortal.selectedClass) {
-            return window.uploadPortal.selectedClass.label || window.uploadPortal.selectedClass.name;
-        }
         if (this.activeEvaluation && (this.activeEvaluation.className || this.activeEvaluation.class || this.activeEvaluation.classLabel)) {
             return this.activeEvaluation.className || this.activeEvaluation.class || this.activeEvaluation.classLabel;
+        }
+        if (this.activePortal === 'uploader' && window.uploadPortal && window.uploadPortal.selectedClass) {
+            return window.uploadPortal.selectedClass.label || window.uploadPortal.selectedClass.name;
         }
         if (this.dashboardManager && this.dashboardManager.selectedClassFilter && this.dashboardManager.selectedClassFilter !== "all") {
             return this.dashboardManager.selectedClassFilter;

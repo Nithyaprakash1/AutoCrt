@@ -640,15 +640,34 @@ class StorageService {
     }
 
     setCurrentUser(user) {
+        const prevUser = this.currentUser;
         this.currentUser = user;
         try {
             if (user) {
                 const uStr = JSON.stringify(user);
                 localStorage.setItem("niprak_active_user", uStr);
                 localStorage.setItem("onespace_active_user", uStr);
+
+                // Purge stale session cache if switching to a new account or logging in freshly
+                const prevId = prevUser ? (prevUser.id || prevUser.email || prevUser.username) : null;
+                const nextId = user.id || user.email || user.username;
+                if (!prevId || prevId !== nextId) {
+                    sessionStorage.removeItem("niprak_active_subject");
+                    sessionStorage.removeItem("onespace_active_subject");
+                    sessionStorage.removeItem("niprak_shared_target");
+                    sessionStorage.removeItem("onespace_shared_target");
+                    sessionStorage.removeItem("niprak_last_uploaded_subject");
+                    sessionStorage.removeItem("niprak_last_uploaded_class");
+                }
             } else {
                 localStorage.removeItem("niprak_active_user");
                 localStorage.removeItem("onespace_active_user");
+                sessionStorage.removeItem("niprak_active_subject");
+                sessionStorage.removeItem("onespace_active_subject");
+                sessionStorage.removeItem("niprak_shared_target");
+                sessionStorage.removeItem("onespace_shared_target");
+                sessionStorage.removeItem("niprak_last_uploaded_subject");
+                sessionStorage.removeItem("niprak_last_uploaded_class");
             }
         } catch (e) {}
     }

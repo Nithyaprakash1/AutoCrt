@@ -108,16 +108,29 @@ class DashboardManager {
             this.activeBatchKey = null;
         }
 
-        // Evaluator / Teacher desk defaults to active subject or assigned subject panel
+        // Evaluator / Teacher desk defaults to assigned subject panel
         const sessSub = sessionStorage.getItem("niprak_active_subject");
-        if (sessSub && sessSub !== "all" && sessSub !== "All Subjects" && (!this.selectedSubjectFilter || this.selectedSubjectFilter === "all")) {
-            this.selectedSubjectFilter = sessSub;
-        } else if (isTeacher && (!this.selectedSubjectFilter || this.selectedSubjectFilter === "all")) {
+        if (isTeacher) {
             const primarySub = (this.teacherSubject && this.teacherSubject !== "all" && this.teacherSubject !== "All Subjects")
                 ? this.teacherSubject
                 : (this.teacherSubjects && this.teacherSubjects.find(s => s && s !== "all" && s !== "All Subjects"));
-            if (primarySub) {
+
+            // Check if sessSub is genuinely one of this teacher's assigned subjects
+            const isAssigned = sessSub && sessSub !== "all" && sessSub !== "All Subjects" &&
+                this.teacherSubjects && this.teacherSubjects.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", sessSub, "") : s.toLowerCase() === sessSub.toLowerCase());
+
+            if (isAssigned) {
+                this.selectedSubjectFilter = sessSub;
+            } else if (primarySub) {
                 this.selectedSubjectFilter = primarySub;
+                try { sessionStorage.setItem("niprak_active_subject", primarySub); } catch (e) {}
+            } else {
+                this.selectedSubjectFilter = "all";
+            }
+        } else {
+            // Admin or Uploader desk: can use sessSub if present, otherwise default to all
+            if (sessSub && sessSub !== "all" && sessSub !== "All Subjects" && (!this.selectedSubjectFilter || this.selectedSubjectFilter === "all")) {
+                this.selectedSubjectFilter = sessSub;
             }
         }
 
