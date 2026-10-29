@@ -427,7 +427,7 @@ class AppController {
                 // 8. Humanities & Commerce
                 else if (subLower.includes("entrep")) {
                     targetTpl = window.MockData?.entrepreneurshipGrade12Template;
-                } else if (subLower.includes("econom")) {
+                } else if (subLower.includes("econom") || subLower.includes("ecom") || subLower === "eco" || subLower.startsWith("eco ") || subLower.includes("eco-") || tplLower.includes("econom") || examLower.includes("econom")) {
                     targetTpl = window.MockData?.economicsTemplate;
                 } else if (subLower.includes("politic") || subLower.includes("pol sci")) {
                     targetTpl = window.MockData?.politicalScienceTemplate;
@@ -3276,13 +3276,15 @@ class AppController {
                 ? activeUser.assignedSubjects.filter(s => s && s !== 'all' && s !== 'All Subjects')
                 : (activeUser.subject ? [activeUser.subject] : []);
 
-            const isMatch = assigned.some(s => window.appStorage.isSubjectMatch(evaluation.subject, evaluation.examName || evaluation.templateName, s));
-            if (!isMatch) {
-                const msg = `Access Restricted: This paper is for ${evaluation.subject || 'another subject'}. You are assigned to ${assigned.join(', ') || 'no subjects'}.`;
-                if (this.showToast) this.showToast(msg, "error");
-                else alert(msg);
-                await this.switchView("dashboard");
-                return;
+            if (assigned.length > 0) {
+                const isMatch = assigned.some(s => window.appStorage.isSubjectMatch(evaluation.subject, evaluation.examName || evaluation.templateName, s, evaluation.templateName));
+                if (!isMatch) {
+                    const msg = `Access Restricted: This paper is for ${evaluation.subject || 'another subject'}. You are assigned to ${assigned.join(', ') || 'no subjects'}.`;
+                    if (this.showToast) this.showToast(msg, "error");
+                    else alert(msg);
+                    await this.switchView("dashboard");
+                    return;
+                }
             }
         }
 
@@ -3467,7 +3469,7 @@ class AppController {
         // 2i. Humanities & Commerce
         if (!matchedTemplate && (evalSubLower.includes("politic") || evalSubLower.includes("pol sci"))) {
             matchedTemplate = window.MockData?.politicalScienceTemplate;
-        } else if (!matchedTemplate && evalSubLower.includes("econom")) {
+        } else if (!matchedTemplate && (evalSubLower.includes("econom") || evalSubLower.includes("ecom") || evalSubLower === "eco" || evalSubLower.startsWith("eco ") || evalTplLower.includes("econom") || evalExamLower.includes("econom"))) {
             matchedTemplate = window.MockData?.economicsTemplate;
         } else if (!matchedTemplate && evalSubLower.includes("history")) {
             matchedTemplate = window.MockData?.historyRevision1Template;

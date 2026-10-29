@@ -46,14 +46,14 @@ class DashboardManager {
         // Check if uploader just published a new batch of papers
         const lastCls = sessionStorage.getItem("niprak_last_uploaded_class");
         const lastSub = sessionStorage.getItem("niprak_last_uploaded_subject");
-        if (lastCls) {
-            this.selectedClassFilter = lastCls;
-            sessionStorage.removeItem("niprak_last_uploaded_class");
-        }
         if (lastSub) {
             this.selectedSubjectFilter = lastSub;
             sessionStorage.removeItem("niprak_last_uploaded_subject");
         }
+        if (lastCls) {
+            sessionStorage.removeItem("niprak_last_uploaded_class");
+        }
+        this.selectedClassFilter = "all";
 
         // Get authenticated user profile for subject panel & greeting name
         const user = window.appStorage.getCurrentUser();
@@ -121,7 +121,7 @@ class DashboardManager {
         // Background Cloud Sync: Pull fresh papers from Firebase quietly without tearing down DOM
         if (window.firebaseManager) {
             window.appStorage.getAllEvaluations(true, true).then((freshList) => {
-                if (Array.isArray(freshList) && freshList.length > 0 && freshList.length !== this.evaluations.length) {
+                if (Array.isArray(freshList) && freshList.length > 0) {
                     this.evaluations = freshList;
                     this.applyFilters();
                     if (!this.activeBatchKey) {
@@ -294,7 +294,7 @@ class DashboardManager {
 
             // 2b. Subject filter dropdown (secondary — within the teacher's own subject)
             if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all") {
-                if (!window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, this.selectedSubjectFilter)) return false;
+                if (!window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, this.selectedSubjectFilter, e.templateName)) return false;
             }
 
             // 3. Search query filter
@@ -422,7 +422,7 @@ class DashboardManager {
         });
         this.batches = Array.from(batchMap.values());
         if (activePanelSubject) {
-            this.batches = this.batches.filter(b => window.appStorage.isSubjectMatch(b.subject, b.templateName, activePanelSubject));
+            this.batches = this.batches.filter(b => window.appStorage.isSubjectMatch(b.subject, b.templateName, activePanelSubject, b.templateName));
         }
         if (this.highlightBatchKey) {
             const hKey = this.highlightBatchKey.toLowerCase().trim();
@@ -903,6 +903,9 @@ class DashboardManager {
                             <button type="button" class="btn-action-view btn-dash-open" data-id="${ev.id}" title="${isPurged ? 'View Student Scorecard' : (isCompleted ? 'Review or edit marks' : 'Start correction')}">
                                 ${isPurged ? 'Scorecard' : (isCompleted ? 'View / Edit' : 'Evaluate')}
                             </button>
+                            <button type="button" class="btn-action-quick-marks btn-dash-quick-marks" data-paper-id="${ev.id}" title="Quick enter or edit marks without opening canvas" style="background: rgba(0, 113, 227, 0.08); border: 1px solid rgba(0, 113, 227, 0.25); color: #0071E3; padding: 4px 8px; border-radius: 6px; font-size: 0.78rem; cursor: pointer; display: inline-flex; align-items: center; gap: 3px;">
+                                <span>✏️ Marks</span>
+                            </button>
                             <button type="button" class="btn-action-pdf btn-dash-pdf" data-id="${ev.id}" title="${isPurged ? 'Download official scorecard PDF' : 'Download individual evaluated PDF'}">
                                 ${ic.pdf || '📄'} ${isPurged ? 'Scorecard' : 'PDF'}
                             </button>
@@ -1302,9 +1305,31 @@ class DashboardManager {
                 const openBtn = e.target.closest(".btn-dash-open");
                 if (openBtn) {
                     const id = openBtn.getAttribute("data-id");
+                    if (window.app && typeof window.app.showLoadingBox === "function") {
+                        window.app.showLoadingBox("Opening Answer Script...", "Loading student paper & correction workspace...");
+                    }
                     const evaluation = await window.appStorage.getEvaluationById(id);
-                    if (evaluation && this.options.onOpenEvaluation) {
-                        this.options.onOpenEvaluation(evaluation);
+                    if (evaluation) {
+                        if (this.options.onOpenEvaluation) {
+                            this.options.onOpenEvaluation(evaluation);
+                        } else if (window.app) {
+                            window.app.openWorkspace(evaluation);
+                        }
+                    } else if (window.app && typeof window.app.hideLoadingBox === "function") {
+                        window.app.hideLoadingBox();
+                    }
+                    return;
+                }
+
+                // Quick Marks shortcut from Dashboard
+                const quickMarksBtn = e.target.closest(".btn-dash-quick-marks");
+                if (quickMarksBtn) {
+                    const id = quickMarksBtn.getAttribute("data-paper-id");
+                    if (window.app && typeof window.app.switchView === "function") {
+                        await window.app.switchView("correction-marks");
+                        if (window.app.correctionMarksPageManager) {
+                            window.app.correctionMarksPageManager.loadPaper(id);
+                        }
                     }
                     return;
                 }
