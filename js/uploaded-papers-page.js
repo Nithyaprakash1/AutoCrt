@@ -1268,7 +1268,17 @@ class UploadedPapersPageManager {
                 }
             });
 
-            await window.appStorage.saveAllEvaluations(allEvals);
+            if (window.appStorage) {
+                if (typeof window.appStorage.saveAllEvaluations === "function") {
+                    await window.appStorage.saveAllEvaluations(allEvals);
+                } else {
+                    for (const p of allEvals) {
+                        if (batchPaperIds.has(String(p.id))) {
+                            await window.appStorage.saveEvaluation(p);
+                        }
+                    }
+                }
+            }
 
             // Sync to Firestore if online
             if (window.firebaseManager && window.firebaseManager.firestore) {

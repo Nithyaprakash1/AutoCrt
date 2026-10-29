@@ -2146,25 +2146,9 @@ class UploadPortalManager {
                         id: "sub-" + Date.now(),
                         name,
                         code,
-                        badge: "1 Template",
+                        badge: "0 Templates",
                         description: desc,
-                        templates: [
-                            {
-                                id: "tpl-" + Date.now(),
-                                name: `${name} Standard Assessment`,
-                                examName: `${name} Assessment 2026`,
-                                maxMarks: 50,
-                                duration: "1.5 Hours",
-                                questions: [
-                                    { qNumber: "Q1", maxMarks: 5, topic: "Core Fundamentals" },
-                                    { qNumber: "Q2", maxMarks: 5, topic: "Conceptual Questions" },
-                                    { qNumber: "Q3", maxMarks: 10, topic: "Analytical Section" },
-                                    { qNumber: "Q4", maxMarks: 15, topic: "Problem Solving" },
-                                    { qNumber: "Q5", maxMarks: 15, topic: "Case Study / Application" }
-                                ],
-                                badge: "Standard"
-                            }
-                        ]
+                        templates: []
                     };
                     this.catalog.push(newSub);
                     if (window.app) window.app.showToast(`Created subject "${name}"`);

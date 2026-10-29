@@ -1141,6 +1141,22 @@ class StorageService {
         return this._putDirect(evaluation);
     }
 
+    /**
+     * Persists multiple evaluations into memoryStore, IndexedDB, and localStorage summaries.
+     */
+    async saveAllEvaluations(evaluations) {
+        if (!Array.isArray(evaluations)) return [];
+        if (!this.isReady) await this.readyPromise;
+
+        for (const ev of evaluations) {
+            if (ev && ev.id) {
+                this._putDirect(ev);
+                this._saveEvaluationToIndexedDB(ev);
+            }
+        }
+        return evaluations;
+    }
+
     _putDirect(evaluation) {
         evaluation.updatedAt = new Date().toISOString();
         if (!evaluation.createdAt) {
@@ -1769,6 +1785,22 @@ class StorageService {
 
         const tplCount = mathSub.templates.length;
         mathSub.badge = tplCount === 1 ? "1 Template" : `${tplCount} Templates`;
+
+        // Clean up hardcoded placeholder "Standard Assessment" templates across all subjects if other templates exist
+        catalog.forEach(sub => {
+            if (sub && Array.isArray(sub.templates) && sub.templates.length > 1) {
+                const initialLen = sub.templates.length;
+                sub.templates = sub.templates.filter(t => {
+                    if (!t) return false;
+                    const tName = (t.name || "").toLowerCase().trim();
+                    return !(tName.includes("standard assessment") && t.maxMarks === 50);
+                });
+                if (sub.templates.length !== initialLen) {
+                    modified = true;
+                    sub.badge = sub.templates.length === 1 ? "1 Template" : `${sub.templates.length} Templates`;
+                }
+            }
+        });
 
         return { catalog, modified };
     }

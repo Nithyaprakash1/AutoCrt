@@ -926,7 +926,7 @@ Attached are high-resolution page images of the student's handwritten ruled answ
 EXAMINATION DETAILS:
 - Student: ${ev.studentName || 'Student'} (Roll: ${ev.rollNo || '—'})
 - Subject: ${ev.subject || 'Subject'}
-- Assessment: ${ev.examName || ev.templateName || 'Standard Assessment'}
+- Assessment: ${ev.examName || ev.templateName || 'Assessment'}
 
 TARGET QUESTIONS TO EVALUATE:
 ${JSON.stringify(qListSummary, null, 2)}
