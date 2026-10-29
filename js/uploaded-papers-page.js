@@ -1188,10 +1188,17 @@ class UploadedPapersPageManager {
                     </div>
                 </div>
 
+                <div style="margin-bottom: 18px; padding: 10px 14px; background: #F1F5F9; border-radius: 8px; border: 1px solid #E2E8F0;">
+                    <label style="display: flex; align-items: center; gap: 8px; font-size: 0.82rem; color: #334155; cursor: pointer;">
+                        <input type="checkbox" id="chk-apply-all-matching" checked style="width: 16px; height: 16px; cursor: pointer;" />
+                        <span>Also apply to all other papers in <strong>${batch.className}</strong> for this subject</span>
+                    </label>
+                </div>
+
                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
                     <button type="button" id="btn-cancel-change-tpl" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; font-size: 0.85rem; color: #475569; cursor: pointer;">Cancel</button>
                     <button type="button" id="btn-confirm-apply-template" style="background: #007AFF; color: #FFFFFF; border: none; padding: 8px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                        <span>Apply to All ${batch.total} Papers</span>
+                        <span>Apply Template Update</span>
                     </button>
                 </div>
             </div>
@@ -1230,7 +1237,7 @@ class UploadedPapersPageManager {
             let newTplName = "";
             let newTplId = "";
             let newMaxMarks = 40;
-            let newTplQuestions = [];
+            let matchedTpl = null;
 
             if (selectedRadio.value === "custom") {
                 const customName = modal.querySelector("#inp-change-custom-name").value.trim();
@@ -1243,28 +1250,66 @@ class UploadedPapersPageManager {
                 newTplId = `tpl_custom_${Date.now()}`;
                 newMaxMarks = customMarks;
             } else {
-                const matchedTpl = availableTemplates.find(t => t.id === selectedRadio.value);
+                matchedTpl = availableTemplates.find(t => t.id === selectedRadio.value);
                 if (matchedTpl) {
                     newTplName = matchedTpl.name;
                     newTplId = matchedTpl.id;
                     newMaxMarks = matchedTpl.maxMarks || 40;
-                    newTplQuestions = matchedTpl.questions || [];
                 }
             }
 
-            // Update all papers in this batch
+            // Build fresh clean questions for the new template!
+            const newQuestions = window.buildQuestionsFromTemplate 
+                ? window.buildQuestionsFromTemplate(matchedTpl, newMaxMarks)
+                : [];
+
+            // Scope: Apply to this batch card OR all papers in this class matching this exam
+            const applyAllMatching = modal.querySelector("#chk-apply-all-matching") ? modal.querySelector("#chk-apply-all-matching").checked : true;
             const batchPaperIds = new Set(batch.papers.map(p => String(p.id)));
             const allEvals = await window.appStorage.getAllEvaluations(false, true);
 
+            const oldClsNorm = (batch.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+            const oldTplNorm = (batch.templateName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+            const oldSubNorm = (batch.subject || "").toLowerCase().trim();
+
+            let updatedCount = 0;
             allEvals.forEach(p => {
-                if (batchPaperIds.has(String(p.id))) {
+                const pId = String(p.id);
+                const isDirectBatch = batchPaperIds.has(pId);
+                let isMatch = isDirectBatch;
+                if (applyAllMatching && !isMatch) {
+                    const pCls = (p.class || p.className || p.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    const pTpl = (p.templateName || p.examName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                    const pSub = (p.subject || "").toLowerCase().trim();
+                    if (pCls === oldClsNorm && (pTpl === oldTplNorm || !pTpl) && (!oldSubNorm || pSub === oldSubNorm || window.appStorage.isSubjectMatch(p.subject, p.examName, batch.subject))) {
+                        isMatch = true;
+                    }
+                }
+
+                if (isMatch) {
                     p.templateName = newTplName;
                     p.templateId = newTplId;
                     p.maxMarks = newMaxMarks;
                     p.examName = newTplName;
-                    if (newTplQuestions && newTplQuestions.length > 0 && (!p.questions || p.questions.length === 0)) {
-                        p.questions = JSON.parse(JSON.stringify(newTplQuestions));
-                    }
+                    // CRITICAL: Replace questions so the old 80-mark questions are completely eradicated!
+                    p.questions = JSON.parse(JSON.stringify(newQuestions));
+                    p.sections = (matchedTpl && matchedTpl.sections) ? JSON.parse(JSON.stringify(matchedTpl.sections)) : [{
+                        id: "sec_main",
+                        name: "All Questions",
+                        title: "All Questions",
+                        qStartNo: 1,
+                        qEndNo: newQuestions.length,
+                        qCount: newQuestions.length,
+                        maxMarks: newMaxMarks
+                    }];
+
+                    // Clear stale sessionStorage drafts for this paper
+                    try {
+                        sessionStorage.removeItem(`niprak_draft_${p.id}`);
+                        sessionStorage.removeItem(`onespace_draft_${p.id}`);
+                    } catch (e) {}
+
+                    updatedCount++;
                 }
             });
 
@@ -1292,6 +1337,7 @@ class UploadedPapersPageManager {
                             templateId: newTplId,
                             maxMarks: newMaxMarks,
                             examName: newTplName,
+                            questions: newQuestions,
                             updatedAt: new Date().toISOString()
                         }, { merge: true });
                     });
@@ -1303,7 +1349,7 @@ class UploadedPapersPageManager {
 
             closeModal();
             if (window.app && typeof window.app.showToast === "function") {
-                window.app.showToast(`✓ Updated template to "${newTplName}" for all ${batch.total} papers!`, "success");
+                window.app.showToast(`✓ Updated template to "${newTplName}" (${newMaxMarks}M) for all ${updatedCount} papers!`, "success");
             }
             await this.init();
             this.selectedBatchKey = "all";

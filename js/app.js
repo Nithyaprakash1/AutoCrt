@@ -3484,6 +3484,47 @@ class AppController {
             evaluation.maxMarks = 40;
         }
 
+        // AUTO-HEAL: Detect and resolve template mismatch (e.g. maxMarks is 40M, but questions sum to 80M)
+        const qSum = Array.isArray(evaluation.questions) && evaluation.questions.length > 0
+            ? evaluation.questions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0)
+            : 0;
+
+        if (qSum > 0 && Math.abs(qSum - Number(evaluation.maxMarks)) > 1) {
+            console.warn(`[Auto-Heal] Paper ${evaluation.id} template mismatch: maxMarks is ${evaluation.maxMarks} but questions sum to ${qSum}. Auto-syncing questions...`);
+            let matchedTpl = null;
+            if (window.appStorage) {
+                const catalog = await window.appStorage.getSubjectCatalog();
+                if (catalog && Array.isArray(catalog)) {
+                    for (const sub of catalog) {
+                        if (sub && Array.isArray(sub.templates)) {
+                            matchedTpl = sub.templates.find(t => t.id === evaluation.templateId || t.name === evaluation.templateName);
+                            if (matchedTpl) break;
+                        }
+                    }
+                }
+            }
+            if (window.buildQuestionsFromTemplate) {
+                evaluation.questions = window.buildQuestionsFromTemplate(matchedTpl, evaluation.maxMarks);
+            } else {
+                const ratio = Number(evaluation.maxMarks) / qSum;
+                evaluation.questions.forEach(q => {
+                    q.maxMarks = Math.max(1, Math.round((Number(q.maxMarks) * ratio) * 10) / 10);
+                });
+            }
+            evaluation.sections = (matchedTpl && matchedTpl.sections) ? JSON.parse(JSON.stringify(matchedTpl.sections)) : [{
+                id: "sec_main",
+                name: "All Questions",
+                title: "All Questions",
+                qStartNo: 1,
+                qEndNo: evaluation.questions.length,
+                qCount: evaluation.questions.length,
+                maxMarks: evaluation.maxMarks
+            }];
+            try {
+                if (window.appStorage) await window.appStorage.saveEvaluation(evaluation);
+            } catch (e) {}
+        }
+
         if (!Array.isArray(evaluation.questions) || evaluation.questions.length === 0) {
             const qCount = evaluation.totalQuestions || 31;
             const tMarks = Number(evaluation.maxMarks) || 40;
@@ -3800,8 +3841,38 @@ class AppController {
 
         const selectEl = document.getElementById("ws-select-template");
         if (selectEl) {
-            selectEl.innerHTML = `<option value="${evaluation.templateId || 'current'}">${examText}</option>`;
-            selectEl.style.display = "none";
+            let availableTemplates = [];
+            if (window.appStorage) {
+                const catalog = await window.appStorage.getSubjectCatalog();
+                const subObj = (catalog || []).find(s => window.appStorage.isSubjectMatch(s.name, '', evaluation.subject));
+                if (subObj && Array.isArray(subObj.templates) && subObj.templates.length > 0) {
+                    availableTemplates = subObj.templates;
+                }
+            }
+
+            if (availableTemplates.length > 1) {
+                selectEl.innerHTML = availableTemplates.map(t => 
+                    `<option value="${t.id}" ${(t.id === evaluation.templateId || t.name === evaluation.templateName) ? 'selected' : ''}>${t.name} (${t.maxMarks || 40}M)</option>`
+                ).join('');
+                selectEl.style.display = "inline-block";
+                selectEl.style.fontSize = "0.78rem";
+                selectEl.style.padding = "3px 8px";
+                selectEl.style.borderRadius = "6px";
+                selectEl.style.border = "1px solid rgba(255,255,255,0.3)";
+                selectEl.style.background = "rgba(255,255,255,0.12)";
+                selectEl.style.color = "#FFFFFF";
+                selectEl.style.cursor = "pointer";
+
+                selectEl.onchange = async (e) => {
+                    const newId = e.target.value;
+                    if (newId && newId !== evaluation.templateId) {
+                        await this.changeActiveEvaluationTemplate(newId);
+                    }
+                };
+            } else {
+                selectEl.innerHTML = `<option value="${evaluation.templateId || 'current'}">${examText}</option>`;
+                selectEl.style.display = "none";
+            }
         }
     }
 

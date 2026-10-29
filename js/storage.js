@@ -2378,3 +2378,85 @@ window.harmonizeTemplateForSubject = function(tpl, sub) {
     return window.appStorage ? window.appStorage.harmonizeTemplateForSubject(tpl, sub) : (tpl || '');
 };
 
+window.buildQuestionsFromTemplate = function(tpl, targetMaxMarks = 40) {
+    const maxMarks = Number(targetMaxMarks) || (tpl ? Number(tpl.maxMarks) : 40) || 40;
+
+    // 1. Explicit questions list on template
+    if (tpl && Array.isArray(tpl.questions) && tpl.questions.length > 0) {
+        return JSON.parse(JSON.stringify(tpl.questions)).map((q, idx) => ({
+            id: q.id || `q_${idx + 1}`,
+            qNo: q.qNo || idx + 1,
+            qNumber: q.qNumber || `Q${q.qNo || idx + 1}`,
+            label: q.label || q.qNumber || `Q${idx + 1}`,
+            section: q.section || "Section A",
+            sectionId: q.sectionId || "sec_a",
+            maxMarks: Number(q.maxMarks) || 1,
+            awardedMarks: q.awardedMarks !== undefined ? q.awardedMarks : null,
+            status: q.status || "unmarked",
+            hasSubQuestions: !!q.hasSubQuestions,
+            subQuestions: Array.isArray(q.subQuestions) ? JSON.parse(JSON.stringify(q.subQuestions)) : []
+        }));
+    }
+
+    // 2. Synthesize from template sections
+    if (tpl && Array.isArray(tpl.sections) && tpl.sections.length > 0) {
+        let tplQuestions = [];
+        let syntheticQNo = 1;
+        tpl.sections.forEach(sec => {
+            const start = sec.qStartNo || syntheticQNo;
+            const end = sec.qEndNo || (start + (sec.qCount || 1) - 1);
+            const marks = Number(sec.marksPerQ) || 1;
+            const secName = sec.title || sec.name || `Section ${sec.letter || 'A'}`;
+            const secId = sec.id || `sec_${(sec.letter || 'a').toLowerCase()}`;
+            const isSub = !!sec.hasSubQuestions;
+            for (let qn = start; qn <= end; qn++) {
+                const subQs = isSub && Array.isArray(sec.subQuestions) && sec.subQuestions.length > 0
+                    ? sec.subQuestions.map((sq, sqIdx) => ({
+                        id: sq.id || sq.subId || sq.letter || String(sqIdx + 1),
+                        subId: sq.subId || sq.letter || String(sqIdx + 1),
+                        letter: sq.letter || sq.label || String(sqIdx + 1),
+                        label: sq.label ? (String(sq.label).startsWith("(") ? sq.label : `(${sq.label})`) : `(${sq.subId || sqIdx + 1})`,
+                        maxMarks: Number(sq.maxMarks !== undefined ? sq.maxMarks : sq.marks) || 1,
+                        awardedMarks: 0
+                    }))
+                    : [];
+                tplQuestions.push({
+                    id: `q_${qn}`,
+                    qNo: qn,
+                    qNumber: `Q${qn}`,
+                    label: `Q${qn}`,
+                    section: secName,
+                    sectionId: secId,
+                    maxMarks: marks,
+                    isChoice: !!sec.hasChoice,
+                    hasSubQuestions: isSub && subQs.length > 0,
+                    subQuestions: subQs,
+                    awardedMarks: null,
+                    status: "unmarked"
+                });
+                syntheticQNo = Math.max(syntheticQNo, qn + 1);
+            }
+        });
+        return tplQuestions;
+    }
+
+    // 3. Fallback: Generate appropriate number of questions totaling maxMarks
+    const qCount = maxMarks === 80 ? 40 : (maxMarks <= 25 ? 10 : (maxMarks <= 50 ? 25 : 30));
+    const markPerQ = Math.max(1, Math.round((maxMarks / qCount) * 10) / 10);
+    const qs = [];
+    for (let i = 1; i <= qCount; i++) {
+        qs.push({
+            id: `q_${i}`,
+            qNo: i,
+            qNumber: `Q${i}`,
+            label: `Q${i}`,
+            section: "All Questions",
+            sectionId: "sec_main",
+            maxMarks: i === qCount ? Math.max(1, Math.round((maxMarks - (markPerQ * (qCount - 1))) * 10) / 10) : markPerQ,
+            awardedMarks: null,
+            status: "unmarked"
+        });
+    }
+    return qs;
+};
+

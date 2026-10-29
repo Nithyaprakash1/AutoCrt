@@ -75,6 +75,16 @@ class MarkingPanel {
     }
 
     setEvaluationData(questions, maxMarks, feedback = "", sections = null) {
+        // Handle polymorphic argument order: (questions, sections, maxMarks, feedback)
+        if (Array.isArray(maxMarks)) {
+            const actualSections = maxMarks;
+            const actualMax = feedback;
+            const actualFeedback = sections;
+            sections = actualSections;
+            maxMarks = actualMax;
+            feedback = actualFeedback || "";
+        }
+
         // Robust helper to extract accurate section information for each question
         const getSecMeta = (q, idx) => {
             const sName = q.section || q.sectionName || "";
