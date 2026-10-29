@@ -589,8 +589,19 @@ class PDFGenerator {
         doc.setFont("helvetica", "normal");
         doc.setFontSize(8.5);
         doc.setTextColor(51, 65, 85);
-        const feedbackText = evaluation.feedback && evaluation.feedback.trim().length > 0 
-            ? `"${evaluation.feedback}"`
+
+        let cleanFb = "";
+        if (typeof evaluation.feedback === "string") {
+            cleanFb = evaluation.feedback.trim();
+        } else if (evaluation.feedback && typeof evaluation.feedback === "object") {
+            const raw = evaluation.feedback.text || evaluation.feedback.remarks || evaluation.feedback.comment || evaluation.feedback.feedback || evaluation.feedback.message || evaluation.feedback.summary || "";
+            cleanFb = typeof raw === "string" ? raw.trim() : String(raw || "").trim();
+        } else if (evaluation.feedback !== undefined && evaluation.feedback !== null) {
+            cleanFb = String(evaluation.feedback).trim();
+        }
+
+        const feedbackText = cleanFb.length > 0 
+            ? `"${cleanFb}"`
             : "No specific feedback recorded. Good effort.";
         doc.text(feedbackText, margin + 5, currentY + 7.5, { maxWidth: pageWidth - margin * 2 - 10 });
 

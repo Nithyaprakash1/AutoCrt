@@ -1189,8 +1189,17 @@ class AdminPanelManager {
                     totalMax += max;
                 }
 
-                if (ev.feedback && ev.feedback.trim()) {
-                    teacherRemarks.push(`<strong>${subName}:</strong> "${ev.feedback.trim()}"`);
+                let fbStr = "";
+                if (typeof ev.feedback === "string") {
+                    fbStr = ev.feedback.trim();
+                } else if (ev.feedback && typeof ev.feedback === "object") {
+                    const raw = ev.feedback.text || ev.feedback.remarks || ev.feedback.comment || ev.feedback.feedback || "";
+                    fbStr = typeof raw === "string" ? raw.trim() : String(raw || "").trim();
+                } else if (ev.feedback !== undefined && ev.feedback !== null) {
+                    fbStr = String(ev.feedback).trim();
+                }
+                if (fbStr) {
+                    teacherRemarks.push(`<strong>${subName}:</strong> "${fbStr}"`);
                 }
 
                 return `
