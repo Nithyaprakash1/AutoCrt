@@ -27,6 +27,36 @@ class PDFGenerator {
         let pages = evaluation.pages || [];
         const annotations = evaluation.annotations || [];
 
+        // Ensure evaluation scores are properly computed
+        if (evaluation.obtainedMarks === undefined || evaluation.obtainedMarks === null) {
+            let sum = 0;
+            if (Array.isArray(evaluation.questions) && evaluation.questions.length > 0) {
+                evaluation.questions.forEach(q => {
+                    if (q.status !== "unmarked" && q.status !== "pending") {
+                        sum += Number(q.awardedMarks) || 0;
+                    }
+                });
+                evaluation.obtainedMarks = Math.round(sum * 10) / 10;
+            } else if (Array.isArray(evaluation.annotations)) {
+                evaluation.annotations.forEach(a => {
+                    const rawVal = a.marks !== undefined && a.marks !== null ? String(a.marks) : String(a.text || "");
+                    const val = parseFloat(rawVal.replace(/^\+/, "").trim());
+                    if (!isNaN(val)) sum += val;
+                });
+                evaluation.obtainedMarks = Math.round(sum * 10) / 10;
+            } else {
+                evaluation.obtainedMarks = 0;
+            }
+        }
+
+        if (!evaluation.maxMarks || Number(evaluation.maxMarks) <= 0) {
+            if (Array.isArray(evaluation.questions) && evaluation.questions.length > 0) {
+                evaluation.maxMarks = evaluation.questions.reduce((s, q) => s + (Number(q.maxMarks) || 0), 0) || 40;
+            } else {
+                evaluation.maxMarks = 40;
+            }
+        }
+
         // If paper was stored as single PDF, extract pages via pdfjsLib
         const pdfCandidate = evaluation.pdfStorageUrl || evaluation.pdfDataUrl || (pages.length > 0 ? pages[0] : null);
         const isPdf = typeof pdfCandidate === "string" && (
@@ -260,37 +290,39 @@ class PDFGenerator {
                         return Math.round(total * 10) / 10;
                     })();
 
-                const scale = 1.0;
-                const numText = String(pageTotal);
-                ctx.font = `400 ${Math.round(14 * scale)}px system-ui, -apple-system, sans-serif`;
-                const textW = ctx.measureText(numText).width;
+                // Render Prominent Page Total Badge inside safe printable margins
+                const badgeText = `Page Total: ${pageTotal}M`;
+                const scale = Math.max(1.0, Math.min(2.0, w / 1200));
+                ctx.font = `600 ${Math.round(14 * scale)}px system-ui, -apple-system, sans-serif`;
+                const textW = ctx.measureText(badgeText).width;
 
-                const boxW = Math.max(34 * scale, textW + 16 * scale);
-                const boxH = 24 * scale;
-                const padRight = 16 * scale;
-                const padBottom = 14 * scale;
+                const boxW = Math.max(90 * scale, textW + 22 * scale);
+                const boxH = Math.round(30 * scale);
+                // Position safely ~50-60px from bottom and ~25px from right (well inside 15mm printable margin)
+                const padRight = Math.max(24 * scale, Math.round(w * 0.025));
+                const padBottom = Math.max(50 * scale, Math.round(h * 0.038));
                 const x = w - boxW - padRight;
                 const y = h - boxH - padBottom;
 
                 ctx.save();
-                ctx.shadowColor = "rgba(15, 23, 42, 0.08)";
-                ctx.shadowBlur = 4 * scale;
-                ctx.shadowOffsetY = 1 * scale;
+                ctx.shadowColor = "rgba(0, 0, 0, 0.16)";
+                ctx.shadowBlur = 6 * scale;
+                ctx.shadowOffsetY = 2 * scale;
                 ctx.fillStyle = "#FFFFFF";
                 ctx.beginPath();
-                ctx.roundRect(x, y, boxW, boxH, [12 * scale]);
+                ctx.roundRect(x, y, boxW, boxH, [15 * scale]);
                 ctx.fill();
 
                 ctx.shadowColor = "transparent";
-                ctx.lineWidth = 1.5 * scale;
+                ctx.lineWidth = 1.8 * scale;
                 ctx.strokeStyle = "#DC2626"; // Teacher red ink
                 ctx.stroke();
 
                 ctx.fillStyle = "#DC2626";
-                ctx.font = `400 ${Math.round(13 * scale)}px system-ui, -apple-system, sans-serif`;
+                ctx.font = `600 ${Math.round(13 * scale)}px system-ui, -apple-system, sans-serif`;
                 ctx.textAlign = "center";
                 ctx.textBaseline = "middle";
-                ctx.fillText(numText, x + boxW / 2, y + boxH / 2);
+                ctx.fillText(badgeText, x + boxW / 2, y + boxH / 2);
                 ctx.restore();
 
                 resolve(canvas.toDataURL("image/jpeg", 0.88));
@@ -308,23 +340,49 @@ class PDFGenerator {
 
     /**
      * Renders the comprehensive Final Summary Page with Co-Branded Institutional Header
-     * Strict Regular Typography: 0 Bold Fonts (font-weight: 400 !important;)
+     * Executive Total Marks & Grade Banner are guaranteed prominent on Page 1.
+     * Full page-break protection ensures question table, feedback, and signature are NEVER clipped.
      */
     static renderSummaryPage(doc, evaluation, logos = {}) {
         const pageWidth = 210;
+        const pageHeight = 297;
         const margin = 14;
         let currentY = 12;
 
-        // 1. Co-Branding Header Banner Container
+        // 1. Resolve scores and percentages reliably
+        const questions = evaluation.questions || [];
+        let calcObtained = 0;
+        let calcMax = 0;
+        if (questions.length > 0) {
+            questions.forEach(q => {
+                calcMax += Number(q.maxMarks) || 0;
+                if (q.status !== "unmarked" && q.status !== "pending") {
+                    calcObtained += Number(q.awardedMarks) || 0;
+                }
+            });
+            calcObtained = Math.round(calcObtained * 10) / 10;
+        }
+
+        const maxMarks = Number(evaluation.maxMarks) || calcMax || 70;
+        const obtainedMarks = (evaluation.obtainedMarks !== undefined && evaluation.obtainedMarks !== null)
+            ? Number(evaluation.obtainedMarks)
+            : calcObtained;
+        const pct = maxMarks > 0 ? Math.round((obtainedMarks / maxMarks) * 100) : 0;
+
+        const gradeInfo = (window.calculateGradeScale 
+            ? window.calculateGradeScale(obtainedMarks, maxMarks)
+            : null) || { grade: evaluation.grade || "A1", gradePoint: 10, marksRange: "91 – 100", remarks: "Pass", status: "Pass" };
+
+        // 2. Co-Branding Header Banner Container
         doc.setFillColor(255, 255, 255);
         doc.setDrawColor(226, 232, 240);
         doc.setLineWidth(0.4);
-        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 22, 2, 2, "FD");
+        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 20, 2, 2, "FD");
 
         // Top-Left: Client School Branding (school_fulllogo.jpg)
         if (logos.schoolLogo) {
             try {
-                doc.addImage(logos.schoolLogo, "JPEG", margin + 3, currentY + 2.5, 46, 15.6);
+                doc.addImage(logos.schoolLogo, "JPEG", margin + 3, currentY + 2.5, 44, 15);
             } catch (err) {
                 console.warn("Could not draw school logo:", err);
             }
@@ -333,7 +391,7 @@ class PDFGenerator {
         // Top-Right: Niprak OSM Branding (fulllogo.png)
         if (logos.appLogo) {
             try {
-                doc.addImage(logos.appLogo, "PNG", pageWidth - margin - 49, currentY + 3.8, 46, 13.8);
+                doc.addImage(logos.appLogo, "PNG", pageWidth - margin - 47, currentY + 3.2, 44, 13.5);
             } catch (err) {
                 console.warn("Could not draw OSM logo:", err);
             }
@@ -343,66 +401,98 @@ class PDFGenerator {
         const instName = evaluation.institutionName || "ADWAITH THOUGHT ACADEMY";
         doc.setTextColor(15, 23, 42);
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(11);
-        doc.text(instName.toUpperCase(), pageWidth / 2, currentY + 9, { align: "center" });
+        doc.setFontSize(10.5);
+        doc.text(instName.toUpperCase(), pageWidth / 2, currentY + 8.5, { align: "center" });
 
         doc.setFontSize(7.5);
         doc.setTextColor(100, 116, 139);
         doc.setFont("helvetica", "normal");
-        doc.text("SMART ON-SCREEN MARKING (OSM) • EVALUATION SUMMARY", pageWidth / 2, currentY + 16, { align: "center" });
+        doc.text("SMART ON-SCREEN MARKING (OSM) • EVALUATION SUMMARY", pageWidth / 2, currentY + 15, { align: "center" });
 
-        currentY += 27;
+        currentY += 24;
 
-        // Student Info Card
+        // 3. Student & Examination Information Card
         doc.setDrawColor(226, 232, 240);
         doc.setFillColor(248, 250, 252);
-        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 38, 3, 3, "FD");
+        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 32, 2.5, 2.5, "FD");
 
         doc.setTextColor(30, 41, 59);
-        doc.setFontSize(10);
+        doc.setFontSize(9);
 
         // Column 1
         doc.setFont("helvetica", "normal");
-        doc.text("Student Name:", margin + 6, currentY + 10);
-        doc.setFont("helvetica", "normal");
-        doc.text(String(evaluation.studentName || "-"), margin + 35, currentY + 10);
+        doc.text("Student Name:", margin + 6, currentY + 8.5);
+        doc.setFont("helvetica", "bold");
+        doc.text(String(evaluation.studentName || "-"), margin + 34, currentY + 8.5);
 
         doc.setFont("helvetica", "normal");
-        doc.text("Register No:", margin + 6, currentY + 18);
-        doc.setFont("helvetica", "normal");
-        doc.text(String(evaluation.rollNo || "-"), margin + 35, currentY + 18);
+        doc.text("Register No:", margin + 6, currentY + 16.5);
+        doc.text(String(evaluation.rollNo || "-"), margin + 34, currentY + 16.5);
 
         doc.setFont("helvetica", "normal");
-        doc.text("Class / Sec:", margin + 6, currentY + 26);
-        doc.setFont("helvetica", "normal");
-        doc.text(`${evaluation.class || "-"} (${evaluation.section || "-"})`, margin + 35, currentY + 26);
+        doc.text("Class / Sec:", margin + 6, currentY + 24.5);
+        doc.text(`${evaluation.class || evaluation.className || "-"} (${evaluation.section || "-"})`, margin + 34, currentY + 24.5);
 
         // Column 2
-        const col2X = margin + 100;
+        const col2X = margin + 98;
         doc.setFont("helvetica", "normal");
-        doc.text("Examination:", col2X, currentY + 10);
-        doc.setFont("helvetica", "normal");
-        doc.text(String(evaluation.examName || "-"), col2X + 26, currentY + 10);
+        doc.text("Examination:", col2X, currentY + 8.5);
+        doc.setFont("helvetica", "bold");
+        doc.text(String(evaluation.examName || evaluation.templateName || "-"), col2X + 26, currentY + 8.5);
 
         doc.setFont("helvetica", "normal");
-        doc.text("Subject:", col2X, currentY + 18);
-        doc.setFont("helvetica", "normal");
-        doc.text(String(evaluation.subject || "-"), col2X + 26, currentY + 18);
+        doc.text("Subject:", col2X, currentY + 16.5);
+        doc.text(String(evaluation.subject || "-"), col2X + 26, currentY + 16.5);
 
         doc.setFont("helvetica", "normal");
-        doc.text("Exam Date:", col2X, currentY + 26);
+        doc.text("Exam Date:", col2X, currentY + 24.5);
+        doc.text(`${evaluation.examDate || "-"}  |  Teacher: ${evaluation.teacherName || "-"}`, col2X + 26, currentY + 24.5);
+
+        currentY += 36;
+
+        // 4. EXECUTIVE TOTAL SCORE & GRADE BANNER CARD (Guaranteed Prominent on Page 1!)
+        doc.setFillColor(240, 253, 244); // #F0FDF4 emerald-50
+        doc.setDrawColor(16, 185, 129);  // #10B981 emerald-500
+        doc.setLineWidth(0.6);
+        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 23, 2.5, 2.5, "FD");
+
+        // Column 1: Total Marks & Percentage
+        doc.setTextColor(6, 78, 59);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(8);
+        doc.text("TOTAL MARKS SCORED:", margin + 8, currentY + 7.5);
+
+        doc.setFontSize(15);
+        doc.text(`${obtainedMarks} / ${maxMarks}`, margin + 8, currentY + 17.5);
+
+        doc.setFontSize(10);
         doc.setFont("helvetica", "normal");
-        doc.text(String(evaluation.examDate || "-"), col2X + 26, currentY + 26);
+        doc.text(`(${pct}%)`, margin + 50, currentY + 17.5);
+
+        // Column 2: Grade & Grade Point
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(11);
+        doc.text(`GRADE: ${gradeInfo.grade}`, margin + 74, currentY + 9.5);
 
         doc.setFont("helvetica", "normal");
-        doc.text("Teacher:", col2X, currentY + 34);
+        doc.setFontSize(8.5);
+        doc.setTextColor(71, 85, 105);
+        doc.text(`Grade Point: ${gradeInfo.gradePoint}  (${gradeInfo.marksRange})`, margin + 74, currentY + 17.5);
+
+        // Column 3: Result & Performance
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(10.5);
+        doc.setTextColor(6, 78, 59);
+        doc.text(`Result: ${gradeInfo.status}`, margin + 142, currentY + 9.5);
+
         doc.setFont("helvetica", "normal");
-        doc.text(String(evaluation.teacherName || "-"), col2X + 26, currentY + 34);
+        doc.setFontSize(8);
+        doc.setTextColor(100, 116, 139);
+        doc.text(String(gradeInfo.remarks || "Qualified"), margin + 142, currentY + 17.5);
 
-        currentY += 44;
+        currentY += 27;
 
-        // Question Marks Table - Clean format without individual question %
-        const questions = evaluation.questions || [];
+        // 5. Question-by-Question Marks Table (with clean Total row in table footer!)
         const tableBody = questions.map((q, idx) => {
             const max = Number(q.maxMarks) || 0;
             const awarded = Number(q.awardedMarks) || 0;
@@ -420,114 +510,118 @@ class PDFGenerator {
             ];
         });
 
-        // Use autoTable
         if (doc.autoTable) {
             doc.autoTable({
                 startY: currentY,
-                margin: { left: margin, right: margin },
+                margin: { left: margin, right: margin, top: 16, bottom: 20 },
                 head: [["Q.No", "Section", "Max Marks", "Marks Obtained", "Status"]],
                 body: tableBody,
+                foot: [["Total Marks", "All Sections", `${calcMax || maxMarks}`, `${obtainedMarks}`, `${pct}% (${gradeInfo.grade})`]],
+                showHead: 'everyPage',
+                showFoot: 'lastPage',
                 theme: "striped",
                 headStyles: {
                     fillColor: [15, 23, 42],
                     textColor: [255, 255, 255],
-                    fontSize: 9.5,
-                    fontStyle: "normal",
+                    fontSize: 9,
+                    fontStyle: "bold",
+                    halign: "center"
+                },
+                footStyles: {
+                    fillColor: [240, 253, 244],
+                    textColor: [6, 78, 59],
+                    fontStyle: "bold",
+                    fontSize: 9,
                     halign: "center"
                 },
                 columnStyles: {
                     0: { halign: "center", cellWidth: 20 },
                     1: { halign: "center", cellWidth: 32 },
                     2: { halign: "center", cellWidth: 28 },
-                    3: { halign: "center", cellWidth: 35, fontStyle: "normal" },
+                    3: { halign: "center", cellWidth: 35, fontStyle: "bold" },
                     4: { halign: "center" }
                 },
                 styles: {
-                    fontSize: 9,
-                    cellPadding: 3.5
+                    fontSize: 8.5,
+                    cellPadding: 3
+                },
+                didDrawPage: () => {
+                    // Footer watermark on every page generated by autoTable
+                    doc.setFontSize(7.5);
+                    doc.setFont("helvetica", "normal");
+                    doc.setTextColor(148, 163, 184);
+                    doc.text("Generated by Niprak OSM Digital Correction • Confirmed & Verified", pageWidth / 2, 288, { align: "center" });
                 }
             });
 
-            currentY = doc.lastAutoTable.finalY + 10;
+            currentY = doc.lastAutoTable.finalY + 8;
         }
 
-        // Official Total Score & Grade Banner Card (Total Marks + Grade + Grade Point)
-        const gradeInfo = (window.calculateGradeScale 
-            ? window.calculateGradeScale(evaluation.obtainedMarks, evaluation.maxMarks)
-            : null) || { grade: evaluation.grade || "A1", gradePoint: 10, marksRange: "91 – 100", remarks: "Pass", status: "Pass" };
+        // 6. Intelligent Page-Break Protection for Post-Table Content (Feedback & Signature)
+        const requiredPostHeight = 56;
+        if (currentY + requiredPostHeight > 275) {
+            doc.addPage("a4", "portrait");
+            currentY = 16;
 
-        doc.setFillColor(240, 253, 244); // #F0FDF4 emerald-50
-        doc.setDrawColor(16, 185, 129);
-        doc.setLineWidth(0.6);
-        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 28, 3, 3, "FD");
-
-        doc.setTextColor(6, 78, 59);
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
-        doc.text("TOTAL MARKS:", margin + 8, currentY + 11);
-
-        doc.setFontSize(18);
-        doc.text(`${evaluation.obtainedMarks !== undefined ? evaluation.obtainedMarks : 0} / ${evaluation.maxMarks || 70}`, margin + 8, currentY + 22);
-
-        doc.setFontSize(12);
-        doc.text(`GRADE: ${gradeInfo.grade}`, margin + 75, currentY + 13);
-        doc.setFontSize(9.5);
-        doc.setTextColor(71, 85, 105);
-        doc.text(`Grade Point: ${gradeInfo.gradePoint}  (${gradeInfo.marksRange})`, margin + 75, currentY + 22);
-
-        doc.setFontSize(10.5);
-        doc.setTextColor(6, 78, 59);
-        doc.text(`Result: ${gradeInfo.status}`, margin + 145, currentY + 13);
-        doc.setFontSize(9);
-        doc.setTextColor(100, 116, 139);
-        doc.text(`${gradeInfo.remarks}`, margin + 145, currentY + 22);
-
-        currentY += 36;
+            // Header strip on continuation page
+            doc.setFont("helvetica", "normal");
+            doc.setFontSize(8);
+            doc.setTextColor(100, 116, 139);
+            doc.text(`${evaluation.studentName || "Student"} • ${evaluation.subject || "Subject"} • Total Marks: ${obtainedMarks}/${maxMarks} (${gradeInfo.grade})`, margin, 11);
+            doc.setDrawColor(226, 232, 240);
+            doc.setLineWidth(0.3);
+            doc.line(margin, 13, pageWidth - margin, 13);
+            currentY = 18;
+        }
 
         // Feedback / Remarks Box
-        doc.setFontSize(10);
-        doc.setFont("helvetica", "normal");
+        doc.setFontSize(9);
+        doc.setFont("helvetica", "bold");
         doc.setTextColor(30, 41, 59);
         doc.text("Teacher's Overall Feedback & Observations:", margin, currentY);
-        currentY += 4;
+        currentY += 3.5;
 
         doc.setFillColor(255, 255, 255);
         doc.setDrawColor(203, 213, 225);
-        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 24, 2, 2, "FD");
+        doc.setLineWidth(0.4);
+        doc.roundedRect(margin, currentY, pageWidth - margin * 2, 20, 2, 2, "FD");
 
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9.5);
+        doc.setFontSize(8.5);
         doc.setTextColor(51, 65, 85);
         const feedbackText = evaluation.feedback && evaluation.feedback.trim().length > 0 
             ? `"${evaluation.feedback}"`
             : "No specific feedback recorded. Good effort.";
-        doc.text(feedbackText, margin + 5, currentY + 9, { maxWidth: pageWidth - margin * 2 - 10 });
+        doc.text(feedbackText, margin + 5, currentY + 7.5, { maxWidth: pageWidth - margin * 2 - 10 });
 
-        currentY += 34;
+        currentY += 25;
 
         // Signature & Date Section
         doc.setFont("helvetica", "normal");
-        doc.setFontSize(9);
+        doc.setFontSize(8.5);
         doc.setTextColor(100, 116, 139);
 
         // Date
-        doc.text(`Evaluation Date: ${evaluation.correctionDate || new Date().toISOString().split("T")[0]}`, margin, currentY + 8);
-        doc.text("System: Niprak OSM Digital Evaluation Engine v1.0", margin, currentY + 14);
+        doc.text(`Evaluation Date: ${evaluation.correctionDate || new Date().toISOString().split("T")[0]}`, margin, currentY + 6);
+        doc.text("System: Niprak OSM Digital Evaluation Engine v1.0", margin, currentY + 12);
 
         // Signature line
         const sigX = pageWidth - margin - 60;
         doc.setDrawColor(148, 163, 184);
-        doc.line(sigX, currentY + 8, pageWidth - margin, currentY + 8);
-        doc.setFont("helvetica", "normal");
+        doc.setLineWidth(0.5);
+        doc.line(sigX, currentY + 6, pageWidth - margin, currentY + 6);
+        doc.setFont("helvetica", "bold");
         doc.setTextColor(30, 41, 59);
-        doc.text("Evaluator Signature", sigX + 10, currentY + 14);
+        doc.text("Evaluator Signature", sigX + 10, currentY + 11);
         doc.setFont("helvetica", "normal");
-        doc.text(evaluation.teacherName || "Authorized Evaluator", sigX + 10, currentY + 19);
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(evaluation.teacherName || "Authorized Faculty Evaluator", sigX + 10, currentY + 16);
 
-        // Footer watermarking
-        doc.setFontSize(8);
+        // Footer watermarking on the final page
+        doc.setFontSize(7.5);
         doc.setTextColor(148, 163, 184);
-        doc.text("Generated by Niprak OSM Digital Correction - Confirmed & Verified", pageWidth / 2, 288, { align: "center" });
+        doc.text("Generated by Niprak OSM Digital Correction • Confirmed & Verified", pageWidth / 2, 288, { align: "center" });
     }
 }
 
