@@ -2153,6 +2153,134 @@ class StorageService {
         return cleanedCount;
     }
 
+    /**
+     * Scans all evaluations and removes only duplicate copies for the same student in the same exam.
+     * Safely preserves exactly ONE primary copy (preferring the graded/evaluated copy with teacher marks).
+     */
+    async deduplicateEvaluations(options = { dryRun: false }) {
+        await this.readyPromise;
+        const all = await this.getAllEvaluations(false, true); // bypassFilter = true to inspect entire store
+        if (!Array.isArray(all) || all.length <= 1) {
+            return { totalScanned: all ? all.length : 0, duplicatesRemoved: 0, survivingCount: all ? all.length : 0, removedPapers: [] };
+        }
+
+        const groups = new Map();
+
+        all.forEach(paper => {
+            if (!paper || !paper.id) return;
+            if (this.deletedEvaluations && this.deletedEvaluations.has(String(paper.id))) return;
+
+            const clsNorm = (paper.class || paper.className || paper.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+            const subNorm = (paper.subject || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+            
+            // Base exam / template name stripped of dates e.g. (2026-10-23)
+            const rawExam = paper.examName || paper.templateName || "assessment";
+            const baseExam = rawExam.toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+
+            // Student identity: roll number or student name or file name
+            const rollNorm = (paper.rollNo || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            const nameNorm = (paper.studentName || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            const fileNorm = (paper.fileName || (paper.rawFile && paper.rawFile.name) || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+
+            let studentKey = "";
+            if (rollNorm) {
+                studentKey = `roll:${rollNorm}`;
+            } else if (nameNorm && !nameNorm.includes("unnamed") && nameNorm !== "student") {
+                studentKey = `name:${nameNorm}`;
+            } else if (fileNorm) {
+                studentKey = `file:${fileNorm}`;
+            } else {
+                studentKey = `id:${paper.id}`;
+            }
+
+            const groupKey = `${clsNorm}:::${subNorm}:::${baseExam}:::${studentKey}`;
+
+            if (!groups.has(groupKey)) {
+                groups.set(groupKey, []);
+            }
+            groups.get(groupKey).push(paper);
+        });
+
+        const removedPapers = [];
+        let duplicatesCount = 0;
+
+        for (const [key, papers] of groups.entries()) {
+            if (papers.length <= 1) continue;
+
+            // Sort papers in descending order of quality/completeness:
+            // Best paper stays at index 0 (SURVIVOR to KEEP).
+            papers.sort((a, b) => {
+                // 1. Graded / Completed status has highest priority
+                const aDone = (a.status === "Completed" || a.status === "Corrected" || a.status === "Graded" || a.status === "Evaluated");
+                const bDone = (b.status === "Completed" || b.status === "Corrected" || b.status === "Graded" || b.status === "Evaluated");
+                if (aDone && !bDone) return -1;
+                if (!aDone && bDone) return 1;
+
+                // 2. Marks awarded > 0
+                const aMarks = Number(a.obtainedMarks) || 0;
+                const bMarks = Number(b.obtainedMarks) || 0;
+                if (aMarks > bMarks) return -1;
+                if (aMarks < bMarks) return 1;
+
+                // 3. Annotations count (teacher drawings / checkmarks)
+                const aAnno = Array.isArray(a.annotations) ? a.annotations.length : 0;
+                const bAnno = Array.isArray(b.annotations) ? b.annotations.length : 0;
+                if (aAnno > bAnno) return -1;
+                if (aAnno < bAnno) return 1;
+
+                // 4. Questions with awarded marks
+                const aQ = Array.isArray(a.questions) ? a.questions.filter(q => q && (q.awardedMarks !== undefined || q.isCorrect !== undefined)).length : 0;
+                const bQ = Array.isArray(b.questions) ? b.questions.filter(q => q && (q.awardedMarks !== undefined || q.isCorrect !== undefined)).length : 0;
+                if (aQ > bQ) return -1;
+                if (aQ < bQ) return 1;
+
+                // 5. PDF scan data presence
+                const aHasPdf = Boolean(a.pdfDataUrl || a.pdfStorageUrl || (Array.isArray(a.pages) && a.pages.length > 0));
+                const bHasPdf = Boolean(b.pdfDataUrl || b.pdfStorageUrl || (Array.isArray(b.pages) && b.pages.length > 0));
+                if (aHasPdf && !bHasPdf) return -1;
+                if (!aHasPdf && bHasPdf) return 1;
+
+                // 6. Original earlier creation date (preserve the original upload)
+                const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                if (aTime && bTime && aTime !== bTime) {
+                    return aTime - bTime;
+                }
+
+                return 0;
+            });
+
+            const survivor = papers[0];
+            const redundant = papers.slice(1);
+
+            for (const dup of redundant) {
+                removedPapers.push({
+                    deletedId: dup.id,
+                    keptId: survivor.id,
+                    studentName: dup.studentName || survivor.studentName || 'Student',
+                    rollNo: dup.rollNo || survivor.rollNo || '—',
+                    className: dup.className || dup.class || survivor.className,
+                    examName: dup.examName || dup.templateName || survivor.examName,
+                    status: dup.status
+                });
+
+                if (!options.dryRun) {
+                    await this.deleteEvaluation(dup.id);
+                }
+                duplicatesCount++;
+            }
+        }
+
+        console.log(`🧹 Deduplication Pass: Scanned ${all.length} papers, ${options.dryRun ? 'found' : 'purged'} ${duplicatesCount} redundant duplicate(s). Surviving unique papers: ${all.length - duplicatesCount}`);
+
+        return {
+            totalScanned: all.length,
+            duplicatesRemoved: duplicatesCount,
+            survivingCount: all.length - duplicatesCount,
+            removedPapers: removedPapers
+        };
+    }
+
     async clearAppCaches() {
         let freedKeys = 0;
         try {

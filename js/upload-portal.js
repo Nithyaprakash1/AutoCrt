@@ -4423,7 +4423,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 const isDuplicateInExisting = (this.existingPapers || []).some(paper => {
                     const rollMatch = possibleRoll && String(paper.rollNo).trim() === possibleRoll;
                     const nameMatch = possibleName && String(paper.studentName).toLowerCase().trim() === possibleName.toLowerCase();
-                    return rollMatch || nameMatch;
+                    const fileMatch = file.name && ((paper.fileName && paper.fileName.toLowerCase() === file.name.toLowerCase()) ||
+                                                   (paper.rawFile && paper.rawFile.name && paper.rawFile.name.toLowerCase() === file.name.toLowerCase()));
+                    return rollMatch || nameMatch || fileMatch;
                 });
 
                 if (isDuplicateInQueue || isDuplicateInExisting) {
@@ -5288,11 +5290,14 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 // Check if paper already exists for this student in this class & exam:
                 const rollKey = String(item.rollNo || "").trim().toLowerCase();
                 const nameKey = String(item.studentName || "").trim().toLowerCase();
+                const itemFileName = String(item.fileName || (item.file && item.file.name) || "").trim().toLowerCase();
                 const existingMatch = (this.existingPapers || []).find(p => {
                     const pRoll = String(p.rollNo || "").trim().toLowerCase();
                     const pName = String(p.studentName || "").trim().toLowerCase();
+                    const pFile = String(p.fileName || (p.rawFile && p.rawFile.name) || "").trim().toLowerCase();
                     if (rollKey && pRoll && rollKey === pRoll) return true;
                     if (nameKey && pName && nameKey === pName) return true;
+                    if (itemFileName && pFile && itemFileName === pFile) return true;
                     return false;
                 });
 

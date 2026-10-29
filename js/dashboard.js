@@ -519,6 +519,9 @@ class DashboardManager {
                                     <span class="btn-icon">✍️</span> Test Me!
                                 </button>
                             ` : ''}
+                            <button type="button" class="btn-secondary btn-large btn-clean-duplicates" id="dash-btn-clean-duplicates-top" title="Scan and safely remove duplicate student papers, keeping original copies" style="background: #FFFFFF; border: 1.5px solid #CBD5E1; color: #334155; font-size: 0.85rem; font-weight: 500; height: 42px; padding: 0 16px; border-radius: 999px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: all 0.15s ease;">
+                                <span class="btn-icon" style="font-size: 0.95rem;">🧹</span> Clean Duplicates
+                            </button>
                             <button type="button" class="btn-primary btn-large" id="dash-btn-start-correction" title="Open first pending paper to evaluate">
                                 <span class="btn-icon">${ic.lightning || '⚡'}</span> Start Correction
                             </button>
@@ -807,6 +810,10 @@ class DashboardManager {
 
                             <button type="button" class="btn-secondary" id="dash-btn-bulk-excel" title="Bulk export spreadsheet" style="background: #FFFFFF; border: 1.5px solid #16A34A; color: #16A34A; font-size: 0.84rem; font-weight: 400 !important; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
                                 <span class="btn-icon" style="display: flex; align-items: center;">${ic.csv || '📊'}</span> Bulk Export Excel
+                            </button>
+
+                            <button type="button" class="btn-secondary btn-clean-duplicates" id="dash-btn-clean-duplicates-table" title="Scan and safely remove duplicate student papers, keeping original copies" style="background: #FFFFFF; border: 1.5px solid #64748B; color: #334155; font-size: 0.84rem; font-weight: 400 !important; height: 38px; padding: 0 14px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
+                                <span class="btn-icon" style="display: flex; align-items: center;">🧹</span> Clean Duplicates
                             </button>
 
                             <button type="button" class="btn-secondary" id="dash-btn-bulk-delete" title="Delete selected papers to free storage space" style="background: #FFFFFF; border: 1.5px solid #DC2626; color: #DC2626; font-size: 0.84rem; font-weight: 400 !important; height: 38px; padding: 0 15px; border-radius: 8px; display: inline-flex; align-items: center; gap: 6px; cursor: pointer; white-space: nowrap; transition: all 0.15s ease;">
@@ -1268,6 +1275,13 @@ class DashboardManager {
             });
         }
 
+        // Clean Duplicates Buttons (both top banner and table toolbar)
+        this.container.querySelectorAll(".btn-clean-duplicates").forEach(btn => {
+            btn.addEventListener("click", () => {
+                this.handleCleanDuplicates();
+            });
+        });
+
         // Status Filter Dropdown
         const statusSelect = this.container.querySelector("#dash-filter-status");
         if (statusSelect) {
@@ -1586,6 +1600,74 @@ class DashboardManager {
                 }
             }
         });
+    }
+
+    async handleCleanDuplicates() {
+        if (!window.appStorage || typeof window.appStorage.deduplicateEvaluations !== "function") return;
+
+        if (window.app && typeof window.app.showLoadingBox === "function") {
+            window.app.showLoadingBox("Scanning for Duplicates...", "Analyzing student records across all batches...");
+        }
+
+        try {
+            // Dry-run first to identify duplicate student papers
+            const scan = await window.appStorage.deduplicateEvaluations({ dryRun: true });
+
+            if (window.app && typeof window.app.hideLoadingBox === "function") {
+                window.app.hideLoadingBox();
+            }
+
+            if (!scan || scan.duplicatesRemoved === 0) {
+                if (window.app && window.app.showToast) {
+                    window.app.showToast("✓ All Clean: No duplicate papers found! Every student in your rosters has exactly one copy.", "success");
+                } else {
+                    alert("✓ All Clean: No duplicate papers found! Every student in your rosters has exactly one copy.");
+                }
+                return;
+            }
+
+            const preview = scan.removedPapers.slice(0, 5).map(p => 
+                `• ${p.studentName || 'Student'} (Roll ${p.rollNo || '—'}) in ${p.className} - ${p.examName}`
+            ).join('\n');
+            const more = scan.removedPapers.length > 5 ? `\n...and ${scan.removedPapers.length - 5} more duplicate(s)` : '';
+
+            const confirmMsg = `Found ${scan.duplicatesRemoved} duplicate student paper copy(ies):\n\n${preview}${more}\n\nSafe deduplication will:\n✓ Keep 1 primary (graded) copy for each student\n✓ Delete only the redundant extra copies\n\nProceed to remove these ${scan.duplicatesRemoved} duplicate copies now?`;
+
+            if (!window.confirm(confirmMsg)) {
+                return;
+            }
+
+            if (window.app && typeof window.app.showLoadingBox === "function") {
+                window.app.showLoadingBox("Purging Duplicates...", `Safely removing ${scan.duplicatesRemoved} duplicate paper copies...`);
+            }
+
+            const result = await window.appStorage.deduplicateEvaluations({ dryRun: false });
+
+            // Reload evaluations from storage
+            this.evaluations = await window.appStorage.getAllEvaluations(false, false);
+            this.applyFilters();
+            this.render();
+            this.bindEvents();
+
+            if (window.app && typeof window.app.hideLoadingBox === "function") {
+                window.app.hideLoadingBox();
+            }
+
+            const successMsg = `Successfully purged ${result.duplicatesRemoved} duplicate paper(s). Originals safely preserved!`;
+            if (window.app && window.app.showToast) {
+                window.app.showToast(successMsg, "success");
+            } else {
+                alert(successMsg);
+            }
+        } catch (err) {
+            console.error("Clean duplicates error:", err);
+            if (window.app && typeof window.app.hideLoadingBox === "function") {
+                window.app.hideLoadingBox();
+            }
+            if (window.app && window.app.showToast) {
+                window.app.showToast("Deduplication error: " + err.message, "error");
+            }
+        }
     }
 
     showBulkDeleteModal() {
