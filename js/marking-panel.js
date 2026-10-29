@@ -325,12 +325,13 @@ class MarkingPanel {
                             const statusIcon = isAllOk ? '✓' : (q.awardedMarks > 0 ? '◑' : (q.status === 'wrong' ? '✗' : '○'));
                             const statusLabel = isAllOk ? 'OK' : (q.awardedMarks > 0 ? 'Partial' : (q.status === 'wrong' ? 'Zero' : '-'));
                             const statusCls = isAllOk ? 'st-ok' : (q.awardedMarks > 0 ? 'st-part' : (q.status === 'wrong' ? 'st-zero' : 'st-unmarked'));
+                            const rowStatus = q.status || (isAllOk ? 'correct' : (q.awardedMarks > 0 ? 'partial' : 'unmarked'));
                             
-                            return `<div class="q-breakdown-row ${isActive ? 'active-brow' : ''}" data-index="${idx}" title="${q.topic || `Question ${q.qNo}`}">
-                                <span class="brow-col col-sec">${secLetter}</span>
-                                <span class="brow-col col-q">Q${q.qNo}</span>
-                                <span class="brow-col col-status ${statusCls}"><span class="st-icon">${statusIcon}</span> ${statusLabel}</span>
-                                <span class="brow-col col-marks">${q.awardedMarks}/${q.maxMarks}</span>
+                            return `<div class="q-breakdown-row ${isActive ? 'active-brow' : ''} ${rowStatus}" data-index="${idx}" title="${q.topic || `Question ${q.qNo}`}">
+                                <span class="brow-col col-sec brow-sec">${secLetter}</span>
+                                <span class="brow-col col-q brow-q">Q${q.qNo}</span>
+                                <span class="brow-col col-status brow-status ${statusCls}"><span class="st-icon">${statusIcon}</span> ${statusLabel}</span>
+                                <span class="brow-col col-marks brow-marks">${q.awardedMarks}/${q.maxMarks}</span>
                             </div>`;
                         }).join('')}
                     </div>
@@ -938,6 +939,23 @@ class MarkingPanel {
         }
     }
 
+    scrollIntoContainer(container, targetEl) {
+        if (!container || !targetEl) return;
+        try {
+            const cRect = container.getBoundingClientRect();
+            const elRect = targetEl.getBoundingClientRect();
+            if (elRect.top < cRect.top) {
+                const diff = elRect.top - cRect.top - 6;
+                container.scrollBy({ top: diff, behavior: "smooth" });
+            } else if (elRect.bottom > cRect.bottom) {
+                const diff = elRect.bottom - cRect.bottom + 6;
+                container.scrollBy({ top: diff, behavior: "smooth" });
+            }
+        } catch (e) {
+            targetEl.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+    }
+
     selectQuestion(index) {
         if (index >= 0 && index < this.questions.length) {
             this.activeQuestionIndex = index;
@@ -946,16 +964,31 @@ class MarkingPanel {
 
             this.renderActiveQuestionDetail();
 
+            // Toggle active-row in questions list & auto-scroll to it
+            const qList = this.container.querySelector("#questions-list-container");
+            let activeQRow = null;
             this.container.querySelectorAll(".q-row").forEach(r => {
                 const rIdx = Number(r.getAttribute("data-index"));
-                r.classList.toggle("active-row", rIdx === index);
+                const isActive = rIdx === index;
+                r.classList.toggle("active-row", isActive);
+                if (isActive) activeQRow = r;
             });
+            if (qList && activeQRow) {
+                this.scrollIntoContainer(qList, activeQRow);
+            }
 
-            // Sync q-breakdown-body active-brow highlight
+            // Sync q-breakdown-body active-brow highlight & auto-scroll to it
+            const breakdownBody = this.container.querySelector("#q-breakdown-body");
+            let activeBRow = null;
             this.container.querySelectorAll(".q-breakdown-row").forEach(r => {
                 const rIdx = Number(r.getAttribute("data-index"));
-                r.classList.toggle("active-brow", rIdx === index);
+                const isActive = rIdx === index;
+                r.classList.toggle("active-brow", isActive);
+                if (isActive) activeBRow = r;
             });
+            if (breakdownBody && activeBRow) {
+                this.scrollIntoContainer(breakdownBody, activeBRow);
+            }
 
             if (this.options.onQuestionSelect) {
                 this.options.onQuestionSelect(q, index);
@@ -1217,17 +1250,24 @@ class MarkingPanel {
             if (breakdownBody) {
                 breakdownBody.innerHTML = this.questions.map((q, idx) => {
                     const isActive = idx === this.activeQuestionIndex;
-                    const secObj = this.sections.find(s => s.id === q.sectionId || s.name === q.section);
-                    const secLetter = secObj ? secObj.letter : (q.section ? q.section.replace(/[^A-Za-z]/g, '').slice(-1).toUpperCase() : 'A');
+                    const secObj = this.sections.find(s => s.id === q.sectionId || s.name === q.section || s.title === q.section);
+                    const secLetter = secObj ? secObj.letter : (q.section ? q.section.replace(/[^A-Za-z0-9]/g, '').slice(-1).toUpperCase() : 'A');
+                    const isAllOk = q.awardedMarks === q.maxMarks && q.maxMarks > 0;
                     const isUnmarked = q.status === 'unmarked' || q.status === 'pending';
-                    const statusIcon = q.status === 'correct' ? '✓' : q.status === 'wrong' ? '✗' : q.status === 'partial' ? '◑' : '○';
+                    const statusIcon = isAllOk ? '✓' : (q.awardedMarks > 0 ? '◑' : (q.status === 'wrong' ? '✗' : '○'));
+                    const statusLabel = isAllOk ? 'OK' : (q.awardedMarks > 0 ? 'Partial' : (q.status === 'wrong' ? 'Zero' : '—'));
+                    const statusCls = isAllOk ? 'st-ok' : (q.awardedMarks > 0 ? 'st-part' : (q.status === 'wrong' ? 'st-zero' : 'st-unmarked'));
                     const marksDisplay = isUnmarked ? `—/${q.maxMarks}` : `${q.awardedMarks}/${q.maxMarks}`;
-                    return `<div class="q-breakdown-row ${isActive ? 'active-brow' : ''} ${q.status}" data-index="${idx}">
-                        <span class="brow-sec">${secLetter}</span>
-                        <span class="brow-q">Q${q.qNo}</span>
-                        <span class="brow-marks">${statusIcon} ${marksDisplay}</span>
+                    const rowStatus = q.status || (isAllOk ? 'correct' : (q.awardedMarks > 0 ? 'partial' : 'unmarked'));
+
+                    return `<div class="q-breakdown-row ${isActive ? 'active-brow' : ''} ${rowStatus}" data-index="${idx}" title="${q.topic || `Question ${q.qNo}`}">
+                        <span class="brow-col col-sec brow-sec">${secLetter}</span>
+                        <span class="brow-col col-q brow-q">Q${q.qNo}</span>
+                        <span class="brow-col col-status brow-status ${statusCls}"><span class="st-icon">${statusIcon}</span> ${statusLabel}</span>
+                        <span class="brow-col col-marks brow-marks">${marksDisplay}</span>
                     </div>`;
                 }).join('');
+
                 // Re-bind click events on breakdown rows
                 breakdownBody.querySelectorAll('.q-breakdown-row').forEach(row => {
                     row.addEventListener('click', () => {
@@ -1235,6 +1275,12 @@ class MarkingPanel {
                         this.selectQuestion(idx);
                     });
                 });
+
+                // Auto-scroll active breakdown row smoothly into view so user flow is uninterrupted
+                const activeBRow = breakdownBody.querySelector(`.q-breakdown-row[data-index="${this.activeQuestionIndex}"]`);
+                if (activeBRow) {
+                    this.scrollIntoContainer(breakdownBody, activeBRow);
+                }
             }
 
             // Update active question detail total pill

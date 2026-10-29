@@ -1097,8 +1097,10 @@ p, span, div, strong, b, th, td, label, a,
 }
 
 .q-breakdown-body {
-    max-height: 155px;
+    min-height: 280px;
+    max-height: 320px;
     overflow-y: auto;
+    scroll-behavior: smooth;
 }
 
 .q-breakdown-row {
@@ -1202,8 +1204,10 @@ p, span, div, strong, b, th, td, label, a,
 }
 
 .questions-list {
-    max-height: 240px;
+    min-height: 280px;
+    max-height: 380px;
     overflow-y: auto;
+    scroll-behavior: smooth;
 }
 
 .q-row {
@@ -3212,8 +3216,10 @@ p, span, div, strong, b, th, td, label, a,
 }
 
 .q-breakdown-body {
-    max-height: 155px;
+    min-height: 280px;
+    max-height: 320px;
     overflow-y: auto;
+    scroll-behavior: smooth;
 }
 
 .q-breakdown-row {
@@ -3238,24 +3244,32 @@ p, span, div, strong, b, th, td, label, a,
 }
 
 .q-breakdown-row.active-brow {
-    background: rgba(220, 38, 38, 0.07);
-    border-left: 2px solid #DC2626;
+    background: #EFF6FF !important;
+    border-left: 3px solid #0071E3 !important;
     padding-left: 8px;
+    font-weight: 600;
 }
 
-.q-breakdown-row.correct .brow-marks {
-    color: #16A34A;
+.q-breakdown-row.correct .brow-marks,
+.q-breakdown-row.st-ok .brow-marks {
+    color: #16A34A !important;
+    font-weight: 700 !important;
 }
 
-.q-breakdown-row.wrong .brow-marks {
-    color: #DC2626;
+.q-breakdown-row.wrong .brow-marks,
+.q-breakdown-row.st-zero .brow-marks {
+    color: #DC2626 !important;
+    font-weight: 700 !important;
 }
 
-.q-breakdown-row.partial .brow-marks {
-    color: #D97706;
+.q-breakdown-row.partial .brow-marks,
+.q-breakdown-row.st-part .brow-marks {
+    color: #D97706 !important;
+    font-weight: 700 !important;
 }
 
-.q-breakdown-row.unmarked .brow-marks {
+.q-breakdown-row.unmarked .brow-marks,
+.q-breakdown-row.st-unmarked .brow-marks {
     color: #94A3B8;
 }
 

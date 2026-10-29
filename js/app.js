@@ -4398,6 +4398,16 @@ class AppController {
             });
         }
 
+        // Close completion modal on backdrop click to allow re-checking paper
+        const compModalEl = document.getElementById("modal-correction-completed");
+        if (compModalEl) {
+            compModalEl.addEventListener("click", (e) => {
+                if (e.target === compModalEl) {
+                    this.closeCorrectionCompletedModal();
+                }
+            });
+        }
+
         // Absent overlay buttons
         const btnAbsentMark = document.getElementById("btn-absent-mark-confirm");
         if (btnAbsentMark) {
@@ -4657,7 +4667,9 @@ class AppController {
             // Only handle shortcuts when workspace is visible
             if (this.currentView !== "workspace") return;
 
-            // Handle Completion Modal shortcuts
+            // Handle Completion Modal shortcuts:
+            // Allow Escape to dismiss modal so the teacher can freely re-check the paper.
+            // DO NOT auto-advance on Enter - user must explicitly click "Save & Go Next Student" button
             const compModal = document.getElementById("modal-correction-completed");
             if (compModal && compModal.style.display !== "none") {
                 if (e.key === "Escape") {
@@ -4666,8 +4678,8 @@ class AppController {
                     return;
                 }
                 if (e.key === "Enter") {
+                    // Prevent accidental Enter auto-advance when completion modal is visible
                     e.preventDefault();
-                    this.handleCompletedSaveAndNext();
                     return;
                 }
             }
@@ -5124,6 +5136,11 @@ class AppController {
 
         const modal = document.getElementById("modal-correction-completed");
         if (!modal) return;
+
+        // Blur active element so keyboard events do not trigger buttons accidentally
+        if (document.activeElement && typeof document.activeElement.blur === "function") {
+            document.activeElement.blur();
+        }
 
         const sName = this.activeEvaluation.studentName || "Student";
         const rNo = this.activeEvaluation.rollNo || "—";
