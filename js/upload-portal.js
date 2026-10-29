@@ -1142,36 +1142,11 @@ class UploadPortalManager {
                     </div>
                 </div>
 
-                <!-- 2. Template Selector -->
+                <!-- 2. Class Selector -->
                 <div class="portal-setup-section" style="margin-bottom: 24px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
                         <label style="font-size: 0.92rem; font-weight: 500; color: #1E293B; margin: 0;">
-                            2. Select Blueprint Template (${activeSub ? activeSub.name : 'Subject'}):
-                        </label>
-                        <span style="font-size: 0.78rem; color: #64748B;">Click a template to load questions & marks</span>
-                    </div>
-                    <div class="portal-template-chips-grid" style="display: flex; flex-wrap: wrap; gap: 10px;">
-                        ${(activeSub && activeSub.templates && activeSub.templates.length > 0) ? activeSub.templates.map(tpl => {
-                            const isSel = this.selectedTemplate && (this.selectedTemplate.id === tpl.id || this.selectedTemplate.name === tpl.name);
-                            const qCount = (tpl.questions && tpl.questions.length > 0) ? tpl.questions.length : (tpl.sections ? tpl.sections.reduce((sum, s) => sum + (s.qCount || 0), 0) : (tpl.questionsCount || 31));
-                            return `
-                                <button type="button" class="portal-chip-btn portal-template-chip ${isSel ? 'active' : ''}" data-template-id="${tpl.id}" style="padding: 10px 16px; border-radius: 12px; border: 1.5px solid ${isSel ? '#AF52DE' : '#E2E8F0'}; background: ${isSel ? 'rgba(175, 82, 222, 0.08)' : '#FFFFFF'}; color: ${isSel ? '#AF52DE' : '#334155'}; font-size: 0.88rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: all 0.15s ease;">
-                                    <span>📋 ${tpl.name}</span>
-                                    <span style="font-size: 0.75rem; background: ${isSel ? '#AF52DE' : '#EEF2F6'}; color: ${isSel ? '#FFFFFF' : '#475569'}; padding: 2px 7px; border-radius: 999px;">${tpl.maxMarks || 40}M</span>
-                                    <span style="font-size: 0.75rem; color: #64748B;">(${qCount} Qs)</span>
-                                </button>
-                            `;
-                        }).join('') : `
-                            <span style="font-size: 0.85rem; color: #94A3B8;">No pre-configured templates for this subject. Use custom parameters below.</span>
-                        `}
-                    </div>
-                </div>
-
-                <!-- 3. Class Selector -->
-                <div class="portal-setup-section" style="margin-bottom: 24px; background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; flex-wrap: wrap; gap: 8px;">
-                        <label style="font-size: 0.92rem; font-weight: 500; color: #1E293B; margin: 0;">
-                            3. Select Class & Section:
+                            2. Select Class & Section:
                         </label>
                         <button type="button" id="btn-portal-add-class" style="background: transparent; border: none; color: #10B981; font-size: 0.82rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1191,11 +1166,11 @@ class UploadPortalManager {
                     </div>
                 </div>
 
-                <!-- 4. Exam Details Grid -->
+                <!-- 3. Exam Details Grid -->
                 <div class="portal-setup-card" style="background: #FFFFFF; border: 1px solid #E2E8F0; border-radius: 16px; padding: 22px; margin-bottom: 28px;">
                     <h4 style="margin: 0 0 16px; font-size: 0.95rem; font-weight: 500; color: #1E293B; display: flex; align-items: center; gap: 8px;">
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#007AFF" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-                        4. Exam Parameters & Scoring
+                        3. Exam Parameters & Scoring
                     </h4>
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
                         <div>
@@ -3719,52 +3694,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 btn.addEventListener("click", () => {
                     const subId = btn.getAttribute("data-subject-id");
                     this.selectedSubject = this.catalog.find(s => s.id === subId) || null;
-                    if (this.selectedSubject && this.selectedSubject.templates && this.selectedSubject.templates.length > 0) {
-                        this.selectedTemplate = this.selectedSubject.templates[0];
-                        this.examName = this.selectedTemplate.name;
-                        this.totalMarks = this.selectedTemplate.maxMarks || 40;
-                        const qCount = (this.selectedTemplate.questions && this.selectedTemplate.questions.length > 0)
-                            ? this.selectedTemplate.questions.length
-                            : (this.selectedTemplate.sections ? this.selectedTemplate.sections.reduce((sum, s) => sum + (s.qCount || 0), 0) : (this.selectedTemplate.questionsCount || 31));
-                        this.totalQuestions = qCount;
-                    }
                     this.updateStepView();
-                });
-            });
-
-            // Template chips selection
-            this.container.querySelectorAll(".portal-template-chip").forEach(btn => {
-                btn.addEventListener("click", () => {
-                    const tplId = btn.getAttribute("data-template-id");
-                    const activeSub = this.selectedSubject || (this.catalog && this.catalog[0]);
-                    const tpl = activeSub?.templates?.find(t => t.id === tplId);
-                    if (tpl) {
-                        this.selectedTemplate = tpl;
-                        this.examName = tpl.examName || tpl.name;
-                        this.totalMarks = tpl.maxMarks || 40;
-                        const qCount = (tpl.questions && tpl.questions.length > 0)
-                            ? tpl.questions.length
-                            : (tpl.sections ? tpl.sections.reduce((sum, s) => sum + (s.qCount || 0), 0) : (tpl.questionsCount || 31));
-                        this.totalQuestions = qCount;
-
-                        const inpName = this.container.querySelector("#inp-portal-exam-name");
-                        const inpMarks = this.container.querySelector("#inp-portal-total-marks");
-                        const inpQs = this.container.querySelector("#inp-portal-total-questions");
-                        if (inpName) inpName.value = this.examName;
-                        if (inpMarks) inpMarks.value = this.totalMarks;
-                        if (inpQs) inpQs.value = this.totalQuestions;
-
-                        this.container.querySelectorAll(".portal-template-chip").forEach(c => {
-                            c.classList.remove("active");
-                            c.style.borderColor = "#E2E8F0";
-                            c.style.background = "#FFFFFF";
-                            c.style.color = "#334155";
-                        });
-                        btn.classList.add("active");
-                        btn.style.borderColor = "#AF52DE";
-                        btn.style.background = "rgba(175, 82, 222, 0.08)";
-                        btn.style.color = "#AF52DE";
-                    }
                 });
             });
 
@@ -3822,23 +3752,14 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     this.totalMarks = Math.max(1, parseFloat(inpMarks ? inpMarks.value : 40) || 40);
                     this.totalQuestions = Math.max(1, parseInt(inpQs ? inpQs.value : 31, 10) || 31);
 
-                    if (!this.selectedTemplate || this.selectedTemplate.name !== this.examName) {
-                        this.selectedTemplate = {
-                            id: (this.selectedTemplate && this.selectedTemplate.id) || `exam-${Date.now()}`,
-                            name: this.examName,
-                            examName: this.examName,
-                            maxMarks: this.totalMarks,
-                            questionsCount: this.totalQuestions,
-                            examDate: this.examDate,
-                            sections: this.selectedTemplate?.sections || [],
-                            questions: this.selectedTemplate?.questions || []
-                        };
-                    } else {
-                        this.selectedTemplate.examName = this.examName;
-                        this.selectedTemplate.examDate = this.examDate;
-                        this.selectedTemplate.maxMarks = this.totalMarks;
-                        this.selectedTemplate.questionsCount = this.totalQuestions;
-                    }
+                    this.selectedTemplate = {
+                        id: `exam-${this.examName.toLowerCase().replace(/[^a-z0-9]/g, '')}`,
+                        name: this.examName,
+                        examName: this.examName,
+                        maxMarks: this.totalMarks,
+                        questionsCount: this.totalQuestions,
+                        examDate: this.examDate
+                    };
 
                     this.currentStep = 2;
                     this.loadExistingClassPapers();
@@ -5621,6 +5542,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 // Overwrite existing paper if found, rather than creating a duplicate!
                 const evalId = item.id || (existingMatch ? existingMatch.id : `eval-${Date.now()}-${Math.floor(Math.random() * 100000)}`);
 
+                const examTitle = this.examName || template.examName || template.name || "Assessment";
+                const maxScore = Math.max(1, parseFloat(this.totalMarks) || template.maxMarks || 40);
+
                 const newEvaluation = {
                     id: evalId,
                     rawFile: item.file || null,
@@ -5630,13 +5554,13 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     className: cls.label || cls.name || "Class 12-A",
                     section: cls.section || (cls.label && cls.label.includes("-") ? cls.label.split("-")[1] : "A"),
                     classLabel: cls.label || (cls.section ? `${cls.name}-${cls.section}` : cls.name),
-                    subject: subject.name || "Political Science",
-                    examName: template.examName || template.name,
-                    templateName: template.name,
-                    templateId: template.id,
-                    examDate: (existingMatch && existingMatch.examDate) || new Date().toISOString().split("T")[0],
+                    subject: subject.name || "Mathematics",
+                    examName: examTitle,
+                    templateName: examTitle,
+                    templateId: template.id || `tpl_${examTitle.toLowerCase().replace(/[^a-z0-9]/g, '_')}`,
+                    examDate: this.examDate || (existingMatch && existingMatch.examDate) || new Date().toISOString().split("T")[0],
                     correctionDate: new Date().toISOString().split("T")[0],
-                    maxMarks: template.maxMarks || 70,
+                    maxMarks: maxScore,
                     obtainedMarks: existingMatch ? existingMatch.obtainedMarks : 0,
                     percentage: existingMatch ? existingMatch.percentage : 0,
                     grade: existingMatch ? existingMatch.grade : "Pending",
