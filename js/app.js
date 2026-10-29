@@ -3341,26 +3341,10 @@ class AppController {
             stampPos = { x: 0.25, y: 0.35 };
         }
 
+        // 2. Clean up any positive tick/mark annotations for this question from the canvas
+        // DO NOT stamp an X mark automatically on the paper!
         if (this.canvasEngine) {
-            // Remove any old positive ticks/marks for this question from the page so 0 marks is strict!
             this.canvasEngine.removeAnnotationsForQuestion(q.qNo);
-
-            const wrongStamp = {
-                id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-                pageIndex: this.canvasEngine.currentPageIndex,
-                type: "wrong",
-                x: stampPos.x,
-                y: stampPos.y,
-                color: "#DC2626", // Teacher Red Ink
-                marks: 0,
-                qNo: q.qNo,
-                qLabel: q.label || `Q${q.qNo}`,
-                isStep: false,
-                hasMarginMark: false,
-                scale: 1.0,
-                timestamp: Date.now()
-            };
-            this.canvasEngine.addAnnotation(wrongStamp);
             this.canvasEngine.renderOverlay();
         }
 
@@ -3698,28 +3682,11 @@ class AppController {
                 if (activeQ && this.canvasEngine) {
                     if (numVal === 0) {
                         this.canvasEngine.removeAnnotationsForQuestion(activeQ.qNo);
-                        const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
-                        if (curPage) {
-                            curPage.annotations.push({
-                                id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-                                pageIndex: this.canvasEngine.currentPageIndex,
-                                type: "wrong",
-                                x: normPos.x,
-                                y: normPos.y,
-                                color: "#DC2626",
-                                marks: 0,
-                                qNo: activeQ.qNo,
-                                qLabel: activeQ.label || `Q${activeQ.qNo}`,
-                                isStep: false,
-                                hasMarginMark: false,
-                                scale: 1.0,
-                                timestamp: Date.now()
-                            });
-                        }
+                        this.canvasEngine.renderOverlay();
                         this.markingPanel.assignCurrentQuestionMark(0, "wrong");
                         this.updateTopHud(activeQ);
                         this.updatePageTotalDisplay();
-                        this.showToast(`Q${activeQ.qNo}: 0 Marks awarded (Wrong). Press Enter to advance.`);
+                        this.showToast(`Q${activeQ.qNo}: 0 Marks awarded. Press Enter to advance.`);
                         return;
                     }
                     const stepSum = this.canvasEngine.getQuestionStepMarksSum(activeQ.qNo);

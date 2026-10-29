@@ -1881,10 +1881,17 @@ class CanvasEngine {
         const isFull = !isStep && numVal >= qMax;
         const isZero = numVal === 0;
 
-        // When mark is 0, show "wrong" (X mark) not "tick"
-        const stampType = isZero ? "wrong" : "tick";
+        // When mark is 0, do NOT place an X cross mark on the paper! Simply award 0 marks
+        if (isZero) {
+            if (this.options.onRadialMarkAwarded) {
+                this.options.onRadialMarkAwarded(0, false, normPos);
+            }
+            return;
+        }
 
-        // Stamp tick or X cross in red ink with marks badge at clicked position
+        const stampType = "tick";
+
+        // Stamp tick in red ink with marks badge at clicked position
         const stamp = {
             id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: this.currentPageIndex,
