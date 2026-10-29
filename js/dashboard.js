@@ -267,13 +267,13 @@ class DashboardManager {
                         (b.className && b.className.toLowerCase().trim() === targetCls && b.templateName && b.templateName.toLowerCase().trim() === targetTpl));
                 }
 
-                let inBatch = false;
-                if (matchedBatch && matchedBatch.papers && matchedBatch.papers.length > 0) {
-                    inBatch = matchedBatch.papers.some(p => String(p.id) === String(e.id));
-                }
-
-                // 2. Deterministic batch key comparison (exact match)
-                if (!inBatch) {
+                if (matchedBatch && Array.isArray(matchedBatch.papers)) {
+                    // Direct membership: matchedBatch is the authoritative ground truth for this card.
+                    // If paper is not in matchedBatch.papers, it MUST NOT appear in this drilled-down batch.
+                    const inBatch = matchedBatch.papers.some(p => String(p.id) === String(e.id));
+                    if (!inBatch) return false;
+                } else {
+                    // Fallback when this.batches is not yet computed
                     const eCls = (e.classLabel || e.className || e.class || "Class 12-A").toLowerCase().trim();
                     const examTitle = (e.examName || e.templateName || "Assessment").toLowerCase().trim();
                     const dateStr = e.examDate ? ` (${e.examDate})`.toLowerCase().trim() : '';
@@ -281,53 +281,30 @@ class DashboardManager {
                     const eBatchKey = `${eCls}:::${eTplFull}`;
 
                     if (eBatchKey === this.activeBatchKey.toLowerCase().trim()) {
-                        inBatch = true;
+                        // Exact batch key match
+                    } else {
+                        // Strict Date Isolation: If active batch has a date, paper must have the exact same date!
+                        const targetDateMatch = targetTpl.match(/\((\d{4}-\d{2}-\d{2})\)/);
+                        const targetDate = targetDateMatch ? targetDateMatch[1] : null;
+                        if (targetDate) {
+                            if (!e.examDate || e.examDate !== targetDate) return false;
+                        } else if (e.examDate) {
+                            // Target batch has no date, but paper has a date -> do not cross-match
+                            return false;
+                        }
+
+                        // Class check
+                        const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
+                        const eClsNorm = (e.class || e.className || e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                        if (normTargetCls && eClsNorm !== normTargetCls) return false;
+
+                        // Base exam/template name check (without date)
+                        const targetTplBase = targetTpl.replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                        const eExamBase = examTitle.replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                        const eTplBase = (e.templateName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+
+                        if (targetTplBase && eExamBase !== targetTplBase && eTplBase !== targetTplBase) return false;
                     }
-                }
-
-                // 3. Flexible normalized fallback (match class AND match template/exam)
-                if (!inBatch) {
-                    const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
-                    const eCls1 = (e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const eCls2 = (e.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const eCls3 = (e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const clsMatches = !normTargetCls || 
-                        eCls1 === normTargetCls || eCls2 === normTargetCls || eCls3 === normTargetCls ||
-                        (eCls1 && (eCls1.includes(normTargetCls) || normTargetCls.includes(eCls1))) ||
-                        (eCls2 && (eCls2.includes(normTargetCls) || normTargetCls.includes(eCls2))) ||
-                        (eCls3 && (eCls3.includes(normTargetCls) || normTargetCls.includes(eCls3)));
-
-                    if (!clsMatches) return false;
-
-                    const examDateStr = e.examDate ? ` (${e.examDate})` : '';
-                    const examNameRaw = (e.examName || "").toLowerCase().trim();
-                    const tplNameRaw = (e.templateName || "").toLowerCase().trim();
-                    const examWithDate = `${examNameRaw}${examDateStr}`.toLowerCase().trim();
-                    const tplWithDate = `${tplNameRaw}${examDateStr}`.toLowerCase().trim();
-                    const harmTpl = (window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(tplNameRaw, e.subject) : tplNameRaw).toLowerCase().trim();
-
-                    const normTargetTpl = targetTpl.replace(/[^a-z0-9]/g, '');
-                    const normExam = examNameRaw.replace(/[^a-z0-9]/g, '');
-                    const normTpl = tplNameRaw.replace(/[^a-z0-9]/g, '');
-                    const normExamDate = examWithDate.replace(/[^a-z0-9]/g, '');
-                    const normTplDate = tplWithDate.replace(/[^a-z0-9]/g, '');
-                    const normHarm = harmTpl.replace(/[^a-z0-9]/g, '');
-
-                    const tplMatches = !normTargetTpl ||
-                        normExam === normTargetTpl || normExamDate === normTargetTpl ||
-                        normTpl === normTargetTpl || normTplDate === normTargetTpl || normHarm === normTargetTpl ||
-                        (normExam && (normExam.includes(normTargetTpl) || normTargetTpl.includes(normExam))) ||
-                        (normExamDate && (normExamDate.includes(normTargetTpl) || normTargetTpl.includes(normExamDate))) ||
-                        (normTpl && (normTpl.includes(normTargetTpl) || normTargetTpl.includes(normTpl))) ||
-                        (normTplDate && (normTplDate.includes(normTargetTpl) || normTargetTpl.includes(normTplDate))) ||
-                        (normHarm && (normHarm.includes(normTargetTpl) || normTargetTpl.includes(normHarm))) ||
-                        (examNameRaw && (examNameRaw.includes(targetTpl) || targetTpl.includes(examNameRaw))) ||
-                        (tplNameRaw && (tplNameRaw.includes(targetTpl) || targetTpl.includes(tplNameRaw))) ||
-                        (examWithDate && (examWithDate.includes(targetTpl) || targetTpl.includes(examWithDate))) ||
-                        (tplWithDate && (tplWithDate.includes(targetTpl) || targetTpl.includes(tplWithDate))) ||
-                        (harmTpl && (harmTpl.includes(targetTpl) || targetTpl.includes(harmTpl)));
-
-                    if (!tplMatches) return false;
                 }
             }
 
@@ -670,20 +647,20 @@ class DashboardManager {
                                         </div>
 
                                         <div class="batch-actions-row">
-                                            <button type="button" class="btn-batch-view" data-class="${b.className}" data-template="${b.templateName}" title="Open papers in this batch">
+                                            <button type="button" class="btn-batch-view" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" title="Open papers in this batch">
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                                 <span>View Papers (${b.total})</span>
                                             </button>
-                                            <button type="button" class="btn-batch-start" data-class="${b.className}" data-template="${b.templateName}" title="Start correcting papers in this batch">
+                                            <button type="button" class="btn-batch-start" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" title="Start correcting papers in this batch">
                                                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
                                                 <span>${isCompleted ? 'Review' : 'Start Marking'}</span>
                                             </button>
                                             ${b.subject && b.subject.toLowerCase().includes('tamil') ? `
-                                                <button type="button" class="btn-batch-view btn-batch-test-me" data-class="${b.className}" data-template="${b.templateName}" style="border-color: #10B981; color: #059669; font-weight: 500;" title="Test correct a sample Tamil paper">
+                                                <button type="button" class="btn-batch-view btn-batch-test-me" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" style="border-color: #10B981; color: #059669; font-weight: 500;" title="Test correct a sample Tamil paper">
                                                     ✍️ Test Me!
                                                 </button>
                                             ` : ''}
-                                            <button type="button" class="btn-batch-share btn-dash-batch-share" data-class="${b.className}" data-template="${b.templateName}" data-subject="${b.subject}" data-total="${b.total}" title="Share this batch via WhatsApp">
+                                            <button type="button" class="btn-batch-share btn-dash-batch-share" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" data-subject="${b.subject}" data-total="${b.total}" title="Share this batch via WhatsApp">
                                                 ${(window.Icons && window.Icons.whatsapp) || ''}
                                                 <span>Share</span>
                                             </button>
@@ -1055,10 +1032,10 @@ class DashboardManager {
         this.container.querySelectorAll(".teacher-batch-card").forEach(card => {
             card.addEventListener("click", (e) => {
                 if (e.target.closest("button")) return;
+                const batchKey = card.getAttribute("data-batch-key") || `${card.getAttribute("data-class")}:::${card.getAttribute("data-template")}`;
                 const cls = card.getAttribute("data-class");
-                const tpl = card.getAttribute("data-template");
-                if (cls && tpl) {
-                    this.activeBatchKey = `${cls}:::${tpl}`;
+                if (batchKey) {
+                    this.activeBatchKey = batchKey;
                     this.activeTab = "all";
                     this.searchQuery = "";
                     this.selectedIds.clear();
@@ -1079,10 +1056,10 @@ class DashboardManager {
         this.container.querySelectorAll(".btn-batch-view").forEach(btn => {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();
+                const batchKey = btn.getAttribute("data-batch-key") || `${btn.getAttribute("data-class")}:::${btn.getAttribute("data-template")}`;
                 const cls = btn.getAttribute("data-class");
-                const tpl = btn.getAttribute("data-template");
-                if (cls && tpl) {
-                    this.activeBatchKey = `${cls}:::${tpl}`;
+                if (batchKey) {
+                    this.activeBatchKey = batchKey;
                     this.activeTab = "all";
                     this.searchQuery = "";
                     this.selectedIds.clear();
@@ -1132,17 +1109,19 @@ class DashboardManager {
         this.container.querySelectorAll(".btn-batch-start").forEach(btn => {
             btn.addEventListener("click", (e) => {
                 e.stopPropagation();
+                const batchKey = btn.getAttribute("data-batch-key");
                 const cls = btn.getAttribute("data-class");
                 const tpl = btn.getAttribute("data-template");
                 const normCls = (cls || "").toLowerCase().replace(/[^a-z0-9]/g, '');
                 const normTpl = (tpl || "").toLowerCase().replace(/[^a-z0-9]/g, '');
 
-                const batch = (this.batches || []).find(b => {
-                    const bCls = (b.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const bTpl = (b.templateName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                    return (bCls === normCls || bCls.includes(normCls) || normCls.includes(bCls)) &&
-                           (bTpl === normTpl || bTpl.includes(normTpl) || normTpl.includes(bTpl));
-                }) || (this.batches || []).find(b => b.className === cls && b.templateName === tpl);
+                const batch = (this.batches || []).find(b => (batchKey && b.key === batchKey) || (b.className === cls && b.templateName === tpl)) ||
+                    (this.batches || []).find(b => {
+                        const bCls = (b.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const bTpl = (b.templateName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                        return (bCls === normCls || bCls.includes(normCls) || normCls.includes(bCls)) &&
+                               (bTpl === normTpl || bTpl.includes(normTpl) || normTpl.includes(bTpl));
+                    });
 
                 if (batch) {
                     const targetPaper = batch.firstPendingPaper || (batch.papers && batch.papers[0]);
@@ -1847,17 +1826,21 @@ class DashboardManager {
                     const eBatchKey = `${eCls}:::${examTitle}${dateStr}`.trim();
                     if (eBatchKey === this.activeBatchKey.toLowerCase().trim()) return true;
 
+                    // Strict Date Check: If active batch has a date, paper must have the exact same date!
+                    const targetDateMatch = targetTpl.match(/\((\d{4}-\d{2}-\d{2})\)/);
+                    const targetDate = targetDateMatch ? targetDateMatch[1] : null;
+                    if (targetDate && (!e.examDate || e.examDate !== targetDate)) return false;
+                    if (!targetDate && e.examDate) return false;
+
                     const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
                     const eClsNorm = eCls.replace(/[^a-z0-9]/g, '');
-                    const clsMatch = !normTargetCls || eClsNorm === normTargetCls || eClsNorm.includes(normTargetCls) || normTargetCls.includes(eClsNorm);
+                    const clsMatch = !normTargetCls || eClsNorm === normTargetCls;
                     if (!clsMatch) return false;
 
-                    const normTargetTpl = targetTpl.replace(/[^a-z0-9]/g, '');
-                    const normExam = (e.examName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const normTpl = (e.templateName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                    return !normTargetTpl || normExam === normTargetTpl || normTpl === normTargetTpl ||
-                           (normExam && (normExam.includes(normTargetTpl) || normTargetTpl.includes(normExam))) ||
-                           (normTpl && (normTpl.includes(normTargetTpl) || normTargetTpl.includes(normTpl)));
+                    const normTargetTpl = targetTpl.replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                    const normExam = (e.examName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                    const normTpl = (e.templateName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                    return !normTargetTpl || normExam === normTargetTpl || normTpl === normTargetTpl;
                 });
             }
         }
