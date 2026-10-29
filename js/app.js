@@ -3342,28 +3342,25 @@ class AppController {
         }
 
         if (this.canvasEngine) {
-            // Check if page already has a wrong mark near stampPos.y, if not place one
-            const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
-            const hasRecentWrong = curPage && (curPage.annotations || []).some(a => a.type === "wrong" && Math.abs(a.y - stampPos.y) < 0.08);
+            // Remove any old positive ticks/marks for this question from the page so 0 marks is strict!
+            this.canvasEngine.removeAnnotationsForQuestion(q.qNo);
 
-            if (!hasRecentWrong) {
-                const wrongStamp = {
-                    id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
-                    pageIndex: this.canvasEngine.currentPageIndex,
-                    type: "wrong",
-                    x: stampPos.x,
-                    y: stampPos.y,
-                    color: "#DC2626", // Teacher Red Ink
-                    marks: 0,
-                    qNo: q.qNo,
-                    qLabel: q.label || `Q${q.qNo}`,
-                    isStep: false,
-                    hasMarginMark: false,
-                    scale: 1.0,
-                    timestamp: Date.now()
-                };
-                this.canvasEngine.addAnnotation(wrongStamp);
-            }
+            const wrongStamp = {
+                id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                pageIndex: this.canvasEngine.currentPageIndex,
+                type: "wrong",
+                x: stampPos.x,
+                y: stampPos.y,
+                color: "#DC2626", // Teacher Red Ink
+                marks: 0,
+                qNo: q.qNo,
+                qLabel: q.label || `Q${q.qNo}`,
+                isStep: false,
+                hasMarginMark: false,
+                scale: 1.0,
+                timestamp: Date.now()
+            };
+            this.canvasEngine.addAnnotation(wrongStamp);
             this.canvasEngine.renderOverlay();
         }
 
@@ -3392,6 +3389,10 @@ class AppController {
 
         if (questions && questions.length > 0) {
             questions.forEach((q, idx) => {
+                // If question is explicitly marked as wrong / 0 marks in marking panel, do NOT let legacy canvas annotations turn it into 1!
+                if (q.status === "wrong" && (q.awardedMarks === 0 || q.awardedMarks === "0")) {
+                    return;
+                }
                 const annTotal = this.canvasEngine.getQuestionTotalFromAnnotations(q.qNo);
                 const annList = this.canvasEngine.getAnnotationsForQuestion(q.qNo);
                 const hasMarginMark = annList.some(a => a.type === "margin_mark" || a.type === "left_mark");
@@ -3695,14 +3696,39 @@ class AppController {
                 const numVal = Number(markVal) || 0;
                 const activeQ = this.markingPanel?.getActiveQuestion();
                 if (activeQ && this.canvasEngine) {
+                    if (numVal === 0) {
+                        this.canvasEngine.removeAnnotationsForQuestion(activeQ.qNo);
+                        const curPage = this.canvasEngine.pages[this.canvasEngine.currentPageIndex];
+                        if (curPage) {
+                            curPage.annotations.push({
+                                id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+                                pageIndex: this.canvasEngine.currentPageIndex,
+                                type: "wrong",
+                                x: normPos.x,
+                                y: normPos.y,
+                                color: "#DC2626",
+                                marks: 0,
+                                qNo: activeQ.qNo,
+                                qLabel: activeQ.label || `Q${activeQ.qNo}`,
+                                isStep: false,
+                                hasMarginMark: false,
+                                scale: 1.0,
+                                timestamp: Date.now()
+                            });
+                        }
+                        this.markingPanel.assignCurrentQuestionMark(0, "wrong");
+                        this.updateTopHud(activeQ);
+                        this.updatePageTotalDisplay();
+                        this.showToast(`Q${activeQ.qNo}: 0 Marks awarded (Wrong). Press Enter to advance.`);
+                        return;
+                    }
                     const stepSum = this.canvasEngine.getQuestionStepMarksSum(activeQ.qNo);
-                    const runningScore = stepSum > 0 ? Math.min(activeQ.maxMarks, stepSum) : (numVal === 0 ? 0 : (activeQ.awardedMarks || numVal));
+                    const runningScore = stepSum > 0 ? Math.min(activeQ.maxMarks, stepSum) : (activeQ.awardedMarks || numVal);
                     const status = runningScore >= activeQ.maxMarks ? "correct" : (runningScore === 0 ? "wrong" : "partial");
                     this.markingPanel.assignCurrentQuestionMark(runningScore, status);
                     this.updateTopHud(activeQ);
                     this.updatePageTotalDisplay();
-                    const markDesc = numVal === 0 ? `0 Marks` : `+${numVal} Mark`;
-                    this.showToast(`Placed ${markDesc} on paper (Current: ${activeQ.awardedMarks}/${activeQ.maxMarks}M). Press Enter to calculate & advance.`);
+                    this.showToast(`Placed +${numVal} Mark on paper (Current: ${activeQ.awardedMarks}/${activeQ.maxMarks}M). Press Enter to calculate & advance.`);
                 }
             },
             onAnnotationSelected: (ann) => {
@@ -3794,13 +3820,20 @@ class AppController {
                     obtEl.textContent = scoreSummary.obtainedMarks;
                 }
 
-                // Check and clean up companion margin marks for all questions that became unmarked
+                // Check and clean up companion margin marks for all questions that became unmarked or wrong
                 if (this.canvasEngine && this.markingPanel?.questions) {
                     this.markingPanel.questions.forEach(ques => {
                         if (ques.status === "unmarked" || ques.status === "pending") {
                             const qAnns = this.canvasEngine.getAnnotationsForQuestion(ques.qNo);
                             const hasMargin = qAnns.some(a => a.type === "margin_mark" || a.type === "left_mark");
                             if (hasMargin) {
+                                this.canvasEngine.removeAnnotationsForQuestion(ques.qNo);
+                            }
+                        } else if (ques.status === "wrong" || Number(ques.awardedMarks) === 0) {
+                            // If marked wrong/0, remove any conflicting positive tick/step marks on canvas
+                            const qAnns = this.canvasEngine.getAnnotationsForQuestion(ques.qNo);
+                            const hasPositiveTicks = qAnns.some(a => a.type === "tick" || a.type === "marks" || ((a.type === "margin_mark" || a.type === "left_mark") && (Number(a.marks) > 0)));
+                            if (hasPositiveTicks) {
                                 this.canvasEngine.removeAnnotationsForQuestion(ques.qNo);
                             }
                         }
@@ -4832,14 +4865,21 @@ class AppController {
 
         let totalMarks = 0;
         if (this.canvasEngine) {
-            // 1. Calculate sum from all step marks placed for this question on canvas (e.g. 1 + 1 + 1)
-            const stepTotal = this.canvasEngine.getQuestionStepMarksSum(committingQ.qNo);
-            if (stepTotal > 0) {
-                totalMarks = Math.min(committingQ.maxMarks, stepTotal);
-            } else if (committingQ.awardedMarks !== undefined && committingQ.awardedMarks !== null && committingQ.awardedMarks > 0) {
-                totalMarks = Math.min(committingQ.maxMarks, committingQ.awardedMarks);
-            } else {
+            // Check if active question was explicitly set to 0 marks or wrong: strictly preserve 0!
+            if (committingQ.status === "wrong" || committingQ.awardedMarks === 0 || committingQ.awardedMarks === "0") {
                 totalMarks = 0;
+                // Clean up any positive tick/mark annotations on canvas so 0 marks is strict and uncorrupted
+                this.canvasEngine.removeAnnotationsForQuestion(committingQ.qNo);
+            } else {
+                // 1. Calculate sum from all step marks placed for this question on canvas (e.g. 1 + 1 + 1)
+                const stepTotal = this.canvasEngine.getQuestionStepMarksSum(committingQ.qNo);
+                if (stepTotal > 0) {
+                    totalMarks = Math.min(committingQ.maxMarks, stepTotal);
+                } else if (committingQ.awardedMarks !== undefined && committingQ.awardedMarks !== null && committingQ.awardedMarks > 0) {
+                    totalMarks = Math.min(committingQ.maxMarks, committingQ.awardedMarks);
+                } else {
+                    totalMarks = 0;
+                }
             }
 
             // 2. Assign calculated total to active question in marking panel

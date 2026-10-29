@@ -2004,16 +2004,18 @@ class CanvasEngine {
         };
 
         if (type === "marks") {
-            stamp.text = this.activeMarksValue || "+1";
-            const val = parseFloat(String(stamp.text).replace(/^\+/, "").trim());
-            stamp.marks = isNaN(val) ? 1 : val;
+            const rawText = (this.activeMarksValue !== undefined && this.activeMarksValue !== null) ? String(this.activeMarksValue) : "+1";
+            stamp.text = rawText;
+            const val = parseFloat(rawText.replace(/^\+/, "").trim());
+            stamp.marks = isNaN(val) ? 0 : val;
         } else if (type === "wrong") {
             stamp.marks = 0;
             stamp.text = "0";
         } else if (type === "tick") {
-            const val = parseFloat(String(this.activeMarksValue || "+1").replace(/^\+/, "").trim());
+            const rawText = (this.activeMarksValue !== undefined && this.activeMarksValue !== null) ? String(this.activeMarksValue) : "+1";
+            const val = parseFloat(rawText.replace(/^\+/, "").trim());
             stamp.marks = isNaN(val) ? 1 : val;
-            stamp.text = `+${stamp.marks}`;
+            stamp.text = stamp.marks > 0 ? `+${stamp.marks}` : "0";
         }
 
         this.addAnnotation(stamp);
@@ -2301,11 +2303,16 @@ class CanvasEngine {
         if (!targetQNo) return 0;
         const targetKey = this.normalizeQKey(targetQNo);
         let sum = 0;
+        let hasWrong = false;
         this.pages.forEach(page => {
             (page.annotations || []).forEach(a => {
-                if (a.type !== "tick" && a.type !== "marks") return;
                 const qKey = this.normalizeQKey(a.qNo || a.qLabel);
                 if (qKey !== targetKey) return;
+                if (a.type === "wrong") {
+                    hasWrong = true;
+                    return;
+                }
+                if (a.type !== "tick" && a.type !== "marks") return;
                 const rawVal = a.marks !== undefined && a.marks !== null ? String(a.marks) : String(a.text || "");
                 const val = parseFloat(rawVal.replace(/^\+/, "").trim());
                 if (!isNaN(val)) {
@@ -2313,6 +2320,7 @@ class CanvasEngine {
                 }
             });
         });
+        if (hasWrong) return 0;
         return sum;
     }
 
@@ -2347,13 +2355,16 @@ class CanvasEngine {
             });
         });
 
-        // If ticks exist, ticksSum is the absolute live source of truth.
-        // Never resurrect old marks from a lingering margin mark if ticks were deleted!
+        // If explicitly stamped wrong (cross / 0) and no positive committed margin mark, score is strictly 0
+        if (hasWrong && (committedVal === null || committedVal === 0)) {
+            return 0;
+        }
+
         let finalVal = 0;
-        if (hasTicks) {
-            finalVal = ticksSum;
-        } else if (committedVal !== null && committedVal !== undefined && !hasWrong) {
+        if (committedVal !== null && committedVal !== undefined) {
             finalVal = committedVal;
+        } else if (hasTicks) {
+            finalVal = hasWrong ? 0 : ticksSum;
         } else {
             finalVal = 0;
         }
