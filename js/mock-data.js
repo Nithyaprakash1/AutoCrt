@@ -2861,6 +2861,210 @@ const MockData = {
         })()
     },
 
+    // Grade 12 Accountancy Blueprint (34 Qs / 80 Marks)
+    accountancyGrade12Template: {
+        id: "acc-xii-cbse-80",
+        name: "Grade 12 Accountancy (80 Marks)",
+        examName: "Grade 12 Accountancy Assessment 2026",
+        subject: "Accountancy",
+        maxMarks: 80,
+        duration: "3 Hours",
+        badge: "Official Blueprint (34 Qs)",
+        generalInstructions: [
+            "This question paper consists of 34 questions carrying 80 marks in total.",
+            "Part A: Accounting for Partnership Firms and Companies (Q1 to Q26) - 60 Marks.",
+            "Part B: Financial Statement Analysis (Q27 to Q34) - 20 Marks."
+        ],
+        sections: [
+            { id: "sec_a", letter: "A", name: "Section A", title: "Part A - Q1 to Q16 (16 × 1M = 16 Marks)", qStartNo: 1, qEndNo: 16, qCount: 16, marksPerQ: 1, maxMarks: 16, secTotal: 16 },
+            { id: "sec_b", letter: "B", name: "Section B", title: "Part A - Q17 to Q20 (4 × 3M = 12 Marks)", qStartNo: 17, qEndNo: 20, qCount: 4, marksPerQ: 3, maxMarks: 12, secTotal: 12 },
+            { id: "sec_c", letter: "C", name: "Section C", title: "Part A - Q21 to Q22 (2 × 4M = 8 Marks)", qStartNo: 21, qEndNo: 22, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8 },
+            { id: "sec_d", letter: "D", name: "Section D", title: "Part A - Q23 to Q26 (4 × 6M = 24 Marks)", qStartNo: 23, qEndNo: 26, qCount: 4, marksPerQ: 6, maxMarks: 24, secTotal: 24 },
+            { id: "sec_e", letter: "E", name: "Section E", title: "Part B - Q27 to Q30 (4 × 1M = 4 Marks)", qStartNo: 27, qEndNo: 30, qCount: 4, marksPerQ: 1, maxMarks: 4, secTotal: 4 },
+            { id: "sec_f", letter: "F", name: "Section F", title: "Part B - Q31 (1 × 3M = 3 Marks)", qStartNo: 31, qEndNo: 31, qCount: 1, marksPerQ: 3, maxMarks: 3, secTotal: 3 },
+            { id: "sec_g", letter: "G", name: "Section G", title: "Part B - Q32 (1 × 4M = 4 Marks)", qStartNo: 32, qEndNo: 32, qCount: 1, marksPerQ: 4, maxMarks: 4, secTotal: 4 },
+            { id: "sec_h", letter: "H", name: "Section H", title: "Part B - Q33 to Q34 (2 × 6M = 12 Marks)", qStartNo: 33, qEndNo: 34, qCount: 2, marksPerQ: 6, maxMarks: 12, secTotal: 12 }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 16; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 1, section: "Section A", sectionId: "sec_a" });
+            for (let i = 17; i <= 20; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 3, section: "Section B", sectionId: "sec_b" });
+            for (let i = 21; i <= 22; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 4, section: "Section C", sectionId: "sec_c" });
+            for (let i = 23; i <= 26; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 6, section: "Section D", sectionId: "sec_d" });
+            for (let i = 27; i <= 30; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 1, section: "Section E", sectionId: "sec_e" });
+            qs.push({ id: "q_31", qNo: 31, qNumber: "Q31", label: "Q31", maxMarks: 3, section: "Section F", sectionId: "sec_f" });
+            qs.push({ id: "q_32", qNo: 32, qNumber: "Q32", label: "Q32", maxMarks: 4, section: "Section G", sectionId: "sec_g" });
+            for (let i = 33; i <= 34; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 6, section: "Section H", sectionId: "sec_h" });
+            return qs;
+        })()
+    },
+
+    // Grade 12 Business Studies Blueprint (34 Qs / 80 Marks)
+    businessStudiesGrade12Template: {
+        id: "bst-xii-cbse-80",
+        name: "Grade 12 Business Studies (80 Marks)",
+        examName: "Grade 12 Business Studies Assessment 2026",
+        subject: "Business Studies",
+        maxMarks: 80,
+        duration: "3 Hours",
+        badge: "Official Blueprint (34 Qs)",
+        generalInstructions: [
+            "This question paper contains 34 questions carrying 80 marks in total.",
+            "Section A: Q1 to Q20 carry 1 mark each (20 Marks).",
+            "Section B: Q21 to Q24 carry 3 marks each (12 Marks).",
+            "Section C: Q25 to Q28 carry 4 marks each (16 Marks).",
+            "Section D: Q29 to Q34 carry long answer marks (32 Marks)."
+        ],
+        sections: [
+            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - MCQs (20 × 1M = 20 Marks)", qStartNo: 1, qEndNo: 20, qCount: 20, marksPerQ: 1, maxMarks: 20, secTotal: 20 },
+            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Short Answer I (4 × 3M = 12 Marks)", qStartNo: 21, qEndNo: 24, qCount: 4, marksPerQ: 3, maxMarks: 12, secTotal: 12 },
+            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Short Answer II (4 × 4M = 16 Marks)", qStartNo: 25, qEndNo: 28, qCount: 4, marksPerQ: 4, maxMarks: 16, secTotal: 16 },
+            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Long Answer (4 × 6M + 2 × 4M = 32 Marks)", qStartNo: 29, qEndNo: 34, qCount: 6, marksPerQ: 6, maxMarks: 32, secTotal: 32 }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 20; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 1, section: "Section A", sectionId: "sec_a" });
+            for (let i = 21; i <= 24; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 3, section: "Section B", sectionId: "sec_b" });
+            for (let i = 25; i <= 28; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 4, section: "Section C", sectionId: "sec_c" });
+            for (let i = 29; i <= 32; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 6, section: "Section D", sectionId: "sec_d" });
+            for (let i = 33; i <= 34; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 4, section: "Section D", sectionId: "sec_d" });
+            return qs;
+        })()
+    },
+
+    // Grade 12 Informatics Practices Blueprint (35 Qs / 70 Marks)
+    informaticsPracticesGrade12Template: {
+        id: "ip-xii-cbse-70",
+        name: "Grade 12 Informatics Practices (70 Marks)",
+        examName: "Grade 12 Informatics Practices Assessment 2026",
+        subject: "Informatics Practices",
+        maxMarks: 70,
+        duration: "3 Hours",
+        badge: "Official Blueprint (35 Qs)",
+        generalInstructions: [
+            "This question paper contains 35 questions carrying 70 marks in total.",
+            "Section A: Q1 to Q18 carry 1 mark each (18 Marks).",
+            "Section B: Q19 to Q25 carry 2 marks each (14 Marks).",
+            "Section C: Q26 to Q30 carry 3 marks each (15 Marks).",
+            "Section D: Q31 to Q32 carry 4 marks each (8 Marks).",
+            "Section E: Q33 to Q35 carry 5 marks each (15 Marks)."
+        ],
+        sections: [
+            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - MCQs (18 × 1M = 18 Marks)", qStartNo: 1, qEndNo: 18, qCount: 18, marksPerQ: 1, maxMarks: 18, secTotal: 18 },
+            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Very Short Answer (7 × 2M = 14 Marks)", qStartNo: 19, qEndNo: 25, qCount: 7, marksPerQ: 2, maxMarks: 14, secTotal: 14 },
+            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Short Answer (5 × 3M = 15 Marks)", qStartNo: 26, qEndNo: 30, qCount: 5, marksPerQ: 3, maxMarks: 15, secTotal: 15 },
+            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Case Study (2 × 4M = 8 Marks)", qStartNo: 31, qEndNo: 32, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8 },
+            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Long Answer (3 × 5M = 15 Marks)", qStartNo: 33, qEndNo: 35, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15 }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 18; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 1, section: "Section A", sectionId: "sec_a" });
+            for (let i = 19; i <= 25; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 2, section: "Section B", sectionId: "sec_b" });
+            for (let i = 26; i <= 30; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 3, section: "Section C", sectionId: "sec_c" });
+            for (let i = 31; i <= 32; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 4, section: "Section D", sectionId: "sec_d" });
+            for (let i = 33; i <= 35; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 5, section: "Section E", sectionId: "sec_e" });
+            return qs;
+        })()
+    },
+
+    // Grade 12 Computer Science Blueprint (35 Qs / 70 Marks)
+    computerScienceGrade12Template: {
+        id: "cs-xii-cbse-70",
+        name: "Grade 12 Computer Science (70 Marks)",
+        examName: "Grade 12 Computer Science Assessment 2026",
+        subject: "Computer Science",
+        maxMarks: 70,
+        duration: "3 Hours",
+        badge: "Official Blueprint (35 Qs)",
+        generalInstructions: [
+            "This question paper contains 35 questions carrying 70 marks in total.",
+            "Section A: Q1 to Q18 carry 1 mark each (18 Marks).",
+            "Section B: Q19 to Q25 carry 2 marks each (14 Marks).",
+            "Section C: Q26 to Q30 carry 3 marks each (15 Marks).",
+            "Section D: Q31 to Q32 carry 4 marks each (8 Marks).",
+            "Section E: Q33 to Q35 carry 5 marks each (15 Marks)."
+        ],
+        sections: [
+            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - MCQs (18 × 1M = 18 Marks)", qStartNo: 1, qEndNo: 18, qCount: 18, marksPerQ: 1, maxMarks: 18, secTotal: 18 },
+            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Short Answer I (7 × 2M = 14 Marks)", qStartNo: 19, qEndNo: 25, qCount: 7, marksPerQ: 2, maxMarks: 14, secTotal: 14 },
+            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Short Answer II (5 × 3M = 15 Marks)", qStartNo: 26, qEndNo: 30, qCount: 5, marksPerQ: 3, maxMarks: 15, secTotal: 15 },
+            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Case Study (2 × 4M = 8 Marks)", qStartNo: 31, qEndNo: 32, qCount: 2, marksPerQ: 4, maxMarks: 8, secTotal: 8 },
+            { id: "sec_e", letter: "E", name: "Section E", title: "Section E - Long Answer (3 × 5M = 15 Marks)", qStartNo: 33, qEndNo: 35, qCount: 3, marksPerQ: 5, maxMarks: 15, secTotal: 15 }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 18; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 1, section: "Section A", sectionId: "sec_a" });
+            for (let i = 19; i <= 25; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 2, section: "Section B", sectionId: "sec_b" });
+            for (let i = 26; i <= 30; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 3, section: "Section C", sectionId: "sec_c" });
+            for (let i = 31; i <= 32; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 4, section: "Section D", sectionId: "sec_d" });
+            for (let i = 33; i <= 35; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 5, section: "Section E", sectionId: "sec_e" });
+            return qs;
+        })()
+    },
+
+    // French Blueprint (Grade 12 / Grade 10 - 80 Marks, 30 Qs)
+    frenchGrade12Template: {
+        id: "fre-xii-cbse-80",
+        name: "Grade 12 French (80 Marks)",
+        examName: "Grade 12 French Assessment 2026",
+        subject: "French",
+        maxMarks: 80,
+        duration: "3 Hours",
+        badge: "Official Blueprint (80M)",
+        generalInstructions: [
+            "This question paper consists of 30 questions carrying 80 marks in total.",
+            "Section A: Compréhension Écrite (Q1 to Q5) - 10 Marks.",
+            "Section B: Expression Écrite (Q6 to Q10) - 20 Marks.",
+            "Section C: Grammaire (Q11 to Q22) - 30 Marks.",
+            "Section D: Culture et Civilisation (Q23 to Q30) - 20 Marks."
+        ],
+        sections: [
+            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Compréhension (5 × 2M = 10 Marks)", qStartNo: 1, qEndNo: 5, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Expression (5 × 4M = 20 Marks)", qStartNo: 6, qEndNo: 10, qCount: 5, marksPerQ: 4, maxMarks: 20, secTotal: 20 },
+            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Grammaire (12 × 2.5M = 30 Marks)", qStartNo: 11, qEndNo: 22, qCount: 12, marksPerQ: 2.5, maxMarks: 30, secTotal: 30 },
+            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Culture (8 × 2.5M = 20 Marks)", qStartNo: 23, qEndNo: 30, qCount: 8, marksPerQ: 2.5, maxMarks: 20, secTotal: 20 }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 5; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 2, section: "Section A", sectionId: "sec_a" });
+            for (let i = 6; i <= 10; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 4, section: "Section B", sectionId: "sec_b" });
+            for (let i = 11; i <= 22; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 2.5, section: "Section C", sectionId: "sec_c" });
+            for (let i = 23; i <= 30; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 2.5, section: "Section D", sectionId: "sec_d" });
+            return qs;
+        })()
+    },
+
+    frenchGrade10Template: {
+        id: "fre-x-cbse-80",
+        name: "Grade 10 French (80 Marks)",
+        examName: "Grade 10 French Assessment 2026",
+        subject: "French",
+        maxMarks: 80,
+        duration: "3 Hours",
+        badge: "Official Blueprint (80M)",
+        generalInstructions: [
+            "This question paper consists of 30 questions carrying 80 marks in total.",
+            "Section A: Compréhension Écrite (Q1 to Q5) - 10 Marks.",
+            "Section B: Expression Écrite (Q6 to Q10) - 20 Marks.",
+            "Section C: Grammaire (Q11 to Q22) - 30 Marks.",
+            "Section D: Culture et Civilisation (Q23 to Q30) - 20 Marks."
+        ],
+        sections: [
+            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Compréhension (5 × 2M = 10 Marks)", qStartNo: 1, qEndNo: 5, qCount: 5, marksPerQ: 2, maxMarks: 10, secTotal: 10 },
+            { id: "sec_b", letter: "B", name: "Section B", title: "Section B - Expression (5 × 4M = 20 Marks)", qStartNo: 6, qEndNo: 10, qCount: 5, marksPerQ: 4, maxMarks: 20, secTotal: 20 },
+            { id: "sec_c", letter: "C", name: "Section C", title: "Section C - Grammaire (12 × 2.5M = 30 Marks)", qStartNo: 11, qEndNo: 22, qCount: 12, marksPerQ: 2.5, maxMarks: 30, secTotal: 30 },
+            { id: "sec_d", letter: "D", name: "Section D", title: "Section D - Culture (8 × 2.5M = 20 Marks)", qStartNo: 23, qEndNo: 30, qCount: 8, marksPerQ: 2.5, maxMarks: 20, secTotal: 20 }
+        ],
+        questions: (function() {
+            const qs = [];
+            for (let i = 1; i <= 5; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 2, section: "Section A", sectionId: "sec_a" });
+            for (let i = 6; i <= 10; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 4, section: "Section B", sectionId: "sec_b" });
+            for (let i = 11; i <= 22; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 2.5, section: "Section C", sectionId: "sec_c" });
+            for (let i = 23; i <= 30; i++) qs.push({ id: `q_${i}`, qNo: i, qNumber: `Q${i}`, label: `Q${i}`, maxMarks: 2.5, section: "Section D", sectionId: "sec_d" });
+            return qs;
+        })()
+    },
+
     presetComments: [
         "Good presentation",
         "Step derivation complete",

@@ -913,6 +913,9 @@ class UploadedPapersPageManager {
         // Action: Evaluate Paper
         this.container.querySelectorAll(".btn-action-eval").forEach(btn => {
             btn.addEventListener("click", async () => {
+                if (window.app && typeof window.app.showLoadingBox === "function") {
+                    window.app.showLoadingBox("Opening Answer Script...", "Loading student paper & correction workspace...");
+                }
                 const id = btn.getAttribute("data-paper-id");
                 let target = this.papers.find(p => p.id === id);
                 if (window.appStorage) {

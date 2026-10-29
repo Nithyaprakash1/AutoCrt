@@ -646,7 +646,8 @@ class StorageService {
         if (s.includes('account')) return 'accountancy';
         if (s.includes('social') || s.includes('sst') || s.includes('soc sci') || s.includes('soc-x') || s.includes('soc-')) return 'social_science';
         if (s.includes('politic') || s.includes('civic') || s.includes('pol sci') || s.includes('pol. sci') || s.includes('pol science') || s.includes('polity') || s === 'pol' || s.startsWith('pol ') || s.endsWith(' pol') || s.includes('pol-') || s === 'ps') return 'political_science';
-        if (s.includes('computer') || s.includes('info prac') || s.includes('ip') || s === 'cs') return 'computer_science';
+        if (s.includes('informatics') || s.includes('info prac') || s === 'ip' || s.startsWith('ip ') || s.includes('ip-')) return 'informatics_practices';
+        if (s.includes('computer') || s === 'cs' || s.startsWith('cs ') || s.includes('cs-')) return 'computer_science';
         if (s.includes('bio') || s.includes('botany') || s.includes('zoology') || s.includes('life sci') || s.includes('bio-')) return 'biology';
         if (s.includes('chem') || s.includes('che-')) return 'chemistry';
         if (s.includes('physic') || s === 'phy' || s.startsWith('phy ') || s.includes('phy-')) return 'physics';
@@ -663,13 +664,30 @@ class StorageService {
         return s.replace(/\s+/g, '_');
     }
 
-    harmonizeTemplateForSubject(templateName, subject) {
+    harmonizeTemplateForSubject(templateName, subject, className = '') {
         if (!templateName || !subject) return templateName || '';
         const cleanSub = String(subject).trim();
         const canon = this.canonicalizeSubject(cleanSub);
+        const isClass12 = /\b(12|xii|grade\s*12|class\s*12)\b/i.test(String(className || templateName));
+
         if (canon !== 'mathematics' && /mathematics|maths|math\b/i.test(templateName)) {
-            return templateName.replace(/\b(10th\s+|10\s+|Grade\s+10\s+|STD\s+10\s+)?(MATHEMATICS|MATHS|MATH)\b/gi, (match, prefix) => (prefix || "") + cleanSub.toUpperCase());
+            let replaced = templateName.replace(/\b(10th\s+|10\s+|Grade\s+10\s+|STD\s+10\s+)?(MATHEMATICS|MATHS|MATH)\b/gi, (match, prefix) => {
+                if (isClass12) {
+                    return "Grade 12 " + cleanSub.toUpperCase();
+                }
+                return (prefix || "") + cleanSub.toUpperCase();
+            });
+            if (isClass12) {
+                replaced = replaced.replace(/\b(10th|10|STD 10)\b/gi, "Grade 12");
+            }
+            return replaced;
         }
+
+        // If template has "10" but the class is clearly 12th grade, correct the label
+        if (isClass12 && /\b(10th\s+|10\s+|Grade\s+10\s+|STD\s+10\s+)/i.test(templateName)) {
+            return templateName.replace(/\b(10th\s+|10\s+|Grade\s+10\s+|STD\s+10\s+)/gi, "Grade 12 ");
+        }
+
         return templateName;
     }
 
@@ -748,6 +766,12 @@ class StorageService {
         }
         if (cTarget === 'entrepreneurship') {
             return combined.includes('entrepreneur');
+        }
+        if (cTarget === 'french') {
+            return combined.includes('french') || combined.includes('fre-');
+        }
+        if (cTarget === 'informatics_practices') {
+            return combined.includes('informatics') || combined.includes('info prac') || combined.includes('ip') || combined.includes('ip-');
         }
         if (cTarget === 'science') {
             return (combined.includes('science') || combined.includes('sci-x') || combined.includes('sci-') || combined.includes('gen sci')) && !combined.includes('social') && !combined.includes('political') && !combined.includes('computer');

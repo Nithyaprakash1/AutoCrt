@@ -1047,6 +1047,9 @@ class DashboardManager {
 
                 if (batch) {
                     const targetPaper = batch.firstPendingPaper || (batch.papers && batch.papers[0]);
+                    if (window.app && typeof window.app.showLoadingBox === "function") {
+                        window.app.showLoadingBox("Opening Answer Script...", `Opening ${targetPaper?.studentName || 'Student'}'s paper in ${batch.className}...`);
+                    }
                     if (targetPaper && this.options.onOpenEvaluation) {
                         this.options.onOpenEvaluation(targetPaper);
                     } else if (targetPaper && window.app) {
@@ -1129,6 +1132,9 @@ class DashboardManager {
         const startBtn = this.container.querySelector("#dash-btn-start-correction");
         if (startBtn) {
             startBtn.addEventListener("click", () => {
+                if (window.app && typeof window.app.showLoadingBox === "function") {
+                    window.app.showLoadingBox("Opening Answer Script...", "Loading first pending student paper...");
+                }
                 // Find first uncorrected paper in active scope to open directly
                 const targetPool = (this.filteredEvaluations && this.filteredEvaluations.length > 0)
                     ? this.filteredEvaluations

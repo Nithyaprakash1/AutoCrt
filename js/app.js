@@ -436,16 +436,47 @@ class AppController {
                 } else if (subLower.includes("science")) {
                     targetTpl = window.MockData?.scienceGrade10BiologyTemplate || window.MockData?.scienceGrade10ChemistryTemplate;
                 }
+                // 9. Commerce & Technical Subjects
+                else if (subLower.includes("account")) {
+                    targetTpl = window.MockData?.accountancyGrade12Template;
+                } else if (subLower.includes("business") || subLower.includes("bst")) {
+                    targetTpl = window.MockData?.businessStudiesGrade12Template;
+                } else if (subLower.includes("informatics") || subLower === "ip" || subLower.includes("info prac")) {
+                    targetTpl = window.MockData?.informaticsPracticesGrade12Template;
+                } else if (subLower.includes("computer") || subLower === "cs") {
+                    targetTpl = window.MockData?.computerScienceGrade12Template;
+                } else if (subLower.includes("french")) {
+                    targetTpl = (clsLower.includes("10") || clsLower.includes("x")) ? window.MockData?.frenchGrade10Template : window.MockData?.frenchGrade12Template;
+                }
 
                 if (!targetTpl) {
-                    console.warn(`[Auto-Restore] Could not find blueprint for ${ev.subject} (${ev.id})`);
-                    continue;
+                    const is12 = clsLower.includes("12") || clsLower.includes("xii");
+                    const subClean = (ev.subject || "General").trim();
+                    const cleanName = `${is12 ? 'Grade 12' : 'Grade 10'} ${subClean} Assessment 2026`;
+                    targetTpl = {
+                        id: `tpl-${subLower.replace(/[^a-z0-9]/g, '_')}-${is12 ? '12' : '10'}`,
+                        name: cleanName,
+                        examName: cleanName,
+                        subject: ev.subject,
+                        maxMarks: ev.maxMarks || 80,
+                        duration: "3 Hours",
+                        badge: "Official Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Section A - Main", qStartNo: 1, qEndNo: (ev.questions?.length || 30), qCount: (ev.questions?.length || 30), marksPerQ: 1, maxMarks: (ev.maxMarks || 80), secTotal: (ev.maxMarks || 80) }
+                        ],
+                        questions: ev.questions && ev.questions.length > 0 ? ev.questions : []
+                    };
                 }
 
                 // Restore blueprint metadata
                 ev.templateId = targetTpl.id;
                 ev.templateName = targetTpl.name;
                 ev.examName = targetTpl.examName || targetTpl.name;
+                // If this paper belongs to Class 12, rigorously strip any stale "10 " prefixes
+                if (clsLower.includes("12") || clsLower.includes("xii")) {
+                    ev.templateName = ev.templateName.replace(/\b(10th\s+|10\s+|STD\s+10\s+)/gi, "Grade 12 ");
+                    ev.examName = ev.examName.replace(/\b(10th\s+|10\s+|STD\s+10\s+)/gi, "Grade 12 ");
+                }
                 ev.maxMarks = targetTpl.maxMarks;
                 ev.sections = JSON.parse(JSON.stringify(targetTpl.sections || []));
 
@@ -3229,6 +3260,7 @@ class AppController {
 
     async openWorkspace(evaluation) {
         if (!evaluation) return;
+        this.showLoadingBox("Opening Answer Script...", `Loading ${evaluation.studentName || 'Student'}'s paper & correction tools...`);
         this.hidePortalLoginScreen();
 
         // Always fetch fresh record from storage to get saved annotations & page images
@@ -3441,6 +3473,18 @@ class AppController {
             matchedTemplate = window.MockData?.historyRevision1Template;
         } else if (!matchedTemplate && evalSubLower.includes("entrep")) {
             matchedTemplate = window.MockData?.entrepreneurshipGrade12Template;
+        } else if (!matchedTemplate && evalSubLower.includes("account")) {
+            matchedTemplate = window.MockData?.accountancyGrade12Template;
+        } else if (!matchedTemplate && (evalSubLower.includes("business") || evalSubLower.includes("bst"))) {
+            matchedTemplate = window.MockData?.businessStudiesGrade12Template;
+        } else if (!matchedTemplate && (evalSubLower.includes("informatics") || evalSubLower === "ip" || evalSubLower.includes("info prac"))) {
+            matchedTemplate = window.MockData?.informaticsPracticesGrade12Template;
+        } else if (!matchedTemplate && (evalSubLower.includes("computer") || evalSubLower === "cs")) {
+            matchedTemplate = window.MockData?.computerScienceGrade12Template;
+        } else if (!matchedTemplate && evalSubLower.includes("french")) {
+            matchedTemplate = (evalClassLower.includes("10") || evalClassLower.includes("x"))
+                ? window.MockData?.frenchGrade10Template
+                : window.MockData?.frenchGrade12Template;
         }
 
         // 3. Questions integrity and preservation check:
@@ -3653,6 +3697,7 @@ class AppController {
 
         // Populate and synchronize the Template Switcher dropdown
         await this.populateWorkspaceTemplateSelector(evaluation);
+        this.hideLoadingBox();
 
         // Save & Report Button visibility (shown for Tamil / test evaluations)
         const btnSaveReport = document.getElementById("ws-btn-save-report");
@@ -6414,6 +6459,38 @@ class AppController {
     }
 
     // --- Toast Notifications ---
+
+    showLoadingBox(title = "Opening Answer Script...", desc = "Loading student paper, annotations & correction tools...") {
+        let el = document.getElementById("global-app-loader");
+        if (!el) {
+            el = document.createElement("div");
+            el.id = "global-app-loader";
+            el.className = "global-app-loader-overlay";
+            el.innerHTML = `
+                <div class="global-app-loader-card">
+                    <div class="global-app-spinner"></div>
+                    <h4 id="global-loader-title">${title}</h4>
+                    <p id="global-loader-desc">${desc}</p>
+                </div>
+            `;
+            document.body.appendChild(el);
+        } else {
+            const titleEl = document.getElementById("global-loader-title");
+            const descEl = document.getElementById("global-loader-desc");
+            if (titleEl) titleEl.textContent = title;
+            if (descEl) descEl.textContent = desc;
+        }
+        el.style.display = "flex";
+        el.style.opacity = "1";
+    }
+
+    hideLoadingBox() {
+        const el = document.getElementById("global-app-loader");
+        if (el) {
+            el.style.opacity = "0";
+            setTimeout(() => { el.style.display = "none"; }, 200);
+        }
+    }
 
     showToast(message, type = "success") {
         let container = document.getElementById("toast-container");

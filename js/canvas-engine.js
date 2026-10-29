@@ -263,10 +263,32 @@ class CanvasEngine {
                     storageRef = window.firebaseManager.storage.ref(url);
                 }
                 if (storageRef) {
-                    const blob = await storageRef.getBlob();
-                    if (blob) {
-                        const buf = await blob.arrayBuffer();
-                        return new Uint8Array(buf);
+                    if (typeof storageRef.getBytes === "function") {
+                        try {
+                            const buf = await storageRef.getBytes(50 * 1024 * 1024);
+                            if (buf && buf.byteLength > 100) return new Uint8Array(buf);
+                        } catch (e) {}
+                    }
+                    if (typeof storageRef.getBlob === "function") {
+                        try {
+                            const blob = await storageRef.getBlob();
+                            if (blob) {
+                                const buf = await blob.arrayBuffer();
+                                return new Uint8Array(buf);
+                            }
+                        } catch (e) {}
+                    }
+                    if (typeof storageRef.getDownloadURL === "function") {
+                        try {
+                            const dUrl = await storageRef.getDownloadURL();
+                            if (dUrl && dUrl !== url) {
+                                const resp = await fetch(dUrl, { mode: "cors" });
+                                if (resp.ok) {
+                                    const buf = await resp.arrayBuffer();
+                                    if (buf && buf.byteLength > 100) return new Uint8Array(buf);
+                                }
+                            }
+                        } catch (e) {}
                     }
                 }
             } catch (fbErr) {
