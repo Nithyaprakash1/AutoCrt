@@ -2558,6 +2558,9 @@ class AppController {
         let name = user ? user.name : "";
         const isSuper = user && (user.role === 'super_admin' || (user.email && user.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
         const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
+        const userSub = (user && user.assignedSubjects && user.assignedSubjects.length > 0)
+            ? user.assignedSubjects[0]
+            : (user?.subject || "");
 
         const userSubs = (user && user.assignedSubjects && user.assignedSubjects.length > 0)
             ? user.assignedSubjects.filter(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
@@ -2566,7 +2569,7 @@ class AppController {
             ? user.assignedClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
             : (user?.class && user.class.toLowerCase() !== 'all classes' && user.class.toLowerCase() !== 'all' ? [user.class] : []);
 
-        const subLabel = userSubs.length > 0 ? userSubs.join(', ') : (user?.subject || "");
+        const subLabel = userSubs.length > 0 ? userSubs.join(', ') : (userSub || "");
         const clsLabel = userClasses.length > 0 ? userClasses.join(', ') : (user?.class || "");
 
         let specTag = "";
@@ -6107,6 +6110,9 @@ class AppController {
         const activeUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
         const isTeacher = activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher');
         const isSuper = activeUser && (activeUser.role === 'super_admin' || (activeUser.email && activeUser.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
+        const userSub = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
+            ? activeUser.assignedSubjects[0]
+            : (activeUser?.subject || "");
 
         const userSubs = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
             ? activeUser.assignedSubjects.filter(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
@@ -6115,7 +6121,7 @@ class AppController {
             ? activeUser.assignedClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
             : (activeUser?.class && activeUser.class.toLowerCase() !== 'all classes' && activeUser.class.toLowerCase() !== 'all' ? [activeUser.class] : []);
 
-        const subLabel = userSubs.length > 0 ? userSubs.join(', ') : (activeUser?.subject || "");
+        const subLabel = userSubs.length > 0 ? userSubs.join(', ') : (userSub || "");
         const clsLabel = userClasses.length > 0 ? userClasses.join(', ') : (activeUser?.class || "");
 
         let specTag = "";
