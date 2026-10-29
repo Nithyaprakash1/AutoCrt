@@ -4342,7 +4342,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     possibleRoll = extracted.rollNo;
                 }
 
-                // --- DUPLICATE PREVENTION ---
+                // --- DUPLICATE PREVENTION (Strictly scoped inside current template) ---
                 const isDuplicateInQueue = (this.fileQueue || []).some(item => {
                     const rollMatch = possibleRoll && String(item.rollNo).trim() === possibleRoll;
                     const nameMatch = possibleName && String(item.studentName).toLowerCase().trim() === possibleName.toLowerCase();
@@ -4363,9 +4363,10 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
                 if (isDuplicateInQueue || isDuplicateInExisting) {
                     duplicateCount++;
-                    const reason = isDuplicateInQueue ? "already in upload queue" : "already uploaded for this class";
+                    const currentTplName = this.selectedTemplate?.name || "this template";
+                    const reason = isDuplicateInQueue ? "already in upload queue" : `already uploaded for "${currentTplName}"`;
                     if (window.app && window.app.showToast) {
-                        window.app.showToast(`Duplicate skipped: Roll ${possibleRoll} (${possibleName}) is ${reason}.`, "warning");
+                        window.app.showToast(`Duplicate skipped: Roll ${possibleRoll || '—'} (${possibleName || file.name}) is ${reason}.`, "warning");
                     }
                     continue;
                 }
@@ -5374,13 +5375,18 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 : (String(e.subject || '').toLowerCase().includes('politic'));
             if (!subMatches) return false;
 
-            // 3. Template matching
-            const eTplId = String(e.templateId || "").toLowerCase();
-            const eTplName = String(e.templateName || e.examName || "").toLowerCase();
+            // 3. Strict Template matching (Only match papers for THIS specific template / test)
+            const eTplId = String(e.templateId || "").toLowerCase().trim();
+            const eTplName = String(e.templateName || e.examName || "").toLowerCase().trim();
             if (targetTplId && eTplId && targetTplId === eTplId) return true;
-            if (targetTplName && eTplName && (targetTplName.includes(eTplName) || eTplName.includes(targetTplName))) return true;
-            // If same subject and class, treat as existing paper
-            return true;
+            if (targetTplName && eTplName) {
+                if (targetTplName === eTplName) return true;
+                const normTarget = targetTplName.replace(/[^a-z0-9]/g, '');
+                const normE = eTplName.replace(/[^a-z0-9]/g, '');
+                if (normTarget && normE && (normTarget === normE || normTarget.includes(normE) || normE.includes(normTarget))) return true;
+            }
+            // Do NOT pull in papers from different templates (e.g. Revision 1 vs Revision 2)!
+            return false;
         });
 
         this.existingPapers = matches;

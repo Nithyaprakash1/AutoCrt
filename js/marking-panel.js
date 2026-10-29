@@ -59,7 +59,9 @@ class MarkingPanel {
         this.options = Object.assign({
             onScoreChange: null,
             onQuestionSelect: null,
-            onPresetCommentClick: null
+            onPresetCommentClick: null,
+            onQuestionMarkCleared: null,
+            onAllGraded: null
         }, options);
 
         this.questions = [];
@@ -236,6 +238,10 @@ class MarkingPanel {
         this.maxMarksTotal = Number(maxMarks) || this.calculateDefaultMaxMarks();
         this.activeQuestionIndex = 0;
         this.activeSubQuestionIndex = 0;
+
+        // Check if all questions were already graded initially
+        const initialUnmarked = this.questions.filter(q => q.status === "unmarked" || q.status === "pending").length;
+        this.wasAllGraded = (this.questions.length > 0 && initialUnmarked === 0);
 
         this.render();
         this.recalculate();
@@ -1255,10 +1261,34 @@ class MarkingPanel {
                     statusPill.className = "score-pill pill-status status-all-graded";
                     statusPill.title = "All questions evaluated and graded!";
                 }
-                if (!this.wasAllGraded && this.questions.length > 0) {
+                const justCompleted = !this.wasAllGraded && this.questions.length > 0;
+                if (justCompleted) {
                     this.triggerAllGradedConfetti(card || topScoreDisplay);
                 }
                 this.wasAllGraded = true;
+
+                // Sync floating Save & Next pill in the corner
+                if (window.app && typeof window.app.updateFloatingSaveNextPill === "function") {
+                    window.app.updateFloatingSaveNextPill(true, this.obtainedMarksTotal, this.maxMarksTotal);
+                }
+
+                // If just transitioned to all questions completed, pop up the dialog!
+                if (justCompleted) {
+                    const compSummary = {
+                        obtainedMarks: this.obtainedMarksTotal,
+                        maxMarks: this.maxMarksTotal,
+                        percentage: pct,
+                        grade: grade,
+                        gradePoint: gradeInfo.gradePoint,
+                        questions: this.questions,
+                        feedback: this.overallFeedback
+                    };
+                    if (this.options.onAllGraded) {
+                        this.options.onAllGraded(compSummary);
+                    } else if (window.app && typeof window.app.showCorrectionCompletedModal === "function") {
+                        window.app.showCorrectionCompletedModal(compSummary);
+                    }
+                }
             } else {
                 if (card) card.classList.remove("all-graded-shimmer");
                 if (topScoreDisplay) topScoreDisplay.classList.remove("all-graded-shimmer");
@@ -1268,6 +1298,11 @@ class MarkingPanel {
                     statusPill.title = `${unmarkedCount} questions remain unmarked`;
                 }
                 this.wasAllGraded = false;
+
+                // Hide floating Save & Next pill when paper has pending questions
+                if (window.app && typeof window.app.updateFloatingSaveNextPill === "function") {
+                    window.app.updateFloatingSaveNextPill(false);
+                }
             }
         }
 

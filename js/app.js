@@ -2811,6 +2811,10 @@ class AppController {
         this.currentView = viewName;
 
         // If leaving workspace, close it gracefully
+        if (viewName !== "workspace") {
+            this.closeCorrectionCompletedModal();
+            this.updateFloatingSaveNextPill(false);
+        }
         if (this.activeEvaluation && viewName !== "workspace") {
             await this.saveActiveEvaluation(false);
             this.stopAutosave();
@@ -3260,6 +3264,8 @@ class AppController {
 
     async openWorkspace(evaluation) {
         if (!evaluation) return;
+        this.closeCorrectionCompletedModal();
+        this.updateFloatingSaveNextPill(false);
         this.showLoadingBox("Opening Answer Script...", `Loading ${evaluation.studentName || 'Student'}'s paper & correction tools...`);
         this.hidePortalLoginScreen();
 
@@ -3874,6 +3880,9 @@ class AppController {
                     this.canvasEngine.addPresetComment(commentText);
                     this.showToast(`Comment "${commentText}" added to paper`);
                 }
+            },
+            onAllGraded: (scoreSummary) => {
+                this.showCorrectionCompletedModal(scoreSummary);
             }
         });
 
@@ -4511,6 +4520,37 @@ class AppController {
             });
         }
 
+        // Floating Corner Action: Save & Next
+        const btnFloatingSaveNext = document.getElementById("ws-floating-save-next-pill");
+        if (btnFloatingSaveNext) {
+            btnFloatingSaveNext.addEventListener("click", async () => {
+                await this.saveAndGoNextStudent();
+            });
+        }
+
+        // Correction Completed Modal Actions
+        const btnCompletedRecheck = document.getElementById("btn-completed-recheck");
+        if (btnCompletedRecheck) {
+            btnCompletedRecheck.addEventListener("click", () => {
+                this.closeCorrectionCompletedModal();
+                this.showToast("Review mode active. Click 'Save & Next' in the corner whenever you are done.", "info");
+            });
+        }
+
+        const btnCompletedSaveNext = document.getElementById("btn-completed-save-next");
+        if (btnCompletedSaveNext) {
+            btnCompletedSaveNext.addEventListener("click", async () => {
+                await this.handleCompletedSaveAndNext();
+            });
+        }
+
+        const btnCloseCompleted = document.getElementById("btn-close-completed-modal");
+        if (btnCloseCompleted) {
+            btnCloseCompleted.addEventListener("click", () => {
+                this.closeCorrectionCompletedModal();
+            });
+        }
+
         // Absent overlay buttons
         const btnAbsentMark = document.getElementById("btn-absent-mark-confirm");
         if (btnAbsentMark) {
@@ -4769,6 +4809,21 @@ class AppController {
         window.addEventListener("keydown", (e) => {
             // Only handle shortcuts when workspace is visible
             if (this.currentView !== "workspace") return;
+
+            // Handle Completion Modal shortcuts
+            const compModal = document.getElementById("modal-correction-completed");
+            if (compModal && compModal.style.display !== "none") {
+                if (e.key === "Escape") {
+                    e.preventDefault();
+                    this.closeCorrectionCompletedModal();
+                    return;
+                }
+                if (e.key === "Enter") {
+                    e.preventDefault();
+                    this.handleCompletedSaveAndNext();
+                    return;
+                }
+            }
 
             // Prevent rapid autorepeat from skipping questions
             if (e.repeat) return;
@@ -5213,6 +5268,68 @@ class AppController {
 
     async goToNextStudentInQueue() {
         return this.saveAndGoNextStudent();
+    }
+
+    // --- Correction Completed Modal & Floating Save & Next Pill ---
+
+    showCorrectionCompletedModal(summary) {
+        if (!this.activeEvaluation || this.currentView !== "workspace") return;
+
+        const modal = document.getElementById("modal-correction-completed");
+        if (!modal) return;
+
+        const sName = this.activeEvaluation.studentName || "Student";
+        const rNo = this.activeEvaluation.rollNo || "—";
+        const cls = this.activeEvaluation.class || this.activeEvaluation.className || "";
+        const sub = this.activeEvaluation.subject || "";
+        const obt = summary && summary.obtainedMarks !== undefined ? summary.obtainedMarks : (this.activeEvaluation.obtainedMarks || 0);
+        const max = summary && summary.maxMarks !== undefined ? summary.maxMarks : (this.activeEvaluation.maxMarks || 0);
+        const pct = summary && summary.percentage !== undefined ? summary.percentage : (max > 0 ? Math.round((obt / max) * 100) : 0);
+        const grade = summary && summary.grade ? summary.grade : (this.activeEvaluation.grade || "A1");
+
+        const metaEl = document.getElementById("completed-student-meta");
+        if (metaEl) {
+            metaEl.textContent = sName + " • Roll No: " + rNo + (cls ? " • " + cls : "") + (sub ? " • " + sub : "");
+        }
+
+        const scoreEl = document.getElementById("completed-score-val");
+        if (scoreEl) scoreEl.textContent = obt + " / " + max;
+
+        const pctEl = document.getElementById("completed-pct-val");
+        if (pctEl) pctEl.textContent = pct + "%";
+
+        const gradeEl = document.getElementById("completed-grade-val");
+        if (gradeEl) gradeEl.textContent = grade;
+
+        // Display modal
+        modal.style.display = "flex";
+
+        // Show floating Save & Next pill in the corner as well
+        this.updateFloatingSaveNextPill(true, obt, max);
+    }
+
+    closeCorrectionCompletedModal() {
+        const modal = document.getElementById("modal-correction-completed");
+        if (modal) modal.style.display = "none";
+    }
+
+    async handleCompletedSaveAndNext() {
+        this.closeCorrectionCompletedModal();
+        await this.saveAndGoNextStudent();
+    }
+
+    updateFloatingSaveNextPill(show, obt = null, max = null) {
+        const pill = document.getElementById("ws-floating-save-next-pill");
+        if (!pill) return;
+        if (show && this.currentView === "workspace" && this.activeEvaluation) {
+            pill.style.display = "inline-flex";
+            const scoreTag = document.getElementById("ws-floating-score-badge");
+            if (scoreTag && obt !== null && max !== null) {
+                scoreTag.textContent = obt + "/" + max + "M";
+            }
+        } else {
+            pill.style.display = "none";
+        }
     }
 
     // --- Tamil "Test Me!" Interactive Evaluation Engine ---

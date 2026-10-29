@@ -3556,3 +3556,261 @@ p, span, div, strong, b, th, td, label, a,
         display: none !important;
     }
 }
+
+
+/* ==========================================================================
+   Correction Completed Modal & Floating Save & Go Next Pill
+   ========================================================================== */
+
+/* 1. Floating Corner "Save & Next" Pill */
+.ws-floating-save-next-pill {
+    position: fixed;
+    bottom: 24px;
+    right: 28px;
+    z-index: 1050;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 18px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #0077ED 0%, #0064C8 100%);
+    color: #FFFFFF;
+    font-size: 0.88rem;
+    font-weight: 600;
+    border: 1.5px solid rgba(255, 255, 255, 0.35);
+    box-shadow: 0 10px 25px -4px rgba(0, 113, 227, 0.48), 0 4px 10px rgba(0, 0, 0, 0.12);
+    cursor: pointer;
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: floatingPillEntrance 0.3s cubic-bezier(0.16, 1, 0.3, 1), floatingPulseGlow 3.5s ease-in-out infinite;
+    user-select: none;
+}
+
+@keyframes floatingPillEntrance {
+    from {
+        opacity: 0;
+        transform: translateY(16px) scale(0.92);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes floatingPulseGlow {
+    0%, 100% {
+        box-shadow: 0 10px 25px -4px rgba(0, 113, 227, 0.48), 0 4px 10px rgba(0, 0, 0, 0.12);
+    }
+    50% {
+        box-shadow: 0 14px 32px -2px rgba(0, 113, 227, 0.72), 0 6px 14px rgba(0, 0, 0, 0.16);
+    }
+}
+
+.ws-floating-save-next-pill svg {
+    stroke: #FFFFFF;
+    flex-shrink: 0;
+}
+
+.ws-floating-save-next-pill .pill-text {
+    letter-spacing: -0.01em;
+}
+
+.ws-floating-save-next-pill .pill-score {
+    display: inline-block;
+    background: rgba(255, 255, 255, 0.22);
+    border-radius: 999px;
+    padding: 2px 8px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    margin-left: 2px;
+}
+
+.ws-floating-save-next-pill:hover {
+    background: linear-gradient(135deg, #0066CC 0%, #0052A3 100%);
+    transform: translateY(-2px) scale(1.03);
+    box-shadow: 0 16px 36px -4px rgba(0, 113, 227, 0.65), 0 6px 16px rgba(0, 0, 0, 0.18);
+}
+
+.ws-floating-save-next-pill:active {
+    transform: scale(0.96);
+}
+
+/* 2. Correction Completed Dialog */
+.correction-completed-dialog {
+    background: #FFFFFF;
+    border-radius: 20px;
+    box-shadow: 0 25px 60px rgba(0, 0, 0, 0.25), 0 0 0 1px rgba(0, 0, 0, 0.07);
+    width: 92%;
+    max-width: 480px;
+    padding: 26px 28px 24px;
+    animation: completedModalPopIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes completedModalPopIn {
+    from {
+        opacity: 0;
+        transform: scale(0.92) translateY(12px);
+    }
+    to {
+        opacity: 1;
+        transform: scale(1) translateY(0);
+    }
+}
+
+.completed-dialog-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    margin-bottom: 20px;
+    position: relative;
+}
+
+.completed-icon-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #FEF08A 0%, #FDE047 100%);
+    border: 1px solid rgba(234, 179, 8, 0.35);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.6rem;
+    flex-shrink: 0;
+    box-shadow: 0 4px 12px rgba(234, 179, 8, 0.2);
+}
+
+.completed-header-text {
+    flex: 1;
+    min-width: 0;
+}
+
+.completed-dialog-title {
+    margin: 0 0 4px;
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #0F172A;
+    letter-spacing: -0.02em;
+}
+
+.completed-dialog-sub {
+    margin: 0;
+    font-size: 0.82rem;
+    color: #64748B;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.completed-score-summary-card {
+    background: #F8FAFC;
+    border: 1px solid #E2E8F0;
+    border-radius: 14px;
+    padding: 14px 16px;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 18px;
+}
+
+.completed-score-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+}
+
+.completed-score-lbl {
+    font-size: 0.7rem;
+    color: #64748B;
+    text-transform: uppercase;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    margin-bottom: 3px;
+}
+
+.completed-score-val {
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: #0F172A;
+}
+
+.completed-prompt-desc {
+    font-size: 0.86rem;
+    color: #475569;
+    line-height: 1.45;
+    margin: 0 0 22px;
+    text-align: center;
+}
+
+.completed-dialog-footer {
+    display: flex;
+    gap: 10px;
+    justify-content: flex-end;
+}
+
+.btn-completed-recheck {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 18px;
+    border-radius: 10px;
+    border: 1px solid #CBD5E1;
+    background: #FFFFFF;
+    color: #334155;
+    font-size: 0.86rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-completed-recheck:hover {
+    background: #F1F5F9;
+    border-color: #94A3B8;
+}
+
+.btn-completed-save-next {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 10px 20px;
+    border-radius: 10px;
+    border: 1px solid #0064C8;
+    background: linear-gradient(180deg, #0077ED 0%, #0071E3 100%);
+    color: #FFFFFF;
+    font-size: 0.88rem;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 12px rgba(0, 113, 227, 0.35);
+    transition: all 0.15s ease;
+}
+
+.btn-completed-save-next:hover {
+    background: linear-gradient(180deg, #0071E3 0%, #0066CC 100%);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 16px rgba(0, 113, 227, 0.45);
+}
+
+.btn-completed-save-next:active {
+    transform: scale(0.97);
+}
+
+@media (max-width: 640px) {
+    .ws-floating-save-next-pill {
+        bottom: 16px;
+        right: 16px;
+        padding: 8px 14px;
+        font-size: 0.8rem;
+    }
+    .completed-score-summary-card {
+        grid-template-columns: repeat(2, 1fr);
+        gap: 12px;
+    }
+    .completed-dialog-footer {
+        flex-direction: column-reverse;
+    }
+    .btn-completed-recheck,
+    .btn-completed-save-next {
+        width: 100%;
+    }
+}

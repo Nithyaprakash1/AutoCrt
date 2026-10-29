@@ -945,6 +945,18 @@
             </aside>
         </div>
 
+        <!-- Floating Corner Action: Save & Go Next (Appears smoothly when all questions are graded) -->
+        <button type="button" class="ws-floating-save-next-pill" id="ws-floating-save-next-pill" style="display: none;" title="All questions evaluated! Click to save and move to next student (Ctrl+Enter)">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+                <polyline points="17 21 17 13 7 13 7 21"/>
+                <line x1="5" y1="12" x2="19" y2="12"/>
+                <polyline points="12 5 19 12 12 19"/>
+            </svg>
+            <span class="pill-text">Save &amp; Next</span>
+            <span class="pill-score" id="ws-floating-score-badge">0/0M</span>
+        </button>
+
         <!-- Absent Student Overlay (shown when no paper exists for a student) -->
         <div class="ws-absent-overlay" id="ws-absent-overlay" style="display: none;">
             <div class="absent-card">
@@ -1283,6 +1295,52 @@
         </div>
     </div>
 
+    <!-- Correction Completed Modal (Re-check or Save & Next) -->
+    <div class="modal-backdrop" id="modal-correction-completed" style="display: none;">
+        <div class="modal-dialog correction-completed-dialog">
+            <div class="completed-dialog-header">
+                <div class="completed-icon-circle">🎉</div>
+                <div class="completed-header-text">
+                    <h3 class="completed-dialog-title">Correction Completed!</h3>
+                    <p class="completed-dialog-sub" id="completed-student-meta">Student: — | Roll: —</p>
+                </div>
+                <button type="button" class="btn-modal-close" id="btn-close-completed-modal">×</button>
+            </div>
+            
+            <div class="completed-score-summary-card">
+                <div class="completed-score-item">
+                    <span class="completed-score-lbl">Total Score</span>
+                    <span class="completed-score-val" id="completed-score-val">0 / 0</span>
+                </div>
+                <div class="completed-score-item">
+                    <span class="completed-score-lbl">Percentage</span>
+                    <span class="completed-score-val" id="completed-pct-val" style="color: #0071E3;">0%</span>
+                </div>
+                <div class="completed-score-item">
+                    <span class="completed-score-lbl">Grade</span>
+                    <span class="completed-score-val" id="completed-grade-val" style="color: #16A34A;">A1</span>
+                </div>
+                <div class="completed-score-item">
+                    <span class="completed-score-lbl">Status</span>
+                    <span class="completed-score-val" style="color: #059669; font-size: 0.95rem;">✓ 100% Graded</span>
+                </div>
+            </div>
+
+            <p class="completed-prompt-desc">All questions have been evaluated. Would you like to review the paper or save and proceed to the next student?</p>
+
+            <div class="completed-dialog-footer">
+                <button type="button" class="btn-completed-recheck" id="btn-completed-recheck">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+                    <span>Re-check Paper</span>
+                </button>
+                <button type="button" class="btn-completed-save-next" id="btn-completed-save-next">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    <span>Save &amp; Go Next Student →</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Toast Notifications Root -->
     <div class="toast-container" id="toast-container"></div>
 
@@ -1356,25 +1414,25 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
     <!-- Application Script Modules (Cache-busted for cross-device consistency) -->
-    <script src="js/firebase-config.js?v=6.1"></script>
-    <script src="js/mock-data.js?v=6.1"></script>
-    <script src="js/storage.js?v=6.1"></script>
-    <script src="js/canvas-engine.js?v=6.1"></script>
-    <script src="js/marking-panel.js?v=6.1"></script>
-    <script src="js/pdf-generator.js?v=6.1"></script>
-    <script src="js/bulk-report.js?v=6.1"></script>
-    <script src="js/dashboard.js?v=6.1"></script>
-    <script src="js/history.js?v=6.1"></script>
-    <script src="js/eval-form.js?v=6.1"></script>
-    <script src="js/upload-portal.js?v=6.1"></script>
-    <script src="js/classes-page.js?v=6.1"></script>
-    <script src="js/uploaded-papers-page.js?v=6.1"></script>
-    <script src="js/settings-page.js?v=6.1"></script>
-    <script src="js/user-management-page.js?v=6.1"></script>
-    <script src="js/correction-marks-page.js?v=6.1"></script>
-    <script src="js/admin-panel.js?v=6.1"></script>
-    <script src="js/super-admin.js?v=6.1"></script>
-    <script src="js/share-manager.js?v=6.1"></script>
-    <script src="js/app.js?v=6.1"></script>
+    <script src="js/firebase-config.js?v=6.2"></script>
+    <script src="js/mock-data.js?v=6.2"></script>
+    <script src="js/storage.js?v=6.2"></script>
+    <script src="js/canvas-engine.js?v=6.2"></script>
+    <script src="js/marking-panel.js?v=6.2"></script>
+    <script src="js/pdf-generator.js?v=6.2"></script>
+    <script src="js/bulk-report.js?v=6.2"></script>
+    <script src="js/dashboard.js?v=6.2"></script>
+    <script src="js/history.js?v=6.2"></script>
+    <script src="js/eval-form.js?v=6.2"></script>
+    <script src="js/upload-portal.js?v=6.2"></script>
+    <script src="js/classes-page.js?v=6.2"></script>
+    <script src="js/uploaded-papers-page.js?v=6.2"></script>
+    <script src="js/settings-page.js?v=6.2"></script>
+    <script src="js/user-management-page.js?v=6.2"></script>
+    <script src="js/correction-marks-page.js?v=6.2"></script>
+    <script src="js/admin-panel.js?v=6.2"></script>
+    <script src="js/super-admin.js?v=6.2"></script>
+    <script src="js/share-manager.js?v=6.2"></script>
+    <script src="js/app.js?v=6.2"></script>
 </body>
 </html>
