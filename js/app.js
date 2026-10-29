@@ -3394,7 +3394,11 @@ class AppController {
         }
 
         // 2b. MATHEMATICS - strictly only for Mathematics subject!
-        if (!matchedTemplate && evalSubLower.includes("math")) {
+        const isMathMatch = evalSubLower.includes("math") || 
+            evaluation.templateId === "mat-x-rev2-40" || evaluation.templateId === "mat-x-rev1-40" || evaluation.templateId === "mat-x-10th-rev-40" || evaluation.templateId === "mat-x-80" || evaluation.templateId === "mat-xii-80" ||
+            evalTplLower.includes("mathematics") || evalTplLower.includes("math") || evalExamLower.includes("mathematics") || evalExamLower.includes("math") ||
+            evalTplLower === "10th revision" || evalExamLower.includes("10th revision");
+        if (!matchedTemplate && isMathMatch) {
             if (evalClassLower.includes("12") || evalClassLower.includes("xii")) {
                 matchedTemplate = window.MockData?.mathGrade12Template;
             } else if (evalTplLower.includes("revision 2") || evalExamLower.includes("revision 2") || evalTplLower === "10th revision" || evalExamLower.includes("10th revision") || evaluation.templateId === "mat-x-rev2-40" || evaluation.templateId === "mat-x-10th-rev-40") {
@@ -4024,10 +4028,10 @@ class AppController {
                 // Tamil
                 { t: window.MockData.tamilGrade10Revision1Template, s: "Tamil" },
                 // Mathematics
-                { t: window.MockData.mathGrade10Revision2Template, s: "Mathematics" },
                 { t: window.MockData.mathGrade10Revision1Template, s: "Mathematics" },
-                { t: window.MockData.mathGrade12Template, s: "Mathematics" },
+                { t: window.MockData.mathGrade10Revision2Template, s: "Mathematics" },
                 { t: window.MockData.mathGrade10Template, s: "Mathematics" },
+                { t: window.MockData.mathGrade12Template, s: "Mathematics" },
                 // English
                 { t: window.MockData.englishTemplate, s: "English" },
                 { t: window.MockData.englishGrade12ObjSubjTemplate, s: "English" },

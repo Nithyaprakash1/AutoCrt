@@ -561,9 +561,15 @@ class StorageService {
                 if (merged.subject) {
                     const originalTpl = merged.templateName;
                     const originalExam = merged.examName;
+                    const originalTplId = merged.templateId;
                     merged.templateName = this.harmonizeTemplateForSubject(merged.templateName, merged.subject);
                     merged.examName = this.harmonizeTemplateForSubject(merged.examName, merged.subject);
-                    if (merged.templateName !== originalTpl || merged.examName !== originalExam) {
+                    if (merged.templateId === "mat-x-10th-rev-40" || (merged.templateName === "10 MATHEMATICS - Revision 2 Objective" && !merged.templateId)) {
+                        merged.templateId = "mat-x-rev2-40";
+                    } else if (merged.templateName === "10 MATHEMATICS - Revision 1 Objective" && !merged.templateId) {
+                        merged.templateId = "mat-x-rev1-40";
+                    }
+                    if (merged.templateName !== originalTpl || merged.examName !== originalExam || merged.templateId !== originalTplId) {
                         try { this._saveEvaluationToIndexedDB(merged); } catch (e) {}
                     }
                 }
@@ -651,7 +657,7 @@ class StorageService {
         if (s.includes('bio') || s.includes('botany') || s.includes('zoology') || s.includes('life sci') || s.includes('bio-')) return 'biology';
         if (s.includes('chem') || s.includes('che-')) return 'chemistry';
         if (s.includes('physic') || s === 'phy' || s.startsWith('phy ') || s.includes('phy-')) return 'physics';
-        if (s.includes('math') || s.includes('mat-x') || s.includes('mat-xii') || s.includes('mat x') || s.includes('mat xii') || s.includes('10th math') || s.includes('10 math')) return 'mathematics';
+        if (s.includes('math') || s.includes('mat-x') || s.includes('mat-xii') || s.includes('mat x') || s.includes('mat xii') || s.includes('10th math') || s.includes('10 math') || s === '10th revision' || s === 'revision 2 - objective' || s === 'revision 2 objective') return 'mathematics';
         if (s.includes('english') || s.includes('eng') || s.includes('eng-')) return 'english';
         if (s.includes('econom') || s.includes('ecom') || s === 'eco' || s.startsWith('eco ') || s.endsWith(' eco') || s.includes('eco-') || s.includes('eco_') || s === 'econ' || s === 'ec') return 'economics';
         if (s.includes('histor')) return 'history';
@@ -669,6 +675,42 @@ class StorageService {
         const cleanSub = String(subject).trim();
         const canon = this.canonicalizeSubject(cleanSub);
         const isClass12 = /\b(12|xii|grade\s*12|class\s*12)\b/i.test(String(className || templateName));
+
+        // When the paper is Mathematics:
+        if (canon === 'mathematics') {
+            const tLower = String(templateName).toLowerCase().trim();
+            // Handle Grade 10 Mathematics Revision 2 Objective
+            if (
+                tLower === '10th revision' ||
+                tLower === '10th revision - 2 objective' ||
+                tLower === 'revision 2 - objective' ||
+                tLower === 'revision 2 objective' ||
+                tLower === 'revision 2' ||
+                tLower === 'maths revision 2' ||
+                tLower.includes('revision 2') ||
+                tLower.includes('revision-2') ||
+                tLower.includes('rev 2') ||
+                tLower.includes('rev2')
+            ) {
+                return '10 MATHEMATICS - Revision 2 Objective';
+            }
+            // Handle Grade 10 Mathematics Revision 1 Objective
+            if (
+                tLower === 'std 10 maths revision 1 - 40 marks' ||
+                tLower === 'revision 1 objective 2026' ||
+                tLower === 'revision 1 - objective' ||
+                tLower === 'revision 1 objective' ||
+                tLower === 'revision 1' ||
+                tLower === 'maths revision 1' ||
+                tLower.includes('revision 1') ||
+                tLower.includes('revision-1') ||
+                tLower.includes('rev 1') ||
+                tLower.includes('rev1')
+            ) {
+                return '10 MATHEMATICS - Revision 1 Objective';
+            }
+            return templateName;
+        }
 
         if (canon !== 'mathematics' && /mathematics|maths|math\b/i.test(templateName)) {
             let replaced = templateName.replace(/\b(10th\s+|10\s+|Grade\s+10\s+|STD\s+10\s+)?(MATHEMATICS|MATHS|MATH)\b/gi, (match, prefix) => {
@@ -744,7 +786,7 @@ class StorageService {
             return combined.includes('physic') || combined.includes('phy-') || combined.startsWith('phy ') || combined.endsWith(' phy') || /\bphy\b/.test(combined);
         }
         if (cTarget === 'mathematics') {
-            return combined.includes('math') || combined.includes('mat-x') || combined.includes('mat-xii') || combined.includes('mat x') || combined.includes('mat xii') || combined.includes('10th math') || combined.includes('10 math');
+            return combined.includes('math') || combined.includes('mat-x') || combined.includes('mat-xii') || combined.includes('mat x') || combined.includes('mat xii') || combined.includes('10th math') || combined.includes('10 math') || combined.includes('10th revision') || (combined.includes('revision 2') && !combined.includes('eco') && !combined.includes('chem') && !combined.includes('phy') && !combined.includes('bio'));
         }
         if (cTarget === 'tamil') {
             return combined.includes('tamil') || combined.includes('tam-') || combined.startsWith('tam ') || combined.endsWith(' tam') || /\btam\b/.test(combined);
@@ -1586,21 +1628,174 @@ class StorageService {
         }
     }
 
+    syncCatalogBlueprints(catalog) {
+        if (!Array.isArray(catalog) || catalog.length === 0) return { catalog, modified: false };
+        let modified = false;
+
+        // 1. Synchronize Mathematics
+        let mathSub = catalog.find(s => s && (s.id === 'mat' || (s.name && s.name.toLowerCase().trim() === 'mathematics')));
+        if (!mathSub) {
+            mathSub = {
+                id: "mat",
+                name: "Mathematics",
+                code: "MAT-301",
+                badge: "4 Templates",
+                description: "Class 10 & 12 Mathematics Assessments & 10th Revision",
+                templates: []
+            };
+            catalog.push(mathSub);
+            modified = true;
+        }
+
+        if (!Array.isArray(mathSub.templates)) {
+            mathSub.templates = [];
+            modified = true;
+        }
+
+        const mathRev1Blueprint = window.MockData?.mathGrade10Revision1Template;
+        const mathRev2Blueprint = window.MockData?.mathGrade10Revision2Template;
+
+        // Target Revision 2 Blueprint
+        const targetRev2 = {
+            id: "mat-x-rev2-40",
+            name: "10 MATHEMATICS - Revision 2 Objective",
+            examName: "Revision 2 - Objective",
+            subject: "Mathematics",
+            maxMarks: 40,
+            duration: "1 Hour",
+            badge: "Revision 2 Blueprint",
+            sections: mathRev2Blueprint ? JSON.parse(JSON.stringify(mathRev2Blueprint.sections)) : [
+                { id: "sec_a", letter: "A", name: "Section A", title: "Sec A: 28 Qs (28M)", qStartNo: 1, qEndNo: 28, qCount: 28, marksPerQ: 1, maxMarks: 28, secTotal: 28, hasChoice: false, hasSubQuestions: false, subQuestions: [] },
+                {
+                    id: "sec_b", letter: "B", name: "Section B", title: "Sec B: 3 Qs (12M)", qStartNo: 29, qEndNo: 31, qCount: 3, marksPerQ: 4, maxMarks: 12, secTotal: 12, hasChoice: false, hasSubQuestions: true, subQuestionNumbers: "Q29, Q30, Q31",
+                    subQuestions: [
+                        { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
+                        { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
+                        { id: "iii", subId: "iii", letter: "iii", label: "(iii) [Either (a) or (b)]", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: true, isChoice: true, choiceLabel: "Either (a) or (b)", choices: ["Option (a)", "Option (b)"], selectedChoice: "Option (a)" }
+                    ]
+                }
+            ],
+            questions: mathRev2Blueprint ? JSON.parse(JSON.stringify(mathRev2Blueprint.questions)) : []
+        };
+
+        // Check for Revision 2 in mathSub.templates
+        let rev2Idx = mathSub.templates.findIndex(t => 
+            t && (
+                t.id === "mat-x-rev2-40" || 
+                t.id === "mat-x-10th-rev-40" ||
+                t.name === "10 MATHEMATICS - Revision 2 Objective" ||
+                t.name === "10th Revision" ||
+                t.examName === "10th Revision - 2 Objective" ||
+                t.examName === "Revision 2 - Objective" ||
+                (t.name && t.name.toLowerCase().includes("revision 2")) ||
+                (t.examName && t.examName.toLowerCase().includes("revision 2"))
+            )
+        );
+
+        if (rev2Idx === -1) {
+            // Find Revision 1 to insert right after, or unshift
+            const rev1Idx = mathSub.templates.findIndex(t => t && (t.id === "mat-x-rev1-40" || (t.name && t.name.toLowerCase().includes("revision 1"))));
+            if (rev1Idx !== -1) {
+                mathSub.templates.splice(rev1Idx + 1, 0, targetRev2);
+            } else {
+                mathSub.templates.unshift(targetRev2);
+            }
+            modified = true;
+        } else {
+            const curr = mathSub.templates[rev2Idx];
+            if (curr.id !== targetRev2.id || curr.name !== targetRev2.name || curr.examName !== targetRev2.examName || curr.maxMarks !== 40 || !curr.questions || curr.questions.length !== 31) {
+                mathSub.templates[rev2Idx] = Object.assign({}, curr, targetRev2);
+                modified = true;
+            }
+        }
+
+        // Target Revision 1 Blueprint
+        const targetRev1 = {
+            id: "mat-x-rev1-40",
+            name: "10 MATHEMATICS - Revision 1 Objective",
+            examName: "Revision 1 Objective 2026",
+            subject: "Mathematics",
+            maxMarks: 40,
+            duration: "1 Hour",
+            badge: "Revision 1 Blueprint",
+            sections: mathRev1Blueprint ? JSON.parse(JSON.stringify(mathRev1Blueprint.sections)) : [],
+            questions: mathRev1Blueprint ? JSON.parse(JSON.stringify(mathRev1Blueprint.questions)) : []
+        };
+        let rev1Idx = mathSub.templates.findIndex(t => 
+            t && (
+                t.id === "mat-x-rev1-40" || 
+                t.name === "10 MATHEMATICS - Revision 1 Objective" ||
+                t.name === "STD 10 Maths REVISION 1 - 40 marks" ||
+                t.examName === "Revision 1 Objective 2026" ||
+                (t.name && t.name.toLowerCase().includes("revision 1") && t.name.toLowerCase().includes("math"))
+            )
+        );
+        if (rev1Idx === -1) {
+            mathSub.templates.unshift(targetRev1);
+            modified = true;
+        } else {
+            const curr = mathSub.templates[rev1Idx];
+            if (curr.id !== targetRev1.id || curr.name !== targetRev1.name || curr.maxMarks !== 40 || !curr.questions || curr.questions.length !== 31) {
+                mathSub.templates[rev1Idx] = Object.assign({}, curr, targetRev1);
+                modified = true;
+            }
+        }
+
+        // Deduplicate Mathematics templates
+        const seenIds = new Set();
+        const initialCount = mathSub.templates.length;
+        mathSub.templates = mathSub.templates.filter(t => {
+            if (!t) return false;
+            if (t.id === "mat-x-10th-rev-40" || (t.name === "10th Revision" && t.id !== "mat-x-rev2-40")) {
+                return false;
+            }
+            if (seenIds.has(t.id)) return false;
+            seenIds.add(t.id);
+            return true;
+        });
+        if (mathSub.templates.length !== initialCount) {
+            modified = true;
+        }
+
+        const tplCount = mathSub.templates.length;
+        mathSub.badge = tplCount === 1 ? "1 Template" : `${tplCount} Templates`;
+
+        return { catalog, modified };
+    }
+
     async getSubjectCatalog() {
         await this.readyPromise;
+        let catalog = null;
         if (window.firebaseManager && window.firebaseManager.isConnected) {
             try {
                 const fbCatalog = await window.firebaseManager.getSubjectCatalog();
-                if (fbCatalog) return fbCatalog;
+                if (fbCatalog) catalog = fbCatalog;
             } catch (e) {}
         }
 
-        try {
-            const raw = localStorage.getItem("niprak_custom_catalog") || localStorage.getItem("onespace_custom_catalog");
-            if (raw) return JSON.parse(raw);
-        } catch (e) {
-            console.error("Error loading custom catalog", e);
+        if (!catalog) {
+            try {
+                const raw = localStorage.getItem("niprak_custom_catalog") || localStorage.getItem("onespace_custom_catalog");
+                if (raw) catalog = JSON.parse(raw);
+            } catch (e) {
+                console.error("Error loading custom catalog", e);
+            }
         }
+
+        if (!catalog && window.uploadPortal && window.uploadPortal.catalog) {
+            catalog = window.uploadPortal.catalog;
+        }
+
+        if (catalog && Array.isArray(catalog) && catalog.length > 0) {
+            const syncResult = this.syncCatalogBlueprints(catalog);
+            if (syncResult && syncResult.modified) {
+                try {
+                    await this.saveSubjectCatalog(syncResult.catalog);
+                } catch (e) {}
+            }
+            return syncResult ? syncResult.catalog : catalog;
+        }
+
         return null;
     }
 

@@ -432,39 +432,6 @@ class UploadPortalManager {
                 badge: "4 Templates",
                 description: "Class 10 & 12 Mathematics Assessments & 10th Revision",
                 templates: [
-                    window.MockData && window.MockData.mathGrade10Revision2Template ? window.MockData.mathGrade10Revision2Template : {
-                        id: "mat-x-rev2-40",
-                        name: "10 MATHEMATICS - Revision 2 Objective",
-                        examName: "Revision 2 - Objective",
-                        subject: "Mathematics",
-                        maxMarks: 40,
-                        duration: "1 Hour",
-                        badge: "Revision 2 Blueprint",
-                        sections: [
-                            { id: "sec_a", letter: "A", name: "Section A", title: "Sec A: 28 Qs (28M)", qStartNo: 1, qEndNo: 28, qCount: 28, marksPerQ: 1, maxMarks: 28, secTotal: 28, hasChoice: false, hasSubQuestions: false, subQuestions: [] },
-                            {
-                                id: "sec_b",
-                                letter: "B",
-                                name: "Section B",
-                                title: "Sec B: 3 Qs (12M)",
-                                qStartNo: 29,
-                                qEndNo: 31,
-                                qCount: 3,
-                                marksPerQ: 4,
-                                maxMarks: 12,
-                                secTotal: 12,
-                                hasChoice: false,
-                                hasSubQuestions: true,
-                                subQuestionNumbers: "Q29, Q30, Q31",
-                                subQuestions: [
-                                    { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
-                                    { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
-                                    { id: "iii", subId: "iii", letter: "iii", label: "(iii) [Either (a) or (b)]", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: true, isChoice: true, choiceLabel: "Either (a) or (b)" }
-                                ]
-                            }
-                        ],
-                        questions: []
-                    },
                     window.MockData && window.MockData.mathGrade10Revision1Template ? window.MockData.mathGrade10Revision1Template : {
                         id: "mat-x-rev1-40",
                         name: "10 MATHEMATICS - Revision 1 Objective",
@@ -493,6 +460,39 @@ class UploadPortalManager {
                                     { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
                                     { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false },
                                     { id: "iii", subId: "iii", letter: "iii", label: "(iii)", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: false }
+                                ]
+                            }
+                        ],
+                        questions: []
+                    },
+                    window.MockData && window.MockData.mathGrade10Revision2Template ? window.MockData.mathGrade10Revision2Template : {
+                        id: "mat-x-rev2-40",
+                        name: "10 MATHEMATICS - Revision 2 Objective",
+                        examName: "Revision 2 - Objective",
+                        subject: "Mathematics",
+                        maxMarks: 40,
+                        duration: "1 Hour",
+                        badge: "Revision 2 Blueprint",
+                        sections: [
+                            { id: "sec_a", letter: "A", name: "Section A", title: "Sec A: 28 Qs (28M)", qStartNo: 1, qEndNo: 28, qCount: 28, marksPerQ: 1, maxMarks: 28, secTotal: 28, hasChoice: false, hasSubQuestions: false, subQuestions: [] },
+                            {
+                                id: "sec_b",
+                                letter: "B",
+                                name: "Section B",
+                                title: "Sec B: 3 Qs (12M)",
+                                qStartNo: 29,
+                                qEndNo: 31,
+                                qCount: 3,
+                                marksPerQ: 4,
+                                maxMarks: 12,
+                                secTotal: 12,
+                                hasChoice: false,
+                                hasSubQuestions: true,
+                                subQuestionNumbers: "Q29, Q30, Q31",
+                                subQuestions: [
+                                    { id: "i", subId: "i", letter: "i", label: "(i)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
+                                    { id: "ii", subId: "ii", letter: "ii", label: "(ii)", marks: 1, maxMarks: 1, awardedMarks: 0, hasChoice: false, isChoice: false },
+                                    { id: "iii", subId: "iii", letter: "iii", label: "(iii) [Either (a) or (b)]", marks: 2, maxMarks: 2, awardedMarks: 0, hasChoice: true, isChoice: true, choiceLabel: "Either (a) or (b)", choices: ["Option (a)", "Option (b)"], selectedChoice: "Option (a)" }
                                 ]
                             }
                         ],
@@ -837,10 +837,21 @@ class UploadPortalManager {
                                 t.id === defTpl.id || 
                                 t.name === defTpl.name ||
                                 (defTpl.id === "mat-x-rev1-40" && (
+                                    t.id === "mat-x-rev1-40" ||
                                     t.name === "STD 10 Maths REVISION 1 - 40 marks" ||
                                     t.name === "10 MATHEMATICS - Revision 1 Objective" ||
                                     t.examName === "Revision 1 Objective 2026" ||
                                     (t.name && t.name.toLowerCase().includes("revision 1") && t.name.toLowerCase().includes("math"))
+                                )) ||
+                                (defTpl.id === "mat-x-rev2-40" && (
+                                    t.id === "mat-x-rev2-40" ||
+                                    t.id === "mat-x-10th-rev-40" ||
+                                    t.name === "10th Revision" ||
+                                    t.name === "10 MATHEMATICS - Revision 2 Objective" ||
+                                    t.examName === "10th Revision - 2 Objective" ||
+                                    t.examName === "Revision 2 - Objective" ||
+                                    (t.name && t.name.toLowerCase().includes("revision 2")) ||
+                                    (t.examName && t.examName.toLowerCase().includes("revision 2"))
                                 ))
                             );
                             if (tplIndex === -1) {
@@ -884,6 +895,18 @@ class UploadPortalManager {
                                     }
                                 }
                             }
+                        });
+
+                        // Deduplicate templates: Purge legacy mat-x-10th-rev-40 if mat-x-rev2-40 exists, and deduplicate by ID
+                        const seenTplIds = new Set();
+                        existingSub.templates = existingSub.templates.filter(t => {
+                            if (!t) return false;
+                            if (t.id === "mat-x-10th-rev-40" && existingSub.templates.some(other => other && other.id === "mat-x-rev2-40")) {
+                                return false;
+                            }
+                            if (seenTplIds.has(t.id)) return false;
+                            seenTplIds.add(t.id);
+                            return true;
                         });
                     }
                 });
