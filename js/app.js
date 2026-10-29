@@ -3343,353 +3343,50 @@ class AppController {
             evaluation.pages = [CanvasEngine.generateDefaultLinedPageDataUrl(evaluation.studentName, evaluation.rollNo, evaluation.subject)];
         }
 
-        // Retrieve fresh custom subject catalog if available to find active template definition
-        let catalog = null;
-        if (window.appStorage) {
-            catalog = await window.appStorage.getSubjectCatalog();
-        }
-        if (!catalog && window.uploadPortal && window.uploadPortal.catalog) {
-            catalog = window.uploadPortal.catalog;
+        // Direct PDF Correction Workflow: Preserve paper questions, marks, and annotations 100%!
+        if (!evaluation.maxMarks || evaluation.maxMarks <= 0) {
+            evaluation.maxMarks = 40;
         }
 
-        const evalSubLower = (evaluation.subject || "").toLowerCase().trim();
-        const evalTplLower = (evaluation.templateName || "").toLowerCase().trim();
-        const evalExamLower = (evaluation.examName || "").toLowerCase().trim();
-        const evalClassLower = (evaluation.className || evaluation.class || "").toLowerCase().trim();
-
-        let matchedTemplate = null;
-
-        // 1. Match from subject catalog, strictly checking subject match
-        if (catalog && Array.isArray(catalog)) {
-            for (const sub of catalog) {
-                const isSubMatch = window.appStorage 
-                    ? window.appStorage.isSubjectMatch(sub.name, '', evaluation.subject, '')
-                    : (sub.name || "").toLowerCase().includes(evalSubLower);
-                if (!isSubMatch) continue;
-
-                if (Array.isArray(sub.templates)) {
-                    for (const tpl of sub.templates) {
-                        if (evaluation.templateId && tpl.id === evaluation.templateId) {
-                            matchedTemplate = tpl;
-                            break;
-                        }
-                        if (evaluation.templateName && (tpl.name === evaluation.templateName || tpl.examName === evaluation.templateName)) {
-                            matchedTemplate = tpl;
-                            break;
-                        }
-                        if (evaluation.examName && (tpl.examName === evaluation.examName || tpl.name === evaluation.examName)) {
-                            matchedTemplate = tpl;
-                            break;
-                        }
-                    }
-                }
-                if (matchedTemplate) break;
-            }
-        }
-
-        // 2. Built-in blueprints from MockData - STRICTLY gated by respective subject!
-        // 2a. TAMIL (Grade 10 Revision 1: 40 Qs, all 1 Mark each = 40 Marks)
-        if (!matchedTemplate && evalSubLower.includes("tamil")) {
-            matchedTemplate = window.MockData?.tamilGrade10Revision1Template;
-        }
-
-        // 2b. MATHEMATICS - strictly only for Mathematics subject!
-        const isMathMatch = evalSubLower.includes("math") || 
-            evaluation.templateId === "mat-x-rev2-40" || evaluation.templateId === "mat-x-rev1-40" || evaluation.templateId === "mat-x-10th-rev-40" || evaluation.templateId === "mat-x-80" || evaluation.templateId === "mat-xii-80" ||
-            evalTplLower.includes("mathematics") || evalTplLower.includes("math") || evalExamLower.includes("mathematics") || evalExamLower.includes("math") ||
-            evalTplLower === "10th revision" || evalExamLower.includes("10th revision");
-        if (!matchedTemplate && isMathMatch) {
-            if (evalClassLower.includes("12") || evalClassLower.includes("xii")) {
-                matchedTemplate = window.MockData?.mathGrade12Template;
-            } else if (evalTplLower.includes("revision 2") || evalExamLower.includes("revision 2") || evalTplLower === "10th revision" || evalExamLower.includes("10th revision") || evaluation.templateId === "mat-x-rev2-40" || evaluation.templateId === "mat-x-10th-rev-40") {
-                matchedTemplate = window.MockData?.mathGrade10Revision2Template;
-            } else if (evalTplLower.includes("80") || evaluation.maxMarks === 80 || evaluation.templateId === "mat-x-standard-80") {
-                matchedTemplate = window.MockData?.mathGrade10Template;
-            } else {
-                matchedTemplate = window.MockData?.mathGrade10Revision1Template;
-            }
-        }
-
-        // 2c. BIOLOGY (13 Qs / 35M or 40M Revision 1 Subjective, 33 Qs Board, or 21 Qs Grade 10)
-        const isBioSubject = evalSubLower.includes("bio") || evalSubLower.includes("botany") || evalSubLower.includes("zoology") || evalSubLower.includes("life sci");
-        if (!matchedTemplate && isBioSubject) {
-            if (evalClassLower.includes("10") || evalClassLower.includes("x") || evaluation.templateId === "bio-x-30") {
-                matchedTemplate = window.MockData?.scienceGrade10BiologyTemplate;
-            } else if (evaluation.maxMarks === 40 || evalTplLower.includes("40") || evalExamLower.includes("40")) {
-                matchedTemplate = window.MockData?.biologyRevision1Subjective40Template;
-            } else if (evalTplLower.includes("board") || evaluation.templateId === "bio-cbse-12" || (evaluation.questions && evaluation.questions.length === 33)) {
-                matchedTemplate = window.MockData?.biologyClass12BoardTemplate;
-            } else {
-                matchedTemplate = window.MockData?.biologyRevision1SubjectiveTemplate;
-            }
-        }
-
-        // 2d. CHEMISTRY (13 Qs / 35M Revision 1 Subjective, 33 Qs Board, or 16 Qs Grade 10)
-        const isChemSubject = evalSubLower.includes("chem");
-        if (!matchedTemplate && isChemSubject) {
-            if (evalClassLower.includes("10") || evalClassLower.includes("x") || evaluation.templateId === "che-x-26") {
-                matchedTemplate = window.MockData?.scienceGrade10ChemistryTemplate;
-            } else if (evalTplLower.includes("board") || evaluation.templateId === "che-cbse-70" || (evaluation.questions && evaluation.questions.length === 33)) {
-                matchedTemplate = window.MockData?.chemistryClass12BoardTemplate;
-            } else {
-                matchedTemplate = window.MockData?.chemistryRevision1SubjectiveTemplate;
-            }
-        }
-
-        // 2e. PHYSICS (53 Qs / 80M, 49 Qs / 80M, 33 Qs / 70M)
-        const isPhysSubject = evalSubLower.includes("physic");
-        if (!matchedTemplate && isPhysSubject) {
-            if (evalTplLower.includes("revision test 1") || evaluation.templateId === "g12-rev1-80" || (evaluation.questions && evaluation.questions.length === 49)) {
-                matchedTemplate = window.MockData?.grade12RevisionTest1Template;
-            } else if (evalTplLower.includes("revision 1") || evaluation.templateId === "phy-rev1-80" || (evaluation.questions && evaluation.questions.length === 53)) {
-                matchedTemplate = window.MockData?.physicsRevision1Template;
-            } else {
-                matchedTemplate = window.MockData?.physicsTemplate;
-            }
-        }
-
-        // 2f. ENGLISH (59 Qs / 80M: 40 Objective + 40 Subjective, or 13 Qs / 80M)
-        const isEngSubject = evalSubLower.includes("english") || evalSubLower.includes("eng");
-        if (!matchedTemplate && isEngSubject) {
-            if (evalTplLower.includes("objective") || evalTplLower.includes("subjective") || evaluation.templateId === "eng-xii-rev-80" || (evaluation.questions && evaluation.questions.length === 59)) {
-                matchedTemplate = window.MockData?.englishGrade12ObjSubjTemplate;
-            } else {
-                matchedTemplate = window.MockData?.englishTemplate || window.MockData?.englishGrade12ObjSubjTemplate;
-            }
-        }
-
-        // 2g. SOCIAL SCIENCE (52 Qs / 80M Revision 1)
-        const isSocialSubject = evalSubLower.includes("social");
-        if (!matchedTemplate && isSocialSubject) {
-            matchedTemplate = window.MockData?.socialGrade10Revision1Template;
-        }
-
-        // 2h. SCIENCE (Grade 10 Biology / Chemistry)
-        const isScienceGeneral = evalSubLower.includes("science") && !isSocialSubject;
-        if (!matchedTemplate && isScienceGeneral) {
-            if (evalTplLower.includes("bio") || evalExamLower.includes("bio")) {
-                matchedTemplate = window.MockData?.scienceGrade10BiologyTemplate;
-            } else if (evalTplLower.includes("chem") || evalExamLower.includes("chem")) {
-                matchedTemplate = window.MockData?.scienceGrade10ChemistryTemplate;
-            } else {
-                matchedTemplate = window.MockData?.scienceGrade10BiologyTemplate;
-            }
-        }
-
-        // 2i. Humanities & Commerce
-        if (!matchedTemplate && (evalSubLower.includes("politic") || evalSubLower.includes("pol sci"))) {
-            matchedTemplate = window.MockData?.politicalScienceTemplate;
-        } else if (!matchedTemplate && (evalSubLower.includes("econom") || evalSubLower.includes("ecom") || evalSubLower === "eco" || evalSubLower.startsWith("eco ") || evalTplLower.includes("econom") || evalExamLower.includes("econom"))) {
-            matchedTemplate = window.MockData?.economicsTemplate;
-        } else if (!matchedTemplate && evalSubLower.includes("history")) {
-            matchedTemplate = window.MockData?.historyRevision1Template;
-        } else if (!matchedTemplate && evalSubLower.includes("entrep")) {
-            matchedTemplate = window.MockData?.entrepreneurshipGrade12Template;
-        } else if (!matchedTemplate && evalSubLower.includes("account")) {
-            matchedTemplate = window.MockData?.accountancyGrade12Template;
-        } else if (!matchedTemplate && (evalSubLower.includes("business") || evalSubLower.includes("bst"))) {
-            matchedTemplate = window.MockData?.businessStudiesGrade12Template;
-        } else if (!matchedTemplate && (evalSubLower.includes("informatics") || evalSubLower === "ip" || evalSubLower.includes("info prac"))) {
-            matchedTemplate = window.MockData?.informaticsPracticesGrade12Template;
-        } else if (!matchedTemplate && (evalSubLower.includes("computer") || evalSubLower === "cs")) {
-            matchedTemplate = window.MockData?.computerScienceGrade12Template;
-        } else if (!matchedTemplate && evalSubLower.includes("french")) {
-            matchedTemplate = (evalClassLower.includes("10") || evalClassLower.includes("x"))
-                ? window.MockData?.frenchGrade10Template
-                : window.MockData?.frenchGrade12Template;
-        }
-
-        // 3. Questions integrity and preservation check:
-        const hasExistingQuestions = Array.isArray(evaluation.questions) && evaluation.questions.length > 0;
-        const isCorruptedWithMathTpl = !evalSubLower.includes("math") && (
-            evaluation.templateId === "mat-x-rev1-40" ||
-            evaluation.templateId === "mat-x-rev2-40" ||
-            evaluation.templateId === "mat-x-10th-rev-40" ||
-            (hasExistingQuestions && evaluation.questions.length === 31 && evaluation.maxMarks === 40 && (
-                evalSubLower.includes("chem") ||
-                evalSubLower.includes("bio") ||
-                evalSubLower.includes("eng") ||
-                evalSubLower.includes("social") ||
-                evalSubLower.includes("physic") ||
-                evalSubLower.includes("entrep") ||
-                evalSubLower.includes("econom") ||
-                evalSubLower.includes("politic") ||
-                evalSubLower.includes("history") ||
-                evalSubLower.includes("science") ||
-                evalSubLower.includes("tamil")
-            ))
-        );
-
-        if (matchedTemplate) {
-            // SHIELD: If paper already has valid questions AND is NOT corrupted with the wrong math template:
-            // KEEP questions, sections, and maxMarks completely intact! Never wipe, truncate or degrade marks!
-            if (hasExistingQuestions && !isCorruptedWithMathTpl) {
-                evaluation.templateId = evaluation.templateId || matchedTemplate.id;
-                evaluation.templateName = evaluation.templateName || matchedTemplate.name;
-                evaluation.maxMarks = evaluation.maxMarks || matchedTemplate.maxMarks || 40;
-                if (!evaluation.sections || evaluation.sections.length === 0) {
-                    evaluation.sections = JSON.parse(JSON.stringify(matchedTemplate.sections || []));
-                }
-            } else {
-                // Only populate / restore questions when evaluation has NO questions OR was corrupted!
-                let tplQuestions = (matchedTemplate.questions && matchedTemplate.questions.length > 0)
-                    ? matchedTemplate.questions
-                    : [];
-
-                if (tplQuestions.length === 0 && matchedTemplate.sections && Array.isArray(matchedTemplate.sections)) {
-                    let syntheticQNo = 1;
-                    matchedTemplate.sections.forEach(sec => {
-                        const start = sec.qStartNo || syntheticQNo;
-                        const end = sec.qEndNo || (start + (sec.qCount || 1) - 1);
-                        const marks = Number(sec.marksPerQ) || 1;
-                        const secName = sec.title || sec.name || `Section ${sec.letter || 'A'}`;
-                        const secId = sec.id || `sec_${(sec.letter || 'a').toLowerCase()}`;
-                        const isSub = !!sec.hasSubQuestions;
-                        for (let qn = start; qn <= end; qn++) {
-                            const subQs = isSub && Array.isArray(sec.subQuestions) && sec.subQuestions.length > 0
-                                ? sec.subQuestions.map((sq, sqIdx) => ({
-                                    id: sq.id || sq.subId || sq.letter || (sq.label ? sq.label.replace(/[()]/g, '') : String(sqIdx + 1)),
-                                    subId: sq.subId || sq.letter || sq.label || String(sqIdx + 1),
-                                    letter: sq.letter || sq.label || String(sqIdx + 1),
-                                    label: sq.label ? (String(sq.label).startsWith("(") ? sq.label : `(${sq.label})`) : `(${sq.subId || sqIdx + 1})`,
-                                    maxMarks: Number(sq.maxMarks !== undefined ? sq.maxMarks : sq.marks) || 1,
-                                    awardedMarks: 0,
-                                    hasChoice: !!(sq.hasChoice || sq.isChoice),
-                                    isChoice: !!(sq.hasChoice || sq.isChoice),
-                                    choiceLabel: sq.choiceLabel || ""
-                                }))
-                                : [];
-                            tplQuestions.push({
-                                id: `q_${qn}`,
-                                qNo: qn,
-                                qNumber: `Q${qn}`,
-                                label: `Q${qn}`,
-                                section: secName,
-                                sectionId: secId,
-                                maxMarks: marks,
-                                isChoice: !!sec.hasChoice,
-                                hasSubQuestions: isSub && subQs.length > 0,
-                                subQuestions: subQs
-                            });
-                            syntheticQNo = Math.max(syntheticQNo, qn + 1);
-                        }
-                    });
-                }
-
-                evaluation.templateId = matchedTemplate.id;
-                evaluation.templateName = matchedTemplate.name;
-                if (!evaluation.examName || evaluation.examName === "undefined") evaluation.examName = matchedTemplate.examName || matchedTemplate.name;
-                evaluation.maxMarks = matchedTemplate.maxMarks || evaluation.maxMarks || 40;
-                evaluation.sections = JSON.parse(JSON.stringify(matchedTemplate.sections || []));
-
-                // Sync questions: update sections, maxMarks, subQuestions, choices, while rigorously keeping awardedMarks
-                const oldMarksMap = new Map();
-                (evaluation.questions || []).forEach(q => {
-                    const numMarks = Number(q.awardedMarks) || 0;
-                    const subMarksSum = Array.isArray(q.subQuestions) 
-                        ? q.subQuestions.reduce((sum, sq) => sum + (Number(sq.awardedMarks) || 0), 0) 
-                        : 0;
-                    const effectiveMarks = Math.max(numMarks, subMarksSum);
-                    const isGraded = (q.status && q.status !== "unmarked" && q.status !== "pending") || effectiveMarks > 0;
-                    
-                    if (isGraded || q.status === "wrong") {
-                        const qObj = { ...q, awardedMarks: effectiveMarks };
-                        oldMarksMap.set(String(q.qNo), qObj);
-                        oldMarksMap.set(Number(q.qNo), qObj);
-                        if (q.label) {
-                            oldMarksMap.set(String(q.label).toUpperCase().trim(), qObj);
-                            oldMarksMap.set(String(q.label).replace(/[^0-9]/g, ''), qObj);
-                        }
-                    }
+        if (!Array.isArray(evaluation.questions) || evaluation.questions.length === 0) {
+            const qCount = evaluation.totalQuestions || 31;
+            const tMarks = Number(evaluation.maxMarks) || 40;
+            const markPerQ = Math.max(1, Math.round((tMarks / qCount) * 10) / 10);
+            evaluation.questions = [];
+            for (let qn = 1; qn <= qCount; qn++) {
+                evaluation.questions.push({
+                    id: `q_${qn}`,
+                    qNo: qn,
+                    qNumber: `Q${qn}`,
+                    number: `Q${qn}`,
+                    label: `Q${qn}`,
+                    section: "All Questions",
+                    sectionId: "sec_main",
+                    maxMarks: markPerQ,
+                    awardedMarks: null,
+                    obtainedMarks: 0,
+                    status: "unmarked",
+                    remarks: "",
+                    isChoice: false,
+                    hasSubQuestions: false,
+                    subQuestions: []
                 });
-
-                // Also harvest marks from margin annotations if present
-                if (Array.isArray(evaluation.pages)) {
-                    evaluation.pages.forEach(p => {
-                        if (p && Array.isArray(p.annotations)) {
-                            p.annotations.forEach(a => {
-                                if (a.qNo) {
-                                    const qKey = String(a.qNo).replace(/[^0-9]/g, '');
-                                    if (qKey && !oldMarksMap.has(qKey)) {
-                                        const markVal = Number(a.marks || a.stepMarks || a.mark) || 0;
-                                        if (markVal > 0 || a.type === "tick") {
-                                            oldMarksMap.set(qKey, {
-                                                qNo: Number(qKey),
-                                                awardedMarks: markVal,
-                                                status: markVal > 0 || a.type === "tick" ? "correct" : "unmarked"
-                                            });
-                                        }
-                                    }
-                                }
-                            });
-                        }
-                    });
-                }
-
-                const prevEvalObtained = Number(evaluation.obtainedMarks) || 0;
-
-                evaluation.questions = tplQuestions.map(tq => {
-                    const newQ = JSON.parse(JSON.stringify(tq));
-                    const prev = oldMarksMap.get(String(newQ.qNo)) 
-                        || oldMarksMap.get(Number(newQ.qNo)) 
-                        || oldMarksMap.get(String(newQ.label || '').toUpperCase().trim())
-                        || oldMarksMap.get(String(newQ.label || '').replace(/[^0-9]/g, ''));
-                    if (prev) {
-                        if (prev.status === "correct") {
-                            newQ.awardedMarks = newQ.maxMarks;
-                            newQ.status = "correct";
-                        } else if (prev.status === "wrong") {
-                            newQ.awardedMarks = 0;
-                            newQ.status = "wrong";
-                        } else {
-                            const prevAwarded = Math.max(Number(prev.awardedMarks) || 0, (prev.subQuestions || []).reduce((s, sq) => s + (Number(sq.awardedMarks) || 0), 0));
-                            newQ.awardedMarks = Math.min(prevAwarded, newQ.maxMarks);
-                            newQ.status = prev.status || (newQ.awardedMarks === newQ.maxMarks ? "correct" : (newQ.awardedMarks > 0 ? "partial" : "unmarked"));
-                        }
-                        if (newQ.hasSubQuestions && Array.isArray(newQ.subQuestions) && newQ.subQuestions.length > 0) {
-                            if (prev.subQuestions && prev.subQuestions.length === newQ.subQuestions.length) {
-                                newQ.subQuestions.forEach((sq, sIdx) => {
-                                    sq.awardedMarks = Math.min(Number(prev.subQuestions[sIdx].awardedMarks) || 0, sq.maxMarks);
-                                });
-                            } else {
-                                let rem = newQ.awardedMarks;
-                                newQ.subQuestions.forEach(sq => {
-                                    const alloc = Math.min(rem, sq.maxMarks);
-                                    sq.awardedMarks = alloc;
-                                    rem = Math.max(0, rem - alloc);
-                                });
-                            }
-                        }
-                    }
-                    return newQ;
-                });
-
-                // Recalculate obtained total
-                const totalObt = evaluation.questions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
-                evaluation.obtainedMarks = Math.round(Math.max(totalObt, prevEvalObtained) * 10) / 10;
-                if (evaluation.maxMarks > 0) {
-                    evaluation.percentage = Math.round((evaluation.obtainedMarks / evaluation.maxMarks) * 100);
-                }
-                evaluation.grade = evaluation.percentage >= 90 ? "A+" : evaluation.percentage >= 75 ? "A" : evaluation.percentage >= 60 ? "B" : evaluation.percentage >= 40 ? "C" : "F";
-                evaluation.status = evaluation.obtainedMarks > 0 ? (evaluation.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending") ? "Completed" : "In Progress") : (evaluation.status || "Pending");
-
-                // Persist the restored evaluation to storage
-                if (window.appStorage) {
-                    window.appStorage.saveEvaluation(evaluation).catch(err => console.warn("Auto-save evaluation sync warning:", err));
-                }
-            }
-        } else {
-            // When no new template is matched, preserve valid existing evaluation questions!
-            if (!evaluation.questions || evaluation.questions.length === 0) {
-                if (window.MockData?.physicsTemplate) {
-                    evaluation.questions = JSON.parse(JSON.stringify(window.MockData.physicsTemplate.questions));
-                    evaluation.maxMarks = window.MockData.physicsTemplate.maxMarks || 70;
-                    evaluation.sections = window.MockData.physicsTemplate.sections || evaluation.sections || [];
-                }
             }
         }
 
-        this.activeEvaluation = evaluation;
+        if (!Array.isArray(evaluation.sections) || evaluation.sections.length === 0) {
+            evaluation.sections = [{
+                id: "sec_main",
+                name: "All Questions",
+                title: "All Questions",
+                qStartNo: 1,
+                qEndNo: evaluation.questions.length,
+                qCount: evaluation.questions.length,
+                maxMarks: evaluation.maxMarks || 40
+            }];
+        }
+
+                this.activeEvaluation = evaluation;
         this.switchView("workspace");
 
         // Show workspace loading overlay
@@ -3955,160 +3652,24 @@ class AppController {
     }
 
     async populateWorkspaceTemplateSelector(evaluation) {
+        const titleEl = document.getElementById("ws-active-exam-title");
+        const examName = evaluation.examName || evaluation.templateName || "Assessment";
+        const dateStr = evaluation.examDate ? ` • ${evaluation.examDate}` : "";
+        const maxM = evaluation.maxMarks || 40;
+        const examText = `${examName}${dateStr} (${maxM}M)`;
+
+        if (titleEl) {
+            titleEl.textContent = examText;
+        }
+
         const selectEl = document.getElementById("ws-select-template");
-        if (!selectEl) return;
-
-        selectEl.innerHTML = "";
-
-        // Gather all blueprints from catalog + MockData
-        let catalog = null;
-        if (window.appStorage) {
-            catalog = await window.appStorage.getSubjectCatalog();
+        if (selectEl) {
+            selectEl.innerHTML = `<option value="${evaluation.templateId || 'current'}">${examText}</option>`;
+            selectEl.style.display = "none";
         }
-        if (!catalog && window.uploadPortal && window.uploadPortal.catalog) {
-            catalog = window.uploadPortal.catalog;
-        }
-
-        const currentSub = (evaluation.subject || "").trim().toLowerCase();
-        const subTemplates = [];
-        const otherTemplates = [];
-        const seenIds = new Set();
-
-        const addTpl = (tpl, isCurrentSub) => {
-            if (!tpl || !tpl.id || seenIds.has(tpl.id)) return;
-            seenIds.add(tpl.id);
-            const qCount = (tpl.questions && tpl.questions.length > 0)
-                ? tpl.questions.length
-                : (tpl.sections ? tpl.sections.reduce((sum, s) => sum + (Number(s.qCount) || (s.qEndNo ? s.qEndNo - s.qStartNo + 1 : 1)), 0) : 0);
-            const item = {
-                id: tpl.id,
-                name: tpl.name || tpl.examName || "Assessment Blueprint",
-                subject: tpl.subject || "General",
-                qCount: qCount,
-                maxMarks: tpl.maxMarks || 0
-            };
-            if (isCurrentSub) {
-                subTemplates.push(item);
-            } else {
-                otherTemplates.push(item);
-            }
-        };
-
-        // 1. Process from catalog
-        if (catalog && Array.isArray(catalog)) {
-            catalog.forEach(sub => {
-                const isMatchSub = window.appStorage 
-                    ? window.appStorage.isSubjectMatch(sub.name, '', evaluation.subject, '')
-                    : (sub.name || "").toLowerCase().includes(currentSub);
-
-                if (Array.isArray(sub.templates)) {
-                    sub.templates.forEach(t => {
-                        addTpl({ ...t, subject: t.subject || sub.name }, isMatchSub);
-                    });
-                }
-            });
-        }
-
-        // 2. Process built-in MockData templates
-        if (window.MockData) {
-            const mockMap = [
-                // Biology
-                { t: window.MockData.biologyRevision1SubjectiveTemplate, s: "Biology" },
-                { t: window.MockData.biologyRevision1Subjective40Template, s: "Biology" },
-                { t: window.MockData.biologyClass12BoardTemplate, s: "Biology" },
-                { t: window.MockData.scienceGrade10BiologyTemplate, s: "Biology" },
-                // Chemistry
-                { t: window.MockData.chemistryRevision1SubjectiveTemplate, s: "Chemistry" },
-                { t: window.MockData.chemistryClass12BoardTemplate, s: "Chemistry" },
-                { t: window.MockData.scienceGrade10ChemistryTemplate, s: "Chemistry" },
-                // Physics
-                { t: window.MockData.physicsTemplate, s: "Physics" },
-                { t: window.MockData.physicsRevision1Template, s: "Physics" },
-                { t: window.MockData.grade12RevisionTest1Template, s: "Physics" },
-                // Tamil
-                { t: window.MockData.tamilGrade10Revision1Template, s: "Tamil" },
-                // Mathematics
-                { t: window.MockData.mathGrade10Revision1Template, s: "Mathematics" },
-                { t: window.MockData.mathGrade10Revision2Template, s: "Mathematics" },
-                { t: window.MockData.mathGrade10Template, s: "Mathematics" },
-                { t: window.MockData.mathGrade12Template, s: "Mathematics" },
-                // English
-                { t: window.MockData.englishTemplate, s: "English" },
-                { t: window.MockData.englishGrade12ObjSubjTemplate, s: "English" },
-                // Humanities & Social Sciences
-                { t: window.MockData.politicalScienceTemplate, s: "Political Science" },
-                { t: window.MockData.economicsTemplate, s: "Economics" },
-                { t: window.MockData.historyRevision1Template, s: "History" },
-                { t: window.MockData.socialGrade10Revision1Template, s: "Social Science" },
-                { t: window.MockData.entrepreneurshipGrade12Template, s: "Entrepreneurship" }
-            ];
-
-            mockMap.forEach(({ t, s }) => {
-                if (t) {
-                    const isMatchSub = window.appStorage 
-                        ? window.appStorage.isSubjectMatch(s, '', evaluation.subject, '')
-                        : s.toLowerCase().includes(currentSub);
-
-                    addTpl({ ...t, subject: s }, isMatchSub);
-                }
-            });
-        }
-
-        // Build DOM options: STRICTLY respective subject blueprints only!
-        if (subTemplates.length > 0) {
-            const grp = document.createElement("optgroup");
-            grp.label = `${evaluation.subject || 'Subject'} Blueprints`;
-            subTemplates.forEach(t => {
-                const opt = document.createElement("option");
-                opt.value = t.id;
-                opt.textContent = `${t.name} (${t.qCount} Qs / ${t.maxMarks}M)`;
-                grp.appendChild(opt);
-            });
-            selectEl.appendChild(grp);
-        } else if (otherTemplates.length > 0) {
-            // Fallback only if no specific blueprints were matched for this subject
-            otherTemplates.forEach(t => {
-                const opt = document.createElement("option");
-                opt.value = t.id;
-                opt.textContent = `${t.name} (${t.qCount} Qs / ${t.maxMarks}M)`;
-                selectEl.appendChild(opt);
-            });
-        }
-
-        // Select the currently active template
-        let matchedOption = false;
-        if (evaluation.templateId && seenIds.has(evaluation.templateId)) {
-            selectEl.value = evaluation.templateId;
-            matchedOption = true;
-        } else {
-            const evalTplNorm = (evaluation.templateName || evaluation.examName || "").toLowerCase().replace(/[^a-z0-9]/g, "");
-            for (const opt of selectEl.options) {
-                const optNorm = opt.textContent.toLowerCase().replace(/[^a-z0-9]/g, "");
-                if (optNorm.includes(evalTplNorm) || evalTplNorm.includes(optNorm)) {
-                    selectEl.value = opt.value;
-                    matchedOption = true;
-                    break;
-                }
-            }
-        }
-
-        if (!matchedOption) {
-            const customOpt = document.createElement("option");
-            customOpt.value = evaluation.templateId || "current-custom";
-            customOpt.textContent = `[Active] ${evaluation.templateName || evaluation.examName || 'Custom Blueprint'} (${evaluation.questions?.length || 0} Qs / ${evaluation.maxMarks || 0}M)`;
-            customOpt.selected = true;
-            selectEl.insertBefore(customOpt, selectEl.firstChild);
-        }
-
-        // Dropdown onchange listener
-        selectEl.onchange = async (e) => {
-            const chosenId = e.target.value;
-            if (!chosenId || chosenId === "current-custom") return;
-            await this.changeActiveEvaluationTemplate(chosenId);
-        };
     }
 
-    async changeActiveEvaluationTemplate(newTemplateId) {
+        async changeActiveEvaluationTemplate(newTemplateId) {
         if (!this.activeEvaluation) return;
 
         // Locate blueprint from catalog or MockData

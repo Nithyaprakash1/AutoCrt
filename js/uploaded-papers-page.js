@@ -97,14 +97,17 @@ class UploadedPapersPageManager {
         this.papers.forEach(p => {
             const cls = p.classLabel || p.className || p.class || "Class 12-A";
             const sub = p.subject || "General";
-            const rawTpl = p.templateName || p.examName || "Exam Blueprint";
-            const tpl = window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, sub) : rawTpl;
+            const examTitle = p.examName || p.templateName || "Assessment";
+            const dateStr = p.examDate ? ` (${p.examDate})` : '';
+            const tpl = `${examTitle}${dateStr}`;
             const batchKey = `${cls}:::${tpl}`;
             if (!batchMap.has(batchKey)) {
                 batchMap.set(batchKey, {
                     key: batchKey,
                     className: cls,
                     templateName: tpl,
+                    examName: examTitle,
+                    examDate: p.examDate || '',
                     subject: sub,
                     papers: [],
                     total: 0,
@@ -112,7 +115,7 @@ class UploadedPapersPageManager {
                     pending: 0,
                     totalPages: 0,
                     totalBytes: 0,
-                    maxMarks: p.maxMarks || 20
+                    maxMarks: p.maxMarks || 40
                 });
             }
             const b = batchMap.get(batchKey);
@@ -180,8 +183,9 @@ class UploadedPapersPageManager {
             : Boolean(currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher'));
         return this.papers.filter(p => {
             const pCls = p.classLabel || p.className || p.class || "Class 12-A";
-            const rawTpl = p.templateName || p.examName || "Exam Blueprint";
-            const pTpl = window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, p.subject) : rawTpl;
+            const examTitle = p.examName || p.templateName || "Assessment";
+            const dateStr = p.examDate ? ` (${p.examDate})` : '';
+            const pTpl = `${examTitle}${dateStr}`;
             const pKey = `${pCls}:::${pTpl}`;
 
             // Mandatory Teacher subject guard

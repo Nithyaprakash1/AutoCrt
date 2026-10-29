@@ -382,7 +382,7 @@
                             </button>
                         </li>
                         <li class="sidebar-menu-item-wrap" id="side-nav-tamil-test-wrap" style="display: none;">
-                            <button type="button" class="sidebar-menu-item" id="side-nav-tamil-test" title="Interactive Tamil Test Correction (40M Blueprint)">
+                            <button type="button" class="sidebar-menu-item" id="side-nav-tamil-test" title="Interactive Tamil Test Correction">
                                 <span class="sidebar-menu-icon" style="color: #10B981;">✍️</span>
                                 <span class="sidebar-menu-label">Test Me!</span>
                                 <span class="sidebar-menu-badge" style="background: rgba(16, 185, 129, 0.15); color: #10B981; font-weight: 700;">Tamil</span>
@@ -653,14 +653,12 @@
                     <div class="ws-exam-subtitle" id="ws-exam-subtitle-text">Physics • Board Paper 2026</div>
                 </div>
                 <!-- Interactive Template Switcher Dropdown for Teachers -->
-                <div class="ws-template-selector-wrap" id="ws-template-selector-wrap" title="Change Exam Blueprint / Question Template">
+                <div class="ws-template-selector-wrap" id="ws-template-selector-wrap" title="Exam Details">
                     <span class="ws-tpl-select-icon">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
                     </span>
-                    <label for="ws-select-template" class="ws-tpl-select-label">Blueprint:</label>
-                    <select id="ws-select-template" class="ws-template-dropdown" title="Change Exam Blueprint / Question Template">
-                        <!-- Populated dynamically -->
-                    </select>
+                    <span id="ws-active-exam-title" style="font-size: 0.82rem; font-weight: 500; color: #1e293b;">Exam Assessment</span>
+                    <select id="ws-select-template" class="ws-template-dropdown" style="display: none;"></select>
                 </div>
             </div>
 
@@ -1414,27 +1412,27 @@
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-storage-compat.js"></script>
     <!-- Application Script Modules (Cache-busted for cross-device consistency) -->
-    <script src="js/firebase-config.js?v=6.3"></script>
-    <script src="js/mock-data.js?v=6.3"></script>
-    <script src="js/storage.js?v=6.3"></script>
-    <script src="js/canvas-engine.js?v=6.3"></script>
-    <script src="js/marking-panel.js?v=6.3"></script>
-    <script src="js/pdf-generator.js?v=6.3"></script>
-    <script src="js/bulk-report.js?v=6.3"></script>
-    <script src="js/dashboard.js?v=6.3"></script>
-    <script src="js/history.js?v=6.3"></script>
-    <script src="js/eval-form.js?v=6.3"></script>
-    <script src="js/upload-portal.js?v=6.3"></script>
-    <script src="js/classes-page.js?v=6.3"></script>
-    <script src="js/uploaded-papers-page.js?v=6.3"></script>
-    <script src="js/settings-page.js?v=6.3"></script>
-    <script src="js/user-management-page.js?v=6.3"></script>
-    <script src="js/correction-marks-page.js?v=6.3"></script>
-    <script src="js/admin-panel.js?v=6.3"></script>
-    <script src="js/super-admin.js?v=6.3"></script>
-    <script src="js/share-manager.js?v=6.3"></script>
-    <script src="js/app.js?v=6.3"></script>
+    <script src="js/firebase-config.js?v=7.0"></script>
+    <script src="js/mock-data.js?v=7.0"></script>
+    <script src="js/storage.js?v=7.0"></script>
+    <script src="js/canvas-engine.js?v=7.0"></script>
+    <script src="js/marking-panel.js?v=7.0"></script>
+    <script src="js/pdf-generator.js?v=7.0"></script>
+    <script src="js/bulk-report.js?v=7.0"></script>
+    <script src="js/dashboard.js?v=7.0"></script>
+    <script src="js/history.js?v=7.0"></script>
+    <script src="js/eval-form.js?v=7.0"></script>
+    <script src="js/upload-portal.js?v=7.0"></script>
+    <script src="js/classes-page.js?v=7.0"></script>
+    <script src="js/uploaded-papers-page.js?v=7.0"></script>
+    <script src="js/settings-page.js?v=7.0"></script>
+    <script src="js/user-management-page.js?v=7.0"></script>
+    <script src="js/correction-marks-page.js?v=7.0"></script>
+    <script src="js/admin-panel.js?v=7.0"></script>
+    <script src="js/super-admin.js?v=7.0"></script>
+    <script src="js/share-manager.js?v=7.0"></script>
+    <script src="js/app.js?v=7.0"></script>
     <!-- Standalone Vision AI Auto-Evaluator (Opt-In & Non-Destructive) -->
-    <script src="js/ai-auto-evaluator.js?v=6.3"></script>
+    <script src="js/ai-auto-evaluator.js?v=7.0"></script>
 </body>
 </html>

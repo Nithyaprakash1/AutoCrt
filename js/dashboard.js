@@ -257,18 +257,23 @@ class DashboardManager {
 
                 if (!clsMatches) return false;
 
-                // Flexible template matching (harmonized + raw name)
+                // Flexible template matching (exam name + date + raw name)
                 const rawTpl = (e.templateName || e.examName || "").toLowerCase().trim();
+                const examDateStr = e.examDate ? ` (${e.examDate})` : '';
+                const displayTpl = `${rawTpl}${examDateStr}`.toLowerCase().trim();
                 const harmTpl = (window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, e.subject) : rawTpl).toLowerCase().trim();
                 const normTargetTpl = targetTpl.replace(/[^a-z0-9]/g, '');
                 const normRaw = rawTpl.replace(/[^a-z0-9]/g, '');
+                const normDisplay = displayTpl.replace(/[^a-z0-9]/g, '');
                 const normHarm = harmTpl.replace(/[^a-z0-9]/g, '');
 
                 const tplMatches = !normTargetTpl ||
-                    normRaw === normTargetTpl || normHarm === normTargetTpl ||
+                    normRaw === normTargetTpl || normDisplay === normTargetTpl || normHarm === normTargetTpl ||
                     (normRaw && (normRaw.includes(normTargetTpl) || normTargetTpl.includes(normRaw))) ||
+                    (normDisplay && (normDisplay.includes(normTargetTpl) || normTargetTpl.includes(normDisplay))) ||
                     (normHarm && (normHarm.includes(normTargetTpl) || normTargetTpl.includes(normHarm))) ||
                     rawTpl.includes(targetTpl) || targetTpl.includes(rawTpl) ||
+                    displayTpl.includes(targetTpl) || targetTpl.includes(displayTpl) ||
                     harmTpl.includes(targetTpl) || targetTpl.includes(harmTpl);
 
                 if (!tplMatches) return false;
@@ -392,20 +397,23 @@ class DashboardManager {
         evalsForBatches.forEach(e => {
             const cls = e.classLabel || e.className || e.class || "Class 12-A";
             const sub = e.subject || activePanelSubject || displaySubject;
-            const rawTpl = e.templateName || e.examName || "Mid-Term Exam";
-            const tpl = window.harmonizeTemplateForSubject ? window.harmonizeTemplateForSubject(rawTpl, sub) : rawTpl;
+            const examTitle = e.examName || e.templateName || "Assessment";
+            const dateStr = e.examDate ? ` (${e.examDate})` : '';
+            const tpl = `${examTitle}${dateStr}`;
             const batchKey = `${cls}:::${tpl}`;
             if (!batchMap.has(batchKey)) {
                 batchMap.set(batchKey, {
                     key: batchKey,
                     className: cls,
                     templateName: tpl,
+                    examName: examTitle,
+                    examDate: e.examDate || '',
                     subject: sub,
                     papers: [],
                     total: 0,
                     corrected: 0,
                     uncorrected: 0,
-                    maxMarks: e.maxMarks || 70,
+                    maxMarks: e.maxMarks || 40,
                     firstPendingPaper: null
                 });
             }
@@ -524,7 +532,7 @@ class DashboardManager {
                         </div>
                     </div>
 
-                    <!-- Class & Exam Blueprint Batches Section -->
+                    <!-- Class & Exam Batches Section -->
                     <div class="teacher-batches-section" id="teacher-batches-section">
                         <div class="teacher-batches-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
                             <div class="teacher-batches-title-col">
@@ -623,7 +631,8 @@ class DashboardManager {
         // VIEW 2: Batch Drill-Down Mode (When teacher clicked a specific batch)
         // Shows Batch Header Banner with [Back to All Batches] + Analytics + That batch's papers
         // =========================================================================
-        const [targetClass, targetTemplate] = this.activeBatchKey.split(":::");
+        const [targetClass, ...restTpl] = this.activeBatchKey.split(":::");
+        const targetTemplate = restTpl.join(":::");
         const currentBatch = (this.batches || []).find(b => b.className === targetClass && b.templateName === targetTemplate) || {
             className: targetClass,
             templateName: targetTemplate,
@@ -1733,7 +1742,7 @@ class DashboardManager {
         } else if (this.activeBatchKey) {
             const parts = this.activeBatchKey.split(":::");
             const targetCls = (parts[0] || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
-            const targetTpl = (parts[1] || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
+            const targetTpl = (parts.slice(1).join(":::") || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
             targets = this.evaluations.filter(e => {
                 const eCls = (e.classLabel || e.className || e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
                 const rawTpl = (e.templateName || e.examName || "").toLowerCase().trim();
