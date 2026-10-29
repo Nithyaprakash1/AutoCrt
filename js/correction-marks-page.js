@@ -376,6 +376,12 @@ class CorrectionMarksPageManager {
         if (subFilter) {
             subFilter.addEventListener("change", (e) => {
                 this.selectedSubject = e.target.value;
+                if (this.selectedSubject && this.selectedSubject !== "all") {
+                    sessionStorage.setItem("niprak_active_subject", this.selectedSubject);
+                    if (window.app && typeof window.app.updateUserProfileDisplay === "function") {
+                        window.app.updateUserProfileDisplay(this.selectedSubject, this.selectedClass !== "all" ? this.selectedClass : null);
+                    }
+                }
                 this.render();
             });
         }

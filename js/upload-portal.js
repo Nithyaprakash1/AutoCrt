@@ -1978,6 +1978,12 @@ class UploadPortalManager {
             btn.addEventListener("click", () => {
                 const subId = btn.getAttribute("data-subject-id");
                 this.selectedSubject = this.catalog.find(s => s.id === subId) || null;
+                if (this.selectedSubject) {
+                    sessionStorage.setItem("niprak_active_subject", this.selectedSubject.name);
+                    if (window.app && typeof window.app.updateUserProfileDisplay === "function") {
+                        window.app.updateUserProfileDisplay(this.selectedSubject.name);
+                    }
+                }
                 this.selectedTemplate = null;
                 this.selectedClass = null;
                 this.currentStep = 2;
@@ -3683,6 +3689,12 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     if (e.target.closest(".btn-card-action") || e.target.closest(".subject-card-check")) return;
                     const subId = card.getAttribute("data-subject-id");
                     this.selectedSubject = this.catalog.find(s => s.id === subId) || null;
+                    if (this.selectedSubject) {
+                        sessionStorage.setItem("niprak_active_subject", this.selectedSubject.name);
+                        if (window.app && typeof window.app.updateUserProfileDisplay === "function") {
+                            window.app.updateUserProfileDisplay(this.selectedSubject.name);
+                        }
+                    }
                     this.selectedTemplate = null;
                     this.selectedClass = null;
                     this.currentStep = 2;
@@ -4010,6 +4022,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     if (e.target.closest(".class-step3-card-check") || e.target.closest(".btn-delete-single-class-step3")) return;
                     const clsId = card.getAttribute("data-class-id");
                     this.selectedClass = this.classes.find(c => c.id === clsId) || null;
+                    if (this.selectedClass && window.app && typeof window.app.updateUserProfileDisplay === "function") {
+                        window.app.updateUserProfileDisplay(this.selectedSubject?.name, this.selectedClass.label);
+                    }
                     this.currentStep = 4;
                     await this.loadClassRoster();
                     await this.loadExistingClassPapers();

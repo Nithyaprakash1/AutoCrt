@@ -2542,8 +2542,103 @@ class AppController {
         }
     }
 
-    applySettingsToUI() {
+    getActiveSubject() {
+        // 1. Upload Portal active subject
+        if (window.uploadPortal && window.uploadPortal.selectedSubject && window.uploadPortal.selectedSubject.name) {
+            return window.uploadPortal.selectedSubject.name;
+        }
+        // 2. Workspace active evaluation subject
+        if (this.activeEvaluation && this.activeEvaluation.subject) {
+            return this.activeEvaluation.subject;
+        }
+        // 3. Dashboard active subject
+        if (this.dashboardManager && typeof this.dashboardManager.getActiveSubject === "function") {
+            const dSub = this.dashboardManager.getActiveSubject();
+            if (dSub && dSub !== "all" && dSub !== "All Subjects") return dSub;
+        }
+        // 4. Session stored active subject
+        const sessSub = sessionStorage.getItem("niprak_active_subject");
+        if (sessSub && sessSub !== "all" && sessSub !== "All Subjects") {
+            return sessSub;
+        }
+        // 5. User assigned subject (if not generic/all)
         const user = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        if (user) {
+            const assigned = (user.assignedSubjects && user.assignedSubjects.length > 0)
+                ? user.assignedSubjects.find(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
+                : (user.subject && user.subject.toLowerCase() !== 'all subjects' && user.subject.toLowerCase() !== 'all' ? user.subject : null);
+            if (assigned) return assigned;
+        }
+        return null;
+    }
+
+    getActiveClass() {
+        if (window.uploadPortal && window.uploadPortal.selectedClass) {
+            return window.uploadPortal.selectedClass.label || window.uploadPortal.selectedClass.name;
+        }
+        if (this.activeEvaluation && (this.activeEvaluation.className || this.activeEvaluation.class || this.activeEvaluation.classLabel)) {
+            return this.activeEvaluation.className || this.activeEvaluation.class || this.activeEvaluation.classLabel;
+        }
+        if (this.dashboardManager && this.dashboardManager.selectedClassFilter && this.dashboardManager.selectedClassFilter !== "all") {
+            return this.dashboardManager.selectedClassFilter;
+        }
+        const user = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        if (user) {
+            const assignedCls = (user.assignedClasses && user.assignedClasses.length > 0)
+                ? user.assignedClasses.find(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
+                : (user.class && user.class.toLowerCase() !== 'all classes' && user.class.toLowerCase() !== 'all' ? user.class : null);
+            if (assignedCls) return assignedCls;
+        }
+        return null;
+    }
+
+    updateUserProfileDisplay(customSubject = null, customClass = null) {
+        const user = window.appStorage ? window.appStorage.getCurrentUser() : null;
+        const activeSub = customSubject || this.getActiveSubject();
+        const activeCls = customClass || this.getActiveClass();
+
+        const isSuper = user && (user.role === 'super_admin' || (user.email && user.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
+        const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
+        const isAdmin = user && user.role === 'admin';
+        const isUploader = user && user.role === 'uploader';
+
+        // 1. Role label
+        let roleLabel = "";
+        if (isSuper) {
+            roleLabel = activeSub ? `👑 Super Admin • ${activeSub}` : '👑 Super Admin (Owner)';
+        } else if (isAdmin) {
+            roleLabel = activeSub ? `Admin • ${activeSub}` : 'Admin';
+        } else if (isUploader) {
+            roleLabel = activeSub ? `Exam Officer • ${activeSub}` : 'Exam Officer';
+        } else if (isTeacher) {
+            if (activeSub && activeCls) {
+                roleLabel = `${activeSub} • ${activeCls} Evaluator`;
+            } else if (activeSub) {
+                roleLabel = `${activeSub} Evaluator`;
+            } else {
+                roleLabel = 'Teacher Evaluator';
+            }
+        } else {
+            roleLabel = user?.roleLabel || (activeSub ? `${activeSub} Evaluator` : 'Evaluator');
+        }
+
+        // 2. Display Name
+        let displayName = user ? user.name : "";
+        if (isTeacher) {
+            if (!displayName || displayName.includes("Nithya Prakash") || displayName === "Faculty Evaluator" || displayName.includes("Teacher") || displayName.includes("Evaluator")) {
+                displayName = activeSub ? `${activeSub} Teacher` : "Subject Evaluator";
+            }
+        } else if (isSuper) {
+            displayName = user?.name || "Nithya Prakash";
+        } else {
+            displayName = user?.name || (activeSub ? `${activeSub} Officer` : "User");
+        }
+
+        // 3. Initials
+        const initials = isSuper ? "NP" : (displayName
+            ? displayName.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase()
+            : (activeSub ? activeSub.substring(0, 2).toUpperCase() : "--"));
+
         const nameEl = document.getElementById("header-user-name");
         const avatarEl = document.getElementById("header-user-avatar");
         const navNameEl = document.getElementById("navbar-user-name");
@@ -2554,63 +2649,18 @@ class AppController {
         const sideNameEl = document.getElementById("side-user-name");
         const sideAvatarEl = document.getElementById("side-user-avatar");
         const sideRoleEl = document.querySelector(".user-role-label");
+        const logoutNameEl = document.getElementById("logout-user-name");
+        const logoutRoleEl = document.getElementById("logout-user-role");
 
-        let name = user ? user.name : "";
-        const isSuper = user && (user.role === 'super_admin' || (user.email && user.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
-        const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
-        const userSub = (user && user.assignedSubjects && user.assignedSubjects.length > 0)
-            ? user.assignedSubjects[0]
-            : (user?.subject || "");
-
-        const userSubs = (user && user.assignedSubjects && user.assignedSubjects.length > 0)
-            ? user.assignedSubjects.filter(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
-            : (user?.subject && user.subject.toLowerCase() !== 'all subjects' && user.subject.toLowerCase() !== 'all' ? [user.subject] : []);
-        const userClasses = (user && user.assignedClasses && user.assignedClasses.length > 0)
-            ? user.assignedClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
-            : (user?.class && user.class.toLowerCase() !== 'all classes' && user.class.toLowerCase() !== 'all' ? [user.class] : []);
-
-        const subLabel = userSubs.length > 0 ? userSubs.join(', ') : (userSub || "");
-        const clsLabel = userClasses.length > 0 ? userClasses.join(', ') : (user?.class || "");
-
-        let specTag = "";
-        if (subLabel && clsLabel) {
-            specTag = `${subLabel} • ${clsLabel}`;
-        } else if (subLabel) {
-            specTag = subLabel;
-        } else if (clsLabel) {
-            specTag = clsLabel;
-        }
-
-        if (isTeacher) {
-            if (!name || name.includes("Nithya Prakash") || name === "Faculty Evaluator") {
-                name = user?.name || (subLabel ? `${subLabel} Teacher` : "Subject Evaluator");
-            }
-        }
-
-        let roleLabel = "";
-        if (user) {
-            if (isSuper) {
-                roleLabel = specTag ? `👑 Super Admin (${specTag})` : '👑 Super Admin (Owner)';
-            } else if (user.role === 'admin') {
-                roleLabel = specTag ? `Admin (${specTag})` : 'Admin';
-            } else if (user.role === 'uploader') {
-                roleLabel = specTag ? `Exam Officer (${specTag})` : 'Exam Officer';
-            } else if (isTeacher) {
-                roleLabel = specTag ? `${specTag} Evaluator` : 'Teacher Evaluator';
-            } else {
-                roleLabel = specTag ? `${specTag} Evaluator` : (user.roleLabel || 'Faculty Evaluator');
-            }
-        }
-        const initials = isSuper ? "NP" : (name
-            ? name.split(" ").filter(Boolean).map(n => n[0]).join("").slice(0, 2).toUpperCase()
-            : (subLabel ? subLabel.substring(0, 2).toUpperCase() : "--"));
-
-        if (nameEl) nameEl.textContent = name || "Sign In";
-        if (navNameEl) navNameEl.textContent = name || "Sign In";
-        if (dropNameEl) dropNameEl.textContent = name || "Sign In";
+        if (nameEl) nameEl.textContent = displayName || "Sign In";
+        if (navNameEl) navNameEl.textContent = displayName || "Sign In";
+        if (dropNameEl) dropNameEl.textContent = displayName || "Sign In";
         if (dropRoleEl) dropRoleEl.textContent = roleLabel;
-        if (sideNameEl) sideNameEl.textContent = name || "Sign In";
+        if (sideNameEl) sideNameEl.textContent = displayName || "Sign In";
         if (sideRoleEl) sideRoleEl.textContent = roleLabel;
+        if (logoutNameEl) logoutNameEl.textContent = displayName || "Sign In";
+        if (logoutRoleEl) logoutRoleEl.textContent = roleLabel;
+
         if (navAvatarEl) navAvatarEl.textContent = initials;
         if (dropAvatarEl) dropAvatarEl.textContent = initials;
         if (avatarEl) {
@@ -2640,10 +2690,58 @@ class AppController {
 
         const sideTamilWrap = document.getElementById("side-nav-tamil-test-wrap");
         if (sideTamilWrap) {
-            const isTamilUser = (userSub && userSub.toLowerCase().includes("tamil")) ||
+            const isTamilUser = (activeSub && activeSub.toLowerCase().includes("tamil")) ||
                 (user?.assignedSubjects && user.assignedSubjects.some(s => s && s.toLowerCase().includes("tamil")));
             sideTamilWrap.style.display = isTeacher && isTamilUser ? "block" : "none";
         }
+    }
+
+    async applySettingsToUI(settings) {
+        if (!settings && window.appStorage) {
+            try {
+                settings = await window.appStorage.getSettings();
+            } catch (e) {
+                settings = {};
+            }
+        }
+        settings = settings || {};
+
+        // 1. Institution Name across headers, workspace, and modals
+        const instName = settings.institution?.name || "Adwaith Thought Academy";
+        const navSchoolText = document.getElementById("navbar-school-name");
+        if (navSchoolText) navSchoolText.textContent = instName;
+
+        const wsSchoolText = document.getElementById("ws-school-name-text");
+        if (wsSchoolText) {
+            wsSchoolText.textContent = instName.split(" ")[0] || instName;
+        }
+
+        const settingsInstInput = document.getElementById("settings-inst-name");
+        if (settingsInstInput && !settingsInstInput.matches(":focus")) {
+            settingsInstInput.value = instName;
+        }
+
+        // 2. Institution Logos
+        const schoolLogoMark = settings.institution?.logo || "assets/school_logo.jpg";
+        const schoolLogoFull = settings.institution?.fullLogo || "assets/school_fulllogo.jpg";
+
+        const navSchoolFullImg = document.getElementById("navbar-school-full-img");
+        if (navSchoolFullImg && schoolLogoFull) navSchoolFullImg.src = schoolLogoFull;
+
+        const sideSchoolFullImg = document.getElementById("sidebar-school-full-img");
+        if (sideSchoolFullImg && schoolLogoFull) sideSchoolFullImg.src = schoolLogoFull;
+
+        const navSchoolMarkImg = document.getElementById("navbar-school-mark-img");
+        if (navSchoolMarkImg && schoolLogoMark) navSchoolMarkImg.src = schoolLogoMark;
+
+        const mobileSchoolImg = document.getElementById("mobile-school-logo-img");
+        if (mobileSchoolImg && schoolLogoMark) mobileSchoolImg.src = schoolLogoMark;
+
+        const wsSchoolImg = document.getElementById("ws-school-logo-img");
+        if (wsSchoolImg && schoolLogoMark) wsSchoolImg.src = schoolLogoMark;
+
+        // 3. Dynamic User Profile Display
+        this.updateUserProfileDisplay();
     }
 
     // --- Navigation & Routing ---
@@ -3017,6 +3115,7 @@ class AppController {
                 }
             }
         }
+        this.updateUserProfileDisplay();
     }
 
     // --- Workspace Initialization & Lifecycle ---
@@ -3305,6 +3404,11 @@ class AppController {
         if (evaluation.id && window.appStorage) {
             const fresh = await window.appStorage.getEvaluationById(evaluation.id);
             if (fresh) evaluation = fresh;
+        }
+
+        if (evaluation && evaluation.subject) {
+            sessionStorage.setItem("niprak_active_subject", evaluation.subject);
+            this.updateUserProfileDisplay(evaluation.subject, evaluation.className || evaluation.class);
         }
 
         // Subject Authorization Check: Teachers may ONLY evaluate papers of their assigned subjects
@@ -6085,130 +6189,6 @@ class AppController {
                 closeModal();
                 this.showToast("Settings updated successfully!");
             });
-        }
-    }
-
-    applySettingsToUI(settings) {
-        if (!settings) return;
-
-        // 1. Institution Name across headers, workspace, and modals
-        const instName = settings.institution?.name || "Adwaith Thought Academy";
-        const navSchoolText = document.getElementById("navbar-school-name");
-        if (navSchoolText) navSchoolText.textContent = instName;
-
-        const wsSchoolText = document.getElementById("ws-school-name-text");
-        if (wsSchoolText) {
-            wsSchoolText.textContent = instName.split(" ")[0] || instName;
-        }
-
-        const settingsInstInput = document.getElementById("settings-inst-name");
-        if (settingsInstInput && !settingsInstInput.matches(":focus")) {
-            settingsInstInput.value = instName;
-        }
-
-        // 2. Teacher Profile Name across sidebars and previews
-        const activeUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
-        const isTeacher = activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher');
-        const isSuper = activeUser && (activeUser.role === 'super_admin' || (activeUser.email && activeUser.email.toLowerCase() === 'iamnithyaprakash@gmail.com'));
-        const userSub = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
-            ? activeUser.assignedSubjects[0]
-            : (activeUser?.subject || "");
-
-        const userSubs = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
-            ? activeUser.assignedSubjects.filter(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
-            : (activeUser?.subject && activeUser.subject.toLowerCase() !== 'all subjects' && activeUser.subject.toLowerCase() !== 'all' ? [activeUser.subject] : []);
-        const userClasses = (activeUser && activeUser.assignedClasses && activeUser.assignedClasses.length > 0)
-            ? activeUser.assignedClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
-            : (activeUser?.class && activeUser.class.toLowerCase() !== 'all classes' && activeUser.class.toLowerCase() !== 'all' ? [activeUser.class] : []);
-
-        const subLabel = userSubs.length > 0 ? userSubs.join(', ') : (userSub || "");
-        const clsLabel = userClasses.length > 0 ? userClasses.join(', ') : (activeUser?.class || "");
-
-        let specTag = "";
-        if (subLabel && clsLabel) {
-            specTag = `${subLabel} • ${clsLabel}`;
-        } else if (subLabel) {
-            specTag = subLabel;
-        } else if (clsLabel) {
-            specTag = clsLabel;
-        }
-
-        let teacherName = settings.teacher?.name || "";
-        if (isTeacher || !teacherName || teacherName.includes("Nithya Prakash") || teacherName === "Faculty Evaluator") {
-            teacherName = activeUser?.name || (subLabel ? `${subLabel} Teacher` : "Subject Evaluator");
-        }
-        const sideUserName = document.getElementById("side-user-name");
-        if (sideUserName) sideUserName.textContent = teacherName;
-
-        const navUserName = document.getElementById("navbar-user-name");
-        if (navUserName) navUserName.textContent = teacherName;
-
-        const dropUserName = document.getElementById("dropdown-user-name");
-        if (dropUserName) dropUserName.textContent = teacherName;
-
-        let roleLabel = "";
-        if (activeUser) {
-            if (isSuper) {
-                roleLabel = specTag ? `👑 Super Admin (${specTag})` : '👑 Super Admin (Owner)';
-            } else if (activeUser.role === 'admin') {
-                roleLabel = specTag ? `Admin (${specTag})` : 'Admin';
-            } else if (activeUser.role === 'uploader') {
-                roleLabel = specTag ? `Exam Officer (${specTag})` : 'Exam Officer';
-            } else if (isTeacher) {
-                roleLabel = specTag ? `${specTag} Evaluator` : 'Teacher Evaluator';
-            } else {
-                roleLabel = specTag ? `${specTag} Evaluator` : (activeUser.roleLabel || 'Evaluator');
-            }
-        }
-
-        const dropUserRole = document.getElementById("dropdown-user-role");
-        if (dropUserRole) dropUserRole.textContent = roleLabel;
-
-        const sideRole = document.querySelector(".user-role-label");
-        if (sideRole) sideRole.textContent = roleLabel;
-
-        const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || (subLabel ? subLabel.substring(0, 2).toUpperCase() : "SE");
-        const sideAvatar = document.getElementById("side-user-avatar");
-        if (sideAvatar) sideAvatar.textContent = initials;
-
-        const navAvatar = document.getElementById("navbar-user-avatar");
-        if (navAvatar) navAvatar.textContent = initials;
-
-        const previewAvatar = document.getElementById("settings-avatar-preview");
-        if (previewAvatar) previewAvatar.textContent = initials;
-
-        const previewName = document.getElementById("settings-preview-name");
-        if (previewName) previewName.textContent = teacherName;
-
-        const logoutUserName = document.getElementById("logout-user-name");
-        if (logoutUserName) logoutUserName.textContent = teacherName;
-        const logoutUserRole = document.getElementById("logout-user-role");
-        if (logoutUserRole) logoutUserRole.textContent = roleLabel;
-
-        // 3. Institution Logos
-        const schoolLogoMark = settings.institution?.logo || "assets/school_logo.jpg";
-        const schoolLogoFull = settings.institution?.fullLogo || "assets/school_fulllogo.jpg";
-
-        const navSchoolFullImg = document.getElementById("navbar-school-full-img");
-        if (navSchoolFullImg && schoolLogoFull) navSchoolFullImg.src = schoolLogoFull;
-
-        const sideSchoolFullImg = document.getElementById("sidebar-school-full-img");
-        if (sideSchoolFullImg && schoolLogoFull) sideSchoolFullImg.src = schoolLogoFull;
-
-        const navSchoolMarkImg = document.getElementById("navbar-school-mark-img");
-        if (navSchoolMarkImg && schoolLogoMark) navSchoolMarkImg.src = schoolLogoMark;
-
-        const mobileSchoolImg = document.getElementById("mobile-school-logo-img");
-        if (mobileSchoolImg && schoolLogoMark) mobileSchoolImg.src = schoolLogoMark;
-
-        const wsSchoolImg = document.getElementById("ws-school-logo-img");
-        if (wsSchoolImg && schoolLogoMark) wsSchoolImg.src = schoolLogoMark;
-
-        const sideTamilWrap = document.getElementById("side-nav-tamil-test-wrap");
-        if (sideTamilWrap) {
-            const isTamilUser = (userSub && userSub.toLowerCase().includes("tamil")) ||
-                (activeUser?.assignedSubjects && activeUser.assignedSubjects.some(s => s && s.toLowerCase().includes("tamil")));
-            sideTamilWrap.style.display = isTeacher && isTamilUser ? "block" : "none";
         }
     }
 

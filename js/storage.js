@@ -1487,11 +1487,12 @@ class StorageService {
             }
         }
 
-        // Evaluator Full Name should be subject name as requested: no need of Mr. Nithya Prakash
+        // Evaluator Full Name should reflect custom account name or active subject
         const isTeacherRole = activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher');
         if (isTeacherRole || !result.teacher?.name || result.teacher.name.includes("Nithya Prakash")) {
+            const hasCustomName = activeUser?.name && !activeUser.name.includes("Nithya Prakash") && !activeUser.name.includes("Evaluator");
             result.teacher = Object.assign({}, result.teacher, {
-                name: activeSub || (activeUser?.name && !activeUser.name.includes("Nithya Prakash") ? activeUser.name : "Subject Evaluator")
+                name: hasCustomName ? activeUser.name : (activeSub && activeSub !== 'All Subjects' ? `${activeSub} Teacher` : (result.teacher?.name || "Subject Evaluator"))
             });
         }
         return result;

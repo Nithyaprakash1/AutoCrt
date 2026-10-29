@@ -108,8 +108,11 @@ class DashboardManager {
             this.activeBatchKey = null;
         }
 
-        // Evaluator / Teacher desk defaults to their assigned subject panel (e.g. Maths panel)
-        if (isTeacher && (!this.selectedSubjectFilter || this.selectedSubjectFilter === "all")) {
+        // Evaluator / Teacher desk defaults to active subject or assigned subject panel
+        const sessSub = sessionStorage.getItem("niprak_active_subject");
+        if (sessSub && sessSub !== "all" && sessSub !== "All Subjects" && (!this.selectedSubjectFilter || this.selectedSubjectFilter === "all")) {
+            this.selectedSubjectFilter = sessSub;
+        } else if (isTeacher && (!this.selectedSubjectFilter || this.selectedSubjectFilter === "all")) {
             const primarySub = (this.teacherSubject && this.teacherSubject !== "all" && this.teacherSubject !== "All Subjects")
                 ? this.teacherSubject
                 : (this.teacherSubjects && this.teacherSubjects.find(s => s && s !== "all" && s !== "All Subjects"));
@@ -122,6 +125,14 @@ class DashboardManager {
         this.render();
         this.bindEvents();
         this.renderCharts();
+
+        const activeSubNow = this.getActiveSubject();
+        if (activeSubNow && activeSubNow !== "all" && activeSubNow !== "All Subjects") {
+            sessionStorage.setItem("niprak_active_subject", activeSubNow);
+        }
+        if (window.app && typeof window.app.updateUserProfileDisplay === "function") {
+            window.app.updateUserProfileDisplay(activeSubNow, this.selectedClassFilter !== "all" ? this.selectedClassFilter : null);
+        }
 
         // Background Cloud Sync: Pull fresh papers from Firebase quietly without tearing down DOM
         if (window.firebaseManager) {
@@ -1056,6 +1067,11 @@ class DashboardManager {
                     this.bindEvents();
                     this.renderCharts();
                     window.scrollTo({ top: 0, behavior: "smooth" });
+                    const matchedBatch = (this.batches || []).find(b => b.key === this.activeBatchKey);
+                    const bSub = matchedBatch?.subject || this.getActiveSubject();
+                    if (window.app && typeof window.app.updateUserProfileDisplay === "function") {
+                        window.app.updateUserProfileDisplay(bSub, cls);
+                    }
                 }
             });
         });
@@ -1075,6 +1091,11 @@ class DashboardManager {
                     this.bindEvents();
                     this.renderCharts();
                     window.scrollTo({ top: 0, behavior: "smooth" });
+                    const matchedBatch = (this.batches || []).find(b => b.key === this.activeBatchKey);
+                    const bSub = matchedBatch?.subject || this.getActiveSubject();
+                    if (window.app && typeof window.app.updateUserProfileDisplay === "function") {
+                        window.app.updateUserProfileDisplay(bSub, cls);
+                    }
                 }
             });
         });
@@ -1317,8 +1338,14 @@ class DashboardManager {
         if (subjectSelect) {
             subjectSelect.addEventListener("change", (e) => {
                 this.selectedSubjectFilter = e.target.value;
+                if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all" && this.selectedSubjectFilter !== "All Subjects") {
+                    sessionStorage.setItem("niprak_active_subject", this.selectedSubjectFilter);
+                }
                 this.applyFilters();
                 this.renderTableRows();
+                if (window.app && typeof window.app.updateUserProfileDisplay === "function") {
+                    window.app.updateUserProfileDisplay(this.getActiveSubject(), this.selectedClassFilter !== "all" ? this.selectedClassFilter : null);
+                }
             });
         }
 
