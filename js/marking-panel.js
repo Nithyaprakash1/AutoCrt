@@ -679,7 +679,7 @@ class MarkingPanel {
                         this.clearQuestionMark(this.activeQuestionIndex);
                     } else {
                         this.assignCurrentQuestionMark(val);
-                        if (curQ && val >= curQ.maxMarks) {
+                        if (curQ && (val >= curQ.maxMarks || val === 0)) {
                             setTimeout(() => {
                                 this.nextQuestion();
                             }, 300);
@@ -908,7 +908,7 @@ class MarkingPanel {
                     this.clearQuestionMark(this.activeQuestionIndex);
                 } else {
                     this.assignCurrentQuestionMark(val);
-                    if (curQ && val >= curQ.maxMarks) {
+                    if (curQ && (val >= curQ.maxMarks || val === 0)) {
                         setTimeout(() => {
                             this.nextQuestion();
                         }, 300);
@@ -1079,7 +1079,14 @@ class MarkingPanel {
                             this.assignQuestionMarkDirect(idx, q.maxMarks, "correct");
                         }
                     } else if (action === "wrong") {
-                        this.assignQuestionMarkDirect(idx, 0, "wrong");
+                        if (this.options.onAwardZeroMarks) {
+                            this.options.onAwardZeroMarks(q);
+                        } else {
+                            this.assignQuestionMarkDirect(idx, 0, "wrong");
+                            setTimeout(() => {
+                                this.nextQuestion();
+                            }, 300);
+                        }
                     } else if (action === "skip") {
                         if (this.canSkipQuestion(q)) {
                             this.assignQuestionMarkDirect(idx, 0, "skipped");

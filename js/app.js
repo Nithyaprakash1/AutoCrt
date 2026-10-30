@@ -3535,11 +3535,22 @@ class AppController {
         this.updateTopHud(q);
         this.updatePageTotalDisplay();
 
-        // 5. User feedback
-        this.showToast(`Marked Q${q.qNo} as 0 Marks. Press Enter to calculate & advance.`);
-
+        // 5. User feedback & Auto-advance to next question automatically!
         this.hasUnsavedChanges = true;
         this.setAutosaveBadge("unsaved");
+
+        setTimeout(() => {
+            if (this.markingPanel) {
+                const moved = this.markingPanel.nextQuestion();
+                if (moved) {
+                    const nextQ = this.markingPanel.getActiveQuestion();
+                    if (nextQ) this.updateTopHud(nextQ);
+                    this.showToast(`Marked Q${q.qNo} as 0 Marks (Wrong). Moved to ${nextQ.label || `Q${nextQ.qNo}`}.`);
+                } else {
+                    this.showToast(`Marked Q${q.qNo} as 0 Marks (Final question).`);
+                }
+            }
+        }, 300);
     }
 
     updatePageTotalDisplay() {
@@ -3894,17 +3905,21 @@ class AppController {
                     this.updatePageTotalDisplay();
                     const markDesc = numVal === 0 ? "0 Marks" : `+${numVal} Mark`;
 
-                    // If full mark done, move to next question automatically!
-                    if (runningScore >= activeQ.maxMarks) {
+                    // If full mark done OR zero mark given, move to next question automatically!
+                    if (runningScore >= activeQ.maxMarks || numVal === 0) {
                         setTimeout(() => {
                             if (this.markingPanel) {
                                 const moved = this.markingPanel.nextQuestion();
                                 if (moved) {
                                     const nextQ = this.markingPanel.getActiveQuestion();
                                     if (nextQ) this.updateTopHud(nextQ);
-                                    this.showToast(`Q${activeQ.qNo} Full Marks (${runningScore}/${activeQ.maxMarks}M). Moved to ${nextQ.label || `Q${nextQ.qNo}`}.`);
+                                    if (numVal === 0) {
+                                        this.showToast(`Q${activeQ.qNo} marked as 0 Marks. Moved to ${nextQ.label || `Q${nextQ.qNo}`}.`);
+                                    } else {
+                                        this.showToast(`Q${activeQ.qNo} Full Marks (${runningScore}/${activeQ.maxMarks}M). Moved to ${nextQ.label || `Q${nextQ.qNo}`}.`);
+                                    }
                                 } else {
-                                    this.showToast(`Q${activeQ.qNo} Full Marks (${runningScore}/${activeQ.maxMarks}M) [Final question].`);
+                                    this.showToast(numVal === 0 ? `Q${activeQ.qNo} 0 Marks [Final question].` : `Q${activeQ.qNo} Full Marks [Final question].`);
                                 }
                             }
                         }, 300);
@@ -5157,14 +5172,29 @@ class AppController {
             // Numeric quick mark shortcut: press 0..9 to set mark for active question
             if (e.key >= "0" && e.key <= "9") {
                 const mark = Number(e.key);
+                if (mark === 0) {
+                    this.awardZeroMarks();
+                    return;
+                }
                 this.markingPanel?.setActiveQuestionMark(mark);
                 if (this.canvasEngine) {
-                    this.canvasEngine.setMarksValue(mark > 0 ? `+${mark}` : "0");
+                    this.canvasEngine.setMarksValue(`+${mark}`);
                 }
                 const activeQ = this.markingPanel?.getActiveQuestion();
                 if (activeQ) {
                     this.updateTopHud(activeQ);
                     this.updatePageTotalDisplay();
+                    if (mark >= activeQ.maxMarks) {
+                        setTimeout(() => {
+                            if (this.markingPanel) {
+                                const moved = this.markingPanel.nextQuestion();
+                                if (moved) {
+                                    const nextQ = this.markingPanel.getActiveQuestion();
+                                    if (nextQ) this.updateTopHud(nextQ);
+                                }
+                            }
+                        }, 300);
+                    }
                 }
                 return;
             }
