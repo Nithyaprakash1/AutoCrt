@@ -5347,31 +5347,64 @@ class AppController {
         await this.saveActiveEvaluation(true);
 
         // 2. Scan queue for next paper
-        this.updateActionProgressModal(70, "Scanning evaluation queue for next uncorrected paper...");
+        this.updateActionProgressModal(70, "Locating next paper in batch queue...");
         const allEvaluations = await window.appStorage.getAllEvaluations(false, true);
 
-        // Match current class/exam/subject or all assigned papers
-        const currentClass = this.activeEvaluation?.class || this.activeEvaluation?.className;
-        const currentSubject = this.activeEvaluation?.subject;
+        // Match current class, exam, and subject using robust canonicalization
+        const rawCls = this.activeEvaluation?.classLabel || this.activeEvaluation?.className || this.activeEvaluation?.class || "";
+        const normCls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+            ? window.appStorage.canonicalizeClassName(rawCls).toLowerCase().replace(/[^a-z0-9]/g, '')
+            : (rawCls || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const rawExam = this.activeEvaluation?.examName || this.activeEvaluation?.templateName || "";
+        const normExam = (rawExam || "").toLowerCase().replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').replace(/[^a-z0-9]/g, '');
+
+        const curSub = this.activeEvaluation?.subject || "";
+
         let queue = Array.isArray(allEvaluations) ? [...allEvaluations] : [];
 
-        if (currentSubject) {
-            queue = queue.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, currentSubject));
+        // 1st Level: Match class (robust normalization)
+        if (normCls) {
+            const classMatches = queue.filter(e => {
+                const eClsRaw = e.classLabel || e.className || e.class || "";
+                const eClsNorm = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+                    ? window.appStorage.canonicalizeClassName(eClsRaw).toLowerCase().replace(/[^a-z0-9]/g, '')
+                    : (eClsRaw || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                return eClsNorm === normCls || eClsNorm.includes(normCls) || normCls.includes(eClsNorm);
+            });
+            if (classMatches.length > 0) queue = classMatches;
         }
 
-        const currentExam = this.activeEvaluation?.examName || this.activeEvaluation?.templateName;
-        if (currentExam) {
-            const sameExam = queue.filter(e => (e.examName || e.templateName) === currentExam);
-            if (sameExam.length > 0) queue = sameExam;
+        // 2nd Level: Match exam/template (robust normalization)
+        if (normExam) {
+            const examMatches = queue.filter(e => {
+                const eExamRaw = e.examName || e.templateName || "";
+                const eExamNorm = (eExamRaw || "").toLowerCase().replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').replace(/[^a-z0-9]/g, '');
+                return eExamNorm === normExam || eExamNorm.includes(normExam) || normExam.includes(eExamNorm);
+            });
+            if (examMatches.length > 0) queue = examMatches;
         }
 
-        if (currentClass) {
-            const sameClass = queue.filter(e => (e.class || e.className) === currentClass);
-            if (sameClass.length > 0) queue = sameClass;
+        // 3rd Level: Match subject if specified
+        if (curSub) {
+            const subMatches = queue.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, curSub));
+            if (subMatches.length > 0) queue = subMatches;
         }
 
-        // Sort by roll number, then name
-        const sorted = queue.sort((a, b) => {
+        // Deduplicate papers for the same student inside the batch
+        const studentMap = new Map();
+        queue.forEach(e => {
+            const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || (e.studentName ? String(e.studentName).trim().toLowerCase() : String(e.id));
+            if (!studentMap.has(sKey)) {
+                studentMap.set(sKey, e);
+            } else if (String(e.id) === currentId) {
+                studentMap.set(sKey, e);
+            }
+        });
+        const batchPapers = Array.from(studentMap.values());
+
+        // Sort by roll number, then student name
+        const sorted = batchPapers.sort((a, b) => {
             const rollA = parseInt((a.rollNo || "").replace(/\D/g, "")) || 0;
             const rollB = parseInt((b.rollNo || "").replace(/\D/g, "")) || 0;
             if (rollA !== rollB) return rollA - rollB;
@@ -5380,21 +5413,41 @@ class AppController {
 
         const currentIdx = sorted.findIndex(e => String(e.id) === currentId);
 
-        // Find next UNCORRECTED paper strictly:
-        // 1. First search subsequent papers after currentIdx
-        let nextEval = sorted.slice(currentIdx + 1).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
+        // Find next paper in order:
+        let nextEval = null;
 
-        // 2. If no uncorrected paper found after currentIdx, wrap around from beginning of queue
+        // Priority 1: Next uncorrected paper AFTER current student in the roster
+        if (currentIdx >= 0 && currentIdx < sorted.length - 1) {
+            nextEval = sorted.slice(currentIdx + 1).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
+        }
+
+        // Priority 2: Immediate next student paper in the roster (Save & Next moves to next student without returning to dashboard)
+        if (!nextEval && currentIdx >= 0 && currentIdx < sorted.length - 1) {
+            nextEval = sorted[currentIdx + 1];
+        }
+
+        // Priority 3: If at the end of the roster, check if any uncorrected student remains earlier in the batch (wrap around)
         if (!nextEval && currentIdx > 0) {
             nextEval = sorted.slice(0, currentIdx).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
         }
 
-        // --- CASE 1: No next paper found (Queue is finished) ---
-        if (!nextEval) {
+        // Priority 4: If single-paper filtered queue or end of roster, check across all evaluations
+        if (!nextEval && allEvaluations.length > 1) {
+            const otherPending = allEvaluations.find(e => String(e.id) !== currentId && !this.isPaperCorrected(e));
+            if (otherPending) {
+                nextEval = otherPending;
+            } else if (sorted.length > 1 && currentIdx === sorted.length - 1) {
+                // At the very end of the class roster, loop to the first student
+                nextEval = sorted[0];
+            }
+        }
+
+        // --- CASE 1: Truly only 1 paper exists in the system or every paper is done and no other paper exists ---
+        if (!nextEval || String(nextEval.id) === currentId) {
             this.checkAndSendSubjectCompletedNotification(this.activeEvaluation);
             this.setActionProgressModalSuccess({
-                title: "✓ Saved! No More Papers In Queue",
-                subtitle: `All student papers have been evaluated successfully.`,
+                title: "✓ Batch Evaluation Complete!",
+                subtitle: `All ${sorted.length} student paper${sorted.length === 1 ? '' : 's'} evaluated successfully.`,
                 statusText: "Returning to Dashboard...",
                 delayMs: 1100,
                 onComplete: () => {
@@ -5405,7 +5458,7 @@ class AppController {
             return;
         }
 
-        // --- CASE 2: Next paper is found ---
+        // --- CASE 2: Next paper is found -> Seamlessly open next student paper in workspace! ---
         const nextName = nextEval.studentName || "Next Student";
         const fullEval = await window.appStorage.getEvaluationById(nextEval.id);
         const evalToOpen = fullEval || nextEval;
@@ -5428,7 +5481,7 @@ class AppController {
             title: "✓ Saved! Loading Next Student",
             subtitle: `Now opening ${nextName} (Roll: ${evalToOpen.rollNo || "—"})...`,
             statusText: "Rendering answer sheet pages...",
-            delayMs: 400,
+            delayMs: 350,
             onComplete: async () => {
                 await this.openWorkspace(evalToOpen);
                 this.showToast(`Loaded ${nextName}'s answer sheet.`, "success");
