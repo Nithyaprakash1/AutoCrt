@@ -105,7 +105,19 @@ class ClassesPageManager {
                     </div>
 
                     <div class="classes-cards-grid">
-                        ${this.classes.map(cls => {
+                        ${(() => {
+                        const sortedClasses = [...this.classes].sort((a, b) => {
+                            const strA = String(a.name || a.label || "");
+                            const strB = String(b.name || b.label || "");
+                            const na = parseInt(strA.match(/\d+/)?.[0] || "0", 10);
+                            const nb = parseInt(strB.match(/\d+/)?.[0] || "0", 10);
+                            if (na !== nb) return na - nb; // 10th first, then 12th
+                            const secA = (a.section || strA.match(/[-_\s]([A-Z])(?:\b|$)/)?.[1] || "A").toUpperCase();
+                            const secB = (b.section || strB.match(/[-_\s]([A-Z])(?:\b|$)/)?.[1] || "A").toUpperCase();
+                            if (secA !== secB) return secA.localeCompare(secB);
+                            return strA.localeCompare(strB);
+                        });
+                        return sortedClasses.map(cls => {
                             const isSelected = cls.id === this.activeClassId;
                             const isChecked = this.selectedClassIds.has(cls.id);
                             const count = isSelected ? this.currentRoster.length : (cls.studentCount !== undefined ? cls.studentCount : 0);

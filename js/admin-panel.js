@@ -9,6 +9,79 @@
  */
 
 class AdminPanelManager {
+    getGradeLevel(className) {
+        const str = String(className || "").toLowerCase();
+        if ((/\b10\b|\b10th\b|\bx\b/i.test(str) || str.includes("class 10") || str.includes("grade 10") || str.includes("std 10")) && !(/\b12\b|\b12th\b|\bxii\b/i.test(str))) {
+            return 10;
+        }
+        if (/\b12\b|\b12th\b|\bxii\b/i.test(str) || str.includes("class 12") || str.includes("grade 12") || str.includes("std 12")) {
+            return 12;
+        }
+        if (/\b11\b|\b11th\b|\bxi\b/i.test(str) || str.includes("class 11") || str.includes("grade 11") || str.includes("std 11")) {
+            return 11;
+        }
+        const num = parseInt(str.match(/\d+/)?.[0] || "0", 10);
+        return num || 99;
+    }
+
+    getSectionLetter(className) {
+        const str = String(className || "").toUpperCase().trim();
+        const m = str.match(/[-_\s]([A-Z])(?:\b|$)/) || str.match(/\b([A-Z])$/);
+        return m ? m[1] : "Z";
+    }
+
+    renderAdminBatchCardHtml(b) {
+        const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
+        const isCompleted = b.pending === 0 && b.total > 0;
+        const isBatchActive = this.selectedBatchKey === b.key;
+
+        return `
+            <div class="teacher-batch-card admin-batch-card ${isBatchActive ? 'active' : ''}" data-batch-key="${b.key}" data-subject="${b.subject}">
+                <div class="batch-card-top-row">
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <span class="batch-class-badge">${b.className}</span>
+                        <span class="batch-subject-tag">${b.subject}</span>
+                        ${b.isNew ? `
+                            <span class="batch-new-pill" style="display: inline-flex; align-items: center; gap: 3px; font-size: 0.68rem; font-weight: 700; background: rgba(16, 185, 129, 0.15); color: #059669; padding: 2px 7px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.3);">✨ NEW</span>
+                        ` : ''}
+                    </div>
+                    <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
+                        ${isCompleted ? '✓ 100% Graded' : `${b.pending} Need To Do`}
+                    </span>
+                </div>
+
+                <h4 class="batch-card-name" title="${b.templateName}">${b.templateName}</h4>
+
+                <div class="batch-card-meta-row">
+                    <span>Max Marks: <strong>${b.maxMarks}M</strong></span>
+                    <span>•</span>
+                    <span>Roster: <strong>${b.total} Papers</strong></span>
+                </div>
+
+                <div class="batch-progress-wrapper">
+                    <div class="batch-progress-labels">
+                        <span class="progress-ratio">${b.corrected} / ${b.total} Graded</span>
+                        <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'}; font-weight: 600;">${pct}%</span>
+                    </div>
+                    <div class="batch-progress-bar">
+                        <div class="batch-progress-fill" style="width: ${pct}%; background: ${pct === 100 ? '#16A34A' : 'linear-gradient(90deg, #AF52DE, #0071E3)'};"></div>
+                    </div>
+                </div>
+
+                <div class="batch-actions-row" style="margin-top: 10px; display: flex; gap: 6px;">
+                    <button type="button" class="btn-batch-view btn-admin-filter-batch" data-batch-key="${b.key}" data-subject="${b.subject}" title="Filter evaluation records to this batch">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>${isBatchActive ? '✓ Viewing' : `View (${b.total})`}</span>
+                    </button>
+                    <button type="button" class="btn-batch-share btn-admin-batch-share" data-batch-key="${b.key}" data-subject="${b.subject}" data-class="${b.className}" data-template="${b.templateName}" data-total="${b.total}" title="Share this batch via WhatsApp">
+                        ${(window.Icons && window.Icons.whatsapp) || ''}
+                        <span>Share</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
     constructor(container, options = {}) {
         this.container = container;
         this.options = options;
@@ -547,59 +620,95 @@ class AdminPanelManager {
                         ` : ''}
                     </div>
 
-                    <div class="teacher-batches-grid">
-                        ${filteredBatches.length === 0 ? `
-                            <div class="teacher-batches-empty">
-                                <p>No examination batches found for ${isSubjectScoped ? this.selectedSubject : 'current selection'}. Ingest papers to populate blueprint batches.</p>
-                            </div>
-                        ` : filteredBatches.map(b => {
-                            const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
-                            const isCompleted = b.pending === 0 && b.total > 0;
-                            const isBatchActive = this.selectedBatchKey === b.key;
+                    <div class="teacher-batches-grouped-container">
+                        ${(() => {
+                            if (filteredBatches.length === 0) {
+                                return `
+                                    <div class="teacher-batches-empty">
+                                        <p>No examination batches found for ${isSubjectScoped ? this.selectedSubject : 'current selection'}. Ingest papers to populate blueprint batches.</p>
+                                    </div>
+                                `;
+                            }
 
-                            return `
-                                <div class="teacher-batch-card admin-batch-card ${isBatchActive ? 'active' : ''}" data-batch-key="${b.key}" data-subject="${b.subject}">
-                                    <div class="batch-card-top-row">
-                                        <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                            <span class="batch-class-badge">${b.className}</span>
-                                            <span class="batch-subject-tag">${b.subject}</span>
+                            // Group batches by Grade Level (10th top, 12th below, others)
+                            const gradeGroupsMap = new Map();
+                            filteredBatches.forEach(b => {
+                                const g = this.getGradeLevel(b.className);
+                                if (!gradeGroupsMap.has(g)) gradeGroupsMap.set(g, []);
+                                gradeGroupsMap.get(g).push(b);
+                            });
+
+                            const sortedGrades = Array.from(gradeGroupsMap.keys()).sort((a, b) => {
+                                const order = { 10: 1, 12: 2, 11: 3, 99: 4 };
+                                const ordA = order[a] !== undefined ? order[a] : (a < 10 ? 0 : 5);
+                                const ordB = order[b] !== undefined ? order[b] : (b < 10 ? 0 : 5);
+                                return ordA - ordB;
+                            });
+
+                            return sortedGrades.map(gKey => {
+                                const gBatches = gradeGroupsMap.get(gKey) || [];
+                                if (gBatches.length === 0) return '';
+
+                                gBatches.sort((a, b) => {
+                                    const secA = this.getSectionLetter(a.className);
+                                    const secB = this.getSectionLetter(b.className);
+                                    if (secA !== secB) return secA.localeCompare(secB);
+                                    const tsA = a.latestTimestamp || 0;
+                                    const tsB = b.latestTimestamp || 0;
+                                    if (tsA !== tsB) return tsB - tsA;
+                                    return (a.templateName || "").localeCompare(b.templateName || "");
+                                });
+
+                                const gradeTitle = gKey === 10 ? 'Class 10th (Grade X)' : (gKey === 12 ? 'Class 12th (Grade XII)' : (gKey === 11 ? 'Class 11th (Grade XI)' : `Grade ${gKey}`));
+                                const totalPapersInGrade = gBatches.reduce((sum, b) => sum + b.total, 0);
+                                const totalPendingInGrade = gBatches.reduce((sum, b) => sum + b.pending, 0);
+                                const isCollapsed = this.collapsedGradeGroups ? this.collapsedGradeGroups.has(gKey) : false;
+
+                                return `
+                                    <div class="dash-grade-group-section" data-grade="${gKey}" style="margin-bottom: 24px;">
+                                        <div class="dash-grade-header admin-grade-header" data-grade="${gKey}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 14px; margin-bottom: 12px; cursor: pointer; user-select: none; transition: all 0.15s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                                            <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                                <span style="font-size: 1.25rem;">${gKey === 10 ? '🔟' : (gKey === 12 ? '🎓' : '📚')}</span>
+                                                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                                    <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: #1E293B;">
+                                                        ${gradeTitle}
+                                                    </h4>
+                                                    <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(175, 82, 222, 0.1); color: #AF52DE; border: 1px solid rgba(175, 82, 222, 0.2);">
+                                                        ${gBatches.length} ${gBatches.length === 1 ? 'Batch' : 'Batches'}
+                                                    </span>
+                                                    <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(100, 116, 139, 0.08); color: #64748B;">
+                                                        ${totalPapersInGrade} Papers
+                                                    </span>
+                                                    ${totalPendingInGrade > 0 ? `
+                                                        <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(217, 119, 6, 0.1); color: #D97706; border: 1px solid rgba(217, 119, 6, 0.2);">
+                                                            ${totalPendingInGrade} Need To Do
+                                                        </span>
+                                                    ` : `
+                                                        <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(22, 163, 74, 0.1); color: #16A34A; border: 1px solid rgba(22, 163, 74, 0.2);">
+                                                            ✓ 100% Graded
+                                                        </span>
+                                                    `}
+                                                </div>
+                                            </div>
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <span class="grade-toggle-text" style="font-size: 0.78rem; font-weight: 600; color: #64748B;">
+                                                    ${isCollapsed ? 'Expand' : 'Collapse'}
+                                                </span>
+                                                <span class="grade-toggle-chevron" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #F1F5F9; color: #475569; transition: transform 0.2s ease; transform: rotate(${isCollapsed ? '-90deg' : '0deg'});">
+                                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                                </span>
+                                            </div>
                                         </div>
-                                        <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
-                                            ${isCompleted ? '✓ 100% Graded' : `${b.pending} Need To Do`}
-                                        </span>
-                                    </div>
 
-                                    <h4 class="batch-card-name" title="${b.templateName}">${b.templateName}</h4>
-
-                                    <div class="batch-card-meta-row">
-                                        <span>Max Marks: <strong>${b.maxMarks}M</strong></span>
-                                        <span>•</span>
-                                        <span>Roster: <strong>${b.total} Papers</strong></span>
-                                    </div>
-
-                                    <div class="batch-progress-wrapper">
-                                        <div class="batch-progress-labels">
-                                            <span class="progress-ratio">${b.corrected} / ${b.total} Graded</span>
-                                            <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'}; font-weight: 600;">${pct}%</span>
-                                        </div>
-                                        <div class="batch-progress-bar">
-                                            <div class="batch-progress-fill" style="width: ${pct}%; background: ${pct === 100 ? '#16A34A' : 'linear-gradient(90deg, #AF52DE, #0071E3)'};"></div>
+                                        <div class="dash-grade-batches-body" style="display: ${isCollapsed ? 'none' : 'block'};">
+                                            <div class="teacher-batches-grid">
+                                                ${gBatches.map(b => this.renderAdminBatchCardHtml(b)).join('')}
+                                            </div>
                                         </div>
                                     </div>
-
-                                    <div class="batch-actions-row" style="margin-top: 10px; display: flex; gap: 6px;">
-                                        <button type="button" class="btn-batch-view btn-admin-filter-batch" data-batch-key="${b.key}" data-subject="${b.subject}" title="Filter evaluation records to this batch">
-                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                            <span>${isBatchActive ? '✓ Viewing' : `View (${b.total})`}</span>
-                                        </button>
-                                        <button type="button" class="btn-batch-share btn-admin-batch-share" data-batch-key="${b.key}" data-subject="${b.subject}" data-class="${b.className}" data-template="${b.templateName}" data-total="${b.total}" title="Share this batch via WhatsApp">
-                                            ${(window.Icons && window.Icons.whatsapp) || ''}
-                                            <span>Share</span>
-                                        </button>
-                                    </div>
-                                </div>
-                            `;
-                        }).join("")}
+                                `;
+                            }).join('');
+                        })()}
                     </div>
                 </div>
 
@@ -917,6 +1026,29 @@ class AdminPanelManager {
         });
 
         // 4. Batch Card Clicks & View Batch Records Button (Section 2)
+        // Collapsible Grade Headers for Admin
+        this.container.querySelectorAll(".admin-grade-header").forEach(header => {
+            header.addEventListener("click", () => {
+                const gKey = Number(header.getAttribute("data-grade"));
+                if (!this.collapsedGradeGroups) this.collapsedGradeGroups = new Set();
+                if (this.collapsedGradeGroups.has(gKey)) {
+                    this.collapsedGradeGroups.delete(gKey);
+                } else {
+                    this.collapsedGradeGroups.add(gKey);
+                }
+                const section = header.closest(".dash-grade-group-section");
+                if (section) {
+                    const body = section.querySelector(".dash-grade-batches-body");
+                    const txt = section.querySelector(".grade-toggle-text");
+                    const chevron = section.querySelector(".grade-toggle-chevron");
+                    const isNowCollapsed = this.collapsedGradeGroups.has(gKey);
+                    if (body) body.style.display = isNowCollapsed ? "none" : "block";
+                    if (txt) txt.textContent = isNowCollapsed ? "Expand" : "Collapse";
+                    if (chevron) chevron.style.transform = isNowCollapsed ? "rotate(-90deg)" : "rotate(0deg)";
+                }
+            });
+        });
+
         this.container.querySelectorAll(".admin-batch-card, .btn-admin-filter-batch").forEach(el => {
             el.addEventListener("click", (e) => {
                 if (e.target.closest(".btn-admin-batch-share")) return;

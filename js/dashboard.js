@@ -496,7 +496,8 @@ class DashboardManager {
                     corrected: 0,
                     uncorrected: 0,
                     maxMarks: e.maxMarks || 40,
-                    firstPendingPaper: null
+                    firstPendingPaper: null,
+                    latestTimestamp: 0
                 });
             }
             const b = batchMap.get(batchKey);
@@ -518,12 +519,17 @@ class DashboardManager {
                 b.papers.push(e);
             }
             if (!b.examDate && e.examDate) b.examDate = e.examDate;
+            const pTime = new Date(e.createdAt || e.uploadedAt || e.timestamp || e.lastUpdated || 0).getTime();
+            if (pTime > b.latestTimestamp) b.latestTimestamp = pTime;
         });
+        const now = Date.now();
         this.batches = Array.from(batchMap.values()).map(b => {
             b.total = b.papers.length;
             b.corrected = b.papers.filter(p => this.isPaperCorrected(p)).length;
             b.uncorrected = b.total - b.corrected;
             b.firstPendingPaper = b.papers.find(p => !this.isPaperCorrected(p)) || null;
+            const isRecent = b.latestTimestamp > 0 && (now - b.latestTimestamp < 48 * 60 * 60 * 1000);
+            b.isNew = isRecent && b.uncorrected > 0;
             return b;
         });
         if (activePanelSubject) {
@@ -561,9 +567,12 @@ class DashboardManager {
         });
 
         const distinctBatchClasses = Array.from(classBatchCountMap.keys()).sort((a, b) => {
-            const na = parseInt(a.match(/\d+/)?.[0] || "0", 10);
-            const nb = parseInt(b.match(/\d+/)?.[0] || "0", 10);
-            if (nb !== na) return nb - na; // 12th, 11th, 10th
+            const na = this.getGradeLevel(a);
+            const nb = this.getGradeLevel(b);
+            if (na !== nb) return na - nb; // 10th first, then 11th, then 12th
+            const secA = this.getSectionLetter(a);
+            const secB = this.getSectionLetter(b);
+            if (secA !== secB) return secA.localeCompare(secB); // A, then B, then C
             return a.localeCompare(b);
         });
 
@@ -770,75 +779,100 @@ class DashboardManager {
                             ` : ''}
                         </div>
 
-                        <div class="teacher-batches-grid">
-                            ${displayBatches.length === 0 ? `
-                                <div class="teacher-batches-empty">
-                                    <p>No exam batches found for ${this.selectedClassFilter !== 'all' ? this.selectedClassFilter : displaySubject}.</p>
-                                </div>
-                            ` : displayBatches.map(b => {
-                                const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
-                                const isCompleted = b.uncorrected === 0 && b.total > 0;
-                                const isSharedTarget = Boolean(this.highlightBatchKey && (
-                                    b.key.toLowerCase().trim() === this.highlightBatchKey.toLowerCase().trim() ||
-                                    this.highlightBatchKey.toLowerCase().trim().includes(b.key.toLowerCase().trim()) ||
-                                    (this.highlightBatchKey.toLowerCase().includes(b.className.toLowerCase()) && this.highlightBatchKey.toLowerCase().includes(b.templateName.toLowerCase()))
-                                ));
+                        <div class="teacher-batches-grouped-container">
+                            ${(() => {
+                                if (displayBatches.length === 0) {
+                                    return `
+                                        <div class="teacher-batches-empty">
+                                            <p>No exam batches found for ${this.selectedClassFilter !== 'all' ? this.selectedClassFilter : displaySubject}.</p>
+                                        </div>
+                                    `;
+                                }
 
-                                return `
-                                    <div class="teacher-batch-card ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" style="cursor: pointer; ${isSharedTarget ? 'border: 2px solid #0071E3; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.22), 0 10px 28px rgba(0, 113, 227, 0.12);' : ''}">
-                                        <div class="batch-card-top-row">
-                                            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
-                                                <span class="batch-class-badge">${b.className}</span>
-                                                <span class="batch-subject-tag">${b.subject}</span>
-                                                ${isSharedTarget ? `
-                                                    <span class="batch-status-pill" style="background: rgba(0, 113, 227, 0.12); color: #0071E3; font-weight: 600; border: 1px solid rgba(0, 113, 227, 0.25);">★ Shared Batch</span>
-                                                ` : ''}
+                                // Group batches by Grade Level (10th top, then 12th below, then others)
+                                const gradeGroupsMap = new Map();
+                                displayBatches.forEach(b => {
+                                    const g = this.getGradeLevel(b.className);
+                                    if (!gradeGroupsMap.has(g)) gradeGroupsMap.set(g, []);
+                                    gradeGroupsMap.get(g).push(b);
+                                });
+
+                                // Sorted grades: 10th first, 12th second, 11th third, others
+                                const sortedGrades = Array.from(gradeGroupsMap.keys()).sort((a, b) => {
+                                    const order = { 10: 1, 12: 2, 11: 3, 99: 4 };
+                                    const ordA = order[a] !== undefined ? order[a] : (a < 10 ? 0 : 5);
+                                    const ordB = order[b] !== undefined ? order[b] : (b < 10 ? 0 : 5);
+                                    return ordA - ordB;
+                                });
+
+                                return sortedGrades.map(gKey => {
+                                    const gBatches = gradeGroupsMap.get(gKey) || [];
+                                    if (gBatches.length === 0) return '';
+
+                                    // Sort batches within grade:
+                                    // 1. Section A first, then Section B, then Section C
+                                    // 2. Newly added / latest timestamp first (LIFO)
+                                    // 3. Fallback alphabetical
+                                    gBatches.sort((a, b) => {
+                                        const secA = this.getSectionLetter(a.className);
+                                        const secB = this.getSectionLetter(b.className);
+                                        if (secA !== secB) return secA.localeCompare(secB);
+                                        const tsA = a.latestTimestamp || 0;
+                                        const tsB = b.latestTimestamp || 0;
+                                        if (tsA !== tsB) return tsB - tsA;
+                                        return (a.templateName || "").localeCompare(b.templateName || "");
+                                    });
+
+                                    const gradeTitle = gKey === 10 ? 'Class 10th (Grade X)' : (gKey === 12 ? 'Class 12th (Grade XII)' : (gKey === 11 ? 'Class 11th (Grade XI)' : `Grade ${gKey}`));
+                                    const totalPapersInGrade = gBatches.reduce((sum, b) => sum + b.total, 0);
+                                    const totalPendingInGrade = gBatches.reduce((sum, b) => sum + b.uncorrected, 0);
+                                    const isCollapsed = this.collapsedGradeGroups ? this.collapsedGradeGroups.has(gKey) : false;
+
+                                    return `
+                                        <div class="dash-grade-group-section" data-grade="${gKey}" style="margin-bottom: 24px;">
+                                            <div class="dash-grade-header" data-grade="${gKey}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 14px; margin-bottom: 12px; cursor: pointer; user-select: none; transition: all 0.15s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
+                                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                                                    <span style="font-size: 1.25rem;">${gKey === 10 ? '🔟' : (gKey === 12 ? '🎓' : '📚')}</span>
+                                                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                                        <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: #1E293B;">
+                                                            ${gradeTitle}
+                                                        </h4>
+                                                        <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(0, 113, 227, 0.08); color: #0071E3; border: 1px solid rgba(0, 113, 227, 0.2);">
+                                                            ${gBatches.length} ${gBatches.length === 1 ? 'Batch' : 'Batches'}
+                                                        </span>
+                                                        <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(100, 116, 139, 0.08); color: #64748B;">
+                                                            ${totalPapersInGrade} Papers
+                                                        </span>
+                                                        ${totalPendingInGrade > 0 ? `
+                                                            <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(217, 119, 6, 0.1); color: #D97706; border: 1px solid rgba(217, 119, 6, 0.2);">
+                                                                ${totalPendingInGrade} Pending
+                                                            </span>
+                                                        ` : `
+                                                            <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(22, 163, 74, 0.1); color: #16A34A; border: 1px solid rgba(22, 163, 74, 0.2);">
+                                                                ✓ All Graded
+                                                            </span>
+                                                        `}
+                                                    </div>
+                                                </div>
+                                                <div style="display: flex; align-items: center; gap: 8px;">
+                                                    <span class="grade-toggle-text" style="font-size: 0.78rem; font-weight: 600; color: #64748B;">
+                                                        ${isCollapsed ? 'Expand' : 'Collapse'}
+                                                    </span>
+                                                    <span class="grade-toggle-chevron" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #F1F5F9; color: #475569; transition: transform 0.2s ease; transform: rotate(${isCollapsed ? '-90deg' : '0deg'});">
+                                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <span class="batch-status-pill ${isCompleted ? 'status-all-done' : 'status-has-pending'}">
-                                                ${isCompleted ? '✓ All Graded' : `${b.uncorrected} Pending`}
-                                            </span>
-                                        </div>
 
-                                        <h4 class="batch-card-name" title="${b.templateName}">${b.templateName}</h4>
-
-                                        <div class="batch-card-meta-row">
-                                            <span>Max Marks: <strong>${b.maxMarks}M</strong></span>
-                                            <span>•</span>
-                                            <span>Roster: <strong>${b.total} Papers</strong></span>
-                                        </div>
-
-                                        <div class="batch-progress-wrapper">
-                                            <div class="batch-progress-labels">
-                                                <span class="progress-ratio">${b.corrected} / ${b.total} Evaluated</span>
-                                                <span class="progress-pct" style="color: ${pct === 100 ? '#16A34A' : '#0071E3'}; font-weight: 700;">${pct}%</span>
-                                            </div>
-                                            <div class="batch-progress-bar">
-                                                <div class="batch-progress-fill" style="width: ${pct}%; background: ${pct === 100 ? '#16A34A' : 'linear-gradient(90deg, #0071E3, #38BDF8)'};"></div>
+                                            <div class="dash-grade-batches-body" style="display: ${isCollapsed ? 'none' : 'block'};">
+                                                <div class="teacher-batches-grid">
+                                                    ${gBatches.map(b => this.renderBatchCardHtml(b)).join('')}
+                                                </div>
                                             </div>
                                         </div>
-
-                                        <div class="batch-actions-row">
-                                            <button type="button" class="btn-batch-view" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" title="Open papers in this batch">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                                                <span>View Papers (${b.total})</span>
-                                            </button>
-                                            <button type="button" class="btn-batch-start" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" title="Start correcting papers in this batch">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                                                <span>${isCompleted ? 'Review' : 'Start Marking'}</span>
-                                            </button>
-                                            ${b.subject && b.subject.toLowerCase().includes('tamil') ? `
-                                                <button type="button" class="btn-batch-view btn-batch-test-me" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" style="border-color: #10B981; color: #059669; font-weight: 500;" title="Test correct a sample Tamil paper">
-                                                    ✍️ Test Me!
-                                                </button>
-                                            ` : ''}
-                                            <button type="button" class="btn-batch-share btn-dash-batch-share" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" data-subject="${b.subject}" data-total="${b.total}" title="Share this batch via WhatsApp">
-                                                ${(window.Icons && window.Icons.whatsapp) || ''}
-                                                <span>Share</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                `;
-                            }).join('')}
+                                    `;
+                                }).join('');
+                            })()}
                         </div>
                     </div>
                 </div>
@@ -1233,6 +1267,29 @@ class DashboardManager {
         });
 
         // Teacher Batch Cards Interactions -> Drill down into that batch
+        // Collapsible Grade Headers
+        this.container.querySelectorAll(".dash-grade-header").forEach(header => {
+            header.addEventListener("click", () => {
+                const gKey = Number(header.getAttribute("data-grade"));
+                if (!this.collapsedGradeGroups) this.collapsedGradeGroups = new Set();
+                if (this.collapsedGradeGroups.has(gKey)) {
+                    this.collapsedGradeGroups.delete(gKey);
+                } else {
+                    this.collapsedGradeGroups.add(gKey);
+                }
+                const section = header.closest(".dash-grade-group-section");
+                if (section) {
+                    const body = section.querySelector(".dash-grade-batches-body");
+                    const txt = section.querySelector(".grade-toggle-text");
+                    const chevron = section.querySelector(".grade-toggle-chevron");
+                    const isNowCollapsed = this.collapsedGradeGroups.has(gKey);
+                    if (body) body.style.display = isNowCollapsed ? "none" : "block";
+                    if (txt) txt.textContent = isNowCollapsed ? "Expand" : "Collapse";
+                    if (chevron) chevron.style.transform = isNowCollapsed ? "rotate(-90deg)" : "rotate(0deg)";
+                }
+            });
+        });
+
         this.container.querySelectorAll(".teacher-batch-card").forEach(card => {
             card.addEventListener("click", (e) => {
                 if (e.target.closest("button")) return;

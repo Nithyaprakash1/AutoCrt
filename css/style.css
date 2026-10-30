@@ -13973,3 +13973,17 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     border-color: #005BB5;
     color: #005BB5;
 }
+
+/* Collapsible Grade Group Sections */
+.dash-grade-header {
+    cursor: pointer;
+    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.dash-grade-header:hover {
+    border-color: #0071E3 !important;
+    background: #F8FAFC !important;
+    box-shadow: 0 4px 14px rgba(0, 113, 227, 0.08) !important;
+}
+.dash-grade-header:active {
+    transform: scale(0.997);
+}
