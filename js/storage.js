@@ -1683,12 +1683,13 @@ class StorageService {
         try {
             const raw = sessionStorage.getItem(`niprak_draft_${evalId}`) || sessionStorage.getItem(`onespace_draft_${evalId}`);
             if (raw) {
-                return JSON.parse(raw);
+                const parsed = JSON.parse(raw);
+                return (parsed && parsed.data) ? parsed.data : parsed;
             }
         } catch (e) {
             return null;
         }
-        return null;
+        return this.memoryStore?.find(e => String(e.id) === String(evalId)) || null;
     }
 
     clearDraft(evalId) {

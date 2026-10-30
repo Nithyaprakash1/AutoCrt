@@ -3486,18 +3486,8 @@ class AppController {
                         }
                         updated = true;
                     }
-                } else {
-                    // Score annotations were deleted or removed from the paper: remove from the side where marks are entered!
-                    if (q.awardedMarks > 0 || q.status === "correct" || q.status === "partial" || q.status === "wrong") {
-                        if (this.markingPanel) {
-                            this.markingPanel.clearQuestionMark(idx);
-                        } else {
-                            q.awardedMarks = 0;
-                            q.status = "unmarked";
-                        }
-                        updated = true;
-                    }
                 }
+                // Do NOT wipe out questions that were graded directly in marking panel or loaded from storage!
             });
         }
 
@@ -3634,13 +3624,8 @@ class AppController {
             evaluation.maxMarks = 40;
         }
 
-        // AUTO-HEAL: Detect and resolve template mismatch (e.g. maxMarks is 40M, but questions sum to 80M)
-        const qSum = Array.isArray(evaluation.questions) && evaluation.questions.length > 0
-            ? evaluation.questions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0)
-            : 0;
-
-        if (qSum > 0 && Math.abs(qSum - Number(evaluation.maxMarks)) > 1) {
-            console.warn(`[Auto-Heal] Paper ${evaluation.id} template mismatch: maxMarks is ${evaluation.maxMarks} but questions sum to ${qSum}. Auto-syncing questions...`);
+        // AUTO-HEAL: Only build questions from template if evaluation.questions is missing or empty
+        if (!Array.isArray(evaluation.questions) || evaluation.questions.length === 0) {
             let matchedTpl = null;
             if (window.appStorage) {
                 const catalog = await window.appStorage.getSubjectCatalog();
@@ -3653,26 +3638,9 @@ class AppController {
                     }
                 }
             }
-            if (window.buildQuestionsFromTemplate) {
+            if (matchedTpl && window.buildQuestionsFromTemplate) {
                 evaluation.questions = window.buildQuestionsFromTemplate(matchedTpl, evaluation.maxMarks);
-            } else {
-                const ratio = Number(evaluation.maxMarks) / qSum;
-                evaluation.questions.forEach(q => {
-                    q.maxMarks = Math.max(1, Math.round((Number(q.maxMarks) * ratio) * 10) / 10);
-                });
             }
-            evaluation.sections = (matchedTpl && matchedTpl.sections) ? JSON.parse(JSON.stringify(matchedTpl.sections)) : [{
-                id: "sec_main",
-                name: "All Questions",
-                title: "All Questions",
-                qStartNo: 1,
-                qEndNo: evaluation.questions.length,
-                qCount: evaluation.questions.length,
-                maxMarks: evaluation.maxMarks
-            }];
-            try {
-                if (window.appStorage) await window.appStorage.saveEvaluation(evaluation);
-            } catch (e) {}
         }
 
         if (!Array.isArray(evaluation.questions) || evaluation.questions.length === 0) {
@@ -3730,6 +3698,14 @@ class AppController {
         if (rollEl) rollEl.textContent = `Roll: ${evaluation.rollNo || "-"}`;
         const subEl = document.getElementById("ws-exam-subtitle-text");
         if (subEl) subEl.textContent = `${evaluation.subject || ""} • ${evaluation.examName || ""}`;
+
+        // Initialize live score value from evaluation record immediately
+        const topScoreEl = document.getElementById("ws-live-score-val");
+        if (topScoreEl) {
+            const curObt = (evaluation.obtainedMarks !== undefined && evaluation.obtainedMarks !== null) ? evaluation.obtainedMarks : 0;
+            const curMax = evaluation.maxMarks || 40;
+            topScoreEl.textContent = `${curObt} / ${curMax}`;
+        }
 
         // Populate and synchronize the Template Switcher dropdown
         await this.populateWorkspaceTemplateSelector(evaluation);
