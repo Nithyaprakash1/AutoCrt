@@ -2912,7 +2912,7 @@ class AppController {
 
     async handleBackToDashboard() {
         if (this._isNavigatingBack) {
-            if (Date.now() - (this._navigatingBackStartTime || 0) > 800) {
+            if (Date.now() - (this._navigatingBackStartTime || 0) > 4000) {
                 this._isNavigatingBack = false;
             } else {
                 return;
@@ -2920,6 +2920,28 @@ class AppController {
         }
         this._isNavigatingBack = true;
         this._navigatingBackStartTime = Date.now();
+
+        const wsEl = document.getElementById("view-workspace");
+        const isLeavingWorkspace = (wsEl && wsEl.style.display !== "none") || !!this.activeEvaluation;
+
+        // Immediate visual feedback on the top back button
+        const wsBackBtn = document.getElementById("ws-btn-back");
+        let originalBackHtml = null;
+        if (wsBackBtn && isLeavingWorkspace) {
+            originalBackHtml = wsBackBtn.innerHTML;
+            wsBackBtn.disabled = true;
+            wsBackBtn.classList.add("is-navigating-back");
+            wsBackBtn.innerHTML = `
+                <span class="btn-spinner-icon" style="display:inline-block; width:13px; height:13px; border:2px solid currentColor; border-top-color:transparent; border-radius:50%; animation:spinLoading 0.6s linear infinite; vertical-align:middle; margin-right:4px;"></span>
+                <span>Returning...</span>
+            `;
+        }
+
+        // Show Apple-style global loading indicator
+        if (isLeavingWorkspace) {
+            const sName = this.activeEvaluation ? (this.activeEvaluation.studentName || "Paper") : "Paper";
+            this.showLoadingBox("Returning to Dashboard...", `Saving progress for ${sName} & updating dashboard...`);
+        }
 
         try {
             this.closeCorrectionCompletedModal();
@@ -2971,6 +2993,29 @@ class AppController {
                     dash.style.display = "block";
                 }
             } finally {
+                // Ensure a smooth perception window if leaving workspace so loading isn't jarringly instant
+                const elapsed = Date.now() - (this._navigatingBackStartTime || 0);
+                if (isLeavingWorkspace && elapsed < 350) {
+                    await new Promise(r => setTimeout(r, 350 - elapsed));
+                }
+
+                if (isLeavingWorkspace) {
+                    this.hideLoadingBox();
+                }
+
+                if (wsBackBtn) {
+                    wsBackBtn.disabled = false;
+                    wsBackBtn.classList.remove("is-navigating-back");
+                    wsBackBtn.style.pointerEvents = "";
+                    if (originalBackHtml) {
+                        wsBackBtn.innerHTML = originalBackHtml;
+                    } else {
+                        wsBackBtn.innerHTML = `
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+                            <span>Dashboard</span>
+                        `;
+                    }
+                }
                 this._isNavigatingBack = false;
             }
         }
@@ -6624,6 +6669,10 @@ class AppController {
     // --- Toast Notifications ---
 
     showLoadingBox(title = "Opening Answer Script...", desc = "Loading student paper, annotations & correction tools...") {
+        if (this._hideLoaderTimeout) {
+            clearTimeout(this._hideLoaderTimeout);
+            this._hideLoaderTimeout = null;
+        }
         let el = document.getElementById("global-app-loader");
         if (!el) {
             el = document.createElement("div");
@@ -6644,6 +6693,7 @@ class AppController {
             if (descEl) descEl.textContent = desc;
         }
         el.style.display = "flex";
+        void el.offsetHeight;
         el.style.opacity = "1";
     }
 
@@ -6651,7 +6701,12 @@ class AppController {
         const el = document.getElementById("global-app-loader");
         if (el) {
             el.style.opacity = "0";
-            setTimeout(() => { el.style.display = "none"; }, 200);
+            if (this._hideLoaderTimeout) clearTimeout(this._hideLoaderTimeout);
+            this._hideLoaderTimeout = setTimeout(() => {
+                if (el.style.opacity === "0") {
+                    el.style.display = "none";
+                }
+            }, 220);
         }
     }
 

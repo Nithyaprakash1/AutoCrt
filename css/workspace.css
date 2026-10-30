@@ -3876,3 +3876,14 @@ p, span, div, strong, b, th, td, label, a,
         width: 100%;
     }
 }
+
+
+/* Back to Dashboard Loading Indicator */
+.btn-back-dash.is-navigating-back {
+    opacity: 0.85 !important;
+    cursor: wait !important;
+    pointer-events: none !important;
+    background: rgba(0, 113, 227, 0.08) !important;
+    color: var(--color-primary, #0071E3) !important;
+    border-color: rgba(0, 113, 227, 0.3) !important;
+}

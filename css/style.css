@@ -15030,3 +15030,8 @@ tr.row-paper-completed td {
 tr.row-paper-completed:hover td {
     background: rgba(220, 252, 231, 0.8) !important;
 }
+
+
+@keyframes spinLoading {
+    to { transform: rotate(360deg); }
+}
