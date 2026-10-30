@@ -936,6 +936,12 @@ class UploadPortalManager {
                 this.classes = savedClasses;
             }
 
+            try {
+                this.allEvaluations = await window.appStorage.getAllEvaluations(false, true);
+            } catch (e) {
+                this.allEvaluations = [];
+            }
+
             // Update dynamic student counts for all classes from actual rosters
             for (const cls of this.classes) {
                 try {
@@ -1338,82 +1344,123 @@ class UploadPortalManager {
                 ` : ''}
 
                 <div class="templates-grid">
-                    ${(this.selectedSubject.templates || []).map(tpl => {
-                        let secSummary = [];
-                        let totalQuestionsCount = (tpl.questions && Array.isArray(tpl.questions)) ? tpl.questions.length : 0;
-                        if (tpl.questions && tpl.questions.length > 8) {
-                            const secMap = {};
-                            tpl.questions.forEach(q => {
-                                const secName = q.section || "Questions";
-                                if (!secMap[secName]) secMap[secName] = { count: 0, marks: 0 };
-                                secMap[secName].count++;
-                                secMap[secName].marks += (q.maxMarks || 0);
-                            });
-                            secSummary = Object.keys(secMap).map(s => `${s.replace('Section ', 'Sec ')}: ${secMap[s].count} Qs (${secMap[s].marks}M)`);
-                        } else if (tpl.questions && tpl.questions.length > 0) {
-                            secSummary = tpl.questions.map(q => `${q.qNumber} (${q.maxMarks}m)`);
-                        } else if (tpl.sections && Array.isArray(tpl.sections) && tpl.sections.length > 0) {
-                            secSummary = tpl.sections.map(s => {
-                                const cnt = s.qCount || (s.qEndNo && s.qStartNo ? (s.qEndNo - s.qStartNo + 1) : 0);
-                                totalQuestionsCount += cnt;
-                                return `${s.name || s.letter}: ${cnt} Qs (${s.secTotal || s.maxMarks || 0}M)`;
-                            });
-                        }
+                    ${(() => {
+                        const allEvals = (this.allEvaluations && Array.isArray(this.allEvaluations) && this.allEvaluations.length > 0)
+                            ? this.allEvaluations
+                            : ((window.appStorage && window.appStorage.memoryStore) ? window.appStorage.memoryStore : []);
 
-                        const isChecked = this.selectedTemplateIds.has(tpl.id);
-                        return `
-                            <div class="template-card ${this.selectedTemplate && this.selectedTemplate.id === tpl.id ? 'selected' : ''}" data-template-id="${tpl.id}" style="${isChecked ? 'border-color: #DC2626; background: rgba(220, 38, 38, 0.03);' : ''}">
-                                <div class="template-card-header">
-                                    <div style="display: flex; align-items: center; gap: 8px;">
-                                        <input type="checkbox" class="template-card-check" data-template-id="${tpl.id}" ${isChecked ? 'checked' : ''} title="Select template for bulk action" style="cursor: pointer; width: 16px; height: 16px;" />
-                                        <span class="template-badge">${tpl.badge || 'Standard'}</span>
+                        // Sort templates: Last-In, First-Show (LIFO: newly added templates first, then by creation date/order)
+                        const sortedTemplates = [...(this.selectedSubject.templates || [])].sort((a, b) => {
+                            const aNew = Boolean(a.isNew);
+                            const bNew = Boolean(b.isNew);
+                            if (aNew && !bNew) return -1;
+                            if (!aNew && bNew) return 1;
+                            const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+                            const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+                            if (aTime !== bTime) return bTime - aTime;
+                            return 0;
+                        });
+
+                        return sortedTemplates.map(tpl => {
+                            // Check if any paper for this template has started correction
+                            let isTemplateNew = Boolean(tpl.isNew);
+                            if (isTemplateNew && allEvals && allEvals.length > 0) {
+                                const hasStartedCorrection = allEvals.some(e => {
+                                    if (!e) return false;
+                                    const match = (tpl.id && e.templateId === tpl.id) ||
+                                                  (e.templateName && e.templateName.toLowerCase().trim() === tpl.name.toLowerCase().trim()) ||
+                                                  (tpl.examName && e.examName && e.examName.toLowerCase().trim() === tpl.examName.toLowerCase().trim());
+                                    if (!match) return false;
+                                    const marks = Number(e.obtainedMarks) || 0;
+                                    const isDone = e.status === 'Completed' || e.status === 'Corrected' || e.status === 'Graded' || e.status === 'Evaluated' || e.status === 'In Progress';
+                                    return isDone || marks > 0;
+                                });
+                                if (hasStartedCorrection) {
+                                    tpl.isNew = false;
+                                    isTemplateNew = false;
+                                    if (window.appStorage) window.appStorage.saveSubjectCatalog(this.catalog);
+                                }
+                            }
+
+                            let secSummary = [];
+                            let totalQuestionsCount = (tpl.questions && Array.isArray(tpl.questions)) ? tpl.questions.length : 0;
+                            if (tpl.questions && tpl.questions.length > 8) {
+                                const secMap = {};
+                                tpl.questions.forEach(q => {
+                                    const secName = q.section || "Questions";
+                                    if (!secMap[secName]) secMap[secName] = { count: 0, marks: 0 };
+                                    secMap[secName].count++;
+                                    secMap[secName].marks += (q.maxMarks || 0);
+                                });
+                                secSummary = Object.keys(secMap).map(s => `${s.replace('Section ', 'Sec ')}: ${secMap[s].count} Qs (${secMap[s].marks}M)`);
+                            } else if (tpl.questions && tpl.questions.length > 0) {
+                                secSummary = tpl.questions.map(q => `${q.qNumber} (${q.maxMarks}m)`);
+                            } else if (tpl.sections && Array.isArray(tpl.sections) && tpl.sections.length > 0) {
+                                secSummary = tpl.sections.map(s => {
+                                    const cnt = s.qCount || (s.qEndNo && s.qStartNo ? (s.qEndNo - s.qStartNo + 1) : 0);
+                                    totalQuestionsCount += cnt;
+                                    return `${s.name || s.letter}: ${cnt} Qs (${s.secTotal || s.maxMarks || 0}M)`;
+                                });
+                            }
+
+                            const isChecked = this.selectedTemplateIds.has(tpl.id);
+                            return `
+                                <div class="template-card ${this.selectedTemplate && this.selectedTemplate.id === tpl.id ? 'selected' : ''}" data-template-id="${tpl.id}" style="${isChecked ? 'border-color: #DC2626; background: rgba(220, 38, 38, 0.03);' : ''}">
+                                    <div class="template-card-header">
+                                        <div style="display: flex; align-items: center; gap: 8px;">
+                                            <input type="checkbox" class="template-card-check" data-template-id="${tpl.id}" ${isChecked ? 'checked' : ''} title="Select template for bulk action" style="cursor: pointer; width: 16px; height: 16px;" />
+                                            ${isTemplateNew ? `
+                                                <span class="template-badge badge-new" style="background: linear-gradient(135deg, #10B981, #059669); color: #fff; font-weight: 700; font-size: 0.72rem; padding: 2px 9px; border-radius: 12px; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35); text-transform: uppercase; letter-spacing: 0.5px; display: inline-flex; align-items: center; gap: 4px;">✨ NEW</span>
+                                            ` : ''}
+                                            <span class="template-badge">${tpl.badge || 'Standard'}</span>
+                                        </div>
+                                        <div class="template-header-actions" style="display: flex; align-items: center; gap: 6px;">
+                                            <button type="button" class="btn-card-action btn-edit-template" data-template-id="${tpl.id}" title="Edit Exam Template Structure">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                                            </button>
+                                            <button type="button" class="btn-card-action btn-duplicate-template" data-template-id="${tpl.id}" title="Duplicate / Copy Template">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+                                            </button>
+                                            <button type="button" class="btn-card-action btn-delete-template" data-template-id="${tpl.id}" title="Delete Exam Template">
+                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                                            </button>
+                                        </div>
                                     </div>
-                                    <div class="template-header-actions" style="display: flex; align-items: center; gap: 6px;">
-                                        <button type="button" class="btn-card-action btn-edit-template" data-template-id="${tpl.id}" title="Edit Exam Template Structure">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-                                        </button>
-                                        <button type="button" class="btn-card-action btn-duplicate-template" data-template-id="${tpl.id}" title="Duplicate / Copy Template">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-                                        </button>
-                                        <button type="button" class="btn-card-action btn-delete-template" data-template-id="${tpl.id}" title="Delete Exam Template">
-                                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
-                                        </button>
+                                    <h4 class="template-title">${tpl.name}</h4>
+                                    <p class="template-exam-name">${tpl.examName}</p>
+
+                                    <div class="template-stats-bar">
+                                        <div class="template-stat-item">
+                                            <span class="stat-label">Max Marks</span>
+                                            <span class="stat-val highlight">${tpl.maxMarks}</span>
+                                        </div>
+                                        <div class="template-stat-item">
+                                            <span class="stat-label">Questions</span>
+                                            <span class="stat-val">${totalQuestionsCount}</span>
+                                        </div>
+                                        <div class="template-stat-item">
+                                            <span class="stat-label">Duration</span>
+                                            <span class="stat-val">${tpl.duration || '3 Hours'}</span>
+                                        </div>
                                     </div>
+
+                                    <div class="template-questions-preview">
+                                        <span class="q-preview-title">Exam Blueprint Structure:</span>
+                                        <div class="q-pill-row">
+                                            ${secSummary.map(tag => `
+                                                <span class="q-pill">${tag}</span>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+
+                                    <button type="button" class="btn-select-template">
+                                        Select Template & Pick Class
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                                    </button>
                                 </div>
-                                <h4 class="template-title">${tpl.name}</h4>
-                                <p class="template-exam-name">${tpl.examName}</p>
-
-                                <div class="template-stats-bar">
-                                    <div class="template-stat-item">
-                                        <span class="stat-label">Max Marks</span>
-                                        <span class="stat-val highlight">${tpl.maxMarks}</span>
-                                    </div>
-                                    <div class="template-stat-item">
-                                        <span class="stat-label">Questions</span>
-                                        <span class="stat-val">${totalQuestionsCount}</span>
-                                    </div>
-                                    <div class="template-stat-item">
-                                        <span class="stat-label">Duration</span>
-                                        <span class="stat-val">${tpl.duration || '3 Hours'}</span>
-                                    </div>
-                                </div>
-
-                                <div class="template-questions-preview">
-                                    <span class="q-preview-title">Exam Blueprint Structure:</span>
-                                    <div class="q-pill-row">
-                                        ${secSummary.map(tag => `
-                                            <span class="q-pill">${tag}</span>
-                                        `).join('')}
-                                    </div>
-                                </div>
-
-                                <button type="button" class="btn-select-template">
-                                    Select Template & Pick Class
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-                                </button>
-                            </div>
-                        `;
-                    }).join('')}
+                            `;
+                        }).join('');
+                    })()}
 
                     <!-- Add Exam Template Card -->
                     <div class="card-add-entity btn-create-template-trigger" id="btn-add-template-card" title="Add Exam Template">
@@ -3648,11 +3695,13 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     duration: duration,
                     sections: structuredSections,
                     questions: questionList,
-                    badge: `${structuredSections.length} Sections (${totalMaxMarks}M)`
+                    badge: `${structuredSections.length} Sections (${totalMaxMarks}M)`,
+                    isNew: true,
+                    createdAt: new Date().toISOString()
                 };
 
                 if (!this.selectedSubject.templates) this.selectedSubject.templates = [];
-                this.selectedSubject.templates.push(newTemplate);
+                this.selectedSubject.templates.unshift(newTemplate);
                 this.selectedSubject.badge = this.selectedSubject.templates.length === 1 ? "1 Template" : `${this.selectedSubject.templates.length} Templates`;
                 if (window.app) {
                     window.app.showToast(`Created template "${tplName}" (${totalMaxMarks} Marks, ${structuredSections.length} Sections)!`);
@@ -4020,8 +4069,10 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                         duplicated.id = "tpl-" + Date.now();
                         duplicated.name = `${tpl.name} (Copy)`;
                         duplicated.examName = `${tpl.examName} (Copy)`;
+                        duplicated.isNew = true;
+                        duplicated.createdAt = new Date().toISOString();
 
-                        this.selectedSubject.templates.push(duplicated);
+                        this.selectedSubject.templates.unshift(duplicated);
                         this.selectedSubject.badge = this.selectedSubject.templates.length === 1 ? "1 Template" : `${this.selectedSubject.templates.length} Templates`;
                         if (window.appStorage) {
                             await window.appStorage.saveSubjectCatalog(this.catalog);
@@ -4408,6 +4459,11 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
     }
 
     updateStepView() {
+        if (window.appStorage && typeof window.appStorage.getAllEvaluations === "function") {
+            window.appStorage.getAllEvaluations(false, true).then(list => {
+                if (Array.isArray(list)) this.allEvaluations = list;
+            }).catch(() => {});
+        }
         this.render();
         this.bindEvents();
     }

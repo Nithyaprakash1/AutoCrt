@@ -249,41 +249,27 @@ class DashboardManager {
         const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
         const activeSub = this.getActiveSubject();
 
-        this.filteredEvaluations = this.evaluations.filter(e => {
-            const isCorr = this.isPaperCorrected(e);
-
-            // 0. Subject Isolation: If viewing a particular subject panel (e.g. Maths panel), strictly show that subject's papers alone!
-            if (activeSub && activeSub !== 'all' && activeSub !== 'All Subjects') {
-                const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, activeSub, e.templateName);
-                if (!subMatch) return false;
-            } else if (this.teacherSubject && this.teacherSubject !== 'all' && this.teacherSubject !== 'All Subjects') {
-                const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName);
-                if (!subMatch) return false;
-            } else if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
-                const matches = this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
-                if (!matches) return false;
-            }
-
-            // Active Batch filter: When drilled down into a specific batch card
-            if (this.activeBatchKey) {
+        // Active Batch filter: When drilled down into a specific batch card, base evaluations MUST come from this batch
+        if (this.activeBatchKey) {
+            let matchedBatch = null;
+            if (this.batches && this.batches.length > 0) {
                 const parts = this.activeBatchKey.split(":::");
                 const targetCls = (parts[0] || "").toLowerCase().trim();
                 const targetTpl = (parts.slice(1).join(":::") || "").toLowerCase().trim();
+                matchedBatch = this.batches.find(b => b.key === this.activeBatchKey ||
+                    (b.className && b.className.toLowerCase().trim() === targetCls && b.templateName && b.templateName.toLowerCase().trim() === targetTpl));
+            }
 
-                // 1. Direct batch membership check: If this.batches is already calculated and has this active batch
-                let matchedBatch = null;
-                if (this.batches && this.batches.length > 0) {
-                    matchedBatch = this.batches.find(b => b.key === this.activeBatchKey ||
-                        (b.className && b.className.toLowerCase().trim() === targetCls && b.templateName && b.templateName.toLowerCase().trim() === targetTpl));
-                }
-
-                if (matchedBatch && Array.isArray(matchedBatch.papers)) {
-                    // Direct membership: matchedBatch is the authoritative ground truth for this card.
-                    // If paper is not in matchedBatch.papers, it MUST NOT appear in this drilled-down batch.
-                    const inBatch = matchedBatch.papers.some(p => String(p.id) === String(e.id));
-                    if (!inBatch) return false;
-                } else {
-                    // Fallback when this.batches is not yet computed
+            let baseList = [];
+            if (matchedBatch && Array.isArray(matchedBatch.papers)) {
+                // Direct membership: matchedBatch is the authoritative ground truth for this card
+                baseList = matchedBatch.papers;
+            } else {
+                // Fallback when this.batches is not yet computed
+                const parts = this.activeBatchKey.split(":::");
+                const targetCls = (parts[0] || "").toLowerCase().trim();
+                const targetTpl = (parts.slice(1).join(":::") || "").toLowerCase().trim();
+                baseList = this.evaluations.filter(e => {
                     const rawCls = (e.classLabel || e.className || e.class || "Class 12-A");
                     const eCls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
                         ? window.appStorage.canonicalizeClassName(rawCls).toLowerCase().trim()
@@ -291,22 +277,63 @@ class DashboardManager {
                     const examTitle = (e.examName || e.templateName || "Assessment").toLowerCase().trim().replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '');
                     const eBatchKey = `${eCls}:::${examTitle}`;
 
-                    if (eBatchKey === this.activeBatchKey.toLowerCase().trim()) {
-                        // Exact batch key match
-                    } else {
-                        // Class check
-                        const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
-                        const eClsNorm = (e.class || e.className || e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                        if (normTargetCls && eClsNorm !== normTargetCls) return false;
+                    if (eBatchKey === this.activeBatchKey.toLowerCase().trim()) return true;
 
-                        // Base exam/template name check (without date)
-                        const targetTplBase = targetTpl.replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
-                        const eExamBase = examTitle.replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
-                        const eTplBase = (e.templateName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                    const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
+                    const eClsNorm = (e.class || e.className || e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                    if (normTargetCls && eClsNorm !== normTargetCls) return false;
 
-                        if (targetTplBase && eExamBase !== targetTplBase && eTplBase !== targetTplBase) return false;
+                    const targetTplBase = targetTpl.replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                    const eExamBase = examTitle.replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                    const eTplBase = (e.templateName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+
+                    return Boolean(targetTplBase && (eExamBase === targetTplBase || eTplBase === targetTplBase));
+                });
+            }
+
+            // Filter this batch's papers ONLY by status tab ('all', 'uncorrected', 'corrected') and search query
+            this.filteredEvaluations = baseList.filter(e => {
+                const isCorr = this.isPaperCorrected(e);
+                if (this.activeTab === "uncorrected" && isCorr) return false;
+                if (this.activeTab === "corrected" && !isCorr) return false;
+
+                if (this.searchQuery && this.searchQuery.trim().length > 0) {
+                    const q = this.searchQuery.toLowerCase().trim();
+                    const name = (e.studentName || "").toLowerCase();
+                    const roll = (e.rollNo || "").toLowerCase();
+                    const sub = (e.subject || "").toLowerCase();
+                    const exam = (e.examName || e.templateName || "").toLowerCase();
+                    const cls = (e.class || e.className || "").toLowerCase();
+                    if (!name.includes(q) && !roll.includes(q) && !sub.includes(q) && !exam.includes(q) && !cls.includes(q)) {
+                        return false;
                     }
                 }
+                return true;
+            });
+
+            // Clean up selectedIds that are no longer in filtered set
+            const visibleIdSet = new Set(this.filteredEvaluations.map(e => String(e.id)));
+            const newSelected = new Set();
+            this.selectedIds.forEach(id => {
+                if (visibleIdSet.has(id)) newSelected.add(id);
+            });
+            this.selectedIds = newSelected;
+            return;
+        }
+
+        this.filteredEvaluations = this.evaluations.filter(e => {
+            const isCorr = this.isPaperCorrected(e);
+
+            // 0. Subject Isolation: If viewing a particular subject panel, strictly show that subject's papers alone!
+            if (activeSub && activeSub !== 'all' && activeSub !== 'All Subjects') {
+                const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, activeSub, e.templateName);
+                if (!subMatch) return false;
+            } else if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
+                const matches = this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+                if (!matches) return false;
+            } else if (this.teacherSubject && this.teacherSubject !== 'all' && this.teacherSubject !== 'All Subjects') {
+                const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName);
+                if (!subMatch) return false;
             }
 
             // 1. Status Tab filter
@@ -314,7 +341,7 @@ class DashboardManager {
             if (this.activeTab === "corrected" && !isCorr) return false;
 
             // 2. Class filter (flexible matching when on overview)
-            if (!this.activeBatchKey && this.selectedClassFilter && this.selectedClassFilter !== "all") {
+            if (this.selectedClassFilter && this.selectedClassFilter !== "all") {
                 const normFilter = this.selectedClassFilter.toLowerCase().replace(/[^a-z0-9]/g, '');
                 const eCls1 = (e.class || "").toLowerCase().replace(/[^a-z0-9]/g, '');
                 const eCls2 = (e.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -515,33 +542,54 @@ class DashboardManager {
             });
         }
 
-        // Distinct classes for filter pills
+        // Distinct classes for filter pills: Canonicalize, deduplicate and ensure count > 0
         const activeClassesList = (this.teacherClasses && this.teacherClasses.length > 0)
             ? this.teacherClasses.filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
             : [];
-        const distinctBatchClasses = Array.from(new Set(this.batches.map(b => b.className).filter(Boolean)));
-        if (activeClassesList.length > 0) {
-            activeClassesList.forEach(c => {
-                if (!distinctBatchClasses.includes(c)) distinctBatchClasses.push(c);
-            });
-        }
-        distinctBatchClasses.sort((a, b) => {
-            const na = parseInt(a.match(/\d+/)?.[0] || "0", 10);
-            const nb = parseInt(b.match(/\d+/)?.[0] || "0", 10);
-            return nb - na; // 12th, 11th, 10th
-        });
-
-        // Distinct subjects for filter pills
         const activeSubjectsList = (this.teacherSubjects && this.teacherSubjects.length > 0)
             ? this.teacherSubjects.filter(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
             : [];
-        const distinctBatchSubjects = Array.from(new Set(this.batches.map(b => b.subject).filter(Boolean)));
-        if (activeSubjectsList.length > 0) {
-            activeSubjectsList.forEach(s => {
-                if (!distinctBatchSubjects.includes(s)) distinctBatchSubjects.push(s);
-            });
+
+        const classBatchCountMap = new Map();
+        this.batches.forEach(b => {
+            const rawCls = b.className || "Class 12-A";
+            const canonCls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+                ? window.appStorage.canonicalizeClassName(rawCls)
+                : rawCls;
+            b.className = canonCls;
+            classBatchCountMap.set(canonCls, (classBatchCountMap.get(canonCls) || 0) + 1);
+        });
+
+        const distinctBatchClasses = Array.from(classBatchCountMap.keys()).sort((a, b) => {
+            const na = parseInt(a.match(/\d+/)?.[0] || "0", 10);
+            const nb = parseInt(b.match(/\d+/)?.[0] || "0", 10);
+            if (nb !== na) return nb - na; // 12th, 11th, 10th
+            return a.localeCompare(b);
+        });
+
+        // Distinct subjects for filter pills: Canonicalize, deduplicate and ensure count > 0
+        const subjectBatchCountMap = new Map();
+        this.batches.forEach(b => {
+            let sub = (b.subject || "General").trim();
+            if (window.appStorage && typeof window.appStorage.isSubjectMatch === "function") {
+                const matchedAssigned = (this.teacherSubjects || []).find(ts => window.appStorage.isSubjectMatch(sub, "", ts, ""));
+                if (matchedAssigned) sub = matchedAssigned;
+            }
+            b.subject = sub;
+            subjectBatchCountMap.set(sub, (subjectBatchCountMap.get(sub) || 0) + 1);
+        });
+
+        const distinctBatchSubjects = Array.from(subjectBatchCountMap.keys()).sort();
+
+        // Safety reset filters if previously selected class or subject no longer exists in available batches
+        if (this.selectedClassFilter && this.selectedClassFilter !== "all") {
+            const hasMatch = distinctBatchClasses.some(c => c.toLowerCase().replace(/[^a-z0-9]/g, '') === this.selectedClassFilter.toLowerCase().replace(/[^a-z0-9]/g, ''));
+            if (!hasMatch) this.selectedClassFilter = "all";
         }
-        distinctBatchSubjects.sort();
+        if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all" && this.selectedSubjectFilter !== "All Subjects") {
+            const hasMatch = distinctBatchSubjects.some(s => window.appStorage.isSubjectMatch(s, "", this.selectedSubjectFilter, ""));
+            if (!hasMatch) this.selectedSubjectFilter = "all";
+        }
 
         // Filter batches by selected class & subject filter pills
         let displayBatches = this.batches;
@@ -565,7 +613,8 @@ class DashboardManager {
             teacherAssigned.some(s => s && s.toLowerCase().includes('tamil'));
 
         // Welcome Headline with Subject & Class Display
-        const displayClasses = activeClassesList.join(', ');
+        const canonicalClasses = Array.from(new Set(activeClassesList.map(c => window.appStorage ? window.appStorage.canonicalizeClassName(c) : c)));
+        const displayClasses = canonicalClasses.join(', ');
         const welcomeHeadline = displayClasses
             ? `${displaySubject} • ${displayClasses} Evaluation Desk`
             : `${displaySubject} Evaluation Desk`;
@@ -682,12 +731,9 @@ class DashboardManager {
                                             All Classes (${this.batches.length})
                                         </button>
                                         ${distinctBatchClasses.map(clsName => {
-                                            const countForCls = this.batches.filter(b => {
-                                                const bNorm = (b.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                                                const cNorm = clsName.toLowerCase().replace(/[^a-z0-9]/g, '');
-                                                return bNorm === cNorm || bNorm.includes(cNorm) || cNorm.includes(bNorm);
-                                            }).length;
-                                            const isAct = this.selectedClassFilter === clsName;
+                                            const countForCls = classBatchCountMap.get(clsName) || 0;
+                                            const isAct = this.selectedClassFilter === clsName ||
+                                                (this.selectedClassFilter && this.selectedClassFilter.toLowerCase().replace(/[^a-z0-9]/g, '') === clsName.toLowerCase().replace(/[^a-z0-9]/g, ''));
                                             return `
                                                 <button type="button" class="btn-dash-class-pill ${isAct ? 'active' : ''}" data-class="${clsName}" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${isAct ? '#0071E3' : '#E2E8F0'}; background: ${isAct ? '#0071E3' : '#F8FAFC'}; color: ${isAct ? '#FFFFFF' : '#475569'}; box-shadow: ${isAct ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
                                                     ${clsName} (${countForCls})
@@ -704,8 +750,9 @@ class DashboardManager {
                                             All Subjects (${this.batches.length})
                                         </button>
                                         ${distinctBatchSubjects.map(subName => {
-                                            const countForSub = this.batches.filter(b => window.appStorage ? window.appStorage.isSubjectMatch(b.subject, b.templateName, subName, b.templateName) : b.subject === subName).length;
-                                            const isAct = this.selectedSubjectFilter === subName;
+                                            const countForSub = subjectBatchCountMap.get(subName) || 0;
+                                            const isAct = this.selectedSubjectFilter === subName ||
+                                                (window.appStorage && window.appStorage.isSubjectMatch(subName, "", this.selectedSubjectFilter, ""));
                                             return `
                                                 <button type="button" class="btn-dash-subject-pill ${isAct ? 'active' : ''}" data-subject="${subName}" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${isAct ? '#0071E3' : '#E2E8F0'}; background: ${isAct ? '#0071E3' : '#F8FAFC'}; color: ${isAct ? '#FFFFFF' : '#475569'}; box-shadow: ${isAct ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
                                                     ${subName} (${countForSub})
