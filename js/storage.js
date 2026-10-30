@@ -620,6 +620,34 @@ class StorageService {
             if (raw) {
                 const u = JSON.parse(raw);
                 if (u) {
+                    // Synchronize latest allocations from user management storage if available
+                    try {
+                        const allUsersRaw = localStorage.getItem("niprak_users") || localStorage.getItem("onespace_users");
+                        if (allUsersRaw) {
+                            const allUsers = JSON.parse(allUsersRaw);
+                            if (Array.isArray(allUsers)) {
+                                const fresh = allUsers.find(x =>
+                                    (x.id && u.id && String(x.id) === String(u.id)) ||
+                                    (x.uid && (u.uid || u.id) && String(x.uid) === String(u.uid || u.id)) ||
+                                    (x.email && u.email && x.email.toLowerCase() === u.email.toLowerCase()) ||
+                                    (x.username && u.username && x.username === u.username)
+                                );
+                                if (fresh) {
+                                    if (Array.isArray(fresh.assignedClasses) && fresh.assignedClasses.length > 0) {
+                                        u.assignedClasses = fresh.assignedClasses;
+                                    }
+                                    if (Array.isArray(fresh.assignedSubjects) && fresh.assignedSubjects.length > 0) {
+                                        u.assignedSubjects = fresh.assignedSubjects;
+                                    }
+                                    if (fresh.subject) u.subject = fresh.subject;
+                                    if (fresh.class) u.class = fresh.class;
+                                    if (fresh.name) u.name = fresh.name;
+                                    if (fresh.role) u.role = fresh.role;
+                                }
+                            }
+                        }
+                    } catch (syncErr) {}
+
                     if (u.subject && (!Array.isArray(u.assignedSubjects) || u.assignedSubjects.length === 0)) {
                         u.assignedSubjects = [u.subject];
                     }
@@ -922,7 +950,18 @@ class StorageService {
                     const classMatches = assignedClasses.some(c => {
                         const cLow = c.toLowerCase().trim();
                         if (!cLow) return false;
-                        return eClass === cLow || eClass.includes(cLow) || cLow.includes(eClass);
+                        if (eClass === cLow || eClass.includes(cLow) || cLow.includes(eClass)) return true;
+                        const cNorm = cLow.replace(/[^a-z0-9]/g, '');
+                        const eNorm = eClass.replace(/[^a-z0-9]/g, '');
+                        if (cNorm === eNorm || (cNorm && eNorm.includes(cNorm)) || (eNorm && cNorm.includes(eNorm))) return true;
+                        const cNum = cLow.match(/\d+/)?.[0];
+                        const eNum = eClass.match(/\d+/)?.[0];
+                        if (cNum && eNum && cNum === eNum) {
+                            const cSec = cLow.match(/[-_\s]([a-z])$/)?.[1];
+                            const eSec = eClass.match(/[-_\s]([a-z])$/)?.[1];
+                            if (!cSec || !eSec || cSec === eSec) return true;
+                        }
+                        return false;
                     });
                     if (!classMatches) return false;
                 }
