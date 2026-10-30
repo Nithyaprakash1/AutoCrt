@@ -36,6 +36,8 @@ class AppController {
         await this.migrateTamilGrade10Evaluations();
         // Auto-migrate any Biology Revision 1 evaluations to official 13 Qs Revision 1 Subjective blueprint
         await this.migrateBiologyRevision1Evaluations();
+        // Auto-unify any Economics evaluations from hardcoded eco-xii-40 to genuine Economics Revision 2 blueprint
+        await this.migrateEconomicsDuplicateEvaluations();
 
         // Load settings & teacher info
         const settings = await window.appStorage.getSettings();
@@ -782,6 +784,50 @@ class AppController {
             }
         } catch (e) {
             console.warn("Auto-repair Biology migration warning:", e);
+        }
+    }
+
+    async migrateEconomicsDuplicateEvaluations() {
+        if (!window.appStorage) return;
+        try {
+            const allEvals = await window.appStorage.getAllEvaluations(false, true);
+            if (!allEvals || !Array.isArray(allEvals) || allEvals.length === 0) return;
+
+            const catalog = await window.appStorage.getSubjectCatalog();
+            const ecoSub = Array.isArray(catalog) ? catalog.find(s => (s.name || "").toLowerCase().includes("econom") || s.id === "eco") : null;
+            
+            // Find user's genuine template (e.g. Economics Revision 2 Subjective 2026)
+            let genuineTpl = ecoSub?.templates?.find(t => 
+                (t.name && t.name.toLowerCase().includes("revision 2")) ||
+                (t.examName && t.examName.toLowerCase().includes("revision 2"))
+            ) || ecoSub?.templates?.find(t => t.id !== "eco-xii-40" && !(t.name && t.name.includes("Grade XII Economics - 40 Marks")));
+
+            let updatedCount = 0;
+            for (const ev of allEvals) {
+                if (!ev) continue;
+                const isLegacyEco40 = ev.templateId === "eco-xii-40" || (ev.templateName && ev.templateName.includes("Grade XII Economics - 40 Marks"));
+                if (isLegacyEco40) {
+                    if (genuineTpl) {
+                        ev.templateId = genuineTpl.id;
+                        ev.templateName = genuineTpl.name;
+                        ev.examName = genuineTpl.examName || genuineTpl.name;
+                        if (genuineTpl.sections && (!ev.sections || ev.sections.length === 0)) {
+                            ev.sections = JSON.parse(JSON.stringify(genuineTpl.sections));
+                        }
+                    } else {
+                        ev.templateName = "Economics Revision 2 Subjective 2026";
+                        ev.examName = "Economics Revision 2 Subjective 2026";
+                    }
+                    ev.updatedAt = new Date().toISOString();
+                    await window.appStorage.saveEvaluation(ev);
+                    updatedCount++;
+                }
+            }
+            if (updatedCount > 0) {
+                console.log(`[Auto-Repair] Successfully unified ${updatedCount} Economics evaluation(s) under genuine blueprint: ${genuineTpl?.name || 'Economics Revision 2 Subjective 2026'}.`);
+            }
+        } catch (e) {
+            console.warn("Economics blueprint migration warning:", e);
         }
     }
 

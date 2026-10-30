@@ -256,7 +256,6 @@ class UploadPortalManager {
                 badge: "Official Blueprint",
                 description: "Economics Board Assessment (40 MCQs + 40 Marks Subjective / 80 Marks)",
                 templates: [
-                    (window.MockData && window.MockData.economicsGrade12Template40 ? window.MockData.economicsGrade12Template40 : null),
                     window.MockData && window.MockData.economicsTemplate ? window.MockData.economicsTemplate : {
                         id: "eco-cbse-80",
                         name: "Economics (80 Marks: 40 MCQs + 40 Subjective)",
@@ -899,10 +898,14 @@ class UploadPortalManager {
                             }
                         });
 
-                        // Deduplicate templates: Purge legacy mat-x-10th-rev-40 if mat-x-rev2-40 exists, and deduplicate by ID
+                        // Deduplicate templates: Purge legacy mat-x-10th-rev-40 and duplicate hardcoded eco-xii-40
                         const seenTplIds = new Set();
                         existingSub.templates = existingSub.templates.filter(t => {
                             if (!t) return false;
+                            // Clean up hardcoded duplicate: "Grade XII Economics - 40 Marks (10 Qs)" (eco-xii-40)
+                            if (t.id === "eco-xii-40" || (t.name && t.name.includes("Grade XII Economics - 40 Marks"))) {
+                                return false;
+                            }
                             if (t.id === "mat-x-10th-rev-40" && existingSub.templates.some(other => other && other.id === "mat-x-rev2-40")) {
                                 return false;
                             }
@@ -913,8 +916,11 @@ class UploadPortalManager {
                     }
                 });
 
-                // Dynamically ensure all subjects have accurate badge labels
+                // Dynamically ensure all subjects have accurate badge labels and no legacy eco-xii-40 templates
                 savedCatalog.forEach(sub => {
+                    if (sub.templates && Array.isArray(sub.templates)) {
+                        sub.templates = sub.templates.filter(t => t && t.id !== "eco-xii-40" && !(t.name && t.name.includes("Grade XII Economics - 40 Marks")));
+                    }
                     const tplCount = (sub.templates && Array.isArray(sub.templates)) ? sub.templates.length : 0;
                     sub.badge = tplCount === 1 ? "1 Template" : `${tplCount} Templates`;
                 });
