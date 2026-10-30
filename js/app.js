@@ -2911,9 +2911,20 @@ class AppController {
     }
 
     async handleBackToDashboard() {
-        if (this._isNavigatingBack) return;
+        if (this._isNavigatingBack) {
+            if (Date.now() - (this._navigatingBackStartTime || 0) > 800) {
+                this._isNavigatingBack = false;
+            } else {
+                return;
+            }
+        }
         this._isNavigatingBack = true;
+        this._navigatingBackStartTime = Date.now();
+
         try {
+            this.closeCorrectionCompletedModal();
+            this.updateFloatingSaveNextPill(false);
+
             if (this.activeEvaluation) {
                 const sName = this.activeEvaluation.studentName || "Paper";
                 this.setAutosaveBadge("saving");
@@ -2928,18 +2939,40 @@ class AppController {
                     }
                 }
 
-                // Explicitly save locally and sync to Firebase Cloud when clicking Dashboard
-                await this.saveActiveEvaluation(false, true);
                 this.stopAutosave();
+                try {
+                    await this.saveActiveEvaluation(false, true);
+                } catch (saveErr) {
+                    console.warn("Back navigation save warning:", saveErr);
+                }
                 this.activeEvaluation = null;
                 this.showToast(`✓ Progress for ${sName} saved! Returned to Dashboard.`, "success");
             }
-            await this.switchView("dashboard");
         } catch (err) {
             console.error("Back navigation error:", err);
-            await this.switchView("dashboard");
         } finally {
-            this._isNavigatingBack = false;
+            try {
+                await this.switchView("dashboard");
+            } catch (switchErr) {
+                console.error("SwitchView dashboard error:", switchErr);
+                // Guaranteed DOM fallback
+                const ws = document.getElementById("view-workspace");
+                const dash = document.getElementById("view-dashboard");
+                const shell = document.getElementById("main-app-shell");
+                const content = document.getElementById("main-content-area");
+                const header = document.getElementById("main-app-header");
+                if (ws) ws.style.display = "none";
+                if (shell) shell.style.display = "flex";
+                if (header) header.style.display = "flex";
+                if (content) content.style.display = "block";
+                if (dash) {
+                    document.querySelectorAll(".view-section").forEach(s => s.classList.remove("active-view"));
+                    dash.classList.add("active-view");
+                    dash.style.display = "block";
+                }
+            } finally {
+                this._isNavigatingBack = false;
+            }
         }
     }
 
@@ -4057,6 +4090,15 @@ class AppController {
                 });
             }
 
+            // Ensure back to dashboard button is active and bound
+            const wsBackBtn = document.getElementById("ws-btn-back");
+            if (wsBackBtn) {
+                wsBackBtn.onclick = (e) => {
+                    e.preventDefault();
+                    this.handleBackToDashboard();
+                };
+            }
+
             // Start autosave cycle
             this.startAutosave();
             this.setAutosaveBadge("saved");
@@ -4568,6 +4610,14 @@ class AppController {
         if (btnCompletedSaveNext) {
             btnCompletedSaveNext.addEventListener("click", async () => {
                 await this.handleCompletedSaveAndNext();
+            });
+        }
+
+        const btnCompletedBackDash = document.getElementById("btn-completed-back-dash");
+        if (btnCompletedBackDash) {
+            btnCompletedBackDash.addEventListener("click", async () => {
+                this.closeCorrectionCompletedModal();
+                await this.handleBackToDashboard();
             });
         }
 

@@ -73,7 +73,7 @@ class DashboardManager {
         const startButtonText = isCompleted ? 'Review' : 'Start Marking';
 
         return `
-            <div class="teacher-batch-card ${b.isNew ? 'is-new-batch' : ''} ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}">
+            <div class="teacher-batch-card ${b.isNew ? 'is-new-batch' : ''} ${isCompleted ? 'is-completed-batch' : ''} ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}">
                 <div class="batch-card-top-row">
                     <div class="batch-card-badges-left">
                         <span class="batch-class-badge">${b.className}</span>
@@ -87,7 +87,7 @@ class DashboardManager {
                     </div>
                     <div class="batch-card-status-right">
                         <span class="batch-status-pill ${isCompleted ? 'status-completed' : (isInProgress ? 'status-in-progress' : 'status-pending')}">
-                            ${isCompleted ? '● Graded' : (isInProgress ? '◐ In Progress' : '○ Pending')}
+                            ${isCompleted ? '✓ Completed' : (isInProgress ? '◐ In Progress' : '○ Pending')}
                         </span>
                     </div>
                 </div>
@@ -281,8 +281,14 @@ class DashboardManager {
 
     isPaperCorrected(e) {
         if (!e) return false;
-        // Strictly consider corrected only when teacher explicitly saved/evaluated it
-        return e.status === "Completed" || e.status === "Corrected" || e.status === "Graded" || e.status === "Evaluated";
+        if (e.status === "Completed" || e.status === "Corrected" || e.status === "Graded" || e.status === "Evaluated") {
+            return true;
+        }
+        if (Array.isArray(e.questions) && e.questions.length > 0) {
+            const hasUnmarked = e.questions.some(q => !q.status || q.status === "unmarked" || q.status === "pending");
+            if (!hasUnmarked) return true;
+        }
+        return false;
     }
 
     getActiveSubject() {
@@ -1276,7 +1282,7 @@ class DashboardManager {
                 : (Number(ev.maxMarks) > 0 ? Math.round((Number(ev.obtainedMarks || 0) / Number(ev.maxMarks)) * 100) : 0);
 
             return `
-                <tr class="${isChecked ? 'row-selected' : ''}" style="${isChecked ? 'background-color: rgba(0, 122, 255, 0.04);' : ''}">
+                <tr class="${isChecked ? 'row-selected' : ''} ${isCompleted ? 'row-paper-completed' : ''}" style="${isChecked ? 'background-color: rgba(0, 122, 255, 0.04);' : ''}">
                     <td style="text-align: center;">
                         <input type="checkbox" class="dash-paper-check" data-id="${ev.id}" ${isChecked ? 'checked' : ''} style="cursor: pointer; width: 16px; height: 16px;" />
                     </td>
