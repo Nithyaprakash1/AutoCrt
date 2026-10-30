@@ -1219,10 +1219,20 @@ class UploadedPapersPageManager {
                     </label>
                 </div>
 
+                <div id="change-tpl-progress-bar" style="display: none; margin-bottom: 16px; padding: 12px 14px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-size: 0.8rem; margin-bottom: 6px;">
+                        <span id="change-tpl-status-text" style="color: #334155; font-weight: 500;">Applying template update...</span>
+                        <span id="change-tpl-pct-text" style="color: #007AFF; font-weight: 700;">0%</span>
+                    </div>
+                    <div style="height: 7px; background: #E2E8F0; border-radius: 999px; overflow: hidden;">
+                        <div id="change-tpl-track" style="height: 100%; width: 0%; background: linear-gradient(90deg, #007AFF 0%, #34C759 100%); border-radius: 999px; transition: width 0.2s ease;"></div>
+                    </div>
+                </div>
+
                 <div style="display: flex; justify-content: flex-end; gap: 10px;">
                     <button type="button" id="btn-cancel-change-tpl" style="padding: 8px 16px; border-radius: 8px; border: 1px solid #CBD5E1; background: #FFFFFF; font-size: 0.85rem; color: #475569; cursor: pointer;">Cancel</button>
                     <button type="button" id="btn-confirm-apply-template" style="background: #007AFF; color: #FFFFFF; border: none; padding: 8px 18px; border-radius: 8px; font-size: 0.85rem; font-weight: 500; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-                        <span>Apply Template Update</span>
+                        <span id="btn-confirm-apply-tpl-text">Apply Template Update</span>
                     </button>
                 </div>
             </div>
@@ -1282,102 +1292,184 @@ class UploadedPapersPageManager {
                 }
             }
 
-            // Build fresh clean questions for the new template!
-            const newQuestions = window.buildQuestionsFromTemplate 
-                ? window.buildQuestionsFromTemplate(matchedTpl, newMaxMarks)
-                : [];
+            // UI Elements for progress tracking
+            const confirmBtn = modal.querySelector("#btn-confirm-apply-template");
+            const confirmBtnText = modal.querySelector("#btn-confirm-apply-tpl-text");
+            const cancelBtn = modal.querySelector("#btn-cancel-change-tpl");
+            const closeBtn = modal.querySelector("#btn-close-change-tpl");
+            const progressBox = modal.querySelector("#change-tpl-progress-bar");
+            const statusText = modal.querySelector("#change-tpl-status-text");
+            const pctText = modal.querySelector("#change-tpl-pct-text");
+            const track = modal.querySelector("#change-tpl-track");
 
-            // Scope: Apply to this batch card OR all papers in this class matching this exam
-            const applyAllMatching = modal.querySelector("#chk-apply-all-matching") ? modal.querySelector("#chk-apply-all-matching").checked : true;
-            const batchPaperIds = new Set(batch.papers.map(p => String(p.id)));
-            const allEvals = await window.appStorage.getAllEvaluations(false, true);
+            const setProgress = (pct, msg) => {
+                const p = Math.min(100, Math.max(0, Math.round(pct)));
+                if (track) track.style.width = `${p}%`;
+                if (pctText) pctText.textContent = `${p}%`;
+                if (statusText && msg) statusText.textContent = msg;
+            };
 
-            const oldClsNorm = (batch.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-            const oldTplNorm = (batch.templateName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
-            const oldSubNorm = (batch.subject || "").toLowerCase().trim();
+            // Lock controls & show progress bar
+            if (confirmBtn) {
+                confirmBtn.disabled = true;
+                confirmBtn.style.cursor = "wait";
+                confirmBtn.style.opacity = "0.9";
+            }
+            if (confirmBtnText) {
+                confirmBtnText.innerHTML = `<span class="btn-spinner-icon" style="display: inline-block; width: 13px; height: 13px; border: 2px solid #FFFFFF; border-top-color: transparent; border-radius: 50%; animation: spinLoading 0.6s linear infinite; vertical-align: middle; margin-right: 4px;"></span><span>Applying...</span>`;
+            }
+            if (cancelBtn) {
+                cancelBtn.disabled = true;
+                cancelBtn.style.opacity = "0.45";
+                cancelBtn.style.cursor = "not-allowed";
+            }
+            if (closeBtn) {
+                closeBtn.disabled = true;
+                closeBtn.style.opacity = "0.45";
+                closeBtn.style.cursor = "not-allowed";
+            }
+            modal.querySelectorAll("input").forEach(inp => inp.disabled = true);
+            if (progressBox) progressBox.style.display = "block";
 
-            let updatedCount = 0;
-            allEvals.forEach(p => {
-                const pId = String(p.id);
-                const isDirectBatch = batchPaperIds.has(pId);
-                let isMatch = isDirectBatch;
-                if (applyAllMatching && !isMatch) {
-                    const pCls = (p.class || p.className || p.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                    const pTpl = (p.templateName || p.examName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
-                    const pSub = (p.subject || "").toLowerCase().trim();
-                    if (pCls === oldClsNorm && (pTpl === oldTplNorm || !pTpl) && (!oldSubNorm || pSub === oldSubNorm || window.appStorage.isSubjectMatch(p.subject, p.examName, batch.subject))) {
-                        isMatch = true;
+            try {
+                setProgress(10, "Fetching paper evaluations from storage...");
+
+                // Build fresh clean questions for the new template!
+                const newQuestions = window.buildQuestionsFromTemplate 
+                    ? window.buildQuestionsFromTemplate(matchedTpl, newMaxMarks)
+                    : [];
+
+                // Scope: Apply to this batch card OR all papers in this class matching this exam
+                const applyAllMatching = modal.querySelector("#chk-apply-all-matching") ? modal.querySelector("#chk-apply-all-matching").checked : true;
+                const batchPaperIds = new Set(batch.papers.map(p => String(p.id)));
+                const allEvals = await window.appStorage.getAllEvaluations(false, true);
+
+                setProgress(25, "Scanning and identifying matching answer scripts...");
+
+                const oldClsNorm = (batch.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                const oldTplNorm = (batch.templateName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                const oldSubNorm = (batch.subject || "").toLowerCase().trim();
+
+                let updatedCount = 0;
+                allEvals.forEach(p => {
+                    const pId = String(p.id);
+                    const isDirectBatch = batchPaperIds.has(pId);
+                    let isMatch = isDirectBatch;
+                    if (applyAllMatching && !isMatch) {
+                        const pCls = (p.class || p.className || p.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const pTpl = (p.templateName || p.examName || "").toLowerCase().replace(/\(\d{4}-\d{2}-\d{2}\)/g, '').trim().replace(/[^a-z0-9]/g, '');
+                        const pSub = (p.subject || "").toLowerCase().trim();
+                        if (pCls === oldClsNorm && (pTpl === oldTplNorm || !pTpl) && (!oldSubNorm || pSub === oldSubNorm || window.appStorage.isSubjectMatch(p.subject, p.examName, batch.subject))) {
+                            isMatch = true;
+                        }
                     }
-                }
 
-                if (isMatch) {
-                    p.templateName = newTplName;
-                    p.templateId = newTplId;
-                    p.maxMarks = newMaxMarks;
-                    p.examName = newTplName;
-                    // CRITICAL: Replace questions so the old 80-mark questions are completely eradicated!
-                    p.questions = JSON.parse(JSON.stringify(newQuestions));
-                    p.sections = (matchedTpl && matchedTpl.sections) ? JSON.parse(JSON.stringify(matchedTpl.sections)) : [{
-                        id: "sec_main",
-                        name: "All Questions",
-                        title: "All Questions",
-                        qStartNo: 1,
-                        qEndNo: newQuestions.length,
-                        qCount: newQuestions.length,
-                        maxMarks: newMaxMarks
-                    }];
+                    if (isMatch) {
+                        p.templateName = newTplName;
+                        p.templateId = newTplId;
+                        p.maxMarks = newMaxMarks;
+                        p.examName = newTplName;
+                        // CRITICAL: Replace questions so the old 80-mark questions are completely eradicated!
+                        p.questions = JSON.parse(JSON.stringify(newQuestions));
+                        p.sections = (matchedTpl && matchedTpl.sections) ? JSON.parse(JSON.stringify(matchedTpl.sections)) : [{
+                            id: "sec_main",
+                            name: "All Questions",
+                            title: "All Questions",
+                            qStartNo: 1,
+                            qEndNo: newQuestions.length,
+                            qCount: newQuestions.length,
+                            maxMarks: newMaxMarks
+                        }];
 
-                    // Clear stale sessionStorage drafts for this paper
-                    try {
-                        sessionStorage.removeItem(`niprak_draft_${p.id}`);
-                        sessionStorage.removeItem(`onespace_draft_${p.id}`);
-                    } catch (e) {}
+                        // Clear stale sessionStorage drafts for this paper
+                        try {
+                            sessionStorage.removeItem(`niprak_draft_${p.id}`);
+                            sessionStorage.removeItem(`onespace_draft_${p.id}`);
+                        } catch (e) {}
 
-                    updatedCount++;
-                }
-            });
+                        updatedCount++;
+                    }
+                });
 
-            if (window.appStorage) {
-                if (typeof window.appStorage.saveAllEvaluations === "function") {
-                    await window.appStorage.saveAllEvaluations(allEvals);
-                } else {
-                    for (const p of allEvals) {
-                        if (batchPaperIds.has(String(p.id))) {
-                            await window.appStorage.saveEvaluation(p);
+                setProgress(55, `Saving ${updatedCount} updated papers to local storage...`);
+
+                if (window.appStorage) {
+                    if (typeof window.appStorage.saveAllEvaluations === "function") {
+                        await window.appStorage.saveAllEvaluations(allEvals);
+                    } else {
+                        const directList = allEvals.filter(p => batchPaperIds.has(String(p.id)));
+                        for (let i = 0; i < directList.length; i++) {
+                            await window.appStorage.saveEvaluation(directList[i]);
+                            const stepPct = 55 + Math.round(((i + 1) / directList.length) * 20);
+                            setProgress(stepPct, `Saving paper ${i + 1} of ${directList.length}...`);
                         }
                     }
                 }
-            }
 
-            // Sync to Firestore if online
-            if (window.firebaseManager && window.firebaseManager.firestore) {
-                try {
-                    const batchWriter = window.firebaseManager.firestore.batch();
-                    const evalColl = window.firebaseManager.firestore.collection("evaluations");
-                    allEvals.filter(p => batchPaperIds.has(String(p.id))).forEach(p => {
-                        const docRef = evalColl.doc(String(p.id));
-                        batchWriter.set(docRef, {
-                            templateName: newTplName,
-                            templateId: newTplId,
-                            maxMarks: newMaxMarks,
-                            examName: newTplName,
-                            questions: newQuestions,
-                            updatedAt: new Date().toISOString()
-                        }, { merge: true });
-                    });
-                    await batchWriter.commit();
-                } catch (fsErr) {
-                    console.warn("Firestore batch template update notice:", fsErr);
+                setProgress(80, "Synchronizing updates with cloud database...");
+
+                // Sync to Firestore if online
+                if (window.firebaseManager && window.firebaseManager.firestore) {
+                    try {
+                        const batchWriter = window.firebaseManager.firestore.batch();
+                        const evalColl = window.firebaseManager.firestore.collection("evaluations");
+                        allEvals.filter(p => batchPaperIds.has(String(p.id))).forEach(p => {
+                            const docRef = evalColl.doc(String(p.id));
+                            batchWriter.set(docRef, {
+                                templateName: newTplName,
+                                templateId: newTplId,
+                                maxMarks: newMaxMarks,
+                                examName: newTplName,
+                                questions: newQuestions,
+                                updatedAt: new Date().toISOString()
+                            }, { merge: true });
+                        });
+                        await batchWriter.commit();
+                    } catch (fsErr) {
+                        console.warn("Firestore batch template update notice:", fsErr);
+                    }
                 }
-            }
 
-            closeModal();
-            if (window.app && typeof window.app.showToast === "function") {
-                window.app.showToast(`✓ Updated template to "${newTplName}" (${newMaxMarks}M) for all ${updatedCount} papers!`, "success");
+                // 100% Complete feedback
+                setProgress(100, `✓ Successfully updated ${updatedCount} paper${updatedCount === 1 ? '' : 's'}!`);
+                if (track) track.style.background = "#16A34A";
+                if (pctText) pctText.style.color = "#16A34A";
+                if (confirmBtn) confirmBtn.style.background = "#16A34A";
+                if (confirmBtnText) confirmBtnText.innerHTML = "✓ Updated!";
+
+                await new Promise(r => setTimeout(r, 450));
+
+                closeModal();
+                if (window.app && typeof window.app.showToast === "function") {
+                    window.app.showToast(`✓ Updated template to "${newTplName}" (${newMaxMarks}M) for all ${updatedCount} papers!`, "success");
+                }
+                await this.init();
+                this.selectedBatchKey = "all";
+                this.render();
+            } catch (err) {
+                console.error("Error applying template update:", err);
+                setProgress(100, "❌ Update encountered an issue.");
+                if (track) track.style.background = "#DC2626";
+                if (pctText) pctText.style.color = "#DC2626";
+                if (confirmBtn) {
+                    confirmBtn.disabled = false;
+                    confirmBtn.style.cursor = "pointer";
+                    confirmBtn.style.opacity = "1";
+                    confirmBtn.style.background = "#007AFF";
+                }
+                if (confirmBtnText) confirmBtnText.innerHTML = "Retry Apply";
+                if (cancelBtn) {
+                    cancelBtn.disabled = false;
+                    cancelBtn.style.opacity = "1";
+                    cancelBtn.style.cursor = "pointer";
+                }
+                if (closeBtn) {
+                    closeBtn.disabled = false;
+                    closeBtn.style.opacity = "1";
+                    closeBtn.style.cursor = "pointer";
+                }
+                modal.querySelectorAll("input").forEach(inp => inp.disabled = false);
             }
-            await this.init();
-            this.selectedBatchKey = "all";
-            this.render();
         });
     }
 
