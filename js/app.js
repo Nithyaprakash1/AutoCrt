@@ -3378,12 +3378,14 @@ class AppController {
                     qNo: q.qNo,
                     qLabel: q.label || `Q${q.qNo}`,
                     isStep: false,
-                    hasMarginMark: false,
+                    hasMarginMark: true,
                     scale: 1.0,
                     timestamp: Date.now()
                 };
                 this.canvasEngine.addAnnotation(tickStamp);
             }
+            // Always stamp side total question mark in margin of paper
+            this.canvasEngine.stampRightMarginMark(q.qNo, maxMarks, stampPos.y);
             this.canvasEngine.renderOverlay();
         }
 
@@ -3429,12 +3431,14 @@ class AppController {
                     qNo: q.qNo,
                     qLabel: q.label || `Q${q.qNo}`,
                     isStep: false,
-                    hasMarginMark: false,
+                    hasMarginMark: true,
                     scale: 1.0,
                     timestamp: Date.now()
                 };
                 this.canvasEngine.addAnnotation(wrongStamp);
             }
+            // Always stamp side total question mark in margin of paper
+            this.canvasEngine.stampRightMarginMark(q.qNo, 0, stampPos.y);
             this.canvasEngine.renderOverlay();
         }
 
@@ -3699,12 +3703,10 @@ class AppController {
         const subEl = document.getElementById("ws-exam-subtitle-text");
         if (subEl) subEl.textContent = `${evaluation.subject || ""} • ${evaluation.examName || ""}`;
 
-        // Initialize live score value from evaluation record immediately
+        // Show loading indicator "-- / --" initially until paper and scoring are loaded
         const topScoreEl = document.getElementById("ws-live-score-val");
         if (topScoreEl) {
-            const curObt = (evaluation.obtainedMarks !== undefined && evaluation.obtainedMarks !== null) ? evaluation.obtainedMarks : 0;
-            const curMax = evaluation.maxMarks || 40;
-            topScoreEl.textContent = `${curObt} / ${curMax}`;
+            topScoreEl.textContent = "-- / --";
         }
 
         // Populate and synchronize the Template Switcher dropdown
@@ -3780,10 +3782,13 @@ class AppController {
                     const runningScore = stepSum > 0 ? Math.min(activeQ.maxMarks, stepSum) : (numVal === 0 ? 0 : (activeQ.awardedMarks || numVal));
                     const status = runningScore >= activeQ.maxMarks ? "correct" : (runningScore === 0 ? "wrong" : "partial");
                     this.markingPanel.assignCurrentQuestionMark(runningScore, status);
+                    // Stamp side total question mark on the paper sheet
+                    this.canvasEngine.stampRightMarginMark(activeQ.qNo, runningScore, normPos.y);
+                    this.canvasEngine.renderOverlay();
                     this.updateTopHud(activeQ);
                     this.updatePageTotalDisplay();
                     const markDesc = numVal === 0 ? "0 Marks" : `+${numVal} Mark`;
-                    this.showToast(`Placed ${markDesc} on paper (Current: ${activeQ.awardedMarks}/${activeQ.maxMarks}M). Press Enter to calculate & advance.`);
+                    this.showToast(`Placed ${markDesc} on paper (Q${activeQ.qNo}: ${runningScore}/${activeQ.maxMarks}M).`);
                 }
             },
             onAnnotationSelected: (ann) => {
@@ -3875,18 +3880,7 @@ class AppController {
                     obtEl.textContent = scoreSummary.obtainedMarks;
                 }
 
-                // Check and clean up companion margin marks for all questions that became unmarked or wrong
-                if (this.canvasEngine && this.markingPanel?.questions) {
-                    this.markingPanel.questions.forEach(ques => {
-                        if (ques.status === "unmarked" || ques.status === "pending") {
-                            const qAnns = this.canvasEngine.getAnnotationsForQuestion(ques.qNo);
-                            const hasMargin = qAnns.some(a => a.type === "margin_mark" || a.type === "left_mark");
-                            if (hasMargin) {
-                                this.canvasEngine.removeAnnotationsForQuestion(ques.qNo);
-                            }
-                        }
-                    });
-                }
+                // Preserve all valid annotations and side marks across paper
 
                 const activeQ = this.markingPanel?.getActiveQuestion();
                 if (activeQ) this.updateTopHud(activeQ);
@@ -3934,6 +3928,35 @@ class AppController {
                 }
             );
             this.markingPanel.setEvaluationData(evaluation.questions || [], evaluation.maxMarks || 20, evaluation.feedback || "", evaluation.sections || []);
+
+            // Ensure every graded question has its side total question mark stamped on the paper
+            if (this.canvasEngine && Array.isArray(evaluation.questions)) {
+                let hasNewStamps = false;
+                evaluation.questions.forEach((q, qIdx) => {
+                    const qMarks = Number(q.awardedMarks);
+                    if (q.status === "correct" || q.status === "partial" || q.status === "wrong" || qMarks > 0) {
+                        const existingAnns = this.canvasEngine.getAnnotationsForQuestion(q.qNo);
+                        const hasMargin = existingAnns.some(a => a.type === "margin_mark" || a.type === "left_mark");
+                        if (!hasMargin) {
+                            const tickAnn = existingAnns.find(a => a.type === "tick" || a.type === "wrong" || a.type === "marks");
+                            const targetY = tickAnn ? tickAnn.y : Math.min(0.88, 0.12 + ((qIdx % 8) * 0.10));
+                            const markVal = (q.status === "wrong") ? 0 : (!isNaN(qMarks) ? qMarks : (q.maxMarks || 0));
+                            this.canvasEngine.stampRightMarginMark(q.qNo, markVal, targetY);
+                            hasNewStamps = true;
+                        }
+                    }
+                });
+                if (hasNewStamps) {
+                    this.canvasEngine.renderOverlay();
+                }
+            }
+
+            // Sync score summary to live score element
+            const scoreSummary = this.markingPanel.recalculate();
+            const topLiveScoreEl = document.getElementById("ws-live-score-val");
+            if (topLiveScoreEl) {
+                topLiveScoreEl.textContent = `${scoreSummary.obtainedMarks} / ${scoreSummary.maxMarks}`;
+            }
 
             // Sync initial Top HUD with Q1
             const initialQ = this.markingPanel.getActiveQuestion();

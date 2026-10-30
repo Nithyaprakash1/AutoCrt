@@ -236,29 +236,56 @@ class MarkingPanel {
                 }));
             }
 
-            const rawM = (q.awardedMarks !== undefined && q.awardedMarks !== null) ? q.awardedMarks 
-                       : ((q.obtainedMarks !== undefined && q.obtainedMarks !== null) ? q.obtainedMarks 
-                       : q.marks);
-            let awardedM = Number(rawM);
+            let awardedM = 0;
+            let status = q.status || "unmarked";
+
+            // Only consider explicitly graded values - NEVER use q.marks (which represents question maxMarks)!
+            if (q.awardedMarks !== undefined && q.awardedMarks !== null && q.awardedMarks !== "") {
+                awardedM = Number(q.awardedMarks);
+            } else if (q.obtainedMarks !== undefined && q.obtainedMarks !== null && q.obtainedMarks !== "") {
+                awardedM = Number(q.obtainedMarks);
+            } else if (q.score !== undefined && q.score !== null && q.score !== "") {
+                awardedM = Number(q.score);
+            } else {
+                awardedM = 0;
+            }
+
             if (isNaN(awardedM)) awardedM = 0;
+
             if (subQs && subQs.length > 0) {
                 const subSum = subQs.reduce((sum, sq) => sum + (Number(sq.awardedMarks) || 0), 0);
-                if (subSum === 0 && awardedM > 0) {
+                if (subSum > 0) {
+                    awardedM = subSum;
+                } else if (awardedM > 0) {
                     let rem = awardedM;
                     subQs.forEach(sq => {
                         const alloc = Math.min(rem, sq.maxMarks);
                         sq.awardedMarks = alloc;
                         rem = Math.max(0, rem - alloc);
                     });
-                } else {
-                    awardedM = subSum;
                 }
             }
 
-            let status = q.status || "unmarked";
-            if (awardedM === maxM) status = "correct";
-            else if (awardedM === 0 && q.status === "wrong") status = "wrong";
-            else if (awardedM > 0) status = "partial";
+            if (status === "skipped") {
+                awardedM = 0;
+            } else if (status === "wrong") {
+                awardedM = 0;
+            } else if (status === "correct") {
+                awardedM = maxM;
+            } else if (status === "partial") {
+                // keep awardedM
+            } else if (status === "unmarked" || status === "pending") {
+                if (awardedM >= maxM && maxM > 0 && (q.awardedMarks !== undefined || q.obtainedMarks !== undefined)) {
+                    status = "correct";
+                } else if (awardedM > 0) {
+                    status = "partial";
+                } else {
+                    awardedM = 0;
+                    status = "unmarked";
+                }
+            } else {
+                status = (awardedM >= maxM && maxM > 0) ? "correct" : (awardedM > 0 ? "partial" : "unmarked");
+            }
 
             return {
                 id: q.id || `q${idx + 1}`,
@@ -385,9 +412,9 @@ class MarkingPanel {
                     <div class="score-main">
                         <span class="score-label">TOTAL MARKS</span>
                         <div class="score-numbers">
-                            <span class="score-obtained" id="score-obtained-val">0</span>
+                            <span class="score-obtained" id="score-obtained-val">--</span>
                             <span class="score-separator">/</span>
-                            <span class="score-max" id="score-max-val">${this.maxMarksTotal}</span>
+                            <span class="score-max" id="score-max-val">--</span>
                         </div>
                     </div>
                     <div class="score-meta-pills">
