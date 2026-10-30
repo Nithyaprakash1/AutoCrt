@@ -1727,8 +1727,26 @@ class CanvasEngine {
             (a.type === "margin_mark" || a.type === "left_mark") && 
             this.normalizeQKey(a.qNo || a.qLabel) === targetKey
         );
+
+        const clampedY = Math.max(0.02, Math.min(0.98, y));
+
+        // If existing margin mark already has the same mark value and position, do NOTHING (prevents recursion)
+        if (existingIdx >= 0) {
+            const oldAnn = page.annotations[existingIdx];
+            if (oldAnn.marks === marks && Math.abs((oldAnn.x || 0.06) - marginX) < 0.01 && Math.abs((oldAnn.y || 0) - clampedY) < 0.01) {
+                return oldAnn;
+            }
+            oldAnn.marks = marks;
+            oldAnn.x = marginX;
+            oldAnn.y = clampedY;
+            if (pIdxToUse === this.currentPageIndex) {
+                this.renderOverlay();
+            }
+            return oldAnn;
+        }
+
         const newAnn = {
-            id: existingIdx >= 0 ? page.annotations[existingIdx].id : ('ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6)),
+            id: 'ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
             pageIndex: pIdxToUse,
             type: "margin_mark",
             qNo: qNo,
@@ -1736,28 +1754,12 @@ class CanvasEngine {
             marks: marks,
             color: "#DC2626", // Strict Teacher Red Ink
             x: marginX,
-            y: Math.max(0.02, Math.min(0.98, y)),
+            y: clampedY,
             scale: 1.0,
             timestamp: Date.now()
         };
 
-        if (existingIdx >= 0) {
-            const oldAnn = page.annotations[existingIdx];
-            page.annotations[existingIdx] = newAnn;
-            if (page.undoStack) {
-                page.undoStack.push({ action: "modify", item: newAnn, oldState: oldAnn, newState: newAnn });
-            }
-            if (page.redoStack) page.redoStack = [];
-            this.notifyChange();
-        } else {
-            page.annotations.push(newAnn);
-            if (page.undoStack) {
-                page.undoStack.push({ action: "add", item: newAnn });
-            }
-            if (page.redoStack) page.redoStack = [];
-            this.notifyChange();
-        }
-
+        page.annotations.push(newAnn);
         if (pIdxToUse === this.currentPageIndex) {
             this.renderOverlay();
         }

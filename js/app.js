@@ -3461,8 +3461,10 @@ class AppController {
     }
 
     syncQuestionScoresFromAnnotations() {
-        if (!this.canvasEngine) return;
-        const questions = this.markingPanel ? (this.markingPanel.questions || []) : (this.activeEvaluation?.questions || []);
+        if (!this.canvasEngine || this._isSyncingScores) return;
+        this._isSyncingScores = true;
+        try {
+            const questions = this.markingPanel ? (this.markingPanel.questions || []) : (this.activeEvaluation?.questions || []);
         let updated = false;
 
         if (questions && questions.length > 0) {
@@ -3535,6 +3537,9 @@ class AppController {
         if (activeQ) this.updateTopHud(activeQ);
         this.updatePageTotalDisplay();
         this.renderScorecardTable();
+        } finally {
+            this._isSyncingScores = false;
+        }
     }
 
     async openWorkspace(evaluation) {
@@ -3882,7 +3887,7 @@ class AppController {
 
                 // Keep companion side margin marks strictly synced on paper canvas
                 const activeQ = this.markingPanel?.getActiveQuestion();
-                if (this.canvasEngine && activeQ) {
+                if (this.canvasEngine && activeQ && !this._isSyncingScores) {
                     const qMarks = Number(activeQ.awardedMarks);
                     if (activeQ.status === "correct" || activeQ.status === "partial" || activeQ.status === "wrong" || qMarks > 0) {
                         let targetPageIdx = this.canvasEngine.currentPageIndex;
