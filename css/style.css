@@ -14632,35 +14632,47 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
 /* 5. Individual Exam Batch Cards - Compact & Crisp */
 .teacher-batches-grid {
     display: grid !important;
-    grid-template-columns: repeat(auto-fill, minmax(235px, 1fr)) !important;
-    gap: 10px !important;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)) !important;
+    gap: 12px !important;
 }
 
 .teacher-batch-card {
-    background: var(--saas-bg-card) !important;
-    border: 1px solid var(--saas-border) !important;
-    border-radius: 10px !important;
-    padding: 12px 14px !important;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02) !important;
+    background: #FFFFFF !important;
+    border: 1px solid #E5E5EA !important;
+    border-radius: 12px !important;
+    padding: 14px 16px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03), 0 2px 6px rgba(0, 0, 0, 0.02) !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: space-between !important;
-    min-height: 155px !important;
+    min-height: 160px !important;
     cursor: pointer !important;
-    transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
     position: relative !important;
 }
 
 .teacher-batch-card:hover {
-    transform: translateY(-1px) !important;
-    border-color: #CBD5E1 !important;
-    box-shadow: var(--saas-shadow-md) !important;
+    transform: translateY(-2px) !important;
+    border-color: #D1D1D6 !important;
+    box-shadow: 0 6px 18px -2px rgba(0, 0, 0, 0.07), 0 2px 6px -1px rgba(0, 0, 0, 0.03) !important;
+}
+
+/* iOS Highlight Border for Newly Added Template */
+.teacher-batch-card.is-new-batch {
+    border: 1.5px solid #007AFF !important;
+    box-shadow: 0 0 0 1px rgba(0, 122, 255, 0.18), 0 4px 14px -2px rgba(0, 122, 255, 0.15) !important;
+    background: #FFFFFF !important;
+}
+
+.teacher-batch-card.is-new-batch:hover {
+    border-color: #007AFF !important;
+    box-shadow: 0 0 0 1.5px #007AFF, 0 8px 22px -3px rgba(0, 122, 255, 0.22) !important;
 }
 
 .teacher-batch-card.active,
 .teacher-batch-card.active-shared-batch {
-    border-color: var(--saas-primary) !important;
-    box-shadow: 0 0 0 2px rgba(8, 120, 249, 0.2), 0 6px 18px rgba(8, 120, 249, 0.08) !important;
+    border-color: #007AFF !important;
+    box-shadow: 0 0 0 2px rgba(0, 122, 255, 0.25), 0 6px 18px rgba(0, 122, 255, 0.1) !important;
 }
 
 .batch-card-top-row {
@@ -14699,14 +14711,15 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
 }
 
 .batch-new-badge {
-    background: linear-gradient(135deg, #10B981, #059669) !important;
+    background: #007AFF !important;
     color: #FFFFFF !important;
     font-size: 0.62rem !important;
     font-weight: 700 !important;
-    padding: 1px 5px !important;
+    letter-spacing: 0.05em !important;
+    padding: 2px 7px !important;
     border-radius: 999px !important;
     text-transform: uppercase !important;
-    box-shadow: 0 2px 5px rgba(16, 185, 129, 0.25) !important;
+    box-shadow: 0 1px 3px rgba(0, 122, 255, 0.3) !important;
 }
 
 .batch-target-pill {
@@ -14830,82 +14843,101 @@ aside.sidebar-nav .nav-item:hover, aside.sidebar-nav .nav-item.active {
     font-weight: 600 !important;
 }
 
-/* Batch Action Buttons */
+/* Batch Action Buttons - iOS Professional & Generous Spacing */
 .batch-actions-row {
     display: flex !important;
     align-items: center !important;
-    gap: 6px !important;
+    gap: 7px !important;
     margin-top: auto !important;
+    padding-top: 10px !important;
 }
 
 .btn-batch-view {
-    background: var(--saas-bg-card) !important;
-    border: 1px solid var(--saas-border) !important;
-    color: #475569 !important;
-    font-size: 0.72rem !important;
-    font-weight: 600 !important;
-    padding: 5px 8px !important;
-    height: 28px !important;
-    border-radius: 6px !important;
-    flex: 1 !important;
+    background: #F2F2F7 !important;
+    border: 1px solid #E5E5EA !important;
+    color: #1C1C1E !important;
+    font-size: 0.74rem !important;
+    font-weight: 500 !important;
+    padding: 0 10px !important;
+    height: 31px !important;
+    border-radius: 7px !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
-    gap: 4px !important;
+    gap: 5px !important;
     cursor: pointer !important;
     transition: all 0.15s ease !important;
 }
 
 .btn-batch-view:hover {
-    background: #F8FAFC !important;
-    border-color: #CBD5E1 !important;
-    color: var(--saas-text-main) !important;
+    background: #E5E5EA !important;
+    color: #000000 !important;
+}
+
+.btn-batch-view span {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
 }
 
 .btn-batch-start {
-    background: var(--saas-primary) !important;
-    border: 1px solid var(--saas-primary) !important;
+    background: #0071E3 !important;
+    border: 1px solid #0071E3 !important;
     color: #FFFFFF !important;
-    font-size: 0.72rem !important;
+    font-size: 0.74rem !important;
     font-weight: 600 !important;
-    padding: 5px 10px !important;
-    height: 28px !important;
-    border-radius: 6px !important;
-    flex: 1.15 !important;
+    padding: 0 12px !important;
+    height: 31px !important;
+    border-radius: 7px !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 5px !important;
+    cursor: pointer !important;
+    transition: all 0.15s ease !important;
+    box-shadow: 0 1px 3px rgba(0, 113, 227, 0.22) !important;
+}
+
+.btn-batch-start:hover {
+    background: #0077ED !important;
+    border-color: #0077ED !important;
+}
+
+.btn-batch-start span {
+    white-space: nowrap !important;
+}
+
+.btn-dash-batch-share {
+    background: rgba(52, 199, 89, 0.09) !important;
+    border: 1px solid rgba(52, 199, 89, 0.24) !important;
+    color: #1B7A38 !important;
+    font-size: 0.73rem !important;
+    font-weight: 500 !important;
+    padding: 0 10px !important;
+    height: 31px !important;
+    border-radius: 7px !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
     display: inline-flex !important;
     align-items: center !important;
     justify-content: center !important;
     gap: 4px !important;
     cursor: pointer !important;
     transition: all 0.15s ease !important;
-    box-shadow: 0 1px 3px rgba(8, 120, 249, 0.2) !important;
-}
-
-.btn-batch-start:hover {
-    background: var(--saas-primary-hover) !important;
-    border-color: var(--saas-primary-hover) !important;
-}
-
-.btn-dash-batch-share {
-    background: var(--saas-success-subtle) !important;
-    border: 1px solid var(--saas-success-border) !important;
-    color: var(--saas-success-hover) !important;
-    font-size: 0.72rem !important;
-    font-weight: 600 !important;
-    padding: 5px 8px !important;
-    height: 28px !important;
-    border-radius: 6px !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    gap: 3px !important;
-    cursor: pointer !important;
-    transition: all 0.15s ease !important;
 }
 
 .btn-dash-batch-share:hover {
-    background: #D1FAE5 !important;
-    border-color: #6EE7B7 !important;
+    background: rgba(52, 199, 89, 0.16) !important;
+}
+
+.btn-batch-more {
+    display: none !important;
 }
 
 /* 6. Mobile & Responsive Layout */

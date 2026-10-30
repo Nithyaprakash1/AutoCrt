@@ -73,13 +73,13 @@ class DashboardManager {
         const startButtonText = isCompleted ? 'Review' : 'Start Marking';
 
         return `
-            <div class="teacher-batch-card ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}">
+            <div class="teacher-batch-card ${b.isNew ? 'is-new-batch' : ''} ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}">
                 <div class="batch-card-top-row">
                     <div class="batch-card-badges-left">
                         <span class="batch-class-badge">${b.className}</span>
                         <span class="batch-subject-tag">${b.subject}</span>
                         ${b.isNew ? `
-                            <span class="batch-new-badge">✨ NEW</span>
+                            <span class="batch-new-badge">NEW</span>
                         ` : ''}
                         ${isSharedTarget ? `
                             <span class="batch-target-pill">Target</span>
@@ -87,9 +87,8 @@ class DashboardManager {
                     </div>
                     <div class="batch-card-status-right">
                         <span class="batch-status-pill ${isCompleted ? 'status-completed' : (isInProgress ? 'status-in-progress' : 'status-pending')}">
-                            ${isCompleted ? '● Completed' : (isInProgress ? '◐ In Progress' : '○ Pending')}
+                            ${isCompleted ? '● Graded' : (isInProgress ? '◐ In Progress' : '○ Pending')}
                         </span>
-                        <button type="button" class="btn-batch-more" title="More options" aria-label="More options">⋮</button>
                     </div>
                 </div>
 
@@ -621,13 +620,34 @@ class DashboardManager {
             if (pTime > b.latestTimestamp) b.latestTimestamp = pTime;
         });
         const now = Date.now();
+        let catalogTpls = [];
+        try {
+            if (window.appStorage && typeof window.appStorage.getSubjectCatalog === 'function') {
+                const cat = window.appStorage.getSubjectCatalog() || {};
+                Object.values(cat).forEach(subItem => {
+                    const tList = subItem?.templates || (Array.isArray(subItem) ? subItem : []);
+                    if (Array.isArray(tList)) {
+                        tList.forEach(t => {
+                            if (t && t.isNew) catalogTpls.push(t);
+                        });
+                    }
+                });
+            }
+        } catch (_) {}
+
         this.batches = Array.from(batchMap.values()).map(b => {
             b.total = b.papers.length;
             b.corrected = b.papers.filter(p => this.isPaperCorrected(p)).length;
             b.uncorrected = b.total - b.corrected;
             b.firstPendingPaper = b.papers.find(p => !this.isPaperCorrected(p)) || null;
             const isRecent = b.latestTimestamp > 0 && (now - b.latestTimestamp < 48 * 60 * 60 * 1000);
-            b.isNew = isRecent && b.uncorrected > 0;
+            const matchesNewTpl = catalogTpls.some(t => {
+                const name = (t.name || t.examName || '').toLowerCase().trim();
+                const bName = (b.templateName || b.examName || '').toLowerCase().trim();
+                return name && bName && (name === bName || bName.includes(name) || name.includes(bName));
+            });
+            // Card stays NEW until at least one paper is corrected
+            b.isNew = (matchesNewTpl || isRecent) && b.corrected === 0;
             return b;
         });
         if (activePanelSubject) {
@@ -937,6 +957,11 @@ class DashboardManager {
                                         const secA = this.getSectionLetter(a.className);
                                         const secB = this.getSectionLetter(b.className);
                                         if (secA !== secB) return secA.localeCompare(secB);
+                                        // Priority 1: Newly added template first!
+                                        const aIsNew = Boolean(a.isNew);
+                                        const bIsNew = Boolean(b.isNew);
+                                        if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
+                                        // Priority 2: Latest timestamp first (LIFO)
                                         const tsA = a.latestTimestamp || 0;
                                         const tsB = b.latestTimestamp || 0;
                                         if (tsA !== tsB) return tsB - tsA;
