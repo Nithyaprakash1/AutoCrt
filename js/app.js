@@ -584,7 +584,7 @@ class AppController {
                 ev.obtainedMarks = Math.round(totalObt * 10) / 10;
                 ev.percentage = ev.maxMarks > 0 ? Math.round((ev.obtainedMarks / ev.maxMarks) * 100) : 0;
                 ev.grade = ev.percentage >= 90 ? "A+" : ev.percentage >= 75 ? "A" : ev.percentage >= 60 ? "B" : ev.percentage >= 40 ? "C" : "F";
-                ev.status = ev.obtainedMarks > 0 ? (ev.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending") ? "Completed" : "In Progress") : (ev.status || "Pending");
+                ev.status = ev.obtainedMarks > 0 ? ((window.isEvaluationFullyGraded ? window.isEvaluationFullyGraded(ev.questions, ev.sections || targetTpl.sections) : ev.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending")) ? "Completed" : "In Progress") : (ev.status || "Pending");
 
                 await window.appStorage.saveEvaluation(ev);
                 restoredCount++;
@@ -2874,7 +2874,7 @@ class AppController {
 
                 if (this.markingPanel) {
                     const allGraded = Array.isArray(this.markingPanel.questions) && this.markingPanel.questions.length > 0 &&
-                        this.markingPanel.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending");
+                        (window.isEvaluationFullyGraded ? window.isEvaluationFullyGraded(this.markingPanel.questions, this.markingPanel.sections) : this.markingPanel.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending"));
                     if (allGraded) {
                         this.activeEvaluation.status = "Completed";
                     } else if (Number(this.activeEvaluation.obtainedMarks) > 0 && this.activeEvaluation.status !== "Completed") {
@@ -3038,7 +3038,7 @@ class AppController {
             const currentEval = this.activeEvaluation;
             if (this.markingPanel) {
                 const allGraded = Array.isArray(this.markingPanel.questions) && this.markingPanel.questions.length > 0 &&
-                    this.markingPanel.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending");
+                    (window.isEvaluationFullyGraded ? window.isEvaluationFullyGraded(this.markingPanel.questions, this.markingPanel.sections) : this.markingPanel.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending"));
                 if (allGraded) {
                     currentEval.status = "Completed";
                 } else if (Number(currentEval.obtainedMarks) > 0 && currentEval.status !== "Completed") {
@@ -4146,7 +4146,7 @@ class AppController {
             this.activeEvaluation.percentage = Math.round((this.activeEvaluation.obtainedMarks / this.activeEvaluation.maxMarks) * 100);
         }
         this.activeEvaluation.grade = this.activeEvaluation.percentage >= 90 ? "A+" : this.activeEvaluation.percentage >= 75 ? "A" : this.activeEvaluation.percentage >= 60 ? "B" : this.activeEvaluation.percentage >= 40 ? "C" : "F";
-        this.activeEvaluation.status = this.activeEvaluation.obtainedMarks > 0 ? (this.activeEvaluation.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending") ? "Completed" : "In Progress") : (this.activeEvaluation.status || "Pending");
+        this.activeEvaluation.status = this.activeEvaluation.obtainedMarks > 0 ? ((window.isEvaluationFullyGraded ? window.isEvaluationFullyGraded(this.activeEvaluation.questions, this.activeEvaluation.sections) : this.activeEvaluation.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending")) ? "Completed" : "In Progress") : (this.activeEvaluation.status || "Pending");
         this.activeEvaluation.updatedAt = new Date().toISOString();
 
         // Persist to storage
@@ -4184,7 +4184,9 @@ class AppController {
         const sections = this.markingPanel.sections || [];
         const evalData = this.activeEvaluation || {};
 
-        let unmarkedCount = 0;
+        let unmarkedCount = window.calculateUnmarkedQuestionsCount 
+            ? window.calculateUnmarkedQuestionsCount(questions, sections)
+            : questions.filter(q => (q.status === "unmarked" || q.status === "pending") && Number(q.awardedMarks) === 0).length;
 
         let tableHtml = `
             <table class="scorecard-matrix-table">
@@ -4202,17 +4204,25 @@ class AppController {
         `;
 
         questions.forEach((q, idx) => {
-            const secObj = sections.find(s => s.id === q.sectionId || s.name === q.section);
+            const secObj = sections.find(s => s.id === q.sectionId || s.name === q.section || s.title === q.section);
             const secName = secObj ? secObj.name : (q.section || "Section A");
-            const isUnmarked = (q.status === "unmarked" || q.status === "pending") && Number(q.awardedMarks) === 0;
+            const reqCount = secObj ? (Number(secObj.requiredCount || secObj.answerCount) || questions.filter(item => item.sectionId === secObj.id || item.section === secObj.name || item.section === secObj.title).length) : (q.sectionRequiredCount || 999);
+            const secQs = secObj ? questions.filter(item => item.sectionId === secObj.id || item.section === secObj.name || item.section === secObj.title) : [];
+            const answeredInSec = secQs.filter(item => item.status && item.status !== "unmarked" && item.status !== "pending" && item.status !== "skipped").length;
+            const isChoiceMet = answeredInSec >= reqCount;
 
-            if (isUnmarked) unmarkedCount++;
+            const isSkipped = q.status === "skipped" || (isChoiceMet && (q.status === "unmarked" || q.status === "pending"));
+            const isUnmarked = !isSkipped && (q.status === "unmarked" || q.status === "pending") && Number(q.awardedMarks) === 0;
 
-            const statusTag = isUnmarked 
-                ? `<span class="score-st-badge st-unmarked">⚠️ UNMARKED</span>`
-                : (q.awardedMarks === q.maxMarks 
-                    ? `<span class="score-st-badge st-graded">✓ Graded (Full)</span>`
-                    : `<span class="score-st-badge st-partial">◐ Graded (${q.awardedMarks}M)</span>`);
+            const statusTag = isSkipped
+                ? `<span class="score-st-badge st-skipped" style="background:#F1F5F9; color:#64748B; border:1px solid #CBD5E1;">⏭️ Optional (Skipped)</span>`
+                : isUnmarked 
+                    ? `<span class="score-st-badge st-unmarked">⚠️ UNMARKED</span>`
+                    : (q.awardedMarks === q.maxMarks 
+                        ? `<span class="score-st-badge st-graded">✓ Graded (Full)</span>`
+                        : (q.status === "wrong" || q.awardedMarks === 0
+                            ? `<span class="score-st-badge st-wrong" style="background:#FEF2F2; color:#DC2626; border:1px solid #FECACA;">✗ Incorrect (0M)</span>`
+                            : `<span class="score-st-badge st-partial">◐ Graded (${q.awardedMarks}M)</span>`));
 
             let subpartsStr = "-";
             if (q.hasSubQuestions && q.subQuestions && q.subQuestions.length > 0) {
@@ -4229,7 +4239,7 @@ class AppController {
                     <td class="col-qno-tag">Q${q.qNo}</td>
                     <td class="col-subparts-tag">${subpartsStr}</td>
                     <td class="col-allotted-tag">${q.maxMarks} M</td>
-                    <td class="col-obtained-tag ${q.awardedMarks > 0 ? 'mark-awarded' : ''}">${q.awardedMarks} M</td>
+                    <td class="col-obtained-tag ${q.awardedMarks > 0 ? 'mark-awarded' : ''}">${isSkipped ? '—' : `${q.awardedMarks} M`}</td>
                     <td class="col-status-tag">${statusTag}</td>
                 </tr>
             `;
@@ -4269,10 +4279,10 @@ class AppController {
         if (badge) {
             if (unmarkedCount > 0) {
                 badge.className = "scorecard-unmarked-pill has-unmarked";
-                badge.textContent = `⚠️ ${unmarkedCount} Question${unmarkedCount > 1 ? 's' : ''} UNMARKED!`;
+                badge.textContent = `⚠️ ${unmarkedCount} Required Question${unmarkedCount > 1 ? 's' : ''} UNMARKED!`;
             } else {
                 badge.className = "scorecard-unmarked-pill all-graded";
-                badge.textContent = `✓ All ${questions.length} Questions Graded (100% Complete)`;
+                badge.textContent = `✓ Required Questions Graded (100% Complete)`;
             }
         }
     }
@@ -4795,6 +4805,15 @@ class AppController {
                 case "f":
                     e.preventDefault();
                     this.awardFullMarksWithMarginStamp();
+                    break;
+                case "s":
+                    e.preventDefault();
+                    if (this.markingPanel) {
+                        const curQ = this.markingPanel.getActiveQuestion();
+                        this.markingPanel.assignCurrentQuestionMark(0, "skipped");
+                        this.markingPanel.nextQuestion();
+                        this.showToast(`Q${curQ ? curQ.qNo : ''} marked as Skipped / Choice.`);
+                    }
                     break;
                 case "h":
                     e.preventDefault();

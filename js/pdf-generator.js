@@ -353,10 +353,15 @@ class PDFGenerator {
         const questions = evaluation.questions || [];
         let calcObtained = 0;
         let calcMax = 0;
+
+        if (Array.isArray(evaluation.sections) && evaluation.sections.length > 0) {
+            calcMax = evaluation.sections.reduce((sum, s) => sum + (Number(s.secTotal || s.maxMarks) || 0), 0);
+        }
+
         if (questions.length > 0) {
             questions.forEach(q => {
-                calcMax += Number(q.maxMarks) || 0;
-                if (q.status !== "unmarked" && q.status !== "pending") {
+                if (!calcMax) calcMax += Number(q.maxMarks) || 0;
+                if (q.status !== "unmarked" && q.status !== "pending" && q.status !== "skipped") {
                     calcObtained += Number(q.awardedMarks) || 0;
                 }
             });
@@ -498,14 +503,19 @@ class PDFGenerator {
             const awarded = Number(q.awardedMarks) || 0;
             const sec = q.section || (q.sectionId ? q.sectionId.replace("sec_", "Section ").toUpperCase() : "Section A");
             let status = "Full Marks";
-            if (awarded === 0) status = "0 Marks";
-            else if (awarded < max) status = "Partial";
+            if (q.status === "skipped") {
+                status = "Skipped (Choice)";
+            } else if (awarded === 0) {
+                status = q.status === "wrong" ? "Incorrect (0M)" : "0 Marks";
+            } else if (awarded < max) {
+                status = "Partial";
+            }
 
             return [
                 `Q${q.qNo !== undefined ? q.qNo : idx + 1}`,
                 sec,
                 `${max}`,
-                `${awarded}`,
+                `${q.status === "skipped" ? "—" : awarded}`,
                 status
             ];
         });

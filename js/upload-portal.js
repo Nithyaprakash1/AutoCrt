@@ -3040,8 +3040,15 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 sec.qEndNo = qEndNo;
                 sec.qCount = qCount;
 
+                // Support section-level choice (e.g. Answer any 5 of 6 questions)
+                if (sec.requiredCount === undefined || sec.requiredCount === null || isNaN(Number(sec.requiredCount))) {
+                    sec.requiredCount = qCount;
+                }
+                const requiredCount = Math.min(qCount, Math.max(1, Number(sec.requiredCount) || qCount));
+                sec.requiredCount = requiredCount;
+
                 const marksPerQ = Math.max(0.5, Number(sec.marksPerQ) || 0.5);
-                const secTotal = Math.round(qCount * marksPerQ * 10) / 10;
+                const secTotal = Math.round(requiredCount * marksPerQ * 10) / 10;
                 sec.secTotal = secTotal;
                 totalQuestions += qCount;
                 totalMarks += secTotal;
@@ -3049,9 +3056,18 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 const card = modalEl.querySelector(`.adv-section-card[data-sec-idx="${sIdx}"]`);
                 if (card) {
                     const badge = card.querySelector(".sec-marks-badge");
-                    if (badge) badge.textContent = `${secTotal} Marks Total`;
+                    if (badge) {
+                        badge.textContent = requiredCount < qCount
+                            ? `${requiredCount} of ${qCount} Qs • ${secTotal} Marks Total`
+                            : `${secTotal} Marks Total`;
+                    }
                     const display = card.querySelector(".sec-total-display");
                     if (display) display.value = `${secTotal} Marks`;
+
+                    const reqInp = card.querySelector(".sec-required-input");
+                    if (reqInp && document.activeElement !== reqInp) {
+                        reqInp.value = requiredCount;
+                    }
 
                     const subqTarget = card.querySelector(".subq-target-val");
                     if (subqTarget) subqTarget.textContent = `${marksPerQ} Marks`;
@@ -3194,12 +3210,26 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
             card.querySelector(".sec-qcount-input")?.addEventListener("input", (e) => {
                 if (state.sections[secIdx]) {
+                    const oldCount = state.sections[secIdx].qCount;
                     const count = Math.max(1, Number(e.target.value) || 1);
                     state.sections[secIdx].qCount = count;
+                    if (state.sections[secIdx].requiredCount === oldCount || !state.sections[secIdx].requiredCount) {
+                        state.sections[secIdx].requiredCount = count;
+                        const reqInp = card.querySelector(".sec-required-input");
+                        if (reqInp) reqInp.value = count;
+                    }
                     const startVal = Math.max(1, Number(state.sections[secIdx].qStartNo) || 1);
                     state.sections[secIdx].qEndNo = startVal + count - 1;
                     const endInp = card.querySelector(".sec-qend-input");
                     if (endInp) endInp.value = state.sections[secIdx].qEndNo;
+                    updateCalculations();
+                }
+            });
+
+            card.querySelector(".sec-required-input")?.addEventListener("input", (e) => {
+                if (state.sections[secIdx]) {
+                    const reqVal = Math.max(1, Number(e.target.value) || 1);
+                    state.sections[secIdx].requiredCount = reqVal;
                     updateCalculations();
                 }
             });
@@ -3366,7 +3396,10 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 sec.qEndNo = qEndNo;
                 sec.qCount = qCount;
 
-                const secMarks = qCount * (Number(sec.marksPerQ) || 0);
+                const requiredCount = Math.min(qCount, Math.max(1, Number(sec.requiredCount) || qCount));
+                sec.requiredCount = requiredCount;
+
+                const secMarks = requiredCount * (Number(sec.marksPerQ) || 0);
                 sec.secTotal = Math.round(secMarks * 10) / 10;
 
                 return `
@@ -3378,7 +3411,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                             </div>
                             <div class="sec-header-actions">
                                 <span class="sec-marks-badge" id="sec-marks-badge-${secIdx}">
-                                    ${sec.secTotal} Marks Total
+                                    ${requiredCount < qCount ? `${requiredCount} of ${qCount} Qs • ${sec.secTotal} Marks` : `${sec.secTotal} Marks Total`}
                                 </span>
                                 ${state.sections.length > 1 ? `
                                     <button type="button" class="btn-delete-sec" data-sec-idx="${secIdx}" title="Remove Section">
@@ -3399,8 +3432,12 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                                     <input type="number" min="1" max="200" class="form-input sec-qend-input" data-sec-idx="${secIdx}" value="${sec.qEndNo}" title="End question number (e.g. 16, 21, 28)" />
                                 </div>
                                 <div class="sec-field">
-                                    <label>No. of Questions</label>
+                                    <label>Total Questions</label>
                                     <input type="number" min="1" max="100" class="form-input sec-qcount-input" data-sec-idx="${secIdx}" value="${sec.qCount}" title="Total questions in section" />
+                                </div>
+                                <div class="sec-field">
+                                    <label>Answer Any (Required)</label>
+                                    <input type="number" min="1" max="100" class="form-input sec-required-input" data-sec-idx="${secIdx}" value="${sec.requiredCount || sec.qCount}" title="Questions student must answer (e.g. 5 out of 6)" />
                                 </div>
                                 <div class="sec-field">
                                     <label>Marks Per Question</label>
@@ -3609,8 +3646,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 const startNo = Math.max(1, Number(sec.qStartNo) || 1);
                 const endNo = Math.max(startNo, Number(sec.qEndNo) || (startNo + Math.max(1, Number(sec.qCount) || 1) - 1));
                 const count = Math.max(1, endNo - startNo + 1);
+                const reqCount = Math.min(count, Math.max(1, Number(sec.requiredCount) || count));
                 const markEach = Math.max(0.5, Number(sec.marksPerQ) || 0.5);
-                const secTotal = Math.round(count * markEach * 10) / 10;
+                const secTotal = Math.round(reqCount * markEach * 10) / 10;
                 totalMaxMarks += secTotal;
 
                 for (let qNo = startNo; qNo <= endNo; qNo++) {
@@ -3624,6 +3662,10 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                         label: `${qNumberStr} (${sec.name})`,
                         section: sec.name,
                         sectionId: sec.id,
+                        sectionRequiredCount: reqCount,
+                        sectionTotalQuestions: count,
+                        sectionMaxMarks: secTotal,
+                        hasOptionalChoice: reqCount < count,
                         maxMarks: markEach,
                         awardedMarks: 0,
                         isChoice: isChoice,
@@ -3662,9 +3704,13 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     title: sec.title,
                     qStartNo: startNo,
                     qEndNo: endNo,
+                    qCount: count,
                     questionCount: count,
+                    requiredCount: reqCount,
+                    hasOptionalChoice: reqCount < count,
                     marksPerQ: markEach,
                     maxMarks: secTotal,
+                    secTotal: secTotal,
                     hasChoice: sec.hasChoice,
                     choiceQuestions: sec.choiceQuestions || '',
                     hasSubQuestions: sec.hasSubQuestions,

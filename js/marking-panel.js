@@ -53,6 +53,37 @@ window.calculateGradeScale = function(obtainedMarks, maxMarks) {
     return { grade, gradePoint, marksRange, remarks, status, percentage: pct };
 };
 
+window.isEvaluationFullyGraded = function(questions, sections) {
+    if (!questions || !Array.isArray(questions) || questions.length === 0) return false;
+    if (sections && Array.isArray(sections) && sections.length > 0) {
+        return sections.every(sec => {
+            const secQs = questions.filter(q => q.sectionId === sec.id || q.section === sec.name || q.section === sec.title);
+            if (secQs.length === 0) return true;
+            const req = Number(sec.requiredCount || sec.answerCount || secQs[0]?.sectionRequiredCount || secQs.length) || secQs.length;
+            const answered = secQs.filter(q => q.status && q.status !== "unmarked" && q.status !== "pending").length;
+            return answered >= req;
+        });
+    }
+    return questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending");
+};
+
+window.calculateUnmarkedQuestionsCount = function(questions, sections) {
+    if (!questions || !Array.isArray(questions) || questions.length === 0) return 0;
+    if (sections && Array.isArray(sections) && sections.length > 0) {
+        let totalUnmarked = 0;
+        sections.forEach(sec => {
+            const secQs = questions.filter(q => q.sectionId === sec.id || q.section === sec.name || q.section === sec.title);
+            if (secQs.length === 0) return;
+            const req = Number(sec.requiredCount || sec.answerCount || secQs[0]?.sectionRequiredCount || secQs.length) || secQs.length;
+            const answered = secQs.filter(q => q.status && q.status !== "unmarked" && q.status !== "pending").length;
+            const needed = Math.max(0, req - answered);
+            totalUnmarked += needed;
+        });
+        return totalUnmarked;
+    }
+    return questions.filter(q => !q.status || q.status === "unmarked" || q.status === "pending").length;
+};
+
 class MarkingPanel {
     constructor(containerElement, options = {}) {
         this.container = containerElement;
@@ -258,24 +289,37 @@ class MarkingPanel {
     }
 
     calculateDefaultMaxMarks() {
+        if (this.sections && this.sections.length > 0) {
+            return this.sections.reduce((sum, s) => sum + (Number(s.secTotal || s.maxMarks) || 0), 0);
+        }
         return this.questions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0);
     }
 
     getSectionTotals() {
         return this.sections.map(sec => {
             const secQuestions = this.questions.filter(q => q.sectionId === sec.id || q.section === sec.name || q.section === sec.title);
-            const obtained = secQuestions.reduce((sum, q) => {
-                if (q.status === "unmarked" || q.status === "pending") return sum;
-                return sum + (Number(q.awardedMarks) || 0);
-            }, 0);
-            const maxM = secQuestions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0) || sec.maxMarks;
+            const reqCount = Number(sec.requiredCount || sec.answerCount || secQuestions[0]?.sectionRequiredCount || secQuestions.length) || secQuestions.length;
+            const hasOptional = reqCount < secQuestions.length;
+
+            const answered = secQuestions.filter(q => q.status !== "unmarked" && q.status !== "pending" && q.status !== "skipped");
+            
+            // Best N scoring rule: if student attempted more than required questions, take the top scoring ones
+            const sorted = [...answered].sort((a, b) => (Number(b.awardedMarks) || 0) - (Number(a.awardedMarks) || 0));
+            const considered = hasOptional ? sorted.slice(0, reqCount) : sorted;
+            const obtained = considered.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
+
+            const secMax = Number(sec.secTotal || sec.maxMarks) || (reqCount * (Number(sec.marksPerQ) || Number(secQuestions[0]?.maxMarks) || 1));
+
             return {
                 id: sec.id,
                 name: sec.name,
                 letter: sec.letter,
                 title: sec.title,
-                obtainedMarks: Math.round(obtained * 10) / 10,
-                maxMarks: maxM,
+                requiredCount: reqCount,
+                hasOptionalChoice: hasOptional,
+                attemptedCount: answered.length,
+                obtainedMarks: Math.min(secMax, Math.round(obtained * 10) / 10),
+                maxMarks: secMax,
                 questionCount: secQuestions.length
             };
         });
@@ -321,17 +365,23 @@ class MarkingPanel {
                             const isActive = idx === this.activeQuestionIndex;
                             const secObj = this.sections.find(s => s.id === q.sectionId || s.name === q.section || s.title === q.section);
                             const secLetter = secObj ? secObj.letter : (q.section ? q.section.replace(/[^A-Za-z0-9]/g, '').slice(-1).toUpperCase() : 'A');
+
+                            const reqCount = secObj ? (Number(secObj.requiredCount || secObj.answerCount || secObj.qCount) || this.questions.length) : this.questions.length;
+                            const secQs = this.questions.filter(x => secObj ? (x.sectionId === secObj.id || x.section === secObj.name || x.section === secObj.title) : true);
+                            const answeredInSec = secQs.filter(x => x.status && x.status !== "unmarked" && x.status !== "pending" && x.status !== "skipped").length;
+                            const isOptionalSkipped = (q.status === "skipped") || ((!q.status || q.status === "unmarked" || q.status === "pending") && Number(q.awardedMarks) === 0 && answeredInSec >= reqCount);
+
                             const isAllOk = q.awardedMarks === q.maxMarks && q.maxMarks > 0;
-                            const statusIcon = isAllOk ? '✓' : (q.awardedMarks > 0 ? '◑' : (q.status === 'wrong' ? '✗' : '○'));
-                            const statusLabel = isAllOk ? 'OK' : (q.awardedMarks > 0 ? 'Partial' : (q.status === 'wrong' ? 'Zero' : '-'));
-                            const statusCls = isAllOk ? 'st-ok' : (q.awardedMarks > 0 ? 'st-part' : (q.status === 'wrong' ? 'st-zero' : 'st-unmarked'));
-                            const rowStatus = q.status || (isAllOk ? 'correct' : (q.awardedMarks > 0 ? 'partial' : 'unmarked'));
+                            const statusIcon = isOptionalSkipped ? '⏭️' : (isAllOk ? '✓' : (q.awardedMarks > 0 ? '◑' : (q.status === 'wrong' ? '✗' : '○')));
+                            const statusLabel = isOptionalSkipped ? 'Skipped' : (isAllOk ? 'OK' : (q.awardedMarks > 0 ? 'Partial' : (q.status === 'wrong' ? 'Zero' : '-')));
+                            const statusCls = isOptionalSkipped ? 'st-skipped' : (isAllOk ? 'st-ok' : (q.awardedMarks > 0 ? 'st-part' : (q.status === 'wrong' ? 'st-zero' : 'st-unmarked')));
+                            const rowStatus = isOptionalSkipped ? 'skipped' : (q.status || (isAllOk ? 'correct' : (q.awardedMarks > 0 ? 'partial' : 'unmarked')));
                             
                             return `<div class="q-breakdown-row ${isActive ? 'active-brow' : ''} ${rowStatus}" data-index="${idx}" title="${q.topic || `Question ${q.qNo}`}">
                                 <span class="brow-col col-sec brow-sec">${secLetter}</span>
                                 <span class="brow-col col-q brow-q">Q${q.qNo}</span>
                                 <span class="brow-col col-status brow-status ${statusCls}"><span class="st-icon">${statusIcon}</span> ${statusLabel}</span>
-                                <span class="brow-col col-marks brow-marks">${q.awardedMarks}/${q.maxMarks}</span>
+                                <span class="brow-col col-marks brow-marks">${isOptionalSkipped ? '—' : `${q.awardedMarks}/${q.maxMarks}`}</span>
                             </div>`;
                         }).join('')}
                     </div>
@@ -391,7 +441,7 @@ class MarkingPanel {
                         </button>
                     </div>
 
-                    <!-- Primary Actions: Full Mark / Zero / Clear -->
+                    <!-- Primary Actions: Full Mark / Zero / Skip / Clear -->
                     <div class="quick-mark-actions">
                         <button type="button" class="quick-action-btn btn-quick-correct" id="btn-quick-tick" title="Mark Full Marks [F]">
                             <span class="btn-icon">
@@ -402,6 +452,9 @@ class MarkingPanel {
                             <span class="btn-icon">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </span> Zero (0)
+                        </button>
+                        <button type="button" class="quick-action-btn btn-quick-skip" id="btn-quick-skip" title="Mark Question as Skipped / Optional Choice [S]" style="background: rgba(100, 116, 139, 0.08); border-color: rgba(100, 116, 139, 0.25); color: #475569;">
+                            <span class="btn-icon">⏭️</span> Skip (S)
                         </button>
                         <button type="button" class="quick-action-btn btn-quick-clear" id="btn-quick-clear" title="Clear / Delete mark for this question" style="background: rgba(220, 38, 38, 0.08); border-color: rgba(220, 38, 38, 0.25); color: #DC2626;">
                             <span class="btn-icon">
@@ -623,9 +676,17 @@ class MarkingPanel {
         visibleQuestions.forEach(q => {
             const actualIdx = this.questions.indexOf(q);
             const isActive = actualIdx === this.activeQuestionIndex;
-            const isUnmarked = q.status === "unmarked" || q.status === "pending";
-            const valAttr = isUnmarked ? "" : (q.awardedMarks !== undefined && q.awardedMarks !== null ? q.awardedMarks : "");
-            const statusClass = isUnmarked ? "q-row-unmarked" : `q-row-${q.status}`;
+
+            // Section choice awareness
+            const secObj = this.sections.find(s => s.id === q.sectionId || s.name === q.section || s.title === q.section);
+            const reqCount = secObj ? (Number(secObj.requiredCount || secObj.answerCount || secObj.qCount) || this.questions.length) : this.questions.length;
+            const secQs = this.questions.filter(x => secObj ? (x.sectionId === secObj.id || x.section === secObj.name || x.section === secObj.title) : true);
+            const answeredInSec = secQs.filter(x => x.status && x.status !== "unmarked" && x.status !== "pending" && x.status !== "skipped").length;
+            const isOptionalSkipped = (q.status === "skipped") || ((!q.status || q.status === "unmarked" || q.status === "pending") && Number(q.awardedMarks) === 0 && answeredInSec >= reqCount);
+
+            const isUnmarked = (q.status === "unmarked" || q.status === "pending") && !isOptionalSkipped;
+            const valAttr = (isUnmarked || isOptionalSkipped) ? "" : (q.awardedMarks !== undefined && q.awardedMarks !== null ? q.awardedMarks : "");
+            const statusClass = isOptionalSkipped ? "q-row-skipped" : (isUnmarked ? "q-row-unmarked" : `q-row-${q.status}`);
 
             // Sub-question mini chips if question has sub-parts
             let subqChips = "";
@@ -651,15 +712,15 @@ class MarkingPanel {
                 <div class="q-row ${isActive ? 'active-row' : ''} ${statusClass}" data-index="${actualIdx}">
                     <div class="q-number-col">
                         <div style="display: flex; align-items: center; gap: 6px;">
-                            <span class="q-badge ${isUnmarked ? 'q-badge-unmarked' : ''}">Q${q.qNo}</span>
-                            ${choiceTag}
+                            <span class="q-badge ${isOptionalSkipped ? 'q-badge-skipped' : (isUnmarked ? 'q-badge-unmarked' : '')}">Q${q.qNo}</span>
+                            ${isOptionalSkipped ? '<span class="q-choice-tag" style="background: rgba(100, 116, 139, 0.15); color: #64748B;">SKIP</span>' : choiceTag}
                             ${isUnmarked ? '<span class="q-pending-dot" title="Pending evaluation"></span>' : ''}
                         </div>
                     </div>
                     <div class="q-inputs-col">
                         <div class="score-input-group ${isUnmarked ? 'is-unmarked-group' : ''}">
                             <input type="number" step="0.5" min="0" max="${q.maxMarks}" 
-                                class="q-score-input" value="${valAttr}" placeholder="—" data-index="${actualIdx}" title="${isUnmarked ? 'Unmarked - Enter marks' : `Awarded: ${q.awardedMarks}M`}" />
+                                class="q-score-input" value="${valAttr}" placeholder="—" data-index="${actualIdx}" title="${isOptionalSkipped ? 'Skipped / Optional' : (isUnmarked ? 'Unmarked - Enter marks' : `Awarded: ${q.awardedMarks}M`)}" />
                             <span class="q-score-divider">/</span>
                             <input type="number" step="0.5" min="1" 
                                 class="q-max-input" value="${q.maxMarks}" data-index="${actualIdx}" title="Max Marks" />
@@ -673,7 +734,10 @@ class MarkingPanel {
                         <button type="button" class="q-mini-btn btn-mini-wrong ${(!isUnmarked && q.status === 'wrong') ? 'active' : ''}" data-action="wrong" data-index="${actualIdx}" title="Zero Mark">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
-                        <button type="button" class="q-mini-btn btn-mini-clear ${isUnmarked ? 'disabled' : ''}" data-action="clear" data-index="${actualIdx}" title="Clear / Delete Mark" style="color: #DC2626;">
+                        <button type="button" class="q-mini-btn btn-mini-skip ${isOptionalSkipped ? 'active' : ''}" data-action="skip" data-index="${actualIdx}" title="Skip Question / Optional Choice" style="color: ${isOptionalSkipped ? '#FFFFFF' : '#64748B'}; background: ${isOptionalSkipped ? '#64748B' : 'transparent'}; font-size: 10px; font-weight: 700; width: 34px;">
+                            SKIP
+                        </button>
+                        <button type="button" class="q-mini-btn btn-mini-clear ${(isUnmarked && !isOptionalSkipped) ? 'disabled' : ''}" data-action="clear" data-index="${actualIdx}" title="Clear / Delete Mark" style="color: #DC2626;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
                     </div>
@@ -768,6 +832,14 @@ class MarkingPanel {
         if (btnCross) {
             btnCross.addEventListener("click", () => {
                 this.assignCurrentQuestionMark(0, "wrong");
+            });
+        }
+
+        const btnSkip = this.container.querySelector("#btn-quick-skip");
+        if (btnSkip) {
+            btnSkip.addEventListener("click", () => {
+                this.assignCurrentQuestionMark(0, "skipped");
+                this.nextQuestion();
             });
         }
 
@@ -882,6 +954,8 @@ class MarkingPanel {
                         }
                     } else if (action === "wrong") {
                         this.assignQuestionMarkDirect(idx, 0, "wrong");
+                    } else if (action === "skip") {
+                        this.assignQuestionMarkDirect(idx, 0, "skipped");
                     } else if (action === "clear") {
                         this.clearQuestionMark(idx);
                     }
@@ -1087,6 +1161,9 @@ class MarkingPanel {
         if (forcedStatus === "unmarked") {
             q.awardedMarks = 0;
             q.status = "unmarked";
+        } else if (forcedStatus === "skipped") {
+            q.awardedMarks = 0;
+            q.status = "skipped";
         } else {
             const val = Math.min(Math.max(0, marks), q.maxMarks);
             q.awardedMarks = Math.round(val * 10) / 10;
@@ -1120,6 +1197,9 @@ class MarkingPanel {
         if (forcedStatus === "unmarked") {
             q.awardedMarks = 0;
             q.status = "unmarked";
+        } else if (forcedStatus === "skipped") {
+            q.awardedMarks = 0;
+            q.status = "skipped";
         } else {
             const val = Math.min(Math.max(0, marks), q.maxMarks);
             q.awardedMarks = Math.round(val * 10) / 10;
@@ -1190,12 +1270,18 @@ class MarkingPanel {
     }
 
     recalculate() {
-        this.obtainedMarksTotal = this.questions.reduce((sum, q) => {
-            if (q.status === "unmarked" || q.status === "pending") return sum;
-            return sum + (Number(q.awardedMarks) || 0);
-        }, 0);
+        if (this.sections && this.sections.length > 0) {
+            const secTotals = this.getSectionTotals();
+            this.obtainedMarksTotal = secTotals.reduce((sum, st) => sum + (Number(st.obtainedMarks) || 0), 0);
+            this.maxMarksTotal = secTotals.reduce((sum, st) => sum + (Number(st.maxMarks) || 0), 0);
+        } else {
+            this.obtainedMarksTotal = this.questions.reduce((sum, q) => {
+                if (q.status === "unmarked" || q.status === "pending" || q.status === "skipped") return sum;
+                return sum + (Number(q.awardedMarks) || 0);
+            }, 0);
+            this.maxMarksTotal = this.questions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0);
+        }
         this.obtainedMarksTotal = Math.round(this.obtainedMarksTotal * 10) / 10;
-        this.maxMarksTotal = this.questions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0);
 
         const pct = this.maxMarksTotal > 0 ? Math.round((this.obtainedMarksTotal / this.maxMarksTotal) * 100) : 0;
 
@@ -1300,9 +1386,20 @@ class MarkingPanel {
 
             // Update Card background shimmer & "✓ All Graded" popper celebration
             let unmarkedCount = 0;
-            this.questions.forEach(q => {
-                if (q.status === "unmarked" || q.status === "pending") unmarkedCount++;
-            });
+            if (this.sections && this.sections.length > 0) {
+                this.sections.forEach(s => {
+                    const secQs = this.questions.filter(q => q.sectionId === s.id || q.section === s.name || q.section === s.title);
+                    if (secQs.length === 0) return;
+                    const req = Number(s.requiredCount || s.answerCount || secQs[0]?.sectionRequiredCount || secQs.length) || secQs.length;
+                    const answered = secQs.filter(q => q.status && q.status !== "unmarked" && q.status !== "pending").length;
+                    const needed = Math.max(0, req - answered);
+                    unmarkedCount += needed;
+                });
+            } else {
+                this.questions.forEach(q => {
+                    if (q.status === "unmarked" || q.status === "pending") unmarkedCount++;
+                });
+            }
             const isAllGraded = this.questions.length > 0 && unmarkedCount === 0;
 
             const card = this.container.querySelector("#score-banner-card") || this.container.querySelector(".score-banner-card");
