@@ -1683,6 +1683,7 @@ class CanvasEngine {
         // Full marks button and Zero button
         opts.push({ label: "Full", sub: `${qMax}M`, val: qMax, isStep: false, cls: "is-full-btn" });
         opts.push({ label: "0", sub: "Zero", val: 0, isStep: false, cls: "is-zero-btn" });
+        opts.push({ label: "⏭️", sub: "Skip", val: "skip", isStep: false, cls: "is-skip-btn" });
 
         return opts;
     }
@@ -1809,6 +1810,11 @@ class CanvasEngine {
                 </div>
                 <button type="button" class="btn-radial-close" id="btn-radial-dismiss" title="Cancel">×</button>
             </div>
+            <div class="radial-bottom-actions">
+                <button type="button" class="btn-radial-bottom-skip" id="btn-radial-bottom-skip" title="Mark this question as Skipped / Optional Choice [S]">
+                    <span>⏭️</span> Skip Question (S)
+                </button>
+            </div>
         `;
 
         const backdrop = document.createElement("div");
@@ -1830,8 +1836,13 @@ class CanvasEngine {
             const opt = radialOptions[idx];
 
             btn.addEventListener("mouseenter", () => {
-                if (hubVal) hubVal.textContent = opt.isStep ? `${opt.label} Step` : `${opt.label} M`;
-                if (hubAction) hubAction.textContent = opt.isStep ? "Award Step" : (opt.val === 0 ? "Mark Zero" : "Award Mark");
+                if (opt.val === "skip") {
+                    if (hubVal) hubVal.textContent = "⏭️ Skip";
+                    if (hubAction) hubAction.textContent = "Skip Question (S)";
+                } else {
+                    if (hubVal) hubVal.textContent = opt.isStep ? `${opt.label} Step` : `${opt.label} M`;
+                    if (hubAction) hubAction.textContent = opt.isStep ? "Award Step" : (opt.val === 0 ? "Mark Zero" : "Award Mark");
+                }
             });
 
             btn.addEventListener("mouseleave", () => {
@@ -1849,6 +1860,14 @@ class CanvasEngine {
             hubBtn.addEventListener("click", (e) => {
                 e.stopPropagation();
                 this.awardRadialMark(normPos, qMax, false, `${qMax}`);
+            });
+        }
+
+        const bottomSkipBtn = container.querySelector("#btn-radial-bottom-skip");
+        if (bottomSkipBtn) {
+            bottomSkipBtn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                this.awardRadialMark(normPos, "skip", false, "Skip");
             });
         }
 
@@ -1874,6 +1893,14 @@ class CanvasEngine {
 
     awardRadialMark(normPos, val, isStep = false, label = "") {
         this.closeRadialMarkingWheel();
+
+        if (val === "skip") {
+            // When skipping: do NOT stamp any tick, wrong mark, or score on the paper!
+            if (this.options.onRadialMarkAwarded) {
+                this.options.onRadialMarkAwarded("skip", false, normPos);
+            }
+            return;
+        }
 
         const qInfo = (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo() : null) || { label: "Q1", maxMarks: 2, qNo: 1 };
         const qMax = Number(qInfo.maxMarks) || 2;

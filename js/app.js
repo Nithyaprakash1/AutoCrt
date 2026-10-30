@@ -3767,6 +3767,20 @@ class AppController {
                 return q ? { label: `Q${q.qNo}`, maxMarks: q.maxMarks, currentMarks: q.awardedMarks, qNo: q.qNo, section: q.section } : { label: "Q1", maxMarks: 2, qNo: 1, section: "Section A" };
             },
             onRadialMarkAwarded: (markVal, isStep, normPos) => {
+                if (markVal === "skip") {
+                    const activeQ = this.markingPanel?.getActiveQuestion();
+                    if (activeQ) {
+                        if (this.canvasEngine) {
+                            this.canvasEngine.removeAnnotationsForQuestion(activeQ.qNo);
+                            this.updatePageTotalDisplay();
+                        }
+                        this.markingPanel.assignCurrentQuestionMark(0, "skipped");
+                        this.updateTopHud(activeQ);
+                        this.markingPanel.nextQuestion();
+                        this.showToast(`Q${activeQ.qNo} marked as Skipped / Choice.`);
+                    }
+                    return;
+                }
                 const numVal = Number(markVal) || 0;
                 const activeQ = this.markingPanel?.getActiveQuestion();
                 if (activeQ && this.canvasEngine) {
