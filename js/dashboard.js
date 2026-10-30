@@ -73,10 +73,7 @@ class DashboardManager {
             this.teacherSubject = assignedSubs[0] || user.subject || "";
             this.teacherClasses = assignedCls;
 
-            this.teacherName = user.name || "";
-            if (isTeacher && (!this.teacherName || this.teacherName.includes("Nithya Prakash") || this.teacherName === "Faculty Evaluator")) {
-                this.teacherName = this.teacherSubject || "Subject Evaluator";
-            }
+            this.teacherName = user.name || (isTeacher ? "Faculty Evaluator" : "User");
         }
 
         // Check URL parameters or direct shared target (e.g. ?view=dashboard&subject=Physics&batch=Class 12-A:::Physics...)
@@ -417,10 +414,7 @@ class DashboardManager {
         const displaySubject = activeSub || (this.teacherSubject && this.teacherSubject !== 'all' && this.teacherSubject !== 'All Subjects'
             ? this.teacherSubject 
             : (teacherAssigned.length === 1 && teacherAssigned[0] !== 'All Subjects' ? teacherAssigned[0] : (teacherAssigned.length > 1 ? teacherAssigned.join(' & ') : (isAdmin ? 'All Subjects' : 'Evaluation'))));
-        let displayName = this.teacherName || "";
-        if (!displayName || displayName.includes("Nithya Prakash")) {
-            displayName = (displaySubject && displaySubject !== 'Evaluation') ? displaySubject : "Teacher";
-        }
+        let displayName = this.teacherName || (user?.name || "Teacher");
 
         // Active panel subject: isolate cards & papers to that specific subject desk if explicitly selected
         const activePanelSubject = (activeSub && activeSub !== 'all' && activeSub !== 'All Subjects')
@@ -527,17 +521,32 @@ class DashboardManager {
             return nb - na; // 12th, 11th, 10th
         });
 
-        // Filter batches by selected class filter pill if not "all"
+        // Distinct subjects for filter pills
+        const activeSubjectsList = (this.teacherSubjects && this.teacherSubjects.length > 0)
+            ? this.teacherSubjects.filter(s => s && s.toLowerCase() !== 'all subjects' && s.toLowerCase() !== 'all')
+            : [];
+        const distinctBatchSubjects = Array.from(new Set(this.batches.map(b => b.subject).filter(Boolean)));
+        if (activeSubjectsList.length > 0) {
+            activeSubjectsList.forEach(s => {
+                if (!distinctBatchSubjects.includes(s)) distinctBatchSubjects.push(s);
+            });
+        }
+        distinctBatchSubjects.sort();
+
+        // Filter batches by selected class & subject filter pills
         let displayBatches = this.batches;
         if (this.selectedClassFilter && this.selectedClassFilter !== "all") {
             const targetNorm = this.selectedClassFilter.toLowerCase().replace(/[^a-z0-9]/g, '');
-            displayBatches = this.batches.filter(b => {
+            displayBatches = displayBatches.filter(b => {
                 const bNorm = (b.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
                 if (bNorm === targetNorm || (targetNorm && bNorm.includes(targetNorm)) || (bNorm && targetNorm.includes(bNorm))) return true;
                 const numTarget = targetNorm.match(/\d+/)?.[0];
                 const numB = bNorm.match(/\d+/)?.[0];
                 return Boolean(numTarget && numB && numTarget === numB);
             });
+        }
+        if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all" && this.selectedSubjectFilter !== "All Subjects") {
+            displayBatches = displayBatches.filter(b => window.appStorage.isSubjectMatch(b.subject, b.templateName, this.selectedSubjectFilter, b.templateName));
         }
 
         // Check if currently viewing Tamil desk
@@ -565,6 +574,16 @@ class DashboardManager {
                             <span class="welcome-greeting">${greetingStr}, ${displayName}! 👋</span>
                             <h2 class="welcome-headline">${welcomeHeadline}</h2>
                             <p class="welcome-sub">Streamlined examination batches. Click into any class card below to view its student answer sheets, evaluate marks, and export results.</p>
+                            <div class="welcome-allocation-tags" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center;">
+                                <div style="display: inline-flex; align-items: center; gap: 5px; background: rgba(0, 113, 227, 0.08); border: 1px solid rgba(0, 113, 227, 0.2); padding: 3px 10px; border-radius: 6px;">
+                                    <span style="font-size: 0.72rem; font-weight: 700; color: #0071E3; text-transform: uppercase; letter-spacing: 0.5px;">Authorized Subjects:</span>
+                                    <span style="font-size: 0.8rem; font-weight: 600; color: #1E293B;">${activeSubjectsList.length > 0 ? activeSubjectsList.join(', ') : 'All Subjects'}</span>
+                                </div>
+                                <div style="display: inline-flex; align-items: center; gap: 5px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 3px 10px; border-radius: 6px;">
+                                    <span style="font-size: 0.72rem; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Classes:</span>
+                                    <span style="font-size: 0.8rem; font-weight: 600; color: #1E293B;">${activeClassesList.length > 0 ? activeClassesList.join(', ') : 'All Classes'}</span>
+                                </div>
+                            </div>
                         </div>
                         <div class="welcome-action-col" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
                             ${isTamilDesk ? `
@@ -648,6 +667,7 @@ class DashboardManager {
                                 <p class="teacher-batches-desc" style="margin: 2px 0 0;">Click any card to view its student answer sheets or start marking directly.</p>
                                 ${distinctBatchClasses.length > 1 ? `
                                     <div class="dash-class-pills-bar" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px;">
+                                        <span style="font-size: 0.74rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.4px;">Classes:</span>
                                         <button type="button" class="btn-dash-class-pill ${this.selectedClassFilter === 'all' ? 'active' : ''}" data-class="all" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${this.selectedClassFilter === 'all' ? '#0071E3' : '#E2E8F0'}; background: ${this.selectedClassFilter === 'all' ? '#0071E3' : '#F8FAFC'}; color: ${this.selectedClassFilter === 'all' ? '#FFFFFF' : '#475569'}; box-shadow: ${this.selectedClassFilter === 'all' ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
                                             All Classes (${this.batches.length})
                                         </button>
@@ -661,6 +681,24 @@ class DashboardManager {
                                             return `
                                                 <button type="button" class="btn-dash-class-pill ${isAct ? 'active' : ''}" data-class="${clsName}" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${isAct ? '#0071E3' : '#E2E8F0'}; background: ${isAct ? '#0071E3' : '#F8FAFC'}; color: ${isAct ? '#FFFFFF' : '#475569'}; box-shadow: ${isAct ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
                                                     ${clsName} (${countForCls})
+                                                </button>
+                                            `;
+                                        }).join('')}
+                                    </div>
+                                ` : ''}
+
+                                ${distinctBatchSubjects.length > 1 ? `
+                                    <div class="dash-subject-pills-bar" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
+                                        <span style="font-size: 0.74rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.4px;">Subjects:</span>
+                                        <button type="button" class="btn-dash-subject-pill ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? 'active' : ''}" data-subject="all" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? '#0071E3' : '#E2E8F0'}; background: ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? '#0071E3' : '#F8FAFC'}; color: ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? '#FFFFFF' : '#475569'}; box-shadow: ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
+                                            All Subjects (${this.batches.length})
+                                        </button>
+                                        ${distinctBatchSubjects.map(subName => {
+                                            const countForSub = this.batches.filter(b => window.appStorage ? window.appStorage.isSubjectMatch(b.subject, b.templateName, subName, b.templateName) : b.subject === subName).length;
+                                            const isAct = this.selectedSubjectFilter === subName;
+                                            return `
+                                                <button type="button" class="btn-dash-subject-pill ${isAct ? 'active' : ''}" data-subject="${subName}" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${isAct ? '#0071E3' : '#E2E8F0'}; background: ${isAct ? '#0071E3' : '#F8FAFC'}; color: ${isAct ? '#FFFFFF' : '#475569'}; box-shadow: ${isAct ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
+                                                    ${subName} (${countForSub})
                                                 </button>
                                             `;
                                         }).join('')}
@@ -1114,6 +1152,23 @@ class DashboardManager {
                 e.stopPropagation();
                 const cls = btn.getAttribute("data-class") || "all";
                 this.selectedClassFilter = cls;
+                this.applyFilters();
+                this.render();
+                this.bindEvents();
+            });
+        });
+
+        // Subject filter pills in Batches section
+        this.container.querySelectorAll(".btn-dash-subject-pill").forEach(btn => {
+            btn.addEventListener("click", (e) => {
+                e.stopPropagation();
+                const sub = btn.getAttribute("data-subject") || "all";
+                this.selectedSubjectFilter = sub;
+                if (sub !== "all") {
+                    try { sessionStorage.setItem("niprak_active_subject", sub); } catch (e) {}
+                } else {
+                    try { sessionStorage.removeItem("niprak_active_subject"); } catch (e) {}
+                }
                 this.applyFilters();
                 this.render();
                 this.bindEvents();

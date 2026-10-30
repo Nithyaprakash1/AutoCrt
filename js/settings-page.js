@@ -110,10 +110,7 @@ class SettingsPageManager {
             : (currentUser?.subject || "");
         const isTeacherRole = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
 
-        let teacherName = this.settings.teacher?.name || "";
-        if (isTeacherRole || !teacherName || teacherName.includes("Nithya Prakash") || teacherName === "Faculty Evaluator") {
-            teacherName = currentSub || (currentUser?.name && !currentUser.name.includes("Nithya Prakash") ? currentUser.name : "Subject Evaluator");
-        }
+        let teacherName = currentUser?.name || this.settings.teacher?.name || "Subject Evaluator";
         const instName = this.settings.institution?.name || "Adwaith Thought Academy";
         const teacherRole = this.settings.teacher?.role || currentUser?.roleLabel || (isTeacherRole && currentSub ? `${currentSub} Evaluator` : "Evaluator");
         const initials = teacherName.split(" ").filter(Boolean).map(n => n[0]).slice(0, 2).join("").toUpperCase() || (currentSub ? currentSub.substring(0, 2).toUpperCase() : "SE");

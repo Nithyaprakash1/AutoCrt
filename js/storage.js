@@ -1521,7 +1521,7 @@ class StorageService {
         const activeSub = (activeUser && activeUser.assignedSubjects && activeUser.assignedSubjects.length > 0)
             ? activeUser.assignedSubjects[0]
             : (activeUser?.subject || "");
-        const defaultTeacherName = activeSub || (activeUser?.name && !activeUser.name.includes("Nithya Prakash") ? activeUser.name : "Subject Evaluator");
+        const defaultTeacherName = activeUser?.name || "Subject Evaluator";
 
         const defaultSettings = {
             institution: {
@@ -1563,10 +1563,9 @@ class StorageService {
 
         // Evaluator Full Name should reflect custom account name or active subject
         const isTeacherRole = activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher');
-        if (isTeacherRole || !result.teacher?.name || result.teacher.name.includes("Nithya Prakash")) {
-            const hasCustomName = activeUser?.name && !activeUser.name.includes("Nithya Prakash") && !activeUser.name.includes("Evaluator");
+        if (isTeacherRole || !result.teacher?.name) {
             result.teacher = Object.assign({}, result.teacher, {
-                name: hasCustomName ? activeUser.name : (activeSub && activeSub !== 'All Subjects' ? `${activeSub} Teacher` : (result.teacher?.name || "Subject Evaluator"))
+                name: activeUser?.name || result.teacher?.name || "Subject Evaluator"
             });
         }
         return result;

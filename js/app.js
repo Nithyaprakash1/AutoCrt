@@ -2698,16 +2698,7 @@ class AppController {
         }
 
         // 2. Display Name
-        let displayName = user ? user.name : "";
-        if (isTeacher) {
-            if (!displayName || displayName.includes("Nithya Prakash") || displayName === "Faculty Evaluator" || displayName.includes("Teacher") || displayName.includes("Evaluator")) {
-                displayName = activeSub ? `${activeSub} Teacher` : "Subject Evaluator";
-            }
-        } else if (isSuper) {
-            displayName = user?.name || "Nithya Prakash";
-        } else {
-            displayName = user?.name || (activeSub ? `${activeSub} Officer` : "User");
-        }
+        let displayName = user?.name || (isTeacher ? "Faculty Evaluator" : (isSuper ? "Nithya Prakash" : "User"));
 
         // 3. Initials
         const initials = isSuper ? "NP" : (displayName
