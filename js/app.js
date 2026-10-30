@@ -3764,20 +3764,36 @@ class AppController {
             },
             getActiveQuestionInfo: () => {
                 const q = this.markingPanel?.getActiveQuestion();
-                return q ? { label: `Q${q.qNo}`, maxMarks: q.maxMarks, currentMarks: q.awardedMarks, qNo: q.qNo, section: q.section } : { label: "Q1", maxMarks: 2, qNo: 1, section: "Section A" };
+                const canSkip = this.markingPanel && q ? this.markingPanel.canSkipQuestion(q) : false;
+                const skipStatus = (this.markingPanel && q) ? this.markingPanel.getSectionSkipStatus(q.sectionId || q.section) : null;
+                return q ? {
+                    label: `Q${q.qNo}`,
+                    maxMarks: q.maxMarks,
+                    currentMarks: q.awardedMarks,
+                    qNo: q.qNo,
+                    section: q.section,
+                    status: q.status,
+                    canSkip: canSkip,
+                    remainingSkips: skipStatus ? skipStatus.remainingSkips : 0,
+                    maxSkips: skipStatus ? skipStatus.maxSkips : 0
+                } : { label: "Q1", maxMarks: 2, qNo: 1, section: "Section A", canSkip: false };
             },
             onRadialMarkAwarded: (markVal, isStep, normPos) => {
                 if (markVal === "skip") {
                     const activeQ = this.markingPanel?.getActiveQuestion();
                     if (activeQ) {
-                        if (this.canvasEngine) {
-                            this.canvasEngine.removeAnnotationsForQuestion(activeQ.qNo);
-                            this.updatePageTotalDisplay();
+                        if (this.markingPanel.canSkipQuestion(activeQ)) {
+                            if (this.canvasEngine) {
+                                this.canvasEngine.removeAnnotationsForQuestion(activeQ.qNo);
+                                this.updatePageTotalDisplay();
+                            }
+                            this.markingPanel.assignCurrentQuestionMark(0, "skipped");
+                            this.updateTopHud(activeQ);
+                            this.markingPanel.nextQuestion();
+                            this.showToast(`Q${activeQ.qNo} marked as Skipped / Choice.`);
+                        } else {
+                            this.showToast(`Cannot skip Q${activeQ.qNo}: no optional skips remaining in this section.`, 2500);
                         }
-                        this.markingPanel.assignCurrentQuestionMark(0, "skipped");
-                        this.updateTopHud(activeQ);
-                        this.markingPanel.nextQuestion();
-                        this.showToast(`Q${activeQ.qNo} marked as Skipped / Choice.`);
                     }
                     return;
                 }
@@ -4870,9 +4886,13 @@ class AppController {
                     e.preventDefault();
                     if (this.markingPanel) {
                         const curQ = this.markingPanel.getActiveQuestion();
-                        this.markingPanel.assignCurrentQuestionMark(0, "skipped");
-                        this.markingPanel.nextQuestion();
-                        this.showToast(`Q${curQ ? curQ.qNo : ''} marked as Skipped / Choice.`);
+                        if (this.markingPanel.canSkipQuestion(curQ)) {
+                            this.markingPanel.assignCurrentQuestionMark(0, "skipped");
+                            this.markingPanel.nextQuestion();
+                            this.showToast(`Q${curQ ? curQ.qNo : ''} marked as Skipped / Choice.`);
+                        } else {
+                            this.showToast(`Cannot skip Q${curQ ? curQ.qNo : ''}: no optional skips available in this section.`, 2500);
+                        }
                     }
                     break;
                 case "h":

@@ -1630,7 +1630,7 @@ class CanvasEngine {
 
     // --- GTA V Style Radial Marking Wheel ---
 
-    getDynamicRadialOptions(qMax) {
+    getDynamicRadialOptions(qMax, canSkip = true) {
         // Step marks: always +0.5 and +1.0
         const opts = [
             { label: "+0.5", sub: "Step", val: 0.5, isStep: true, cls: "is-step-btn" },
@@ -1683,7 +1683,9 @@ class CanvasEngine {
         // Full marks button and Zero button
         opts.push({ label: "Full", sub: `${qMax}M`, val: qMax, isStep: false, cls: "is-full-btn" });
         opts.push({ label: "0", sub: "Zero", val: 0, isStep: false, cls: "is-zero-btn" });
-        opts.push({ label: "⏭️", sub: "Skip", val: "skip", isStep: false, cls: "is-skip-btn" });
+        if (canSkip) {
+            opts.push({ label: "⏭️", sub: "Skip", val: "skip", isStep: false, cls: "is-skip-btn" });
+        }
 
         return opts;
     }
@@ -1765,13 +1767,14 @@ class CanvasEngine {
         const posX = pixelPos ? pixelPos.x : (normPos.x * canvasW);
         const posY = pixelPos ? pixelPos.y : (normPos.y * canvasH);
 
-        const qInfo = (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo() : null) || { label: "Q1", maxMarks: 2, qNo: 1, section: "Section A" };
+        const qInfo = (this.options.getActiveQuestionInfo ? this.options.getActiveQuestionInfo() : null) || { label: "Q1", maxMarks: 2, qNo: 1, section: "Section A", canSkip: false };
         const qMax = Number(qInfo.maxMarks) || 2;
         const qLabel = qInfo.label || "Q1";
         const secName = qInfo.section || "";
+        const canSkip = Boolean(qInfo.canSkip);
 
         // Dynamic nodes adapted to question ceiling (e.g. 7M, 12M, 15M)
-        const radialOptions = this.getDynamicRadialOptions(qMax);
+        const radialOptions = this.getDynamicRadialOptions(qMax, canSkip);
 
         const container = document.createElement("div");
         container.className = "gta-radial-container";
@@ -1810,11 +1813,13 @@ class CanvasEngine {
                 </div>
                 <button type="button" class="btn-radial-close" id="btn-radial-dismiss" title="Cancel">×</button>
             </div>
-            <div class="radial-bottom-actions">
-                <button type="button" class="btn-radial-bottom-skip" id="btn-radial-bottom-skip" title="Mark this question as Skipped / Optional Choice [S]">
-                    <span>⏭️</span> Skip Question (S)
-                </button>
-            </div>
+            ${canSkip ? `
+                <div class="radial-bottom-actions">
+                    <button type="button" class="btn-radial-bottom-skip" id="btn-radial-bottom-skip" title="Mark this question as Skipped / Optional Choice [S]">
+                        <span>⏭️</span> Skip Question (S)${qInfo.remainingSkips !== undefined && qInfo.remainingSkips > 0 ? ` (${qInfo.remainingSkips} left)` : ''}
+                    </button>
+                </div>
+            ` : ''}
         `;
 
         const backdrop = document.createElement("div");

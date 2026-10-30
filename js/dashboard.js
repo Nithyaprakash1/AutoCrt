@@ -39,6 +39,102 @@ class DashboardManager {
         this.viewMode = "papers"; // Default to direct papers view with filters so teacher papers are never hidden
     }
 
+    getGradeLevel(className) {
+        const str = String(className || "").toLowerCase();
+        if ((/\b10\b|\b10th\b|\bx\b/i.test(str) || str.includes("class 10") || str.includes("grade 10") || str.includes("std 10")) && !(/\b12\b|\b12th\b|\bxii\b/i.test(str))) {
+            return 10;
+        }
+        if (/\b12\b|\b12th\b|\bxii\b/i.test(str) || str.includes("class 12") || str.includes("grade 12") || str.includes("std 12")) {
+            return 12;
+        }
+        if (/\b11\b|\b11th\b|\bxi\b/i.test(str) || str.includes("class 11") || str.includes("grade 11") || str.includes("std 11")) {
+            return 11;
+        }
+        const num = parseInt(str.match(/\d+/)?.[0] || "0", 10);
+        return num || 99;
+    }
+
+    getSectionLetter(className) {
+        const str = String(className || "").toUpperCase().trim();
+        const m = str.match(/[-_\s]([A-Z])(?:\b|$)/) || str.match(/\b([A-Z])$/);
+        return m ? m[1] : "Z";
+    }
+
+    renderBatchCardHtml(b) {
+        const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
+        const isCompleted = b.uncorrected === 0 && b.total > 0;
+        const isSharedTarget = Boolean(this.highlightBatchKey && (
+            b.key.toLowerCase().trim() === this.highlightBatchKey.toLowerCase().trim() ||
+            this.highlightBatchKey.toLowerCase().trim().includes(b.key.toLowerCase().trim()) ||
+            (this.highlightBatchKey.toLowerCase().includes(b.className.toLowerCase()) && this.highlightBatchKey.toLowerCase().includes(b.templateName.toLowerCase()))
+        ));
+
+        return `
+            <div class="teacher-batch-card ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" style="cursor: pointer; ${isSharedTarget ? 'border: 2px solid #0071E3; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.22), 0 10px 28px rgba(0, 113, 227, 0.12);' : ''}">
+                <div class="batch-card-top-row">
+                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                        <span class="batch-class-badge">${b.className}</span>
+                        <span class="batch-subject-tag">${b.subject}</span>
+                        ${b.isNew ? `
+                            <span class="batch-new-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: linear-gradient(135deg, #10B981, #059669); color: #FFFFFF; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35); text-transform: uppercase;">
+                                ✨ NEW
+                            </span>
+                        ` : ''}
+                        ${isSharedTarget ? `
+                            <span class="batch-status-pill" style="background: rgba(0, 113, 227, 0.12); color: #0071E3; font-weight: 600; border: 1px solid rgba(0, 113, 227, 0.25);">Target</span>
+                        ` : ''}
+                    </div>
+                    <span class="batch-status-pill ${isCompleted ? 'status-completed' : (b.corrected > 0 ? 'status-in-progress' : 'status-pending')}">
+                        ${isCompleted ? '✓ Completed' : (b.corrected > 0 ? '◐ In Progress' : 'Pending')}
+                    </span>
+                </div>
+
+                <h4 class="batch-card-title">${b.templateName}</h4>
+
+                <div class="batch-card-meta">
+                    <div class="meta-item">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>${b.total} Papers</span>
+                    </div>
+                    <div class="meta-item">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        <span style="color: #059669; font-weight: 600;">${b.corrected} Corrected</span>
+                    </div>
+                    ${b.uncorrected > 0 ? `
+                        <div class="meta-item">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+                            <span style="color: #D97706; font-weight: 600;">${b.uncorrected} Left</span>
+                        </div>
+                    ` : ''}
+                </div>
+
+                <div class="batch-progress-bar-wrap">
+                    <div class="batch-progress-bar-fill" style="width: ${pct}%;"></div>
+                </div>
+
+                <div class="batch-actions-row">
+                    <button type="button" class="btn-batch-view" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" title="Open papers in this batch">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>View Papers (${b.total})</span>
+                    </button>
+                    <button type="button" class="btn-batch-start" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" title="Start correcting papers in this batch">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        <span>${isCompleted ? 'Review' : 'Start Marking'}</span>
+                    </button>
+                    ${b.subject && b.subject.toLowerCase().includes('tamil') ? `
+                        <button type="button" class="btn-batch-view btn-batch-test-me" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" style="border-color: #10B981; color: #059669; font-weight: 500;" title="Test correct a sample Tamil paper">
+                            ✍️ Test Me!
+                        </button>
+                    ` : ''}
+                    <button type="button" class="btn-batch-share btn-dash-batch-share" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" data-subject="${b.subject}" data-total="${b.total}" title="Share this batch via WhatsApp">
+                        ${(window.Icons && window.Icons.whatsapp) || ''}
+                        <span>Share</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
     async init() {
         if (!this.container) return;
         this.evaluations = await window.appStorage.getAllEvaluations(false, true);

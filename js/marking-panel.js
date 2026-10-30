@@ -295,11 +295,42 @@ class MarkingPanel {
         return this.questions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0);
     }
 
+    getSectionSkipStatus(sectionIdOrName) {
+        const secObj = this.sections.find(s => s.id === sectionIdOrName || s.name === sectionIdOrName || s.title === sectionIdOrName);
+        const secQuestions = this.questions.filter(x => secObj ? (x.sectionId === secObj.id || x.section === secObj.name || x.section === secObj.title) : true);
+        const total = secQuestions.length;
+        const reqCount = Number(secObj?.requiredCount || secObj?.answerCount || secQuestions[0]?.sectionRequiredCount || total) || total;
+        const maxSkips = Math.max(0, total - reqCount);
+        const skippedCount = secQuestions.filter(x => x.status === "skipped").length;
+        const remainingSkips = Math.max(0, maxSkips - skippedCount);
+
+        return {
+            total,
+            requiredCount: reqCount,
+            maxSkips,
+            skippedCount,
+            remainingSkips,
+            hasSkipsAvailable: remainingSkips > 0
+        };
+    }
+
+    canSkipQuestion(q) {
+        if (!q) return false;
+        if (q.status === "skipped") return true;
+        if (q.isChoice) return true;
+
+        const skipStatus = this.getSectionSkipStatus(q.sectionId || q.section);
+        return skipStatus.maxSkips > 0 && skipStatus.remainingSkips > 0;
+    }
+
     getSectionTotals() {
         return this.sections.map(sec => {
             const secQuestions = this.questions.filter(q => q.sectionId === sec.id || q.section === sec.name || q.section === sec.title);
             const reqCount = Number(sec.requiredCount || sec.answerCount || secQuestions[0]?.sectionRequiredCount || secQuestions.length) || secQuestions.length;
             const hasOptional = reqCount < secQuestions.length;
+            const maxSkips = Math.max(0, secQuestions.length - reqCount);
+            const skippedCount = secQuestions.filter(x => x.status === "skipped").length;
+            const remainingSkips = Math.max(0, maxSkips - skippedCount);
 
             const answered = secQuestions.filter(q => q.status !== "unmarked" && q.status !== "pending" && q.status !== "skipped");
             
@@ -317,6 +348,9 @@ class MarkingPanel {
                 title: sec.title,
                 requiredCount: reqCount,
                 hasOptionalChoice: hasOptional,
+                maxSkips,
+                skippedCount,
+                remainingSkips,
                 attemptedCount: answered.length,
                 obtainedMarks: Math.min(secMax, Math.round(obtained * 10) / 10),
                 maxMarks: secMax,
@@ -330,6 +364,8 @@ class MarkingPanel {
 
         const secTotals = this.getSectionTotals();
         const activeQ = this.questions[this.activeQuestionIndex] || this.questions[0];
+        const canSkipActive = this.canSkipQuestion(activeQ);
+        const isCurrentlySkipped = activeQ && activeQ.status === "skipped";
 
         this.container.innerHTML = `
             <div class="marking-panel-content">
@@ -453,8 +489,8 @@ class MarkingPanel {
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                             </span> Zero (0)
                         </button>
-                        <button type="button" class="quick-action-btn btn-quick-skip" id="btn-quick-skip" title="Mark Question as Skipped / Optional Choice [S]" style="background: rgba(100, 116, 139, 0.08); border-color: rgba(100, 116, 139, 0.25); color: #475569;">
-                            <span class="btn-icon">⏭️</span> Skip (S)
+                        <button type="button" class="quick-action-btn btn-quick-skip ${isCurrentlySkipped ? 'active' : ''}" id="btn-quick-skip" title="Mark Question as Skipped / Optional Choice [S]" style="background: ${isCurrentlySkipped ? '#64748B' : 'rgba(100, 116, 139, 0.08)'}; border-color: ${isCurrentlySkipped ? '#64748B' : 'rgba(100, 116, 139, 0.25)'}; color: ${isCurrentlySkipped ? '#FFFFFF' : '#475569'}; display: ${(canSkipActive || isCurrentlySkipped) ? 'inline-flex' : 'none'};">
+                            <span class="btn-icon">${isCurrentlySkipped ? '✓' : '⏭️'}</span> ${isCurrentlySkipped ? 'Skipped' : 'Skip (S)'}
                         </button>
                         <button type="button" class="quick-action-btn btn-quick-clear" id="btn-quick-clear" title="Clear / Delete mark for this question" style="background: rgba(220, 38, 38, 0.08); border-color: rgba(220, 38, 38, 0.25); color: #DC2626;">
                             <span class="btn-icon">
@@ -660,6 +696,33 @@ class MarkingPanel {
                 subqContainer.innerHTML = "";
             }
         }
+
+        // Update Skip button visibility and state for active question
+        const btnSkip = this.container.querySelector("#btn-quick-skip");
+        if (btnSkip) {
+            const canSkip = this.canSkipQuestion(q);
+            const isCurrentlySkipped = q.status === "skipped";
+            if (canSkip || isCurrentlySkipped) {
+                btnSkip.style.display = "inline-flex";
+                if (isCurrentlySkipped) {
+                    btnSkip.classList.add("active");
+                    btnSkip.style.background = "#64748B";
+                    btnSkip.style.borderColor = "#64748B";
+                    btnSkip.style.color = "#FFFFFF";
+                    btnSkip.innerHTML = `<span class="btn-icon">✓</span> Skipped`;
+                } else {
+                    btnSkip.classList.remove("active");
+                    btnSkip.style.background = "rgba(100, 116, 139, 0.08)";
+                    btnSkip.style.borderColor = "rgba(100, 116, 139, 0.25)";
+                    btnSkip.style.color = "#475569";
+                    const skipStatus = this.getSectionSkipStatus(q.sectionId || q.section);
+                    const badge = skipStatus.remainingSkips > 0 ? ` (${skipStatus.remainingSkips} left)` : '';
+                    btnSkip.innerHTML = `<span class="btn-icon">⏭️</span> Skip${badge} (S)`;
+                }
+            } else {
+                btnSkip.style.display = "none";
+            }
+        }
     }
 
     renderQuestionsList() {
@@ -734,9 +797,11 @@ class MarkingPanel {
                         <button type="button" class="q-mini-btn btn-mini-wrong ${(!isUnmarked && q.status === 'wrong') ? 'active' : ''}" data-action="wrong" data-index="${actualIdx}" title="Zero Mark">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                         </button>
-                        <button type="button" class="q-mini-btn btn-mini-skip ${isOptionalSkipped ? 'active' : ''}" data-action="skip" data-index="${actualIdx}" title="Skip Question / Optional Choice" style="color: ${isOptionalSkipped ? '#FFFFFF' : '#64748B'}; background: ${isOptionalSkipped ? '#64748B' : 'transparent'}; font-size: 10px; font-weight: 700; width: 34px;">
-                            SKIP
-                        </button>
+                        ${(isOptionalSkipped || this.canSkipQuestion(q)) ? `
+                            <button type="button" class="q-mini-btn btn-mini-skip ${isOptionalSkipped ? 'active' : ''}" data-action="skip" data-index="${actualIdx}" title="Skip Question / Optional Choice" style="color: ${isOptionalSkipped ? '#FFFFFF' : '#64748B'}; background: ${isOptionalSkipped ? '#64748B' : 'transparent'}; font-size: 10px; font-weight: 700; width: 34px;">
+                                SKIP
+                            </button>
+                        ` : ''}
                         <button type="button" class="q-mini-btn btn-mini-clear ${(isUnmarked && !isOptionalSkipped) ? 'disabled' : ''}" data-action="clear" data-index="${actualIdx}" title="Clear / Delete Mark" style="color: #DC2626;">
                             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
                         </button>
@@ -838,8 +903,11 @@ class MarkingPanel {
         const btnSkip = this.container.querySelector("#btn-quick-skip");
         if (btnSkip) {
             btnSkip.addEventListener("click", () => {
-                this.assignCurrentQuestionMark(0, "skipped");
-                this.nextQuestion();
+                const curQ = this.getActiveQuestion();
+                if (curQ && this.canSkipQuestion(curQ)) {
+                    this.assignCurrentQuestionMark(0, "skipped");
+                    this.nextQuestion();
+                }
             });
         }
 
@@ -955,7 +1023,9 @@ class MarkingPanel {
                     } else if (action === "wrong") {
                         this.assignQuestionMarkDirect(idx, 0, "wrong");
                     } else if (action === "skip") {
-                        this.assignQuestionMarkDirect(idx, 0, "skipped");
+                        if (this.canSkipQuestion(q)) {
+                            this.assignQuestionMarkDirect(idx, 0, "skipped");
+                        }
                     } else if (action === "clear") {
                         this.clearQuestionMark(idx);
                     }
