@@ -1544,9 +1544,9 @@ class DashboardManager {
                         window.app.showLoadingBox("Opening Answer Script...", `Opening ${targetPaper?.studentName || 'Student'}'s paper in ${batch.className}...`);
                     }
                     if (targetPaper && this.options.onOpenEvaluation) {
-                        this.options.onOpenEvaluation(targetPaper);
+                        this.options.onOpenEvaluation(targetPaper, batch.papers);
                     } else if (targetPaper && window.app) {
-                        window.app.openWorkspace(targetPaper);
+                        window.app.openWorkspace(targetPaper, batch.papers);
                     } else if (window.app) {
                         window.app.showToast("No papers found in this batch.", "warning");
                     }

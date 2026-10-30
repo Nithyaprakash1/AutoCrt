@@ -3260,7 +3260,7 @@ class AppController {
             activateSection("view-dashboard");
             this.dashboardManager = new DashboardManager(root, {
                 onStartNew: () => this.switchView("new-eval"),
-                onOpenEvaluation: (ev) => this.openWorkspace(ev),
+                onOpenEvaluation: (ev, queue = null) => this.openWorkspace(ev, queue),
                 onDownloadPDF: (ev) => this.downloadEvaluationPDF(ev),
                 onBulkDownloadPDF: (evals) => this.downloadBulkPDFs(evals),
                 onExportExcel: (evals) => this.exportEvaluationsAsExcel(evals)
@@ -3639,8 +3639,11 @@ class AppController {
         }
     }
 
-    async openWorkspace(evaluation) {
+    async openWorkspace(evaluation, batchQueue = null) {
         if (!evaluation) return;
+        if (Array.isArray(batchQueue) && batchQueue.length > 0) {
+            this.activeBatchQueue = batchQueue;
+        }
         this.closeCorrectionCompletedModal();
         this.updateFloatingSaveNextPill(false);
         this.showLoadingBox("Opening Answer Script...", `Loading ${evaluation.studentName || 'Student'}'s paper & correction tools...`);
@@ -5384,38 +5387,52 @@ class AppController {
 
     // --- Save & Next Student Navigation ---
 
-    getBatchKeyForEvaluation(e) {
-        if (!e) return "";
-        const rawCls = e.classLabel || e.className || e.class || "";
-        const cls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
-            ? window.appStorage.canonicalizeClassName(rawCls)
-            : rawCls;
-        const rawExamTitle = (e.examName || e.templateName || "Assessment").trim();
-        const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
-        return `${cls}:::${examTitle}`.toLowerCase().replace(/[^a-z0-9:]/g, '');
-    }
-
-    getSameExamPapers(curEval, allEvaluations) {
+    getSameTemplatePapers(curEval, allEvaluations) {
         if (!curEval || !Array.isArray(allEvaluations)) return [];
         const curId = String(curEval.id);
-        const targetBatchKey = this.getBatchKeyForEvaluation(curEval);
-        const curSubject = (curEval.subject || "").toLowerCase().trim();
 
-        // Filter strictly to papers that belong to THIS SAME EXAM and THIS SAME CLASS
+        const getCleanTpl = (e) => {
+            const raw = (e.templateName || e.examName || "").trim();
+            return raw.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+        };
+
+        const getCleanCls = (e) => {
+            const raw = e.classLabel || e.className || e.class || "";
+            const canon = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+                ? window.appStorage.canonicalizeClassName(raw)
+                : raw;
+            return canon.toLowerCase().replace(/[^a-z0-9]/g, '');
+        };
+
+        const targetTpl = getCleanTpl(curEval);
+        const targetTplId = curEval.templateId ? String(curEval.templateId).trim() : "";
+        const targetCls = getCleanCls(curEval);
+
+        // Filter strictly to papers sharing the exact same template
         const matching = allEvaluations.filter(e => {
             if (!e || !e.id) return false;
-            const eKey = this.getBatchKeyForEvaluation(e);
-            if (eKey !== targetBatchKey) return false;
 
-            if (curSubject && window.appStorage && typeof window.appStorage.isSubjectMatch === "function") {
-                if (!window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, curSubject)) {
-                    return false;
-                }
+            // 1. Template match: must share same templateId OR normalized template/exam name
+            const eTpl = getCleanTpl(e);
+            const eTplId = e.templateId ? String(e.templateId).trim() : "";
+
+            const isTplIdMatch = targetTplId && eTplId && targetTplId === eTplId;
+            const isTplNameMatch = targetTpl && eTpl && (targetTpl === eTpl || targetTpl.includes(eTpl) || eTpl.includes(targetTpl));
+
+            if (!isTplIdMatch && !isTplNameMatch && (targetTpl || eTpl)) {
+                return false;
             }
+
+            // 2. Class match: if both papers have class tags and they differ completely, don't mix classes
+            const eCls = getCleanCls(e);
+            if (targetCls && eCls && targetCls !== eCls && !targetCls.includes(eCls) && !eCls.includes(targetCls)) {
+                return false;
+            }
+
             return true;
         });
 
-        // Deduplicate multiple uploads for the exact same student inside this exam
+        // Deduplicate multiple uploads for the exact same student inside this template
         const studentMap = new Map();
         matching.forEach(e => {
             const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || 
@@ -5443,7 +5460,7 @@ class AppController {
         if (!this.activeEvaluation) return;
         const sName = this.activeEvaluation?.studentName || "student paper";
         const currentId = String(this.activeEvaluation?.id);
-        const curExamTitle = (this.activeEvaluation?.examName || this.activeEvaluation?.templateName || "Exam");
+        const curTemplateTitle = (this.activeEvaluation?.templateName || this.activeEvaluation?.examName || "Template");
 
         this.showActionProgressModal({
             title: "Saving Paper & Loading Next",
@@ -5456,48 +5473,78 @@ class AppController {
         this.updateActionProgressModal(35, "Saving current evaluation record...");
         await this.saveActiveEvaluation(true);
 
-        // 2. Scan queue for next paper strictly in THIS SAME EXAM
-        this.updateActionProgressModal(70, `Locating next student paper in ${curExamTitle}...`);
+        // 2. Scan queue for next paper strictly in THIS SAME TEMPLATE
+        this.updateActionProgressModal(70, `Locating next student paper in ${curTemplateTitle}...`);
         const allEvaluations = await window.appStorage.getAllEvaluations(false, true);
 
-        // Strictly get all papers belonging to this SAME EXAM & CLASS
-        const sameExamPapers = this.getSameExamPapers(this.activeEvaluation, allEvaluations);
-        const currentIdx = sameExamPapers.findIndex(e => String(e.id) === currentId);
+        // Obtain candidates in the SAME TEMPLATE
+        let sameTemplatePapers = [];
+
+        // If an active batch queue was passed from Uploaded Papers or Dashboard, use fresh copies of its papers
+        if (Array.isArray(this.activeBatchQueue) && this.activeBatchQueue.length > 0) {
+            const queueIds = new Set(this.activeBatchQueue.map(p => String(p.id)));
+            sameTemplatePapers = allEvaluations.filter(e => queueIds.has(String(e.id)));
+        }
+
+        // If activeBatchQueue is absent or empty, derive strictly using getSameTemplatePapers
+        if (!sameTemplatePapers || sameTemplatePapers.length <= 1) {
+            sameTemplatePapers = this.getSameTemplatePapers(this.activeEvaluation, allEvaluations);
+        }
+
+        // Deduplicate and sort
+        const studentMap = new Map();
+        sameTemplatePapers.forEach(e => {
+            const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || 
+                         (e.studentName ? String(e.studentName).trim().toLowerCase() : String(e.id));
+            if (!studentMap.has(sKey)) {
+                studentMap.set(sKey, e);
+            } else if (String(e.id) === currentId) {
+                studentMap.set(sKey, e);
+            }
+        });
+        sameTemplatePapers = Array.from(studentMap.values()).sort((a, b) => {
+            const rollA = parseInt((a.rollNo || "").replace(/\D/g, "")) || 0;
+            const rollB = parseInt((b.rollNo || "").replace(/\D/g, "")) || 0;
+            if (rollA !== rollB) return rollA - rollB;
+            return (a.studentName || "").localeCompare(b.studentName || "");
+        });
+
+        const currentIdx = sameTemplatePapers.findIndex(e => String(e.id) === currentId);
 
         let nextEval = null;
 
-        // Priority 1: Next uncorrected paper in this same exam AFTER current student
-        if (currentIdx >= 0 && currentIdx < sameExamPapers.length - 1) {
-            nextEval = sameExamPapers.slice(currentIdx + 1).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
+        // Priority 1: Next uncorrected paper in this same template AFTER current student
+        if (currentIdx >= 0 && currentIdx < sameTemplatePapers.length - 1) {
+            nextEval = sameTemplatePapers.slice(currentIdx + 1).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
         }
 
-        // Priority 2: Immediate next student paper in this same exam roster (sequential review)
-        if (!nextEval && currentIdx >= 0 && currentIdx < sameExamPapers.length - 1) {
-            nextEval = sameExamPapers[currentIdx + 1];
+        // Priority 2: Immediate next student paper in this same template roster (sequential review)
+        if (!nextEval && currentIdx >= 0 && currentIdx < sameTemplatePapers.length - 1) {
+            nextEval = sameTemplatePapers[currentIdx + 1];
         }
 
-        // Priority 3: If reached end of roster, check for any uncorrected papers earlier in this same exam (wrap-around)
+        // Priority 3: If reached end of roster, check for any uncorrected papers earlier in this same template (wrap-around)
         if (!nextEval && currentIdx > 0) {
-            nextEval = sameExamPapers.slice(0, currentIdx).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
+            nextEval = sameTemplatePapers.slice(0, currentIdx).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
         }
 
-        // --- CASE 1: All papers in THIS SAME EXAM are finished ---
+        // --- CASE 1: All papers in THIS SAME TEMPLATE are finished ---
         if (!nextEval || String(nextEval.id) === currentId) {
             this.checkAndSendSubjectCompletedNotification(this.activeEvaluation);
             this.setActionProgressModalSuccess({
-                title: "✓ Exam Evaluation Complete!",
-                subtitle: `All ${sameExamPapers.length} student paper${sameExamPapers.length === 1 ? '' : 's'} in "${curExamTitle}" have been evaluated.`,
+                title: "✓ Template Evaluation Complete!",
+                subtitle: `All ${sameTemplatePapers.length} student paper${sameTemplatePapers.length === 1 ? '' : 's'} in "${curTemplateTitle}" have been evaluated.`,
                 statusText: "Returning to Dashboard...",
                 delayMs: 1100,
                 onComplete: () => {
                     this.switchView("dashboard");
-                    this.showToast(`All papers in ${curExamTitle} evaluated! Returned to Dashboard.`, "success");
+                    this.showToast(`All papers in ${curTemplateTitle} evaluated! Returned to Dashboard.`, "success");
                 }
             });
             return;
         }
 
-        // --- CASE 2: Next paper in THIS SAME EXAM found -> Open it! ---
+        // --- CASE 2: Next paper in THIS SAME TEMPLATE found -> Open it! ---
         const nextName = nextEval.studentName || "Next Student";
         const fullEval = await window.appStorage.getEvaluationById(nextEval.id);
         const evalToOpen = fullEval || nextEval;
@@ -5522,8 +5569,8 @@ class AppController {
             statusText: "Rendering answer sheet pages...",
             delayMs: 350,
             onComplete: async () => {
-                await this.openWorkspace(evalToOpen);
-                this.showToast(`Loaded ${nextName}'s answer sheet.`, "success");
+                await this.openWorkspace(evalToOpen, sameTemplatePapers);
+                this.showToast(`Loaded ${nextName}'s answer sheet (${evalToOpen.templateName || evalToOpen.examName || 'Same Template'}).`, "success");
             }
         });
     }

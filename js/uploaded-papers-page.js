@@ -1006,7 +1006,11 @@ class UploadedPapersPageManager {
                     if (fresh) target = fresh;
                 }
                 if (target && window.app) {
-                    window.app.openWorkspace(target);
+                    const batches = this.computeBatches();
+                    const targetBatch = batches.find(b => b.papers.some(p => String(p.id) === String(id))) ||
+                                        (this.selectedBatchKey !== "all" ? batches.find(b => b.key === this.selectedBatchKey) : null);
+                    const queue = targetBatch ? targetBatch.papers : this.papers;
+                    window.app.openWorkspace(target, queue);
                 }
             });
         });
@@ -1081,7 +1085,10 @@ class UploadedPapersPageManager {
                 if (this.inspectingPaper && window.app) {
                     const p = this.inspectingPaper;
                     closeInspector();
-                    window.app.openWorkspace(p);
+                    const batches = this.computeBatches();
+                    const targetBatch = batches.find(b => b.papers.some(paper => String(paper.id) === String(p.id)));
+                    const queue = targetBatch ? targetBatch.papers : this.papers;
+                    window.app.openWorkspace(p, queue);
                 }
             });
         }
