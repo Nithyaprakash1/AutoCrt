@@ -1202,9 +1202,65 @@ class UploadPortalManager {
         `;
     }
 
+    // --- Existing Batches Lookup for Selected Subject ---
+    getExistingBatchesForSubject(subName) {
+        if (!subName || !window.appStorage) return [];
+        let allEvals = window.appStorage.memoryStore || [];
+        if (!allEvals || allEvals.length === 0) {
+            try {
+                const raw = localStorage.getItem("niprak_evaluations_summary") || localStorage.getItem("onespace_evaluations_summary");
+                if (raw) allEvals = JSON.parse(raw);
+            } catch (e) {}
+        }
+        if (!Array.isArray(allEvals)) return [];
+
+        const subEvals = allEvals.filter(e => e && window.appStorage.isSubjectMatch(e.subject, e.examName, subName, e.templateName));
+        if (subEvals.length === 0) return [];
+
+        const batchMap = new Map();
+        subEvals.forEach(e => {
+            const rawCls = e.classLabel || e.className || e.class || "Class 12-A";
+            const cls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+                ? window.appStorage.canonicalizeClassName(rawCls)
+                : rawCls;
+            const rawExamTitle = (e.examName || e.templateName || "Assessment").trim();
+            const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
+            const bKey = `${cls}:::${examTitle}`;
+            if (!batchMap.has(bKey)) {
+                batchMap.set(bKey, {
+                    key: bKey,
+                    className: cls,
+                    examName: examTitle,
+                    templateName: e.templateName || examTitle,
+                    templateId: e.templateId || "",
+                    examDate: e.examDate || "",
+                    maxMarks: e.maxMarks || 80,
+                    subject: e.subject || subName,
+                    paperCount: 0,
+                    completedCount: 0,
+                    studentMap: new Map(),
+                    samplePaper: e,
+                    papers: []
+                });
+            }
+            const b = batchMap.get(bKey);
+            const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || (e.studentName ? String(e.studentName).trim().toLowerCase() : String(e.id));
+            if (!b.studentMap.has(sKey)) {
+                b.studentMap.set(sKey, e);
+                b.paperCount++;
+                if (e.status === "Completed" || (Number(e.obtainedMarks) > 0)) b.completedCount++;
+                b.papers.push(e);
+            }
+        });
+
+        return Array.from(batchMap.values());
+    }
+
     // --- Step 2: Templates Grid ---
     renderStep2Templates() {
         if (!this.selectedSubject) return this.renderStep1Subjects();
+
+        const existingBatches = this.getExistingBatchesForSubject(this.selectedSubject.name);
 
         return `
             <div class="step-view-block animate-fade-in">
@@ -1217,7 +1273,7 @@ class UploadPortalManager {
                         <div class="step-header-intro" style="margin-bottom: 0;">
                             <span class="step-badge">Step 2 of 4 • ${this.selectedSubject.name}</span>
                             <h3 class="step-title">${this.selectedSubject.name} – Exam Templates</h3>
-                            <p class="step-desc">Select a template to upload data for, or click <strong>+ Create Template</strong> to build a new blueprint.</p>
+                            <p class="step-desc">Add papers to an existing exam batch, or choose a blueprint below to build a new exam.</p>
                         </div>
                     </div>
                     <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
@@ -1236,6 +1292,49 @@ class UploadPortalManager {
                         </button>
                     </div>
                 </div>
+
+                ${existingBatches.length > 0 ? `
+                    <!-- Existing Exam Batches for Selected Subject -->
+                    <div class="existing-batches-portal-section" style="margin-bottom: 28px; background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%); border: 1.5px solid #CBD5E1; border-radius: 16px; padding: 20px 24px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;">
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                <div style="width: 38px; height: 38px; border-radius: 10px; background: #E0F2FE; color: #0284C7; display: flex; align-items: center; justify-content: center;">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                                </div>
+                                <div>
+                                    <h4 style="margin: 0; font-size: 1.05rem; font-weight: 700; color: #0F172A;">Already Existing Exam Batches for ${this.selectedSubject.name}</h4>
+                                    <p style="margin: 3px 0 0; font-size: 0.84rem; color: #64748B;">You can add more answer sheets into an existing exam batch, or choose a blueprint below to create a brand new exam.</p>
+                                </div>
+                            </div>
+                            <span style="font-size: 0.82rem; font-weight: 600; color: #0284C7; background: #E0F2FE; padding: 4px 12px; border-radius: 20px;">${existingBatches.length} Existing Exam${existingBatches.length > 1 ? 's' : ''}</span>
+                        </div>
+
+                        <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 14px;">
+                            ${existingBatches.map((b, bIdx) => `
+                                <div class="existing-batch-card" style="background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 12px; padding: 16px; box-shadow: 0 2px 8px rgba(0,0,0,0.03); display: flex; flex-direction: column; justify-content: space-between;">
+                                    <div>
+                                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                                            <span style="font-size: 0.78rem; font-weight: 700; color: #1E293B; background: #F1F5F9; padding: 3px 8px; border-radius: 6px;">${b.className}</span>
+                                            <span style="font-size: 0.78rem; font-weight: 600; color: ${b.completedCount === b.paperCount ? '#16A34A' : '#D97706'};">
+                                                ${b.paperCount} Paper${b.paperCount > 1 ? 's' : ''} (${b.completedCount}/${b.paperCount} Done)
+                                            </span>
+                                        </div>
+                                        <h5 style="margin: 0 0 6px 0; font-size: 0.95rem; font-weight: 700; color: #0F172A; line-height: 1.3;">${b.examName}</h5>
+                                        <div style="font-size: 0.8rem; color: #64748B; margin-bottom: 12px;">Max Marks: <strong>${b.maxMarks}M</strong> ${b.examDate ? `• Date: ${b.examDate}` : ''}</div>
+                                    </div>
+                                    <button type="button" class="btn-portal-add-to-existing-batch" data-batch-key="${b.key}" data-batch-idx="${bIdx}" style="width: 100%; padding: 9px 14px; background: #007AFF; color: #FFFFFF; border: none; border-radius: 9px; font-size: 0.86rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; transition: background 0.15s ease;">
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                        Add Papers to This Exam
+                                    </button>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <h4 style="margin: 0; font-size: 0.95rem; font-weight: 700; color: #475569; text-transform: uppercase; letter-spacing: 0.05em;">Or Select Blueprint to Create New Exam</h4>
+                    </div>
+                ` : ''}
 
                 <div class="templates-grid">
                     ${(this.selectedSubject.templates || []).map(tpl => {
@@ -1735,6 +1834,28 @@ class UploadPortalManager {
                         </p>
                     </div>
                 </div>
+
+                ${this.isAddingToExisting ? `
+                    <!-- Adding to Existing Exam Notice Banner -->
+                    <div class="adding-existing-exam-banner" style="background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%); border: 1.5px solid #93C5FD; border-radius: 12px; padding: 14px 18px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; box-shadow: 0 2px 6px rgba(59, 130, 246, 0.08);">
+                        <div style="display: flex; align-items: center; gap: 12px;">
+                            <div style="width: 32px; height: 32px; border-radius: 8px; background: #3B82F6; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 16px;">
+                                ✓
+                            </div>
+                            <div>
+                                <strong style="color: #1E40AF; font-size: 0.95rem;">Mode: Adding Papers into Existing Exam Batch</strong>
+                                <p style="margin: 2px 0 0; font-size: 0.83rem; color: #1E3A8A;">
+                                    Target Exam: <strong>${this.existingBatchMeta?.examName || this.selectedTemplate?.name}</strong> • 
+                                    Class: <strong>${this.selectedClass?.label}</strong> (${(this.existingPapers && this.existingPapers.length) || (this.existingBatchMeta?.paperCount || 0)} papers already in batch).
+                                    <span style="color: #16A34A; font-weight: 600;">🔒 All existing marks & evaluations are preserved.</span>
+                                </p>
+                            </div>
+                        </div>
+                        <button type="button" id="btn-cancel-add-existing" style="padding: 7px 14px; background: #FFFFFF; color: #1E40AF; border: 1.5px solid #93C5FD; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+                            Switch to New Exam
+                        </button>
+                    </div>
+                ` : ''}
 
                 <!-- Class Roster & Bulk Student Name Import Toolbar -->
                 <div class="roster-toolbar-card">
@@ -3812,6 +3933,59 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 });
             }
 
+            // Add Papers to Existing Batch Button
+            this.container.querySelectorAll(".btn-portal-add-to-existing-batch").forEach(btn => {
+                btn.addEventListener("click", async (e) => {
+                    e.stopPropagation();
+                    const bIdx = parseInt(btn.getAttribute("data-batch-idx"), 10);
+                    const existingBatches = this.getExistingBatchesForSubject(this.selectedSubject?.name);
+                    const b = existingBatches[bIdx];
+                    if (!b) return;
+
+                    // Match or build class
+                    let matchedClass = this.classes.find(c => {
+                        const cNorm = String(c.label || c.name || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const bNorm = String(b.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                        return cNorm === bNorm || (cNorm && bNorm.includes(cNorm)) || (bNorm && cNorm.includes(bNorm));
+                    });
+                    if (!matchedClass) {
+                        matchedClass = {
+                            id: b.className.toLowerCase().replace(/[^a-z0-9]/g, '-'),
+                            label: b.className,
+                            name: b.className
+                        };
+                    }
+
+                    // Match or build template
+                    let matchedTpl = (this.selectedSubject?.templates || []).find(t => 
+                        (b.templateId && t.id === b.templateId) ||
+                        (t.name && b.templateName && t.name.toLowerCase() === b.templateName.toLowerCase()) ||
+                        (t.examName && b.examName && t.examName.toLowerCase() === b.examName.toLowerCase())
+                    );
+                    if (!matchedTpl) {
+                        matchedTpl = {
+                            id: b.templateId || `tpl-${Date.now()}`,
+                            name: b.templateName || b.examName,
+                            examName: b.examName,
+                            maxMarks: b.maxMarks || 80,
+                            sections: b.samplePaper?.sections || [],
+                            questions: b.samplePaper?.questions || []
+                        };
+                    }
+
+                    this.selectedClass = matchedClass;
+                    this.selectedTemplate = matchedTpl;
+                    this.examDate = b.examDate || new Date().toISOString().split("T")[0];
+                    this.isAddingToExisting = true;
+                    this.existingBatchMeta = b;
+
+                    await this.loadExistingClassPapers();
+                    this.currentStep = 4;
+                    this.updateStepView();
+                    if (window.app) window.app.showToast(`Selected existing exam "${b.examName}" (${b.className})`);
+                });
+            });
+
             // Template card selection
             this.container.querySelectorAll(".template-card").forEach(card => {
                 card.addEventListener("click", (e) => {
@@ -4037,9 +4211,26 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             // Back button
             const back3 = this.container.querySelector("#btn-back-to-step3");
             if (back3) back3.addEventListener("click", () => {
-                this.currentStep = 3;
+                if (this.isAddingToExisting) {
+                    this.isAddingToExisting = false;
+                    this.existingBatchMeta = null;
+                    this.currentStep = 2;
+                } else {
+                    this.currentStep = 3;
+                }
                 this.updateStepView();
             });
+
+            // Cancel Adding to Existing button
+            const btnCancelExisting = this.container.querySelector("#btn-cancel-add-existing");
+            if (btnCancelExisting) {
+                btnCancelExisting.addEventListener("click", () => {
+                    this.isAddingToExisting = false;
+                    this.existingBatchMeta = null;
+                    this.currentStep = 2;
+                    this.updateStepView();
+                });
+            }
 
                         // Demo CSV Template Download
             const btnDemoCsv = this.container.querySelector("#btn-download-demo-csv");
@@ -5182,6 +5373,19 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             const template = this.selectedTemplate || (subject.templates ? subject.templates[0] : null) || { name: "Physics Board Paper (33 Qs / 70 Marks)", maxMarks: 70, id: "phy-cbse-70" };
             const cls = this.selectedClass || (this.classes && this.classes[0]) || { name: "Class 12", section: "A", label: "Class 12-A" };
 
+            // Consistent Batch Metadata for all papers in this upload session
+            const batchExamDate = (this.container.querySelector("#inp-portal-exam-date") && this.container.querySelector("#inp-portal-exam-date").value)
+                || this.examDate
+                || (this.existingBatchMeta && this.existingBatchMeta.examDate)
+                || (this.existingPapers && this.existingPapers[0] && this.existingPapers[0].examDate)
+                || new Date().toISOString().split("T")[0];
+            const batchExamName = (this.existingBatchMeta && this.existingBatchMeta.examName) || template.examName || template.name;
+            const batchTemplateName = (this.existingBatchMeta && this.existingBatchMeta.templateName) || template.name;
+            const batchTemplateId = (this.existingBatchMeta && this.existingBatchMeta.templateId) || template.id;
+            const batchClass = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+                ? window.appStorage.canonicalizeClassName(cls.label || cls.name || "Class 12-A")
+                : (cls.label || cls.name || "Class 12-A");
+
             let publishedCount = 0;
             const total = readyItems.length;
 
@@ -5293,15 +5497,15 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     rawFile: item.file || null,
                     studentName: item.studentName || (existingMatch ? existingMatch.studentName : "Unnamed Student"),
                     rollNo: item.rollNo || (existingMatch ? existingMatch.rollNo : String(100 + publishedCount)),
-                    class: cls.label || cls.name || "Class 12-A",
-                    className: cls.label || cls.name || "Class 12-A",
+                    class: batchClass,
+                    className: batchClass,
                     section: cls.section || (cls.label && cls.label.includes("-") ? cls.label.split("-")[1] : "A"),
-                    classLabel: cls.label || (cls.section ? `${cls.name}-${cls.section}` : cls.name),
-                    subject: subject.name || "Political Science",
-                    examName: template.examName || template.name,
-                    templateName: template.name,
-                    templateId: template.id,
-                    examDate: (this.container.querySelector("#inp-portal-exam-date") && this.container.querySelector("#inp-portal-exam-date").value) || this.examDate || (existingMatch && existingMatch.examDate) || new Date().toISOString().split("T")[0],
+                    classLabel: batchClass,
+                    subject: subject.name || "English",
+                    examName: batchExamName,
+                    templateName: batchTemplateName,
+                    templateId: batchTemplateId,
+                    examDate: batchExamDate,
                     correctionDate: new Date().toISOString().split("T")[0],
                     maxMarks: template.maxMarks || 70,
                     obtainedMarks: existingMatch ? existingMatch.obtainedMarks : 0,
@@ -5373,10 +5577,10 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             } : null;
 
             this.setPublishDialogComplete(publishedCount, {
-                subjectName: subject?.name || "Physics",
-                className: cls?.label || cls?.name || "Class 12-A",
-                templateName: template?.name || "",
-                batchKey: `${cls?.label || cls?.name || "Class 12-A"}:::${template?.name || "Exam Blueprint"}`,
+                subjectName: subject?.name || "English",
+                className: batchClass,
+                templateName: batchTemplateName,
+                batchKey: `${batchClass}:::${batchExamName}`,
                 singleItem: singleItemInfo
             });
 

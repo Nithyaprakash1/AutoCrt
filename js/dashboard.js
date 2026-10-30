@@ -284,25 +284,16 @@ class DashboardManager {
                     if (!inBatch) return false;
                 } else {
                     // Fallback when this.batches is not yet computed
-                    const eCls = (e.classLabel || e.className || e.class || "Class 12-A").toLowerCase().trim();
-                    const examTitle = (e.examName || e.templateName || "Assessment").toLowerCase().trim();
-                    const dateStr = e.examDate ? ` (${e.examDate})`.toLowerCase().trim() : '';
-                    const eTplFull = `${examTitle}${dateStr}`.trim();
-                    const eBatchKey = `${eCls}:::${eTplFull}`;
+                    const rawCls = (e.classLabel || e.className || e.class || "Class 12-A");
+                    const eCls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+                        ? window.appStorage.canonicalizeClassName(rawCls).toLowerCase().trim()
+                        : rawCls.toLowerCase().trim();
+                    const examTitle = (e.examName || e.templateName || "Assessment").toLowerCase().trim().replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '');
+                    const eBatchKey = `${eCls}:::${examTitle}`;
 
                     if (eBatchKey === this.activeBatchKey.toLowerCase().trim()) {
                         // Exact batch key match
                     } else {
-                        // Strict Date Isolation: If active batch has a date, paper must have the exact same date!
-                        const targetDateMatch = targetTpl.match(/\((\d{4}-\d{2}-\d{2})\)/);
-                        const targetDate = targetDateMatch ? targetDateMatch[1] : null;
-                        if (targetDate) {
-                            if (!e.examDate || e.examDate !== targetDate) return false;
-                        } else if (e.examDate) {
-                            // Target batch has no date, but paper has a date -> do not cross-match
-                            return false;
-                        }
-
                         // Class check
                         const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
                         const eClsNorm = (e.class || e.className || e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -455,21 +446,25 @@ class DashboardManager {
 
         const batchMap = new Map();
         evalsForBatches.forEach(e => {
-            const cls = e.classLabel || e.className || e.class || "Class 12-A";
+            const rawCls = e.classLabel || e.className || e.class || "Class 12-A";
+            const cls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+                ? window.appStorage.canonicalizeClassName(rawCls)
+                : rawCls;
             const sub = e.subject || activePanelSubject || displaySubject;
-            const examTitle = e.examName || e.templateName || "Assessment";
-            const dateStr = e.examDate ? ` (${e.examDate})` : '';
-            const tpl = `${examTitle}${dateStr}`;
-            const batchKey = `${cls}:::${tpl}`;
+            const rawExamTitle = (e.examName || e.templateName || "Assessment").trim();
+            // Ignore minor date divergence in exam name so papers for the same exam never split into multiple cards
+            const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
+            const batchKey = `${cls}:::${examTitle}`;
             if (!batchMap.has(batchKey)) {
                 batchMap.set(batchKey, {
                     key: batchKey,
                     className: cls,
-                    templateName: tpl,
+                    templateName: examTitle,
                     examName: examTitle,
                     examDate: e.examDate || '',
                     subject: sub,
                     papers: [],
+                    studentMap: new Map(),
                     total: 0,
                     corrected: 0,
                     uncorrected: 0,
@@ -478,17 +473,32 @@ class DashboardManager {
                 });
             }
             const b = batchMap.get(batchKey);
-            b.papers.push(e);
-            b.total++;
-            const isCorr = this.isPaperCorrected(e);
-            if (isCorr) {
-                b.corrected++;
+            // Deduplicate exact duplicate uploads for the same student inside the batch, prioritizing graded copy with marks
+            const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || (e.studentName ? String(e.studentName).trim().toLowerCase() : String(e.id));
+            if (b.studentMap.has(sKey)) {
+                const existing = b.studentMap.get(sKey);
+                const existingScore = Number(existing.obtainedMarks) || 0;
+                const newScore = Number(e.obtainedMarks) || 0;
+                const existingIsDone = existing.status === 'Completed' || existingScore > 0;
+                const newIsDone = e.status === 'Completed' || newScore > 0;
+                if (!existingIsDone && newIsDone) {
+                    const idx = b.papers.findIndex(p => String(p.id) === String(existing.id));
+                    if (idx >= 0) b.papers[idx] = e;
+                    b.studentMap.set(sKey, e);
+                }
             } else {
-                b.uncorrected++;
-                if (!b.firstPendingPaper) b.firstPendingPaper = e;
+                b.studentMap.set(sKey, e);
+                b.papers.push(e);
             }
+            if (!b.examDate && e.examDate) b.examDate = e.examDate;
         });
-        this.batches = Array.from(batchMap.values());
+        this.batches = Array.from(batchMap.values()).map(b => {
+            b.total = b.papers.length;
+            b.corrected = b.papers.filter(p => this.isPaperCorrected(p)).length;
+            b.uncorrected = b.total - b.corrected;
+            b.firstPendingPaper = b.papers.find(p => !this.isPaperCorrected(p)) || null;
+            return b;
+        });
         if (activePanelSubject) {
             this.batches = this.batches.filter(b => window.appStorage.isSubjectMatch(b.subject, b.templateName, activePanelSubject, b.templateName));
         }

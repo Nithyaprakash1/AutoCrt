@@ -95,21 +95,25 @@ class UploadedPapersPageManager {
     computeBatches() {
         const batchMap = new Map();
         this.papers.forEach(p => {
-            const cls = p.classLabel || p.className || p.class || "Class 12-A";
+            const rawCls = p.classLabel || p.className || p.class || "Class 12-A";
+            const cls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+                ? window.appStorage.canonicalizeClassName(rawCls)
+                : rawCls;
             const sub = p.subject || "General";
-            const examTitle = p.examName || p.templateName || "Assessment";
-            const dateStr = p.examDate ? ` (${p.examDate})` : '';
-            const tpl = `${examTitle}${dateStr}`;
-            const batchKey = `${cls}:::${tpl}`;
+            const rawExamTitle = (p.examName || p.templateName || "Assessment").trim();
+            // Ignore minor date divergence in exam name so papers stay together in 1 card
+            const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
+            const batchKey = `${cls}:::${examTitle}`;
             if (!batchMap.has(batchKey)) {
                 batchMap.set(batchKey, {
                     key: batchKey,
                     className: cls,
-                    templateName: tpl,
+                    templateName: examTitle,
                     examName: examTitle,
                     examDate: p.examDate || '',
                     subject: sub,
                     papers: [],
+                    studentMap: new Map(),
                     total: 0,
                     completed: 0,
                     pending: 0,
@@ -119,22 +123,40 @@ class UploadedPapersPageManager {
                 });
             }
             const b = batchMap.get(batchKey);
-            b.papers.push(p);
-            b.total++;
-            if (p.status === "Completed") {
-                b.completed++;
+            // Deduplicate exact duplicate uploads for the same student inside the batch, prioritizing graded copy
+            const sKey = (p.rollNo ? String(p.rollNo).trim().toLowerCase() : '') || (p.studentName ? String(p.studentName).trim().toLowerCase() : String(p.id));
+            if (b.studentMap.has(sKey)) {
+                const existing = b.studentMap.get(sKey);
+                const existingScore = Number(existing.obtainedMarks) || 0;
+                const newScore = Number(p.obtainedMarks) || 0;
+                const existingIsDone = existing.status === 'Completed' || existingScore > 0;
+                const newIsDone = p.status === 'Completed' || newScore > 0;
+                if (!existingIsDone && newIsDone) {
+                    const idx = b.papers.findIndex(item => String(item.id) === String(existing.id));
+                    if (idx >= 0) b.papers[idx] = p;
+                    b.studentMap.set(sKey, p);
+                }
             } else {
-                b.pending++;
+                b.studentMap.set(sKey, p);
+                b.papers.push(p);
             }
-            const pg = p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1));
-            b.totalPages += pg;
-            if (window.appStorage && typeof window.appStorage.measurePaperBytesSync === "function") {
-                b.totalBytes += window.appStorage.measurePaperBytesSync(p);
-            } else {
-                b.totalBytes += (p.fileSizeBytes || (pg * 185 * 1024));
-            }
+            if (!b.examDate && p.examDate) b.examDate = p.examDate;
         });
-        return Array.from(batchMap.values());
+
+        return Array.from(batchMap.values()).map(b => {
+            b.total = b.papers.length;
+            b.completed = b.papers.filter(p => p.status === "Completed").length;
+            b.pending = b.total - b.completed;
+            b.totalPages = b.papers.reduce((sum, p) => sum + (p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1))), 0);
+            b.totalBytes = b.papers.reduce((sum, p) => {
+                if (window.appStorage && typeof window.appStorage.measurePaperBytesSync === "function") {
+                    return sum + window.appStorage.measurePaperBytesSync(p);
+                }
+                const pg = p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1));
+                return sum + (p.fileSizeBytes || (pg * 185 * 1024));
+            }, 0);
+            return b;
+        });
     }
 
     getFilteredBatches() {
@@ -200,11 +222,13 @@ class UploadedPapersPageManager {
             : (currentUser && currentUser.class && currentUser.class.toLowerCase() !== 'all classes' && currentUser.class.toLowerCase() !== 'all' ? [currentUser.class] : []);
 
         return this.papers.filter(p => {
-            const pCls = p.classLabel || p.className || p.class || "Class 12-A";
-            const examTitle = p.examName || p.templateName || "Assessment";
-            const dateStr = p.examDate ? ` (${p.examDate})` : '';
-            const pTpl = `${examTitle}${dateStr}`;
-            const pKey = `${pCls}:::${pTpl}`;
+            const rawCls = p.classLabel || p.className || p.class || "Class 12-A";
+            const pCls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+                ? window.appStorage.canonicalizeClassName(rawCls)
+                : rawCls;
+            const rawExamTitle = (p.examName || p.templateName || "Assessment").trim();
+            const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
+            const pKey = `${pCls}:::${examTitle}`;
 
             // Mandatory Teacher subject guard
             if (isTeacher && this.subjects.length > 0) {

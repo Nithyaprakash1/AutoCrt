@@ -557,6 +557,33 @@ class StorageService {
                     }
                 }
 
+                // Canonicalize Class Names: e.g. "10 A", "10-A", "10 B", "12 C", etc.
+                if (merged.class || merged.className || merged.classLabel) {
+                    const canonCls = this.canonicalizeClassName(merged.classLabel || merged.className || merged.class);
+                    merged.classLabel = canonCls;
+                    merged.className = canonCls;
+                    merged.class = canonCls;
+                }
+
+                // Canonicalize Subject Name: "10 English" -> "English"
+                if (merged.subject) {
+                    const sTrim = String(merged.subject).trim();
+                    if (sTrim.toLowerCase() === '10 english') {
+                        merged.subject = 'English';
+                    }
+                }
+
+                // Strip incorrect "Grade XII English" mistakenly forced on Class 10
+                const isGrade10 = String(merged.classLabel || merged.className || merged.class || '').includes('10');
+                if (isGrade10) {
+                    if (merged.examName && String(merged.examName).toLowerCase().includes('grade xii english')) {
+                        merged.examName = 'Grade 10 English Assessment 2026';
+                    }
+                    if (merged.templateName && String(merged.templateName).toLowerCase().includes('grade xii english')) {
+                        merged.templateName = 'Grade 10 English Assessment 2026';
+                    }
+                }
+
                 // Harmonize template and exam name if contradictory to the actual paper subject
                 if (merged.subject) {
                     const originalTpl = merged.templateName;
@@ -698,6 +725,45 @@ class StorageService {
                 sessionStorage.removeItem("niprak_last_uploaded_class");
             }
         } catch (e) {}
+    }
+
+    canonicalizeClassName(cls) {
+        if (!cls) return 'Class 12-A';
+        const str = String(cls).trim();
+        const norm = str.toLowerCase();
+        
+        let grade = '';
+        const numMatch = norm.match(/\b(10|11|12|9)(?:th|st|nd|rd)?\b/);
+        if (numMatch) {
+            grade = numMatch[1];
+        } else {
+            const romanMatch = norm.match(/\b(xii|xi|x|ix)\b/i);
+            if (romanMatch) {
+                const r = romanMatch[1].toLowerCase();
+                if (r === 'xii') grade = '12';
+                else if (r === 'xi') grade = '11';
+                else if (r === 'x') grade = '10';
+                else if (r === 'ix') grade = '9';
+            }
+        }
+        
+        let sec = '';
+        const cleanAfterGrade = norm.replace(/\b(class|grade|std|standard|sec|section|10th|11th|12th|9th|10|11|12|9|xii|xi|x|ix)\b/gi, '').replace(/[^a-z]/gi, '').trim();
+        if (cleanAfterGrade.length === 1 && cleanAfterGrade.toUpperCase() >= 'A' && cleanAfterGrade.toUpperCase() <= 'Z') {
+            sec = cleanAfterGrade.toUpperCase();
+        } else if (str.includes('-')) {
+            const p = str.split('-');
+            const cand = p[p.length - 1].trim().toUpperCase();
+            if (cand.length === 1 && cand >= 'A' && cand <= 'Z') sec = cand;
+        }
+
+        if (grade && sec) {
+            return `Class ${grade}-${sec}`;
+        }
+        if (grade) {
+            return `Class ${grade}`;
+        }
+        return str;
     }
 
     canonicalizeSubject(sub) {
@@ -2425,6 +2491,9 @@ class StorageService {
 }
 
 window.appStorage = new StorageService();
+window.canonicalizeClassName = function(cls) {
+    return window.appStorage ? window.appStorage.canonicalizeClassName(cls) : (cls || 'Class 12-A');
+};
 window.canonicalizeSubject = function(sub) {
     return window.appStorage ? window.appStorage.canonicalizeSubject(sub) : (sub || '').toLowerCase().trim();
 };

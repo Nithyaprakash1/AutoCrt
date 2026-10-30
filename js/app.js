@@ -333,6 +333,10 @@ class AppController {
 
             let restoredCount = 0;
             for (const ev of all) {
+                if (!ev) continue;
+                // Never mutate user-uploaded papers
+                if (ev.isUserUploaded) continue;
+
                 const subLower = (ev.subject || "").toLowerCase().trim();
                 const tplLower = (ev.templateName || "").toLowerCase().trim();
                 const examLower = (ev.examName || "").toLowerCase().trim();
@@ -400,7 +404,9 @@ class AppController {
                 }
                 // 3. English
                 else if (subLower.includes("english") || subLower.includes("eng")) {
-                    targetTpl = window.MockData?.englishGrade12ObjSubjTemplate || window.MockData?.englishTemplate;
+                    targetTpl = (clsLower.includes("10") || clsLower.includes("x"))
+                        ? null
+                        : (window.MockData?.englishGrade12ObjSubjTemplate || window.MockData?.englishTemplate);
                 }
                 // 4. Social Science
                 else if (subLower.includes("social")) {
@@ -610,6 +616,7 @@ class AppController {
 
             let updatedCount = 0;
             for (const ev of all) {
+                if (!ev || ev.isUserUploaded) continue;
                 const subLower = (ev.subject || "").toLowerCase();
                 const tplLower = (ev.templateName || "").toLowerCase();
                 const examLower = (ev.examName || "").toLowerCase();
@@ -698,6 +705,7 @@ class AppController {
 
             let updatedCount = 0;
             for (const ev of allEvals) {
+                if (!ev || ev.isUserUploaded) continue;
                 const subLower = (ev.subject || "").toLowerCase();
                 const tplLower = (ev.templateName || "").toLowerCase();
                 const examLower = (ev.examName || "").toLowerCase();
