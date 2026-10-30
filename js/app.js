@@ -3880,9 +3880,40 @@ class AppController {
                     obtEl.textContent = scoreSummary.obtainedMarks;
                 }
 
-                // Preserve all valid annotations and side marks across paper
-
+                // Keep companion side margin marks strictly synced on paper canvas
                 const activeQ = this.markingPanel?.getActiveQuestion();
+                if (this.canvasEngine && activeQ) {
+                    const qMarks = Number(activeQ.awardedMarks);
+                    if (activeQ.status === "correct" || activeQ.status === "partial" || activeQ.status === "wrong" || qMarks > 0) {
+                        let targetPageIdx = this.canvasEngine.currentPageIndex;
+                        let targetY = null;
+                        for (let pIdx = 0; pIdx < this.canvasEngine.pages.length; pIdx++) {
+                            const p = this.canvasEngine.pages[pIdx];
+                            const qAnn = (p.annotations || []).find(a => 
+                                this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(activeQ.qNo)
+                            );
+                            if (qAnn) {
+                                targetPageIdx = pIdx;
+                                targetY = qAnn.y;
+                                break;
+                            }
+                        }
+                        if (targetY === null) {
+                            const pagesCount = Math.max(1, this.canvasEngine.pages.length);
+                            const qIdx = this.markingPanel.activeQuestionIndex;
+                            const qPerPg = Math.ceil(this.markingPanel.questions.length / pagesCount);
+                            targetPageIdx = Math.min(pagesCount - 1, Math.floor(qIdx / qPerPg));
+                            targetY = Math.min(0.88, 0.14 + ((qIdx % qPerPg) * 0.08));
+                        }
+                        const markVal = (activeQ.status === "wrong") ? 0 : qMarks;
+                        this.canvasEngine.stampRightMarginMark(activeQ.qNo, markVal, targetY, 0.06, targetPageIdx);
+                        this.canvasEngine.renderOverlay();
+                    } else if (activeQ.status === "skipped" || activeQ.status === "unmarked") {
+                        this.canvasEngine.removeAnnotationsForQuestion(activeQ.qNo);
+                        this.canvasEngine.renderOverlay();
+                    }
+                }
+
                 if (activeQ) this.updateTopHud(activeQ);
 
                 this.updatePageTotalDisplay();
@@ -3929,19 +3960,49 @@ class AppController {
             );
             this.markingPanel.setEvaluationData(evaluation.questions || [], evaluation.maxMarks || 20, evaluation.feedback || "", evaluation.sections || []);
 
-            // Ensure every graded question has its side total question mark stamped on the paper
+            // Ensure every graded question has its side total question mark stamped on its proper page
             if (this.canvasEngine && Array.isArray(evaluation.questions)) {
                 let hasNewStamps = false;
+                const pagesCount = Math.max(1, this.canvasEngine.pages.length);
+                const qPerPg = Math.ceil(evaluation.questions.length / pagesCount);
+
                 evaluation.questions.forEach((q, qIdx) => {
                     const qMarks = Number(q.awardedMarks);
                     if (q.status === "correct" || q.status === "partial" || q.status === "wrong" || qMarks > 0) {
-                        const existingAnns = this.canvasEngine.getAnnotationsForQuestion(q.qNo);
-                        const hasMargin = existingAnns.some(a => a.type === "margin_mark" || a.type === "left_mark");
-                        if (!hasMargin) {
-                            const tickAnn = existingAnns.find(a => a.type === "tick" || a.type === "wrong" || a.type === "marks");
-                            const targetY = tickAnn ? tickAnn.y : Math.min(0.88, 0.12 + ((qIdx % 8) * 0.10));
+                        let foundMargin = false;
+                        let targetPageIdx = 0;
+                        let targetY = null;
+
+                        for (let pIdx = 0; pIdx < this.canvasEngine.pages.length; pIdx++) {
+                            const p = this.canvasEngine.pages[pIdx];
+                            const mAnn = (p.annotations || []).find(a => 
+                                (a.type === "margin_mark" || a.type === "left_mark") &&
+                                this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(q.qNo)
+                            );
+                            if (mAnn) {
+                                foundMargin = true;
+                                const markVal = (q.status === "wrong") ? 0 : (!isNaN(qMarks) ? qMarks : (q.maxMarks || 0));
+                                mAnn.marks = markVal;
+                                break;
+                            }
+                            const tickAnn = (p.annotations || []).find(a => 
+                                (a.type === "tick" || a.type === "wrong" || a.type === "marks") &&
+                                this.canvasEngine.normalizeQKey(a.qNo || a.qLabel) === this.canvasEngine.normalizeQKey(q.qNo)
+                            );
+                            if (tickAnn) {
+                                targetPageIdx = pIdx;
+                                targetY = tickAnn.y;
+                            }
+                        }
+
+                        if (!foundMargin) {
+                            if (targetY === null) {
+                                targetPageIdx = Math.min(pagesCount - 1, Math.floor(qIdx / qPerPg));
+                                const posOnPg = qIdx % qPerPg;
+                                targetY = Math.min(0.88, 0.14 + (posOnPg * 0.08));
+                            }
                             const markVal = (q.status === "wrong") ? 0 : (!isNaN(qMarks) ? qMarks : (q.maxMarks || 0));
-                            this.canvasEngine.stampRightMarginMark(q.qNo, markVal, targetY);
+                            this.canvasEngine.stampRightMarginMark(q.qNo, markVal, targetY, 0.06, targetPageIdx);
                             hasNewStamps = true;
                         }
                     }

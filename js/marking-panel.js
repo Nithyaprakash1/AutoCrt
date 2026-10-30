@@ -120,11 +120,11 @@ class MarkingPanel {
         const getSecMeta = (q, idx) => {
             const sName = q.section || q.sectionName || "";
             let sId = q.sectionId;
-            const match = sName.match(/Section\s+([A-Za-z])/i);
+            const match = sName.match(/Section\s+([A-Za-z0-9]+)/i);
             let letter = match ? match[1].toUpperCase() : null;
 
             if (!letter && sId && sId.startsWith("sec_")) {
-                letter = sId.replace("sec_", "").slice(0, 1).toUpperCase();
+                letter = sId.replace("sec_", "").toUpperCase();
             }
 
             if (!letter) {
@@ -132,6 +132,10 @@ class MarkingPanel {
                     if (idx < 2) letter = "A";
                     else if (idx < 6) letter = "B";
                     else letter = "C";
+                } else if ((questions || []).length === 10) {
+                    if (idx < 4) letter = "I";
+                    else if (idx < 8) letter = "II";
+                    else letter = "III";
                 } else {
                     // Infer from question sequence for standard 33 Q paper if needed
                     if (idx < 16) letter = "A";
@@ -359,9 +363,11 @@ class MarkingPanel {
             const secQuestions = this.questions.filter(q => {
                 if (q.sectionId && sec.id && q.sectionId.toLowerCase().trim() === sec.id.toLowerCase().trim()) return true;
                 if (q.section && sec.name && q.section.toLowerCase().trim() === sec.name.toLowerCase().trim()) return true;
-                if (q.section && sec.title && (q.section.toLowerCase().trim() === sec.title.toLowerCase().trim() || sec.title.toLowerCase().includes(q.section.toLowerCase().trim()))) return true;
-                if (sec.letter && (q.section || '').toUpperCase().includes(sec.letter.toUpperCase())) return true;
+                if (q.section && sec.title && q.section.toLowerCase().trim() === sec.title.toLowerCase().trim()) return true;
                 if (sec.qStartNo && sec.qEndNo && q.qNo >= sec.qStartNo && q.qNo <= sec.qEndNo) return true;
+                const qClean = (q.section || '').replace(/^section\s+/i, '').trim().toUpperCase();
+                const secClean = (sec.letter || sec.name || '').replace(/^section\s+/i, '').trim().toUpperCase();
+                if (qClean && secClean && qClean === secClean) return true;
                 return false;
             });
             const reqCount = Number(sec.requiredCount || sec.answerCount || secQuestions[0]?.sectionRequiredCount || secQuestions.length) || secQuestions.length;
@@ -934,7 +940,11 @@ class MarkingPanel {
         const btnCross = this.container.querySelector("#btn-quick-cross");
         if (btnCross) {
             btnCross.addEventListener("click", () => {
-                this.assignCurrentQuestionMark(0, "wrong");
+                if (this.options.onAwardZeroMarks) {
+                    this.options.onAwardZeroMarks(this.getActiveQuestion());
+                } else {
+                    this.assignCurrentQuestionMark(0, "wrong");
+                }
             });
         }
 
@@ -1378,41 +1388,24 @@ class MarkingPanel {
     }
 
     recalculate() {
-        if (this.sections && this.sections.length > 0) {
-            const secTotals = this.getSectionTotals();
+        // Direct sum of awarded marks on graded questions is the ultimate ground truth
+        const directSum = this.questions.reduce((sum, q) => {
+            if (q.status === "unmarked" || q.status === "pending" || q.status === "skipped") return sum;
+            return sum + (Number(q.awardedMarks) || 0);
+        }, 0);
+
+        const secTotals = this.getSectionTotals();
+        const anyHasOptional = secTotals.some(st => st.hasOptionalChoice);
+
+        if (anyHasOptional) {
             const secObt = secTotals.reduce((sum, st) => sum + (Number(st.obtainedMarks) || 0), 0);
-            const secMax = secTotals.reduce((sum, st) => sum + (Number(st.maxMarks) || 0), 0);
-
-            // Collect questions matched to any section
-            const matchedQNos = new Set();
-            this.sections.forEach(sec => {
-                this.questions.forEach(q => {
-                    const match = (q.sectionId && sec.id && q.sectionId.toLowerCase().trim() === sec.id.toLowerCase().trim()) ||
-                                  (q.section && sec.name && q.section.toLowerCase().trim() === sec.name.toLowerCase().trim()) ||
-                                  (q.section && sec.title && (q.section.toLowerCase().trim() === sec.title.toLowerCase().trim() || sec.title.toLowerCase().includes(q.section.toLowerCase().trim()))) ||
-                                  (sec.letter && (q.section || '').toUpperCase().includes(sec.letter.toUpperCase())) ||
-                                  (sec.qStartNo && sec.qEndNo && q.qNo >= sec.qStartNo && q.qNo <= sec.qEndNo);
-                    if (match) matchedQNos.add(q.qNo);
-                });
-            });
-
-            // Any questions not matched to a section are also counted
-            const unassigned = this.questions.filter(q => !matchedQNos.has(q.qNo));
-            const unassignedObt = unassigned.reduce((sum, q) => {
-                if (q.status === "unmarked" || q.status === "pending" || q.status === "skipped") return sum;
-                return sum + (Number(q.awardedMarks) || 0);
-            }, 0);
-
-            this.obtainedMarksTotal = secObt + unassignedObt;
-            this.maxMarksTotal = this.initialMaxMarks || (secMax + unassigned.reduce((s, q) => s + (Number(q.maxMarks) || 0), 0));
+            this.obtainedMarksTotal = Math.min(secObt, directSum);
         } else {
-            this.obtainedMarksTotal = this.questions.reduce((sum, q) => {
-                if (q.status === "unmarked" || q.status === "pending" || q.status === "skipped") return sum;
-                return sum + (Number(q.awardedMarks) || 0);
-            }, 0);
-            this.maxMarksTotal = this.initialMaxMarks || this.questions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0);
+            this.obtainedMarksTotal = directSum;
         }
+
         this.obtainedMarksTotal = Math.round(this.obtainedMarksTotal * 10) / 10;
+        this.maxMarksTotal = this.initialMaxMarks || this.questions.reduce((sum, q) => sum + (Number(q.maxMarks) || 0), 0);
 
         const pct = this.maxMarksTotal > 0 ? Math.round((this.obtainedMarksTotal / this.maxMarksTotal) * 100) : 0;
 
@@ -1430,8 +1423,6 @@ class MarkingPanel {
             else if (q.status === "wrong") wrong++;
             else if (q.status === "partial") partial++;
         });
-
-        const secTotals = this.getSectionTotals();
 
         // Update DOM if container exists
         if (this.container) {

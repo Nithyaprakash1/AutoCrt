@@ -1690,17 +1690,17 @@ class CanvasEngine {
         return opts;
     }
 
-    stampRightMarginMark(qNo, marks, yNorm = null, xNorm = null) {
-        const page = this.pages[this.currentPageIndex];
+    stampRightMarginMark(qNo, marks, yNorm = null, xNorm = null, targetPageIdx = null) {
+        const pIdxToUse = (targetPageIdx !== null && targetPageIdx !== undefined && targetPageIdx >= 0 && targetPageIdx < this.pages.length)
+            ? targetPageIdx
+            : this.currentPageIndex;
+        const page = this.pages[pIdxToUse];
         if (!page) return null;
 
         const w = page.origWidth || 1200;
         const markVal = marks !== undefined ? marks : "";
         const qLabel = qNo ? (String(qNo).toUpperCase().startsWith("Q") ? String(qNo) : `Q${qNo}`) : "";
-        const scoreText = qLabel ? `${qLabel}: ${markVal}M` : `${markVal}M`;
-        const markW = (scoreText.length * 8 + 14) / w;
-        const leftGap = 10 / w;
-        const defaultLeftX = leftGap + (markW / 2);
+        const defaultLeftX = 0.06;
 
         const y = (yNorm !== null && yNorm !== undefined)
             ? yNorm
@@ -1710,7 +1710,7 @@ class CanvasEngine {
 
         // Remove any existing margin marks for this question from other pages to prevent double counting
         this.pages.forEach((p, pIdx) => {
-            if (pIdx !== this.currentPageIndex && p.annotations) {
+            if (pIdx !== pIdxToUse && p.annotations) {
                 p.annotations = p.annotations.filter(a =>
                     !(a.type === "margin_mark" || a.type === "left_mark") ||
                     this.normalizeQKey(a.qNo || a.qLabel) !== targetKey
@@ -1718,14 +1718,18 @@ class CanvasEngine {
             }
         });
 
-        // Check if there is already a margin_mark or left_mark for this question on current page
-        const existingIdx = (page.annotations || []).findIndex(a => 
+        if (!Array.isArray(page.annotations)) {
+            page.annotations = [];
+        }
+
+        // Check if there is already a margin_mark or left_mark for this question on target page
+        const existingIdx = page.annotations.findIndex(a => 
             (a.type === "margin_mark" || a.type === "left_mark") && 
             this.normalizeQKey(a.qNo || a.qLabel) === targetKey
         );
         const newAnn = {
             id: existingIdx >= 0 ? page.annotations[existingIdx].id : ('ann_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6)),
-            pageIndex: this.currentPageIndex,
+            pageIndex: pIdxToUse,
             type: "margin_mark",
             qNo: qNo,
             qLabel: qNo ? (String(qNo).toUpperCase().startsWith("Q") ? String(qNo) : `Q${qNo}`) : "",
@@ -1740,19 +1744,29 @@ class CanvasEngine {
         if (existingIdx >= 0) {
             const oldAnn = page.annotations[existingIdx];
             page.annotations[existingIdx] = newAnn;
-            page.undoStack.push({ action: "modify", item: newAnn, oldState: oldAnn, newState: newAnn });
-            page.redoStack = [];
+            if (page.undoStack) {
+                page.undoStack.push({ action: "modify", item: newAnn, oldState: oldAnn, newState: newAnn });
+            }
+            if (page.redoStack) page.redoStack = [];
             this.notifyChange();
         } else {
-            this.addAnnotation(newAnn);
+            page.annotations.push(newAnn);
+            if (page.undoStack) {
+                page.undoStack.push({ action: "add", item: newAnn });
+            }
+            if (page.redoStack) page.redoStack = [];
+            this.notifyChange();
         }
-        this.renderOverlay();
+
+        if (pIdxToUse === this.currentPageIndex) {
+            this.renderOverlay();
+        }
         return newAnn;
     }
 
     // Stamp question marks label (alias for compatibility)
-    stampLeftMarginMark(qNo, marks, yNorm = null, xNorm = null) {
-        return this.stampRightMarginMark(qNo, marks, yNorm, xNorm);
+    stampLeftMarginMark(qNo, marks, yNorm = null, xNorm = null, targetPageIdx = null) {
+        return this.stampRightMarginMark(qNo, marks, yNorm, xNorm, targetPageIdx);
     }
 
     openRadialMarkingWheel(normPos, pixelPos) {
@@ -2784,9 +2798,9 @@ class CanvasEngine {
                 const bW = textMetrics.width + bPadX * 2;
                 const bH = numFontSize + bPadY * 2;
 
-                // Position on left margin: keep 10px gap from edge
-                const leftGap = 10 * effScale;
-                const markX = leftGap + (bW / 2);
+                // Position using stored ann.x normalized coordinate (default 0.06 for left margin)
+                const targetNormX = (ann.x !== undefined && ann.x !== null) ? ann.x : 0.06;
+                const markX = Math.max((bW / 2) + 6 * effScale, Math.min(canvasW - (bW / 2) - 6 * effScale, targetNormX * canvasW));
 
                 // Neat pill badge on left margin of paper sheet
                 ctx.shadowColor = "rgba(220, 38, 38, 0.14)";
