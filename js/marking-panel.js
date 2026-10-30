@@ -679,6 +679,11 @@ class MarkingPanel {
                         this.clearQuestionMark(this.activeQuestionIndex);
                     } else {
                         this.assignCurrentQuestionMark(val);
+                        if (curQ && val >= curQ.maxMarks) {
+                            setTimeout(() => {
+                                this.nextQuestion();
+                            }, 300);
+                        }
                     }
                 });
             });
@@ -903,6 +908,11 @@ class MarkingPanel {
                     this.clearQuestionMark(this.activeQuestionIndex);
                 } else {
                     this.assignCurrentQuestionMark(val);
+                    if (curQ && val >= curQ.maxMarks) {
+                        setTimeout(() => {
+                            this.nextQuestion();
+                        }, 300);
+                    }
                 }
             });
         });
@@ -1248,6 +1258,11 @@ class MarkingPanel {
             const current = Number(q.awardedMarks) || 0;
             const nextVal = Math.min(q.maxMarks, Math.round((current + stepVal) * 10) / 10);
             this.assignCurrentQuestionMark(nextVal);
+            if (nextVal >= q.maxMarks) {
+                setTimeout(() => {
+                    this.nextQuestion();
+                }, 300);
+            }
         }
     }
 

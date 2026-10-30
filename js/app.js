@@ -3471,11 +3471,22 @@ class AppController {
         this.updateTopHud(q);
         this.updatePageTotalDisplay();
 
-        // 5. User feedback
-        this.showToast(`[Full Marks] Awarded (${maxMarks}M) to Q${q.qNo}. Press Enter to calculate & advance.`);
-
+        // 5. User feedback & Auto-advance to next question automatically!
         this.hasUnsavedChanges = true;
         this.setAutosaveBadge("unsaved");
+
+        setTimeout(() => {
+            if (this.markingPanel) {
+                const moved = this.markingPanel.nextQuestion();
+                if (moved) {
+                    const nextQ = this.markingPanel.getActiveQuestion();
+                    if (nextQ) this.updateTopHud(nextQ);
+                    this.showToast(`[Full Marks] Awarded (${maxMarks}M) to Q${q.qNo}. Moved to ${nextQ.label || `Q${nextQ.qNo}`}.`);
+                } else {
+                    this.showToast(`[Full Marks] Awarded (${maxMarks}M) to Q${q.qNo} (Final question).`);
+                }
+            }
+        }, 300);
     }
 
     awardZeroMarks(targetQ = null, explicitPos = null) {
@@ -3570,8 +3581,16 @@ class AppController {
                         }
                         updated = true;
                     }
+                } else if (!hasScoreAnnotations && (q.status === "correct" || q.status === "partial" || q.status === "wrong")) {
+                    // All canvas marks/ticks/margin stamps have been removed! Reset question to unmarked.
+                    if (this.markingPanel) {
+                        this.markingPanel.assignQuestionMarkDirect(idx, 0, "unmarked");
+                    } else {
+                        q.awardedMarks = 0;
+                        q.status = "unmarked";
+                    }
+                    updated = true;
                 }
-                // Do NOT wipe out questions that were graded directly in marking panel or loaded from storage!
             });
         }
 
@@ -3871,7 +3890,42 @@ class AppController {
                     this.updateTopHud(activeQ);
                     this.updatePageTotalDisplay();
                     const markDesc = numVal === 0 ? "0 Marks" : `+${numVal} Mark`;
-                    this.showToast(`Placed ${markDesc} on paper (Q${activeQ.qNo}: ${runningScore}/${activeQ.maxMarks}M).`);
+
+                    // If full mark done, move to next question automatically!
+                    if (runningScore >= activeQ.maxMarks) {
+                        setTimeout(() => {
+                            if (this.markingPanel) {
+                                const moved = this.markingPanel.nextQuestion();
+                                if (moved) {
+                                    const nextQ = this.markingPanel.getActiveQuestion();
+                                    if (nextQ) this.updateTopHud(nextQ);
+                                    this.showToast(`Q${activeQ.qNo} Full Marks (${runningScore}/${activeQ.maxMarks}M). Moved to ${nextQ.label || `Q${nextQ.qNo}`}.`);
+                                } else {
+                                    this.showToast(`Q${activeQ.qNo} Full Marks (${runningScore}/${activeQ.maxMarks}M) [Final question].`);
+                                }
+                            }
+                        }, 300);
+                    } else {
+                        this.showToast(`Placed ${markDesc} on paper (Q${activeQ.qNo}: ${runningScore}/${activeQ.maxMarks}M).`);
+                    }
+                }
+            },
+            onQuestionAnnotationsDeleted: (qKey, rawQ) => {
+                if (this.markingPanel && Array.isArray(this.markingPanel.questions)) {
+                    const idx = this.markingPanel.questions.findIndex(q => 
+                        CanvasEngine.normalizeQKey(q.qNo) === qKey || 
+                        CanvasEngine.normalizeQKey(q.label) === qKey ||
+                        CanvasEngine.normalizeQKey(q.id) === qKey
+                    );
+                    if (idx >= 0) {
+                        this.markingPanel.assignQuestionMarkDirect(idx, 0, "unmarked");
+                        const activeQ = this.markingPanel.getActiveQuestion();
+                        if (activeQ) this.updateTopHud(activeQ);
+                        this.updatePageTotalDisplay();
+                        this.renderScorecardTable();
+                        const qObj = this.markingPanel.questions[idx];
+                        this.showToast(`Cleared mark, tick, and side margin stamp for Q${qObj?.qNo || ''}.`, "info");
+                    }
                 }
             },
             onAnnotationSelected: (ann) => {

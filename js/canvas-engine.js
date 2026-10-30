@@ -1214,59 +1214,18 @@ class CanvasEngine {
 
         const toDelete = [ann];
 
-        // If it's a margin mark, deleting it means clearing this question's marks from the paper
-        if (qKey && (ann.type === "margin_mark" || ann.type === "left_mark")) {
+        // When deleting any score annotation (mark, tick, wrong, or side margin mark):
+        // Automatically delete all companion stamps for this question: the mark, the side mark allocated, and the tick!
+        if (qKey && isScoreType) {
             this.pages.forEach(p => {
                 (p.annotations || []).forEach(a => {
-                    if (a !== ann && (a.type === "tick" || a.type === "marks" || a.type === "wrong" || a.type === "margin_mark" || a.type === "left_mark")) {
+                    if (a.type === "tick" || a.type === "marks" || a.type === "wrong" || a.type === "margin_mark" || a.type === "left_mark") {
                         if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
                             if (!toDelete.includes(a)) toDelete.push(a);
                         }
                     }
                 });
             });
-        } else if (qKey && (ann.type === "tick" || ann.type === "marks" || ann.type === "wrong")) {
-            // A tick or mark stamp was deleted.
-            // Check if any other mark stamps remain for this question across all pages
-            let otherMarksCount = 0;
-            let remainingSum = 0;
-            this.pages.forEach(p => {
-                (p.annotations || []).forEach(a => {
-                    if (a !== ann && (a.type === "tick" || a.type === "marks" || a.type === "wrong")) {
-                        if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
-                            otherMarksCount++;
-                            const raw = a.marks !== undefined && a.marks !== null ? String(a.marks) : String(a.text || "");
-                            const v = parseFloat(raw.replace(/^\+/, "").trim());
-                            if (!isNaN(v)) remainingSum = Math.round((remainingSum + v) * 10) / 10;
-                        }
-                    }
-                });
-            });
-
-            // If no other marks remain for this question, also clean up any margin mark for this question
-            if (otherMarksCount === 0) {
-                this.pages.forEach(p => {
-                    (p.annotations || []).forEach(a => {
-                        if (a !== ann && (a.type === "margin_mark" || a.type === "left_mark")) {
-                            if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
-                                if (!toDelete.includes(a)) toDelete.push(a);
-                            }
-                        }
-                    });
-                });
-            } else {
-                // Other marks still remain: update any companion margin mark to reflect the new remainingSum
-                this.pages.forEach(p => {
-                    (p.annotations || []).forEach(a => {
-                        if (a !== ann && (a.type === "margin_mark" || a.type === "left_mark")) {
-                            if (this.normalizeQKey(a.qNo || a.qLabel) === qKey) {
-                                a.marks = remainingSum;
-                                a.text = `${remainingSum}M`;
-                            }
-                        }
-                    });
-                });
-            }
         }
 
         // Remove all items in toDelete from their respective pages
@@ -1288,6 +1247,12 @@ class CanvasEngine {
 
         this.deselectAnnotation();
         this.renderOverlay();
+
+        // Notify app controller that question stamps were deleted so marking panel & HUD reset to unmarked
+        if (qKey && typeof this.options.onQuestionAnnotationsDeleted === "function") {
+            this.options.onQuestionAnnotationsDeleted(qKey, rawQ);
+        }
+
         this.notifyChange();
     }
 
