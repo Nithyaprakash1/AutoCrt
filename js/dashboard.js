@@ -63,71 +63,73 @@ class DashboardManager {
     renderBatchCardHtml(b) {
         const pct = b.total > 0 ? Math.round((b.corrected / b.total) * 100) : 0;
         const isCompleted = b.uncorrected === 0 && b.total > 0;
+        const isInProgress = b.corrected > 0 && b.uncorrected > 0;
         const isSharedTarget = Boolean(this.highlightBatchKey && (
             b.key.toLowerCase().trim() === this.highlightBatchKey.toLowerCase().trim() ||
             this.highlightBatchKey.toLowerCase().trim().includes(b.key.toLowerCase().trim()) ||
             (this.highlightBatchKey.toLowerCase().includes(b.className.toLowerCase()) && this.highlightBatchKey.toLowerCase().includes(b.templateName.toLowerCase()))
         ));
 
+        const startButtonText = isCompleted ? 'Review' : 'Start Marking';
+
         return `
-            <div class="teacher-batch-card ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" style="cursor: pointer; ${isSharedTarget ? 'border: 2px solid #0071E3; box-shadow: 0 0 0 3px rgba(0, 113, 227, 0.22), 0 10px 28px rgba(0, 113, 227, 0.12);' : ''}">
+            <div class="teacher-batch-card ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}">
                 <div class="batch-card-top-row">
-                    <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+                    <div class="batch-card-badges-left">
                         <span class="batch-class-badge">${b.className}</span>
                         <span class="batch-subject-tag">${b.subject}</span>
                         ${b.isNew ? `
-                            <span class="batch-new-badge" style="display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 999px; background: linear-gradient(135deg, #10B981, #059669); color: #FFFFFF; font-size: 0.68rem; font-weight: 700; letter-spacing: 0.03em; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35); text-transform: uppercase;">
-                                ✨ NEW
-                            </span>
+                            <span class="batch-new-badge">✨ NEW</span>
                         ` : ''}
                         ${isSharedTarget ? `
-                            <span class="batch-status-pill" style="background: rgba(0, 113, 227, 0.12); color: #0071E3; font-weight: 600; border: 1px solid rgba(0, 113, 227, 0.25);">Target</span>
+                            <span class="batch-target-pill">Target</span>
                         ` : ''}
                     </div>
-                    <span class="batch-status-pill ${isCompleted ? 'status-completed' : (b.corrected > 0 ? 'status-in-progress' : 'status-pending')}">
-                        ${isCompleted ? '✓ Completed' : (b.corrected > 0 ? '◐ In Progress' : 'Pending')}
-                    </span>
+                    <div class="batch-card-status-right">
+                        <span class="batch-status-pill ${isCompleted ? 'status-completed' : (isInProgress ? 'status-in-progress' : 'status-pending')}">
+                            ${isCompleted ? '● Completed' : (isInProgress ? '◐ In Progress' : '○ Pending')}
+                        </span>
+                        <button type="button" class="btn-batch-more" title="More options" aria-label="More options">⋮</button>
+                    </div>
                 </div>
 
-                <h4 class="batch-card-title">${b.templateName}</h4>
+                <div class="batch-card-mid-section">
+                    <h4 class="batch-card-title" title="${b.templateName}">${b.templateName}</h4>
 
-                <div class="batch-card-meta">
-                    <div class="meta-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                        <span>${b.total} Papers</span>
-                    </div>
-                    <div class="meta-item">
-                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
-                        <span style="color: #059669; font-weight: 600;">${b.corrected} Corrected</span>
-                    </div>
-                    ${b.uncorrected > 0 ? `
+                    <div class="batch-card-meta">
                         <div class="meta-item">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-                            <span style="color: #D97706; font-weight: 600;">${b.uncorrected} Left</span>
+                            <span class="meta-bullet bullet-total">○</span>
+                            <span class="meta-count">${b.total} Papers</span>
                         </div>
-                    ` : ''}
-                </div>
-
-                <div class="batch-progress-bar-wrap">
-                    <div class="batch-progress-bar-fill" style="width: ${pct}%;"></div>
+                        <div class="meta-item">
+                            <span class="meta-bullet bullet-corrected">●</span>
+                            <span class="meta-count text-green">${b.corrected} Corrected</span>
+                        </div>
+                        ${b.uncorrected > 0 ? `
+                            <div class="meta-item">
+                                <span class="meta-bullet bullet-pending">●</span>
+                                <span class="meta-count text-amber">${b.uncorrected} Pending</span>
+                            </div>
+                        ` : ''}
+                    </div>
                 </div>
 
                 <div class="batch-actions-row">
                     <button type="button" class="btn-batch-view" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" title="Open papers in this batch">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
                         <span>View Papers (${b.total})</span>
                     </button>
                     <button type="button" class="btn-batch-start" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" title="Start correcting papers in this batch">
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polygon points="5 3 19 12 5 21 5 3"/></svg>
-                        <span>${isCompleted ? 'Review' : 'Start Marking'}</span>
+                        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                        <span>${startButtonText}</span>
                     </button>
                     ${b.subject && b.subject.toLowerCase().includes('tamil') ? `
-                        <button type="button" class="btn-batch-view btn-batch-test-me" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" style="border-color: #10B981; color: #059669; font-weight: 500;" title="Test correct a sample Tamil paper">
+                        <button type="button" class="btn-batch-view btn-batch-test-me" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" title="Test correct a sample Tamil paper">
                             ✍️ Test Me!
                         </button>
                     ` : ''}
                     <button type="button" class="btn-batch-share btn-dash-batch-share" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}" data-subject="${b.subject}" data-total="${b.total}" title="Share this batch via WhatsApp">
-                        ${(window.Icons && window.Icons.whatsapp) || ''}
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/><polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/></svg>
                         <span>Share</span>
                     </button>
                 </div>
@@ -732,107 +734,129 @@ class DashboardManager {
         if (!this.activeBatchKey) {
             this.container.innerHTML = `
                 <div class="dashboard-page">
-                    <!-- Welcome Banner with Dynamic Greeting, Subject Title & Quick Start Action -->
+                    <!-- Dashboard Header Banner -->
                     <div class="dashboard-welcome-banner">
-                        <div class="welcome-text-col">
-                            <span class="welcome-greeting">${greetingStr}, ${displayName}! 👋</span>
-                            <h2 class="welcome-headline">${welcomeHeadline}</h2>
-                            <p class="welcome-sub">Streamlined examination batches. Click into any class card below to view its student answer sheets, evaluate marks, and export results.</p>
-                            <div class="welcome-allocation-tags" style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; align-items: center;">
-                                <div style="display: inline-flex; align-items: center; gap: 5px; background: rgba(0, 113, 227, 0.08); border: 1px solid rgba(0, 113, 227, 0.2); padding: 3px 10px; border-radius: 6px;">
-                                    <span style="font-size: 0.72rem; font-weight: 700; color: #0071E3; text-transform: uppercase; letter-spacing: 0.5px;">Authorized Subjects:</span>
-                                    <span style="font-size: 0.8rem; font-weight: 600; color: #1E293B;">${activeSubjectsList.length > 0 ? activeSubjectsList.join(', ') : 'All Subjects'}</span>
-                                </div>
-                                <div style="display: inline-flex; align-items: center; gap: 5px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.2); padding: 3px 10px; border-radius: 6px;">
-                                    <span style="font-size: 0.72rem; font-weight: 700; color: #059669; text-transform: uppercase; letter-spacing: 0.5px;">Assigned Classes:</span>
-                                    <span style="font-size: 0.8rem; font-weight: 600; color: #1E293B;">${activeClassesList.length > 0 ? activeClassesList.join(', ') : 'All Classes'}</span>
+                        <div class="welcome-header-left">
+                            <div class="welcome-avatar-icon">
+                                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#12B981" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                                    <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+                                </svg>
+                            </div>
+                            <div class="welcome-text-col">
+                                <span class="welcome-greeting">${greetingStr}, ${displayName}! 👋</span>
+                                <h2 class="welcome-headline">${welcomeHeadline}</h2>
+                                <p class="welcome-sub">Share, review and manage question papers, classes, and student evaluations. Class-wise breakdown, subject-wise progress, and more — all in one place.</p>
+                                <div class="welcome-allocation-tags">
+                                    <div class="allocation-chip chip-subjects">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#0878F9" stroke-width="2.2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+                                        <span class="chip-badge-label text-blue">AUTHORIZED SUBJECTS</span>
+                                        <span class="chip-badge-val">${activeSubjectsList.length > 0 ? activeSubjectsList.join(', ') : 'All Subjects'}</span>
+                                    </div>
+                                    <div class="allocation-chip chip-classes">
+                                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2.2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                                        <span class="chip-badge-label text-green">ASSIGNED CLASSES</span>
+                                        <span class="chip-badge-val">${activeClassesList.length > 0 ? activeClassesList.slice(0, 3).join(', ') + (activeClassesList.length > 3 ? ` + ${activeClassesList.length - 3}` : '') : 'All Classes'}</span>
+                                        <span class="chip-chevron">▾</span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
-                        <div class="welcome-action-col" style="display: flex; gap: 10px; flex-wrap: wrap; align-items: center;">
+                        <div class="welcome-action-col">
                             ${isTamilDesk ? `
-                                <button type="button" class="btn-primary btn-large btn-tamil-test-me" id="dash-btn-test-me" style="background: linear-gradient(135deg, #10B981, #059669); border-color: #059669; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.35); font-weight: 500; display: inline-flex; align-items: center; gap: 8px;" title="Test correct a sample Tamil paper with the 40-mark blueprint">
+                                <button type="button" class="btn-primary btn-large btn-tamil-test-me" id="dash-btn-test-me" title="Test correct a sample Tamil paper with the 40-mark blueprint">
                                     <span class="btn-icon">✍️</span> Test Me!
                                 </button>
                             ` : ''}
-                            <button type="button" class="btn-secondary btn-large btn-clean-duplicates" id="dash-btn-clean-duplicates-top" title="Scan and safely remove duplicate student papers, keeping original copies" style="background: #FFFFFF; border: 1.5px solid #CBD5E1; color: #334155; font-size: 0.85rem; font-weight: 500; height: 42px; padding: 0 16px; border-radius: 999px; display: inline-flex; align-items: center; gap: 7px; cursor: pointer; box-shadow: 0 2px 6px rgba(0,0,0,0.04); transition: all 0.15s ease;">
-                                <span class="btn-icon" style="font-size: 0.95rem;">🧹</span> Clean Duplicates
+                            <button type="button" class="btn-secondary btn-clean-duplicates" id="dash-btn-clean-duplicates-top" title="Scan and safely remove duplicate student papers, keeping original copies">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+                                <span>Clean Duplicates</span>
                             </button>
-                            <button type="button" class="btn-primary btn-large" id="dash-btn-start-correction" title="Open first pending paper to evaluate">
-                                <span class="btn-icon">${ic.lightning || '⚡'}</span> Start Correction
+                            <button type="button" class="btn-primary btn-start-correction" id="dash-btn-start-correction" title="Open first pending paper to evaluate">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                                <span>Start Correction</span>
                             </button>
                         </div>
                     </div>
 
-                    <!-- Live Counter Labels & KPI Metric Cards -->
+                    <!-- Statistics Cards (4 Horizontal Cards) -->
                     <div class="kpi-grid">
                         <div class="kpi-card kpi-uncorrected-highlight" id="card-tab-uncorrected" title="Uncorrected Papers">
                             <div class="kpi-card-header">
-                                <div class="kpi-icon-wrap bg-amber-light">
-                                    <span class="kpi-icon text-amber">${ic.pending || ''}</span>
+                                <div class="kpi-icon-wrap kpi-icon-pending">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F97316" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
                                 </div>
-                                <span class="counter-badge counter-badge-new" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(217, 119, 6, 0.12); color: #D97706; font-weight: 700; white-space: nowrap;">${uncorrectedCount} UNCORRECTED</span>
+                                <span class="counter-badge badge-pending">${uncorrectedCount} UNCORRECTED ›</span>
                             </div>
                             <div class="kpi-card-body">
-                                <span class="kpi-value text-amber">${uncorrectedCount}</span>
-                                <span class="kpi-title">PENDING EVALUATION</span>
+                                <span class="kpi-value">${uncorrectedCount}</span>
+                                <span class="kpi-title">PAPERS FOR EVALUATION</span>
                             </div>
+                            <span class="kpi-card-chevron">›</span>
                         </div>
 
                         <div class="kpi-card kpi-corrected-highlight" id="card-tab-corrected" title="Corrected Papers">
                             <div class="kpi-card-header">
-                                <div class="kpi-icon-wrap bg-green-light">
-                                    <span class="kpi-icon text-green">${ic.completed || ''}</span>
+                                <div class="kpi-icon-wrap kpi-icon-graded">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#12B981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
                                 </div>
-                                <span class="counter-badge counter-badge-done" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(52, 199, 89, 0.12); color: #34C759; font-weight: 700; white-space: nowrap;">${correctedCount} GRADED</span>
+                                <span class="counter-badge badge-graded">${correctedCount} GRADED</span>
                             </div>
                             <div class="kpi-card-body">
-                                <span class="kpi-value text-green">${correctedCount}</span>
+                                <span class="kpi-value">${correctedCount}</span>
                                 <span class="kpi-title">CORRECTED PAPERS</span>
                             </div>
+                            <span class="kpi-card-chevron">›</span>
                         </div>
 
                         <div class="kpi-card" id="card-tab-all" title="Total Papers">
                             <div class="kpi-card-header">
-                                <div class="kpi-icon-wrap bg-blue-light">
-                                    <span class="kpi-icon text-blue">${ic.evaluations || ''}</span>
+                                <div class="kpi-icon-wrap kpi-icon-total">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0878F9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                                 </div>
-                                <span class="counter-badge" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(0, 122, 255, 0.12); color: #007AFF; font-weight: 700; white-space: nowrap;">TOTAL</span>
+                                <span class="counter-badge badge-total">TOTAL</span>
                             </div>
                             <div class="kpi-card-body">
                                 <span class="kpi-value">${totalCount}</span>
                                 <span class="kpi-title">TOTAL ASSIGNED</span>
                             </div>
+                            <span class="kpi-card-chevron">›</span>
                         </div>
 
-                        <div class="kpi-card">
+                        <div class="kpi-card" id="card-tab-performance" title="Average Performance">
                             <div class="kpi-card-header">
-                                <div class="kpi-icon-wrap" style="background: rgba(255, 45, 85, 0.1);">
-                                    <span class="kpi-icon" style="color: #FF2D55;">${ic.performance || ''}</span>
+                                <div class="kpi-icon-wrap kpi-icon-perf">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#EC4899" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
                                 </div>
-                                <span class="counter-badge" style="font-size: 0.72rem; padding: 4px 9px; border-radius: 6px; background: rgba(255, 45, 85, 0.12); color: #FF2D55; font-weight: 700; white-space: nowrap;">${gradedEvals.length} EVALUATED</span>
+                                <span class="counter-badge badge-perf">EVALUATED</span>
                             </div>
                             <div class="kpi-card-body">
                                 <span class="kpi-value">${avgScorePct}%</span>
-                                <span class="kpi-title">AVG PERFORMANCE</span>
+                                <span class="kpi-title">AVERAGE PERFORMANCE</span>
                             </div>
+                            <span class="kpi-card-chevron">›</span>
                         </div>
                     </div>
 
-                    <!-- Class & Exam Batches Section -->
+                    <!-- Class & Exam Blueprint Batches Section -->
                     <div class="teacher-batches-section" id="teacher-batches-section">
-                        <div class="teacher-batches-header" style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; flex-wrap: wrap; gap: 10px;">
+                        <div class="teacher-batches-header">
                             <div class="teacher-batches-title-col">
-                                <h3 class="teacher-batches-title" style="margin: 0; display: flex; align-items: center; gap: 8px;">
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0071E3" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-                                    Class & Exam Blueprint Batches
-                                    <span class="teacher-batches-count-pill">${displayBatches.length} ${displayBatches.length === 1 ? 'Batch' : 'Batches'}</span>
-                                </h3>
-                                <p class="teacher-batches-desc" style="margin: 2px 0 0;">Click any card to view its student answer sheets or start marking directly.</p>
+                                <div style="display: flex; align-items: center; gap: 10px;">
+                                    <div class="batches-section-icon-wrap">
+                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0878F9" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/></svg>
+                                    </div>
+                                    <h3 class="teacher-batches-title">
+                                        Class & Exam Blueprint Batches
+                                        <span class="teacher-batches-count-pill">${displayBatches.length} ${displayBatches.length === 1 ? 'Batch' : 'Batches'}</span>
+                                    </h3>
+                                </div>
+                                <p class="teacher-batches-desc">Click any card to view its student answer sheets or start marking directly.</p>
+                                
                                 ${distinctBatchClasses.length > 1 ? `
-                                    <div class="dash-class-pills-bar" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px;">
-                                        <span style="font-size: 0.74rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.4px;">Classes:</span>
-                                        <button type="button" class="btn-dash-class-pill ${this.selectedClassFilter === 'all' ? 'active' : ''}" data-class="all" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${this.selectedClassFilter === 'all' ? '#0071E3' : '#E2E8F0'}; background: ${this.selectedClassFilter === 'all' ? '#0071E3' : '#F8FAFC'}; color: ${this.selectedClassFilter === 'all' ? '#FFFFFF' : '#475569'}; box-shadow: ${this.selectedClassFilter === 'all' ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
+                                    <div class="dash-class-pills-bar">
+                                        <span class="filter-pills-label">Classes:</span>
+                                        <button type="button" class="btn-dash-class-pill ${this.selectedClassFilter === 'all' ? 'active' : ''}" data-class="all">
                                             All Classes (${this.batches.length})
                                         </button>
                                         ${distinctBatchClasses.map(clsName => {
@@ -840,7 +864,7 @@ class DashboardManager {
                                             const isAct = this.selectedClassFilter === clsName ||
                                                 (this.selectedClassFilter && this.selectedClassFilter.toLowerCase().replace(/[^a-z0-9]/g, '') === clsName.toLowerCase().replace(/[^a-z0-9]/g, ''));
                                             return `
-                                                <button type="button" class="btn-dash-class-pill ${isAct ? 'active' : ''}" data-class="${clsName}" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${isAct ? '#0071E3' : '#E2E8F0'}; background: ${isAct ? '#0071E3' : '#F8FAFC'}; color: ${isAct ? '#FFFFFF' : '#475569'}; box-shadow: ${isAct ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
+                                                <button type="button" class="btn-dash-class-pill ${isAct ? 'active' : ''}" data-class="${clsName}">
                                                     ${clsName} (${countForCls})
                                                 </button>
                                             `;
@@ -849,9 +873,9 @@ class DashboardManager {
                                 ` : ''}
 
                                 ${distinctBatchSubjects.length > 1 ? `
-                                    <div class="dash-subject-pills-bar" style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 8px;">
-                                        <span style="font-size: 0.74rem; font-weight: 700; color: #64748B; text-transform: uppercase; letter-spacing: 0.4px;">Subjects:</span>
-                                        <button type="button" class="btn-dash-subject-pill ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? 'active' : ''}" data-subject="all" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? '#0071E3' : '#E2E8F0'}; background: ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? '#0071E3' : '#F8FAFC'}; color: ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? '#FFFFFF' : '#475569'}; box-shadow: ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
+                                    <div class="dash-subject-pills-bar">
+                                        <span class="filter-pills-label">Subjects:</span>
+                                        <button type="button" class="btn-dash-subject-pill ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? 'active' : ''}" data-subject="all">
                                             All Subjects (${this.batches.length})
                                         </button>
                                         ${distinctBatchSubjects.map(subName => {
@@ -859,7 +883,7 @@ class DashboardManager {
                                             const isAct = this.selectedSubjectFilter === subName ||
                                                 (window.appStorage && window.appStorage.isSubjectMatch(subName, "", this.selectedSubjectFilter, ""));
                                             return `
-                                                <button type="button" class="btn-dash-subject-pill ${isAct ? 'active' : ''}" data-subject="${subName}" style="padding: 4px 12px; border-radius: 20px; font-size: 0.78rem; font-weight: 600; cursor: pointer; border: 1px solid ${isAct ? '#0071E3' : '#E2E8F0'}; background: ${isAct ? '#0071E3' : '#F8FAFC'}; color: ${isAct ? '#FFFFFF' : '#475569'}; box-shadow: ${isAct ? '0 2px 6px rgba(0, 113, 227, 0.28)' : 'none'}; transition: all 0.15s ease;">
+                                                <button type="button" class="btn-dash-subject-pill ${isAct ? 'active' : ''}" data-subject="${subName}">
                                                     ${subName} (${countForSub})
                                                 </button>
                                             `;
@@ -868,7 +892,7 @@ class DashboardManager {
                                 ` : ''}
                             </div>
                             ${this.highlightBatchKey ? `
-                                <button type="button" class="btn-admin-clear-batch" id="btn-clear-dash-highlight" style="display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 8px; border: 1px solid #0071E3; background: rgba(0, 113, 227, 0.08); color: #0071E3; font-size: 0.78rem; font-weight: 500; cursor: pointer;">
+                                <button type="button" class="btn-admin-clear-batch" id="btn-clear-dash-highlight">
                                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                                     <span>Focus: ${this.highlightBatchKey.replace(':::', ' • ')} (Clear)</span>
                                 </button>
@@ -925,36 +949,32 @@ class DashboardManager {
                                     const isCollapsed = this.collapsedGradeGroups ? this.collapsedGradeGroups.has(gKey) : false;
 
                                     return `
-                                        <div class="dash-grade-group-section" data-grade="${gKey}" style="margin-bottom: 24px;">
-                                            <div class="dash-grade-header" data-grade="${gKey}" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 18px; background: #FFFFFF; border: 1.5px solid #E2E8F0; border-radius: 14px; margin-bottom: 12px; cursor: pointer; user-select: none; transition: all 0.15s ease; box-shadow: 0 2px 5px rgba(0,0,0,0.03);">
-                                                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                                    <span style="font-size: 1.25rem;">${gKey === 10 ? '🔟' : (gKey === 12 ? '🎓' : '📚')}</span>
-                                                    <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-                                                        <h4 style="margin: 0; font-size: 0.98rem; font-weight: 700; color: #1E293B;">
-                                                            ${gradeTitle}
-                                                        </h4>
-                                                        <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(0, 113, 227, 0.08); color: #0071E3; border: 1px solid rgba(0, 113, 227, 0.2);">
+                                        <div class="dash-grade-group-section" data-grade="${gKey}">
+                                            <div class="dash-grade-header" data-grade="${gKey}">
+                                                <div class="dash-grade-header-left">
+                                                    <span class="grade-number-badge">${gKey}</span>
+                                                    <h4 class="grade-title-text">${gradeTitle}</h4>
+                                                    <div class="grade-badges-wrap">
+                                                        <span class="grade-badge-batches">
                                                             ${gBatches.length} ${gBatches.length === 1 ? 'Batch' : 'Batches'}
                                                         </span>
-                                                        <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(100, 116, 139, 0.08); color: #64748B;">
+                                                        <span class="grade-badge-papers">
                                                             ${totalPapersInGrade} Papers
                                                         </span>
                                                         ${totalPendingInGrade > 0 ? `
-                                                            <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(217, 119, 6, 0.1); color: #D97706; border: 1px solid rgba(217, 119, 6, 0.2);">
+                                                            <span class="grade-badge-pending">
                                                                 ${totalPendingInGrade} Pending
                                                             </span>
                                                         ` : `
-                                                            <span style="font-size: 0.72rem; font-weight: 600; padding: 2px 8px; border-radius: 12px; background: rgba(22, 163, 74, 0.1); color: #16A34A; border: 1px solid rgba(22, 163, 74, 0.2);">
+                                                            <span class="grade-badge-completed">
                                                                 ✓ All Graded
                                                             </span>
                                                         `}
                                                     </div>
                                                 </div>
-                                                <div style="display: flex; align-items: center; gap: 8px;">
-                                                    <span class="grade-toggle-text" style="font-size: 0.78rem; font-weight: 600; color: #64748B;">
-                                                        ${isCollapsed ? 'Expand' : 'Collapse'}
-                                                    </span>
-                                                    <span class="grade-toggle-chevron" style="display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #F1F5F9; color: #475569; transition: transform 0.2s ease; transform: rotate(${isCollapsed ? '-90deg' : '0deg'});">
+                                                <div class="dash-grade-header-right">
+                                                    <span class="grade-toggle-text">${isCollapsed ? 'Expand' : 'Collapse'}</span>
+                                                    <span class="grade-toggle-chevron">
                                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
                                                     </span>
                                                 </div>
