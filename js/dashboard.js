@@ -949,7 +949,7 @@ class DashboardManager {
                                     const isCollapsed = this.collapsedGradeGroups ? this.collapsedGradeGroups.has(gKey) : false;
 
                                     return `
-                                        <div class="dash-grade-group-section" data-grade="${gKey}">
+                                        <div class="dash-grade-group-section ${isCollapsed ? 'is-collapsed' : ''}" data-grade="${gKey}">
                                             <div class="dash-grade-header" data-grade="${gKey}">
                                                 <div class="dash-grade-header-left">
                                                     <span class="grade-number-badge">${gKey}</span>
@@ -980,7 +980,7 @@ class DashboardManager {
                                                 </div>
                                             </div>
 
-                                            <div class="dash-grade-batches-body" style="display: ${isCollapsed ? 'none' : 'block'};">
+                                            <div class="dash-grade-batches-body ${isCollapsed ? 'is-collapsed' : ''}">
                                                 <div class="teacher-batches-grid">
                                                     ${gBatches.map(b => this.renderBatchCardHtml(b)).join('')}
                                                 </div>
@@ -1399,7 +1399,14 @@ class DashboardManager {
                     const txt = section.querySelector(".grade-toggle-text");
                     const chevron = section.querySelector(".grade-toggle-chevron");
                     const isNowCollapsed = this.collapsedGradeGroups.has(gKey);
-                    if (body) body.style.display = isNowCollapsed ? "none" : "block";
+
+                    if (isNowCollapsed) {
+                        section.classList.add("is-collapsed");
+                        if (body) body.classList.add("is-collapsed");
+                    } else {
+                        section.classList.remove("is-collapsed");
+                        if (body) body.classList.remove("is-collapsed");
+                    }
                     if (txt) txt.textContent = isNowCollapsed ? "Expand" : "Collapse";
                     if (chevron) chevron.style.transform = isNowCollapsed ? "rotate(-90deg)" : "rotate(0deg)";
                 }
