@@ -468,6 +468,35 @@ class FirebaseManager {
         return out;
     }
 
+    // Realtime Cross-Device Synchronization with Firestore onSnapshot
+    // Pushes only modified documents across devices (1 read per edited paper).
+    // Zero polling overhead, zero high cloud cost, stays 100% within free Firebase quota.
+    subscribeToEvaluations(callback) {
+        if (!this.firestore) return null;
+        try {
+            return this.firestore.collection("evaluations").onSnapshot({ includeMetadataChanges: false }, (snapshot) => {
+                const changes = [];
+                snapshot.docChanges().forEach((change) => {
+                    const data = change.doc.data() || {};
+                    if (!data.id) data.id = change.doc.id;
+                    changes.push({
+                        type: change.type, // "added", "modified", "removed"
+                        doc: data,
+                        hasPendingWrites: change.doc.metadata ? change.doc.metadata.hasPendingWrites : false
+                    });
+                });
+                if (changes.length > 0 && typeof callback === "function") {
+                    callback(changes);
+                }
+            }, (err) => {
+                console.warn("Firestore onSnapshot error:", err);
+            });
+        } catch (e) {
+            console.warn("Could not subscribe to evaluations:", e);
+            return null;
+        }
+    }
+
     // Firestore: Get All Evaluations (Dual-Channel: Web SDK + Direct REST API Fallback)
     async getAllEvaluations() {
         await this.ensureReady(1800);

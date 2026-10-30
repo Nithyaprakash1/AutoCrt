@@ -241,7 +241,26 @@ class DashboardManager {
             window.app.updateUserProfileDisplay(activeSubNow, this.selectedClassFilter !== "all" ? this.selectedClassFilter : null);
         }
 
-        // Background Cloud Sync: Pull fresh papers from Firebase quietly without tearing down DOM
+        // Background Cloud Sync & Realtime Cross-Device Listener
+        if (!this._cloudSyncListenerAttached) {
+            this._cloudSyncListenerAttached = true;
+            window.addEventListener("niprak-evaluations-cloud-synced", async () => {
+                if (!this.container || !document.body.contains(this.container)) return;
+                const viewDash = document.getElementById("view-dashboard");
+                if (viewDash && !viewDash.classList.contains("active-view")) return;
+
+                this.evaluations = await window.appStorage.getAllEvaluations(false, true);
+                this.applyFilters();
+                if (!this.activeBatchKey) {
+                    this.render();
+                    this.bindEvents();
+                } else {
+                    this.renderTableRows();
+                    this.updateCountsInUI();
+                }
+            });
+        }
+
         if (window.firebaseManager) {
             window.appStorage.getAllEvaluations(true, true).then((freshList) => {
                 if (Array.isArray(freshList) && freshList.length > 0) {
@@ -797,6 +816,10 @@ class DashboardManager {
                             <button type="button" class="btn-secondary btn-clean-duplicates" id="dash-btn-clean-duplicates-top" title="Scan and safely remove duplicate student papers, keeping original copies">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
                                 <span>Clean Duplicates</span>
+                            </button>
+                            <button type="button" class="btn-secondary btn-sync-cloud" id="dash-btn-cloud-sync" title="Sync papers with cloud in real time">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"/></svg>
+                                <span>Sync Cloud</span>
                             </button>
                             <button type="button" class="btn-primary btn-start-correction" id="dash-btn-start-correction" title="Open first pending paper to evaluate">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>

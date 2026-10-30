@@ -55,6 +55,7 @@ class StorageService {
                     this.purgeLegacyMockData();
                     this.isReady = true;
                     resolve();
+                    this.initRealtimeSync();
                 };
 
                 request.onerror = (event) => {
@@ -499,19 +500,32 @@ class StorageService {
                             addedCount++;
                         } else {
                             const existing = listMap.get(sId);
-                            // If cloud has newer evaluation or updated timestamp, update local record
-                            if (fbItem.updatedAt && (!existing.updatedAt || fbItem.updatedAt >= existing.updatedAt)) {
+                            // Realtime cloud authority: if cloud paper is completed, has marks, or has newer/equal timestamp
+                            const cloudIsDone = fbItem.status === "Completed" || fbItem.status === "Corrected" || fbItem.status === "Graded";
+                            const cloudHasMarks = Number(fbItem.obtainedMarks) > 0;
+                            const cloudHasAnnotations = Array.isArray(fbItem.annotations) && fbItem.annotations.length > 0;
+                            const cloudIsNewer = fbItem.updatedAt && (!existing.updatedAt || fbItem.updatedAt >= existing.updatedAt);
+
+                            if (cloudIsDone || cloudHasMarks || cloudHasAnnotations || cloudIsNewer) {
                                 const merged = Object.assign({}, existing, fbItem, {
-                                    // Retain local annotations if paper is actively being corrected here
-                                    annotations: (existing.annotations && existing.annotations.length > 0) ? existing.annotations : (fbItem.annotations || []),
-                                    // Retain local pages and pdfDataUrl so cloud sync never strips local scans
+                                    obtainedMarks: (fbItem.obtainedMarks !== undefined && fbItem.obtainedMarks !== null) ? fbItem.obtainedMarks : existing.obtainedMarks,
+                                    maxMarks: fbItem.maxMarks || existing.maxMarks,
+                                    percentage: fbItem.percentage !== undefined ? fbItem.percentage : existing.percentage,
+                                    grade: fbItem.grade || existing.grade,
+                                    status: fbItem.status || existing.status,
+                                    questions: (Array.isArray(fbItem.questions) && fbItem.questions.length > 0) ? fbItem.questions : existing.questions,
+                                    annotations: (Array.isArray(fbItem.annotations) && fbItem.annotations.length > 0) ? fbItem.annotations : (existing.annotations || []),
+                                    // Strictly retain local scanned pages & pdf data url so cloud document size optimization never strips local paper scans
                                     pages: (existing.pages && existing.pages.length > 0) ? existing.pages : (fbItem.pages || []),
                                     pdfDataUrl: existing.pdfDataUrl || fbItem.pdfDataUrl || null,
-                                    obtainedMarks: (Number(existing.obtainedMarks) > 0) ? existing.obtainedMarks : fbItem.obtainedMarks
+                                    pdfStorageUrl: fbItem.pdfStorageUrl || existing.pdfStorageUrl || null
                                 });
                                 const idx = list.findIndex(e => String(e.id) === sId);
                                 if (idx >= 0) list[idx] = merged;
                                 this._saveEvaluationToIndexedDB(merged);
+                                if (cloudIsDone || cloudHasMarks) {
+                                    this.clearDraft(sId);
+                                }
                             }
                         }
                     }
@@ -531,15 +545,21 @@ class StorageService {
                 if (!ev || !ev.id) return ev;
                 const draft = this.getDraft(ev.id);
                 let merged = ev;
-                if (draft) {
-                    merged = Object.assign({}, ev, {
-                        obtainedMarks: draft.obtainedMarks !== undefined ? draft.obtainedMarks : ev.obtainedMarks,
-                        maxMarks: draft.maxMarks || ev.maxMarks,
-                        percentage: draft.percentage !== undefined ? draft.percentage : ev.percentage,
-                        grade: draft.grade || ev.grade,
-                        status: draft.status || ev.status,
-                        questions: (draft.questions && draft.questions.length > 0) ? draft.questions : ev.questions
-                    });
+                if (draft && (!ev.status || ev.status !== "Completed")) {
+                    const draftTime = draft.timestamp || draft.savedAt || 0;
+                    const evTime = ev.updatedAt ? new Date(ev.updatedAt).getTime() : 0;
+                    if (!evTime || draftTime >= evTime) {
+                        merged = Object.assign({}, ev, {
+                            obtainedMarks: draft.obtainedMarks !== undefined ? draft.obtainedMarks : ev.obtainedMarks,
+                            maxMarks: draft.maxMarks || ev.maxMarks,
+                            percentage: draft.percentage !== undefined ? draft.percentage : ev.percentage,
+                            grade: draft.grade || ev.grade,
+                            status: draft.status || ev.status,
+                            questions: (draft.questions && draft.questions.length > 0) ? draft.questions : ev.questions
+                        });
+                    } else {
+                        this.clearDraft(ev.id);
+                    }
                 }
 
                 // If questions exist, calculate exact awarded sum to prevent stale or divergent totalMarks
@@ -1078,28 +1098,35 @@ class StorageService {
             evalObj = (this.memoryStore || []).find(e => String(e.id) === targetId) || null;
         }
 
-        if (!evalObj && window.firebaseManager) {
-            try {
-                evalObj = await window.firebaseManager.getEvaluationById(targetId);
-                if (!evalObj) {
-                    const fbList = await window.firebaseManager.getAllEvaluations();
-                    evalObj = fbList.find(e => String(e.id) === targetId) || null;
-                }
-                if (evalObj) {
-                    this._saveEvaluationToIndexedDB(evalObj);
-                }
-            } catch (e) {}
-        }
-
-        // If local record lacks cloud PDF storage URL, fetch latest record from Firebase
-        if (evalObj && !evalObj.pdfStorageUrl && !evalObj.pdfDataUrl && (!evalObj.pages || evalObj.pages.length <= 1) && window.firebaseManager) {
+        // Realtime Multi-Device Verification: Verify single evaluation state against Cloud (costs only 1 read)
+        if (window.firebaseManager) {
             try {
                 const cloudObj = await window.firebaseManager.getEvaluationById(targetId);
-                if (cloudObj && cloudObj.pdfStorageUrl) {
-                    evalObj = Object.assign({}, evalObj, cloudObj);
-                    this._saveEvaluationToIndexedDB(evalObj);
+                if (cloudObj) {
+                    if (!evalObj) {
+                        evalObj = cloudObj;
+                        this._saveEvaluationToIndexedDB(evalObj);
+                    } else {
+                        const cloudIsDone = cloudObj.status === "Completed" || cloudObj.status === "Corrected" || cloudObj.status === "Graded";
+                        const cloudHasMarks = Number(cloudObj.obtainedMarks) > 0;
+                        const cloudHasAnnotations = Array.isArray(cloudObj.annotations) && cloudObj.annotations.length > 0;
+                        const cloudIsNewer = cloudObj.updatedAt && (!evalObj.updatedAt || cloudObj.updatedAt >= evalObj.updatedAt);
+
+                        if (cloudIsDone || cloudHasMarks || cloudHasAnnotations || cloudIsNewer) {
+                            evalObj = Object.assign({}, evalObj, cloudObj, {
+                                pages: (evalObj.pages && evalObj.pages.length > 0) ? evalObj.pages : (cloudObj.pages || []),
+                                pdfDataUrl: evalObj.pdfDataUrl || cloudObj.pdfDataUrl || null,
+                                pdfStorageUrl: cloudObj.pdfStorageUrl || evalObj.pdfStorageUrl || null,
+                                annotations: (Array.isArray(cloudObj.annotations) && cloudObj.annotations.length > 0) ? cloudObj.annotations : (evalObj.annotations || [])
+                            });
+                            this._saveEvaluationToIndexedDB(evalObj);
+                            this.clearDraft(targetId);
+                        }
+                    }
                 }
-            } catch (e) {}
+            } catch (e) {
+                console.warn("getEvaluationById cloud fetch warning:", e);
+            }
         }
 
         if (evalObj) {
@@ -1271,7 +1298,9 @@ class StorageService {
     }
 
     _putDirect(evaluation) {
-        evaluation.updatedAt = new Date().toISOString();
+        if (!evaluation.updatedAt) {
+            evaluation.updatedAt = new Date().toISOString();
+        }
         if (!evaluation.createdAt) {
             evaluation.createdAt = new Date().toISOString();
         }
@@ -1689,7 +1718,7 @@ class StorageService {
         } catch (e) {
             return null;
         }
-        return this.memoryStore?.find(e => String(e.id) === String(evalId)) || null;
+        return null;
     }
 
     clearDraft(evalId) {
@@ -2477,6 +2506,81 @@ class StorageService {
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
         return true;
+    }
+
+    // --- Realtime Multi-Device Synchronization (Zero-Polling / onSnapshot) ---
+    initRealtimeSync() {
+        if (this._realtimeSubscribed) return;
+        if (!window.firebaseManager || !window.firebaseManager.firestore) {
+            setTimeout(() => this.initRealtimeSync(), 1500);
+            return;
+        }
+        this._realtimeSubscribed = true;
+        try {
+            window.firebaseManager.subscribeToEvaluations((changes) => {
+                this.handleRealtimeCloudChanges(changes);
+            });
+            console.log("⚡ Real-time multi-device cloud synchronization active (0-polling, onSnapshot).");
+        } catch (e) {
+            console.warn("Failed to initialize realtime cloud sync:", e);
+        }
+    }
+
+    handleRealtimeCloudChanges(changes) {
+        if (!Array.isArray(changes) || changes.length === 0) return;
+        let hasMeaningfulUpdate = false;
+
+        for (const ch of changes) {
+            if (!ch || !ch.doc || !ch.doc.id) continue;
+            // Ignore echoes of changes originating locally on this device
+            if (ch.hasPendingWrites) continue;
+
+            const cloudDoc = ch.doc;
+            const targetId = String(cloudDoc.id);
+
+            if (ch.type === "removed") {
+                this._addDeletedId(targetId);
+                const memIdx = this.memoryStore.findIndex(e => String(e.id) === targetId);
+                if (memIdx >= 0) this.memoryStore.splice(memIdx, 1);
+                if (this.db) {
+                    try {
+                        const tx = this.db.transaction(["evaluations"], "readwrite");
+                        tx.objectStore("evaluations").delete(targetId);
+                    } catch (_) {}
+                }
+                hasMeaningfulUpdate = true;
+            } else {
+                if (this.deletedEvaluations && this.deletedEvaluations.has(targetId)) continue;
+                const memIdx = this.memoryStore.findIndex(e => String(e.id) === targetId);
+                const existing = memIdx >= 0 ? this.memoryStore[memIdx] : null;
+
+                const merged = existing ? Object.assign({}, existing, cloudDoc, {
+                    pages: (existing.pages && existing.pages.length > 0) ? existing.pages : (cloudDoc.pages || []),
+                    pdfDataUrl: existing.pdfDataUrl || cloudDoc.pdfDataUrl || null,
+                    pdfStorageUrl: cloudDoc.pdfStorageUrl || existing.pdfStorageUrl || null,
+                    annotations: (Array.isArray(cloudDoc.annotations) && cloudDoc.annotations.length > 0)
+                        ? cloudDoc.annotations
+                        : (existing.annotations || [])
+                }) : cloudDoc;
+
+                if (memIdx >= 0) {
+                    this.memoryStore[memIdx] = merged;
+                } else {
+                    this.memoryStore.unshift(merged);
+                }
+                this._saveEvaluationToIndexedDB(merged);
+
+                if (cloudDoc.status === "Completed" || Number(cloudDoc.obtainedMarks) > 0) {
+                    this.clearDraft(targetId);
+                }
+                hasMeaningfulUpdate = true;
+            }
+        }
+
+        if (hasMeaningfulUpdate) {
+            console.log("📡 Real-time update: Received change(s) from cloud. Refreshing views...");
+            window.dispatchEvent(new CustomEvent("niprak-evaluations-cloud-synced", { detail: changes }));
+        }
     }
 }
 

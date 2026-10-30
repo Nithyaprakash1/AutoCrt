@@ -39,6 +39,30 @@ class AppController {
         // Auto-unify any Economics evaluations from hardcoded eco-xii-40 to genuine Economics Revision 2 blueprint
         await this.migrateEconomicsDuplicateEvaluations();
 
+        // Multi-Device Tab Foreground Sync (0-polling, triggers only on returning to active tab)
+        document.addEventListener("visibilitychange", async () => {
+            if (document.visibilityState === "visible" && window.appStorage) {
+                try {
+                    const fresh = await window.appStorage.getAllEvaluations(false, true);
+                    if (this.currentView === "dashboard" && this.dashboardManager) {
+                        this.dashboardManager.evaluations = fresh;
+                        this.dashboardManager.applyFilters();
+                        if (!this.dashboardManager.activeBatchKey) {
+                            this.dashboardManager.render();
+                            this.dashboardManager.bindEvents();
+                        } else {
+                            this.dashboardManager.renderTableRows();
+                            this.dashboardManager.updateCountsInUI();
+                        }
+                    } else if (this.currentView === "uploaded-papers" && this.uploadedPapersPageManager) {
+                        await this.uploadedPapersPageManager.loadData();
+                        this.uploadedPapersPageManager.render();
+                        this.uploadedPapersPageManager.bindEvents();
+                    }
+                } catch (_) {}
+            }
+        }); // visibilitychange-sync-listener
+
         // Load settings & teacher info
         const settings = await window.appStorage.getSettings();
         this.applySettingsToUI(settings);

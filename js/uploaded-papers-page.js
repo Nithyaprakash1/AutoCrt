@@ -25,6 +25,19 @@ class UploadedPapersPageManager {
     }
 
     async init() {
+        if (!this._cloudSyncListenerAttached) {
+            this._cloudSyncListenerAttached = true;
+            window.addEventListener("niprak-evaluations-cloud-synced", async () => {
+                if (!this.container || !document.body.contains(this.container)) return;
+                const viewUp = document.getElementById("view-uploaded-papers");
+                if (viewUp && !viewUp.classList.contains("active-view")) return;
+
+                await this.loadData();
+                this.render();
+                this.bindEvents();
+            });
+        }
+
         await this.loadData();
         this.render();
     }
