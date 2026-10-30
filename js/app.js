@@ -2869,9 +2869,24 @@ class AppController {
         this._isNavigatingBack = true;
         try {
             if (this.activeEvaluation) {
-                await this.saveActiveEvaluation(false);
+                const sName = this.activeEvaluation.studentName || "Paper";
+                this.setAutosaveBadge("saving");
+
+                if (this.markingPanel) {
+                    const allGraded = Array.isArray(this.markingPanel.questions) && this.markingPanel.questions.length > 0 &&
+                        this.markingPanel.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending");
+                    if (allGraded) {
+                        this.activeEvaluation.status = "Completed";
+                    } else if (Number(this.activeEvaluation.obtainedMarks) > 0 && this.activeEvaluation.status !== "Completed") {
+                        this.activeEvaluation.status = "In Progress";
+                    }
+                }
+
+                // Explicitly save locally and sync to Firebase Cloud when clicking Dashboard
+                await this.saveActiveEvaluation(false, true);
                 this.stopAutosave();
                 this.activeEvaluation = null;
+                this.showToast(`✓ Progress for ${sName} saved! Returned to Dashboard.`, "success");
             }
             await this.switchView("dashboard");
         } catch (err) {
@@ -3020,7 +3035,17 @@ class AppController {
             this.updateFloatingSaveNextPill(false);
         }
         if (this.activeEvaluation && viewName !== "workspace") {
-            await this.saveActiveEvaluation(false);
+            const currentEval = this.activeEvaluation;
+            if (this.markingPanel) {
+                const allGraded = Array.isArray(this.markingPanel.questions) && this.markingPanel.questions.length > 0 &&
+                    this.markingPanel.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending");
+                if (allGraded) {
+                    currentEval.status = "Completed";
+                } else if (Number(currentEval.obtainedMarks) > 0 && currentEval.status !== "Completed") {
+                    currentEval.status = "In Progress";
+                }
+            }
+            await this.saveActiveEvaluation(false, true);
             this.stopAutosave();
             this.activeEvaluation = null;
         }
