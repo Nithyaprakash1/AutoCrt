@@ -529,6 +529,214 @@ const MockData = {
     },
 
     // Grade 12 Physics Revision 1 Blueprint (Objective 40x1=40 + Subjective 40 = 80 Marks Total)
+    
+    // Grade 12 Economics - 40 Marks Blueprint (10 Questions: 4x3M, 4x4M, 2x6M)
+    economicsGrade12Template40: {
+        id: "eco-xii-40",
+        name: "Grade XII Economics - 40 Marks (10 Qs)",
+        examName: "Grade XII Economics Assessment 2026",
+        subject: "Economics",
+        maxMarks: 40,
+        duration: "2 Hours",
+        badge: "Official 40M Blueprint",
+        generalInstructions: [
+            "This question paper consists of 10 questions carrying 40 marks in total.",
+            "Section I: Q1 to Q4 carry 3 marks each (4 × 3 = 12 Marks).",
+            "Section II: Q5 to Q8 carry 4 marks each (4 × 4 = 16 Marks).",
+            "Section III: Q9 and Q10 carry 6 marks each (2 × 6 = 12 Marks)."
+        ],
+        sections: [
+            {
+                id: "sec_1",
+                letter: "I",
+                name: "Section I",
+                title: "Section I – 3 Marks Questions (4 × 3 = 12 Marks)",
+                qStartNo: 1,
+                qEndNo: 4,
+                qCount: 4,
+                marksPerQ: 3,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: true
+            },
+            {
+                id: "sec_2",
+                letter: "II",
+                name: "Section II",
+                title: "Section II – 4 Marks Questions (4 × 4 = 16 Marks)",
+                qStartNo: 5,
+                qEndNo: 8,
+                qCount: 4,
+                marksPerQ: 4,
+                maxMarks: 16,
+                secTotal: 16,
+                hasChoice: false,
+                hasSubQuestions: true
+            },
+            {
+                id: "sec_3",
+                letter: "III",
+                name: "Section III",
+                title: "Section III – 6 Marks Questions (2 × 6 = 12 Marks)",
+                qStartNo: 9,
+                qEndNo: 10,
+                qCount: 2,
+                marksPerQ: 6,
+                maxMarks: 12,
+                secTotal: 12,
+                hasChoice: false,
+                hasSubQuestions: true
+            }
+        ],
+        questions: [
+            // Section I (3 Marks each)
+            {
+                id: "eco_40_q1",
+                qNo: 1,
+                qNumber: "Q1",
+                label: "Q1",
+                section: "Section I",
+                sectionId: "sec_1",
+                maxMarks: 3,
+                awardedMarks: 0,
+                hasSubQuestions: true,
+                subQuestions: [
+                    { id: "A", subId: "A", letter: "A", label: "A (1M)", marks: 1, maxMarks: 1, awardedMarks: 0 },
+                    { id: "B", subId: "B", letter: "B", label: "B (2M)", marks: 2, maxMarks: 2, awardedMarks: 0 }
+                ]
+            },
+            {
+                id: "eco_40_q2",
+                qNo: 2,
+                qNumber: "Q2",
+                label: "Q2",
+                section: "Section I",
+                sectionId: "sec_1",
+                maxMarks: 3,
+                awardedMarks: 0,
+                hasSubQuestions: true,
+                subQuestions: [
+                    { id: "A", subId: "A", letter: "A", label: "A (1M)", marks: 1, maxMarks: 1, awardedMarks: 0 },
+                    { id: "B", subId: "B", letter: "B", label: "B (2M)", marks: 2, maxMarks: 2, awardedMarks: 0 }
+                ]
+            },
+            {
+                id: "eco_40_q3",
+                qNo: 3,
+                qNumber: "Q3",
+                label: "Q3",
+                section: "Section I",
+                sectionId: "sec_1",
+                maxMarks: 3,
+                awardedMarks: 0,
+                hasSubQuestions: true,
+                subQuestions: [
+                    { id: "A", subId: "A", letter: "A", label: "A (2M)", marks: 2, maxMarks: 2, awardedMarks: 0 },
+                    { id: "B", subId: "B", letter: "B", label: "B (1M)", marks: 1, maxMarks: 1, awardedMarks: 0 }
+                ]
+            },
+            {
+                id: "eco_40_q4",
+                qNo: 4,
+                qNumber: "Q4",
+                label: "Q4",
+                section: "Section I",
+                sectionId: "sec_1",
+                maxMarks: 3,
+                awardedMarks: 0,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+
+            // Section II (4 Marks each)
+            {
+                id: "eco_40_q5",
+                qNo: 5,
+                qNumber: "Q5",
+                label: "Q5",
+                section: "Section II",
+                sectionId: "sec_2",
+                maxMarks: 4,
+                awardedMarks: 0,
+                hasSubQuestions: true,
+                subQuestions: [
+                    { id: "A", subId: "A", letter: "A", label: "A (2M)", marks: 2, maxMarks: 2, awardedMarks: 0 },
+                    { id: "B", subId: "B", letter: "B", label: "B (2M)", marks: 2, maxMarks: 2, awardedMarks: 0 }
+                ]
+            },
+            {
+                id: "eco_40_q6",
+                qNo: 6,
+                qNumber: "Q6",
+                label: "Q6",
+                section: "Section II",
+                sectionId: "sec_2",
+                maxMarks: 4,
+                awardedMarks: 0,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+            {
+                id: "eco_40_q7",
+                qNo: 7,
+                qNumber: "Q7",
+                label: "Q7",
+                section: "Section II",
+                sectionId: "sec_2",
+                maxMarks: 4,
+                awardedMarks: 0,
+                hasSubQuestions: true,
+                subQuestions: [
+                    { id: "A", subId: "A", letter: "A", label: "A (1M)", marks: 1, maxMarks: 1, awardedMarks: 0 },
+                    { id: "B", subId: "B", letter: "B", label: "B (1M)", marks: 1, maxMarks: 1, awardedMarks: 0 },
+                    { id: "C", subId: "C", letter: "C", label: "C (2M)", marks: 2, maxMarks: 2, awardedMarks: 0 }
+                ]
+            },
+            {
+                id: "eco_40_q8",
+                qNo: 8,
+                qNumber: "Q8",
+                label: "Q8",
+                section: "Section II",
+                sectionId: "sec_2",
+                maxMarks: 4,
+                awardedMarks: 0,
+                hasSubQuestions: false,
+                subQuestions: []
+            },
+
+            // Section III (6 Marks each)
+            {
+                id: "eco_40_q9",
+                qNo: 9,
+                qNumber: "Q9",
+                label: "Q9",
+                section: "Section III",
+                sectionId: "sec_3",
+                maxMarks: 6,
+                awardedMarks: 0,
+                hasSubQuestions: true,
+                subQuestions: [
+                    { id: "A", subId: "A", letter: "A", label: "A (2M)", marks: 2, maxMarks: 2, awardedMarks: 0 },
+                    { id: "B", subId: "B", letter: "B", label: "B (4M)", marks: 4, maxMarks: 4, awardedMarks: 0 }
+                ]
+            },
+            {
+                id: "eco_40_q10",
+                qNo: 10,
+                qNumber: "Q10",
+                label: "Q10",
+                section: "Section III",
+                sectionId: "sec_3",
+                maxMarks: 6,
+                awardedMarks: 0,
+                hasSubQuestions: false,
+                subQuestions: []
+            }
+        ]
+    },
+
     physicsRevision1Template: {
         id: "phy-rev1-80",
         name: "Grade 12 Physics Revision 1 (80 Marks)",

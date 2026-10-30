@@ -256,6 +256,7 @@ class UploadPortalManager {
                 badge: "Official Blueprint",
                 description: "Economics Board Assessment (40 MCQs + 40 Marks Subjective / 80 Marks)",
                 templates: [
+                    (window.MockData && window.MockData.economicsGrade12Template40 ? window.MockData.economicsGrade12Template40 : null),
                     window.MockData && window.MockData.economicsTemplate ? window.MockData.economicsTemplate : {
                         id: "eco-cbse-80",
                         name: "Economics (80 Marks: 40 MCQs + 40 Subjective)",
