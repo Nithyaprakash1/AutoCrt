@@ -1212,7 +1212,7 @@ class StorageService {
         return bytes;
     }
 
-    async saveEvaluation(evaluation) {
+    async saveEvaluation(evaluation, syncToCloud = true) {
         if (!this.isReady) await this.readyPromise;
 
         // Calculate and persist exact paper byte size & page count before stripping pages
@@ -1238,24 +1238,13 @@ class StorageService {
 
         await this.storePdfCache(evaluation.id, cachePayload);
 
-        // Perform cloud sync with Firebase
-        if (window.firebaseManager) {
+        // Perform cloud sync with Firebase ONLY when explicitly requested (e.g. user clicked Save / Save & Next / Upload Portal)
+        // This saves Firebase write costs and prevents repeated billable Firestore document updates on background strokes/ticks!
+        if (syncToCloud && window.firebaseManager) {
             try {
-                const hasRawFile = !!(evaluation.rawFile || (evaluation.pdfDataUrl && evaluation.pdfDataUrl.startsWith("data:")));
-                if (hasRawFile) {
-                    await window.firebaseManager.ensureReady(3500);
-                    if (window.firebaseManager.isConnected || window.firebaseManager.firestore) {
-                        await window.firebaseManager.saveEvaluation(evaluation);
-                    }
-                } else {
-                    // For lightweight autosave strokes, sync in background to keep UI silky smooth
-                    window.firebaseManager.ensureReady(2000).then(ready => {
-                        if (ready || window.firebaseManager.isConnected) {
-                            window.firebaseManager.saveEvaluation(evaluation).catch(fbErr => {
-                                console.warn("Background cloud sync warning:", fbErr);
-                            });
-                        }
-                    }).catch(() => {});
+                await window.firebaseManager.ensureReady(3000);
+                if (window.firebaseManager.isConnected || window.firebaseManager.firestore) {
+                    await window.firebaseManager.saveEvaluation(evaluation);
                 }
             } catch (syncErr) {
                 console.warn("Cloud sync error in saveEvaluation:", syncErr);

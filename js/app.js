@@ -3324,7 +3324,7 @@ class AppController {
         this.showToast(`[Full Marks] Awarded (${maxMarks}M) to Q${q.qNo}. Press Enter to calculate & advance.`);
 
         this.hasUnsavedChanges = true;
-        this.setAutosaveBadge("saving");
+        this.setAutosaveBadge("unsaved");
     }
 
     awardZeroMarks(targetQ = null, explicitPos = null) {
@@ -3375,7 +3375,7 @@ class AppController {
         this.showToast(`Marked Q${q.qNo} as 0 Marks. Press Enter to calculate & advance.`);
 
         this.hasUnsavedChanges = true;
-        this.setAutosaveBadge("saving");
+        this.setAutosaveBadge("unsaved");
     }
 
     updatePageTotalDisplay() {
@@ -3684,7 +3684,7 @@ class AppController {
                 this.syncQuestionScoresFromAnnotations();
                 this.updatePageTotalDisplay();
                 this.hasUnsavedChanges = true;
-                this.setAutosaveBadge("saving");
+                this.setAutosaveBadge("unsaved");
             },
             onPageChange: (currentIdx, totalPages) => {
                 const pagerText = document.getElementById("ws-pager-text");
@@ -3776,7 +3776,7 @@ class AppController {
                 this.updateTopHud(q);
                 this.renderScorecardTable();
                 this.hasUnsavedChanges = true;
-                this.setAutosaveBadge("saving");
+                this.setAutosaveBadge("unsaved");
             },
             onScoreChange: (scoreSummary) => {
                 this.activeEvaluation.obtainedMarks = scoreSummary.obtainedMarks;
@@ -3823,7 +3823,7 @@ class AppController {
                 }
 
                 this.hasUnsavedChanges = true;
-                this.setAutosaveBadge("saving");
+                this.setAutosaveBadge("unsaved");
             },
             onQuestionSelect: (q, idx) => {
                 this.updateTopHud(q);
@@ -4890,11 +4890,13 @@ class AppController {
 
     startAutosave() {
         this.stopAutosave();
+        // Local-only draft timer (0 Firebase cloud costs): persists draft strictly in browser memory & IndexedDB
         this.autosaveTimer = setInterval(async () => {
             if (this.hasUnsavedChanges && this.activeEvaluation) {
-                await this.saveActiveEvaluation(false);
+                // syncToCloud = false: Never writes to Firebase cloud on interval timer!
+                await this.saveActiveEvaluation(false, false);
             }
-        }, 12000); // 12-second intervals
+        }, 25000); // 25-second local draft interval
     }
 
     stopAutosave() {
@@ -4904,10 +4906,16 @@ class AppController {
         }
     }
 
-    async saveActiveEvaluation(notify = false) {
+    async saveActiveEvaluation(notify = false, syncToCloud = false) {
         if (!this.activeEvaluation) return;
 
-        this.setAutosaveBadge("saving");
+        // Sync to cloud ONLY when teacher explicitly saves (e.g. Save, Save & Next, Save & Report, or Ctrl+S)
+        const isExplicitUserSave = notify === true || syncToCloud === true;
+
+        if (isExplicitUserSave) {
+            this.setAutosaveBadge("saving");
+        }
+
         if (this.canvasEngine) {
             this.activeEvaluation.annotations = this.canvasEngine.getAllAnnotations();
             if ((!this.activeEvaluation.pages || this.activeEvaluation.pages.length === 0) && this.canvasEngine.pages && this.canvasEngine.pages.length > 0) {
@@ -4937,9 +4945,9 @@ class AppController {
         const currentEval = this.activeEvaluation;
         if (!currentEval || !currentEval.id) return;
 
-        // Save to IndexedDB / local storage
+        // Save to IndexedDB / local storage; ONLY sync to Firebase cloud when teacher explicitly clicks Save!
         try {
-            await window.appStorage.saveEvaluation(currentEval);
+            await window.appStorage.saveEvaluation(currentEval, isExplicitUserSave);
         } catch (saveErr) {
             console.warn("Storage save warning:", saveErr);
         }
@@ -4951,10 +4959,12 @@ class AppController {
         }
 
         this.hasUnsavedChanges = false;
-        this.setAutosaveBadge("saved");
-        if (notify) {
-            console.log("Evaluation state persisted successfully.");
+        if (isExplicitUserSave) {
+            this.setAutosaveBadge("saved");
+            console.log("Evaluation state persisted to Database & Cloud successfully.");
             this.checkAndSendSubjectCompletedNotification(currentEval);
+        } else {
+            this.setAutosaveBadge("draft");
         }
     }
 
@@ -4965,10 +4975,18 @@ class AppController {
 
         if (state === "saving") {
             dot.classList.add("saving");
-            text.textContent = "Saving...";
-        } else {
+            dot.classList.remove("unsaved");
+            text.textContent = "Syncing to Cloud...";
+        } else if (state === "unsaved") {
             dot.classList.remove("saving");
-            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            dot.classList.add("unsaved");
+            text.textContent = "Unsaved Changes • Click Save";
+        } else if (state === "draft") {
+            dot.classList.remove("saving", "unsaved");
+            text.textContent = "Draft cached locally";
+        } else {
+            dot.classList.remove("saving", "unsaved");
+            const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             text.textContent = `Saved at ${time}`;
         }
     }
@@ -6161,7 +6179,7 @@ class AppController {
 
         // 5. Save reset state to storage
         this.hasUnsavedChanges = true;
-        this.setAutosaveBadge("saving");
+        this.setAutosaveBadge("unsaved");
         await this.saveActiveEvaluation(true);
         this.showToast("Paper has been completely reset to initial state.", "info");
     }

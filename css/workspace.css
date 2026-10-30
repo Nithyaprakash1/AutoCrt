@@ -234,6 +234,10 @@ p, span, div, strong, b, th, td, label, a,
     animation: pulse 1s infinite;
 }
 
+.autosave-dot.unsaved {
+    background-color: #F59E0B;
+}
+
 @keyframes pulse {
     0%, 100% { opacity: 1; }
     50% { opacity: 0.3; }
