@@ -5384,10 +5384,66 @@ class AppController {
 
     // --- Save & Next Student Navigation ---
 
+    getBatchKeyForEvaluation(e) {
+        if (!e) return "";
+        const rawCls = e.classLabel || e.className || e.class || "";
+        const cls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
+            ? window.appStorage.canonicalizeClassName(rawCls)
+            : rawCls;
+        const rawExamTitle = (e.examName || e.templateName || "Assessment").trim();
+        const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
+        return `${cls}:::${examTitle}`.toLowerCase().replace(/[^a-z0-9:]/g, '');
+    }
+
+    getSameExamPapers(curEval, allEvaluations) {
+        if (!curEval || !Array.isArray(allEvaluations)) return [];
+        const curId = String(curEval.id);
+        const targetBatchKey = this.getBatchKeyForEvaluation(curEval);
+        const curSubject = (curEval.subject || "").toLowerCase().trim();
+
+        // Filter strictly to papers that belong to THIS SAME EXAM and THIS SAME CLASS
+        const matching = allEvaluations.filter(e => {
+            if (!e || !e.id) return false;
+            const eKey = this.getBatchKeyForEvaluation(e);
+            if (eKey !== targetBatchKey) return false;
+
+            if (curSubject && window.appStorage && typeof window.appStorage.isSubjectMatch === "function") {
+                if (!window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, curSubject)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        // Deduplicate multiple uploads for the exact same student inside this exam
+        const studentMap = new Map();
+        matching.forEach(e => {
+            const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || 
+                         (e.studentName ? String(e.studentName).trim().toLowerCase() : String(e.id));
+            if (!studentMap.has(sKey)) {
+                studentMap.set(sKey, e);
+            } else if (String(e.id) === curId) {
+                studentMap.set(sKey, e);
+            }
+        });
+        const batchPapers = Array.from(studentMap.values());
+
+        // Sort roster: numeric roll number first, then alphabetical student name
+        batchPapers.sort((a, b) => {
+            const rollA = parseInt((a.rollNo || "").replace(/\D/g, "")) || 0;
+            const rollB = parseInt((b.rollNo || "").replace(/\D/g, "")) || 0;
+            if (rollA !== rollB) return rollA - rollB;
+            return (a.studentName || "").localeCompare(b.studentName || "");
+        });
+
+        return batchPapers;
+    }
+
     async saveAndGoNextStudent() {
         if (!this.activeEvaluation) return;
         const sName = this.activeEvaluation?.studentName || "student paper";
         const currentId = String(this.activeEvaluation?.id);
+        const curExamTitle = (this.activeEvaluation?.examName || this.activeEvaluation?.templateName || "Exam");
 
         this.showActionProgressModal({
             title: "Saving Paper & Loading Next",
@@ -5400,119 +5456,48 @@ class AppController {
         this.updateActionProgressModal(35, "Saving current evaluation record...");
         await this.saveActiveEvaluation(true);
 
-        // 2. Scan queue for next paper
-        this.updateActionProgressModal(70, "Locating next paper in batch queue...");
+        // 2. Scan queue for next paper strictly in THIS SAME EXAM
+        this.updateActionProgressModal(70, `Locating next student paper in ${curExamTitle}...`);
         const allEvaluations = await window.appStorage.getAllEvaluations(false, true);
 
-        // Match current class, exam, and subject using robust canonicalization
-        const rawCls = this.activeEvaluation?.classLabel || this.activeEvaluation?.className || this.activeEvaluation?.class || "";
-        const normCls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
-            ? window.appStorage.canonicalizeClassName(rawCls).toLowerCase().replace(/[^a-z0-9]/g, '')
-            : (rawCls || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+        // Strictly get all papers belonging to this SAME EXAM & CLASS
+        const sameExamPapers = this.getSameExamPapers(this.activeEvaluation, allEvaluations);
+        const currentIdx = sameExamPapers.findIndex(e => String(e.id) === currentId);
 
-        const rawExam = this.activeEvaluation?.examName || this.activeEvaluation?.templateName || "";
-        const normExam = (rawExam || "").toLowerCase().replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').replace(/[^a-z0-9]/g, '');
-
-        const curSub = this.activeEvaluation?.subject || "";
-
-        let queue = Array.isArray(allEvaluations) ? [...allEvaluations] : [];
-
-        // 1st Level: Match class (robust normalization)
-        if (normCls) {
-            const classMatches = queue.filter(e => {
-                const eClsRaw = e.classLabel || e.className || e.class || "";
-                const eClsNorm = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
-                    ? window.appStorage.canonicalizeClassName(eClsRaw).toLowerCase().replace(/[^a-z0-9]/g, '')
-                    : (eClsRaw || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                return eClsNorm === normCls || eClsNorm.includes(normCls) || normCls.includes(eClsNorm);
-            });
-            if (classMatches.length > 0) queue = classMatches;
-        }
-
-        // 2nd Level: Match exam/template (robust normalization)
-        if (normExam) {
-            const examMatches = queue.filter(e => {
-                const eExamRaw = e.examName || e.templateName || "";
-                const eExamNorm = (eExamRaw || "").toLowerCase().replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').replace(/[^a-z0-9]/g, '');
-                return eExamNorm === normExam || eExamNorm.includes(normExam) || normExam.includes(eExamNorm);
-            });
-            if (examMatches.length > 0) queue = examMatches;
-        }
-
-        // 3rd Level: Match subject if specified
-        if (curSub) {
-            const subMatches = queue.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName || e.templateName, curSub));
-            if (subMatches.length > 0) queue = subMatches;
-        }
-
-        // Deduplicate papers for the same student inside the batch
-        const studentMap = new Map();
-        queue.forEach(e => {
-            const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || (e.studentName ? String(e.studentName).trim().toLowerCase() : String(e.id));
-            if (!studentMap.has(sKey)) {
-                studentMap.set(sKey, e);
-            } else if (String(e.id) === currentId) {
-                studentMap.set(sKey, e);
-            }
-        });
-        const batchPapers = Array.from(studentMap.values());
-
-        // Sort by roll number, then student name
-        const sorted = batchPapers.sort((a, b) => {
-            const rollA = parseInt((a.rollNo || "").replace(/\D/g, "")) || 0;
-            const rollB = parseInt((b.rollNo || "").replace(/\D/g, "")) || 0;
-            if (rollA !== rollB) return rollA - rollB;
-            return (a.studentName || "").localeCompare(b.studentName || "");
-        });
-
-        const currentIdx = sorted.findIndex(e => String(e.id) === currentId);
-
-        // Find next paper in order:
         let nextEval = null;
 
-        // Priority 1: Next uncorrected paper AFTER current student in the roster
-        if (currentIdx >= 0 && currentIdx < sorted.length - 1) {
-            nextEval = sorted.slice(currentIdx + 1).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
+        // Priority 1: Next uncorrected paper in this same exam AFTER current student
+        if (currentIdx >= 0 && currentIdx < sameExamPapers.length - 1) {
+            nextEval = sameExamPapers.slice(currentIdx + 1).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
         }
 
-        // Priority 2: Immediate next student paper in the roster (Save & Next moves to next student without returning to dashboard)
-        if (!nextEval && currentIdx >= 0 && currentIdx < sorted.length - 1) {
-            nextEval = sorted[currentIdx + 1];
+        // Priority 2: Immediate next student paper in this same exam roster (sequential review)
+        if (!nextEval && currentIdx >= 0 && currentIdx < sameExamPapers.length - 1) {
+            nextEval = sameExamPapers[currentIdx + 1];
         }
 
-        // Priority 3: If at the end of the roster, check if any uncorrected student remains earlier in the batch (wrap around)
+        // Priority 3: If reached end of roster, check for any uncorrected papers earlier in this same exam (wrap-around)
         if (!nextEval && currentIdx > 0) {
-            nextEval = sorted.slice(0, currentIdx).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
+            nextEval = sameExamPapers.slice(0, currentIdx).find(e => String(e.id) !== currentId && !this.isPaperCorrected(e)) || null;
         }
 
-        // Priority 4: If single-paper filtered queue or end of roster, check across all evaluations
-        if (!nextEval && allEvaluations.length > 1) {
-            const otherPending = allEvaluations.find(e => String(e.id) !== currentId && !this.isPaperCorrected(e));
-            if (otherPending) {
-                nextEval = otherPending;
-            } else if (sorted.length > 1 && currentIdx === sorted.length - 1) {
-                // At the very end of the class roster, loop to the first student
-                nextEval = sorted[0];
-            }
-        }
-
-        // --- CASE 1: Truly only 1 paper exists in the system or every paper is done and no other paper exists ---
+        // --- CASE 1: All papers in THIS SAME EXAM are finished ---
         if (!nextEval || String(nextEval.id) === currentId) {
             this.checkAndSendSubjectCompletedNotification(this.activeEvaluation);
             this.setActionProgressModalSuccess({
-                title: "✓ Batch Evaluation Complete!",
-                subtitle: `All ${sorted.length} student paper${sorted.length === 1 ? '' : 's'} evaluated successfully.`,
+                title: "✓ Exam Evaluation Complete!",
+                subtitle: `All ${sameExamPapers.length} student paper${sameExamPapers.length === 1 ? '' : 's'} in "${curExamTitle}" have been evaluated.`,
                 statusText: "Returning to Dashboard...",
                 delayMs: 1100,
                 onComplete: () => {
                     this.switchView("dashboard");
-                    this.showToast("All student papers evaluated! Returned to Dashboard.", "success");
+                    this.showToast(`All papers in ${curExamTitle} evaluated! Returned to Dashboard.`, "success");
                 }
             });
             return;
         }
 
-        // --- CASE 2: Next paper is found -> Seamlessly open next student paper in workspace! ---
+        // --- CASE 2: Next paper in THIS SAME EXAM found -> Open it! ---
         const nextName = nextEval.studentName || "Next Student";
         const fullEval = await window.appStorage.getEvaluationById(nextEval.id);
         const evalToOpen = fullEval || nextEval;
