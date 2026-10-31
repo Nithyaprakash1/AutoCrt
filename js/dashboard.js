@@ -71,6 +71,9 @@ class DashboardManager {
         ));
 
         const startButtonText = isCompleted ? 'Review' : 'Start Marking';
+        const uploadDateStr = b.latestTimestamp > 0 
+            ? new Date(b.latestTimestamp).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+            : (b.examDate ? new Date(b.examDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : '');
 
         return `
             <div class="teacher-batch-card ${b.isNew ? 'is-new-batch' : ''} ${isCompleted ? 'is-completed-batch' : ''} ${isSharedTarget ? 'active active-shared-batch' : ''}" data-class="${b.className}" data-template="${b.templateName}" data-batch-key="${b.key}">
@@ -94,6 +97,13 @@ class DashboardManager {
 
                 <div class="batch-card-mid-section">
                     <h4 class="batch-card-title" title="${b.templateName}">${b.templateName}</h4>
+
+                    ${uploadDateStr ? `
+                        <div class="batch-card-upload-date" style="display: inline-flex; align-items: center; gap: 5px; font-size: 0.72rem; color: #64748B; margin-top: 2px; margin-bottom: 7px;">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity: 0.75;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                            <span>Uploaded: <strong style="color: #334155; font-weight: 600;">${uploadDateStr}</strong></span>
+                        </div>
+                    ` : ''}
 
                     <div class="batch-card-meta">
                         <div class="meta-item">
@@ -658,7 +668,7 @@ class DashboardManager {
                     const tList = subItem?.templates || (Array.isArray(subItem) ? subItem : []);
                     if (Array.isArray(tList)) {
                         tList.forEach(t => {
-                            if (t && t.isNew) catalogTpls.push(t);
+                            if (t) catalogTpls.push(t);
                         });
                     }
                 });
@@ -670,16 +680,32 @@ class DashboardManager {
             b.corrected = b.papers.filter(p => this.isPaperCorrected(p)).length;
             b.uncorrected = b.total - b.corrected;
             b.firstPendingPaper = b.papers.find(p => !this.isPaperCorrected(p)) || null;
-            // 7-day recency window for newly uploaded batches
-            const isRecent = b.latestTimestamp > 0 && (now - b.latestTimestamp < 7 * 24 * 60 * 60 * 1000);
-            const matchesNewTpl = catalogTpls.some(t => {
+
+            // Match with catalog template to check creation date / isNew flag
+            const matchingTpl = catalogTpls.find(t => {
                 const name = (t.name || t.examName || '').toLowerCase().trim();
                 const bName = (b.templateName || b.examName || '').toLowerCase().trim();
                 return name && bName && (name === bName || bName.includes(name) || name.includes(bName));
             });
-            // Card stays marked NEW while it has pending papers to correct
-            b.isNew = (matchesNewTpl || isRecent) && b.uncorrected > 0;
-            b.isCompletelyNew = b.isNew && b.corrected === 0;
+            if (matchingTpl && matchingTpl.createdAt) {
+                const tplTime = new Date(matchingTpl.createdAt).getTime();
+                if (tplTime > b.latestTimestamp) b.latestTimestamp = tplTime;
+            }
+
+            // 7-day recency window for newly uploaded batches
+            const isRecent = b.latestTimestamp > 0 && (now - b.latestTimestamp < 7 * 24 * 60 * 60 * 1000);
+            const matchesNewTpl = Boolean(matchingTpl && matchingTpl.isNew);
+
+            // A batch/template is strictly NEW ONLY when 0 papers have been corrected yet!
+            // Once even a single paper is saved/graded (b.corrected > 0), it is in-progress and no longer NEW.
+            b.isNew = (matchesNewTpl || isRecent) && b.corrected === 0 && b.total > 0;
+            b.isCompletelyNew = b.isNew;
+
+            // If papers have been evaluated, clear isNew flag from catalog template as well
+            if (b.corrected > 0 && matchingTpl && matchingTpl.isNew) {
+                matchingTpl.isNew = false;
+            }
+
             return b;
         });
 
@@ -687,7 +713,7 @@ class DashboardManager {
             this.batches = this.batches.filter(b => window.appStorage.isSubjectMatch(b.subject, b.templateName, activePanelSubject, b.templateName));
         }
 
-        // Global sort: Newly uploaded templates/batches FIRST!
+        // Global sort: Newly uploaded untouched templates/batches FIRST!
         this.batches.sort((a, b) => {
             if (this.highlightBatchKey) {
                 const hKey = this.highlightBatchKey.toLowerCase().trim();
@@ -699,22 +725,17 @@ class DashboardManager {
                 if (!aMatch && bMatch) return 1;
             }
 
-            // 1. Completely untouched new templates first
-            const aCompNew = Boolean(a.isCompletelyNew);
-            const bCompNew = Boolean(b.isCompletelyNew);
-            if (aCompNew !== bCompNew) return aCompNew ? -1 : 1;
-
-            // 2. Any new template (in progress)
+            // 1. Untouched new templates first (isNew is strictly true only when corrected === 0)
             const aIsNew = Boolean(a.isNew);
             const bIsNew = Boolean(b.isNew);
             if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
 
-            // 3. Batches with pending papers before fully completed ones
+            // 2. Batches with pending papers before fully completed ones
             const aPending = a.uncorrected > 0;
             const bPending = b.uncorrected > 0;
             if (aPending !== bPending) return aPending ? -1 : 1;
 
-            // 4. Latest upload timestamp first (LIFO)
+            // 3. Latest upload timestamp first (LIFO: newest uploads on top)
             const tsA = a.latestTimestamp || 0;
             const tsB = b.latestTimestamp || 0;
             if (tsA !== tsB) return tsB - tsA;
@@ -989,29 +1010,6 @@ class DashboardManager {
                                     `;
                                 }
 
-                                // 1. Identify Newly Uploaded Templates to feature right at the top
-                                const newBatches = displayBatches.filter(b => b.isNew || (b.latestTimestamp > 0 && (now - b.latestTimestamp < 7 * 24 * 60 * 60 * 1000) && b.uncorrected > 0));
-
-                                const newSectionHtml = (newBatches.length > 0 && this.selectedClassFilter === 'all') ? `
-                                    <div class="dash-new-templates-section" style="margin-bottom: 24px; padding: 18px 20px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.03) 100%); border: 1.5px solid rgba(16, 185, 129, 0.35); border-radius: 16px; box-shadow: 0 4px 18px rgba(16, 185, 129, 0.08);">
-                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
-                                            <div style="display: flex; align-items: center; gap: 8px;">
-                                                <span style="font-size: 1.25rem;">✨</span>
-                                                <h4 style="font-size: 0.95rem; font-weight: 700; color: #065F46; margin: 0; display: flex; align-items: center; gap: 8px;">
-                                                    Newly Uploaded Templates & Exams
-                                                    <span style="background: #10B981; color: white; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.03em;">
-                                                        ${newBatches.length} NEW
-                                                    </span>
-                                                </h4>
-                                            </div>
-                                            <span style="font-size: 0.78rem; color: #047857; font-weight: 500;">Recently uploaded answer sheets ready for your evaluation</span>
-                                        </div>
-                                        <div class="teacher-batches-grid">
-                                            ${newBatches.map(b => this.renderBatchCardHtml(b)).join('')}
-                                        </div>
-                                    </div>
-                                ` : '';
-
                                 // Group batches by Grade Level
                                 const gradeGroupsMap = new Map();
                                 displayBatches.forEach(b => {
@@ -1037,15 +1035,11 @@ class DashboardManager {
                                     if (gBatches.length === 0) return '';
 
                                     // Sort batches within grade:
-                                    // 1. Newly added / untouched templates first!
-                                    // 2. Latest uploaded timestamp (LIFO)
+                                    // 1. Untouched newly added templates first (isNew strictly requires corrected === 0)
+                                    // 2. Latest uploaded timestamp (LIFO: newest uploads on top)
                                     // 3. Batches with pending papers before completed
                                     // 4. Section letters (A, B, C)
                                     gBatches.sort((a, b) => {
-                                        const aCompNew = Boolean(a.isCompletelyNew);
-                                        const bCompNew = Boolean(b.isCompletelyNew);
-                                        if (aCompNew !== bCompNew) return aCompNew ? -1 : 1;
-
                                         const aIsNew = Boolean(a.isNew);
                                         const bIsNew = Boolean(b.isNew);
                                         if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
@@ -1111,7 +1105,7 @@ class DashboardManager {
                                     `;
                                 }).join('');
 
-                                return newSectionHtml + gradeSectionsHtml;
+                                return gradeSectionsHtml;
                             })()}
                         </div>
                     </div>
@@ -1144,6 +1138,9 @@ class DashboardManager {
         }
         const batchPct = currentBatch.total > 0 ? Math.round((currentBatch.corrected / currentBatch.total) * 100) : 0;
         const batchIsDone = currentBatch.uncorrected === 0 && currentBatch.total > 0;
+        const detailUploadDate = (currentBatch.latestTimestamp > 0)
+            ? new Date(currentBatch.latestTimestamp).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+            : (currentBatch.examDate ? new Date(currentBatch.examDate).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }) : '');
 
         this.container.innerHTML = `
             <div class="dashboard-page">
@@ -1172,10 +1169,11 @@ class DashboardManager {
 
                     <div style="display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 14px;">
                         <div>
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px; flex-wrap: wrap;">
                                 <span style="background: #0071E3; color: #FFFFFF; font-size: 0.74rem; font-weight: 400 !important; padding: 3px 9px; border-radius: 6px; text-transform: uppercase;">${currentBatch.className}</span>
                                 <span style="background: rgba(255,255,255,0.12); color: #E2E8F0; font-size: 0.74rem; font-weight: 400 !important; padding: 3px 9px; border-radius: 6px;">${currentBatch.subject}</span>
                                 <span style="color: #94A3B8; font-size: 0.8rem;">Max Marks: <span style="color: #FFFFFF;">${currentBatch.maxMarks}M</span></span>
+                                ${detailUploadDate ? `<span style="color: #94A3B8; font-size: 0.8rem;">• Uploaded: <span style="color: #FFFFFF;">${detailUploadDate}</span></span>` : ''}
                             </div>
                             <h2 style="font-size: 1.25rem; font-weight: 400 !important; margin: 0; color: #FFFFFF;">${currentBatch.templateName}</h2>
                         </div>

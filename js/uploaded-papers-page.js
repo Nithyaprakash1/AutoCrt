@@ -480,6 +480,9 @@ class UploadedPapersPageManager {
                                 const pct = b.total > 0 ? Math.round((b.completed / b.total) * 100) : 0;
                                 const isCompleted = b.pending === 0 && b.total > 0;
                                 const formattedStorage = this.formatBytes(b.totalBytes);
+                                const uploadDateStr = b.latestTimestamp > 0
+                                    ? new Date(b.latestTimestamp).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                                    : '';
 
                                 return `
                                     <div class="uploaded-batch-card" data-batch-key="${b.key}">
@@ -501,6 +504,10 @@ class UploadedPapersPageManager {
                                             <span>${b.totalPages} Pages</span>
                                             <span>•</span>
                                             <span style="color: #0071E3;">${formattedStorage}</span>
+                                            ${uploadDateStr ? `
+                                                <span>•</span>
+                                                <span style="color: #64748B;">📅 Uploaded: ${uploadDateStr}</span>
+                                            ` : ''}
                                         </div>
 
                                         <div class="batch-progress-wrapper">
