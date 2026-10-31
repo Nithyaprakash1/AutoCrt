@@ -168,7 +168,16 @@ class UploadedPapersPageManager {
                 const pg = p.pageCount || (p.pages ? p.pages.length : (p.totalPages || 1));
                 return sum + (p.fileSizeBytes || (pg * 185 * 1024));
             }, 0);
+            const pTime = b.papers.reduce((max, p) => {
+                const t = new Date(p.createdAt || p.uploadedAt || p.timestamp || p.lastUpdated || 0).getTime();
+                return t > max ? t : max;
+            }, 0);
+            b.latestTimestamp = pTime;
             return b;
+        }).sort((a, b) => {
+            if (a.pending > 0 && b.pending === 0) return -1;
+            if (a.pending === 0 && b.pending > 0) return 1;
+            return (b.latestTimestamp || 0) - (a.latestTimestamp || 0);
         });
     }
 

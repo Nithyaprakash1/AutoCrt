@@ -5703,6 +5703,12 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             if (cls && subject) {
                 sessionStorage.setItem("niprak_last_uploaded_class", cls.label || cls.name);
                 sessionStorage.setItem("niprak_last_uploaded_subject", subject.name);
+                if (this.selectedTemplate) {
+                    const tplName = (this.selectedTemplate.name || this.selectedTemplate.examName || "").trim();
+                    const bKey = `${cls.label || cls.name}:::${tplName}`;
+                    sessionStorage.setItem("niprak_last_uploaded_template", tplName);
+                    sessionStorage.setItem("niprak_last_uploaded_batch", bKey);
+                }
             }
 
             if (window.app && window.app.showToast) {

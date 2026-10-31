@@ -143,12 +143,17 @@ class DashboardManager {
         // Check if uploader just published a new batch of papers
         const lastCls = sessionStorage.getItem("niprak_last_uploaded_class");
         const lastSub = sessionStorage.getItem("niprak_last_uploaded_subject");
+        const lastBatch = sessionStorage.getItem("niprak_last_uploaded_batch");
         if (lastSub) {
             this.selectedSubjectFilter = lastSub;
             sessionStorage.removeItem("niprak_last_uploaded_subject");
         }
         if (lastCls) {
             sessionStorage.removeItem("niprak_last_uploaded_class");
+        }
+        if (lastBatch) {
+            this.highlightBatchKey = lastBatch;
+            sessionStorage.removeItem("niprak_last_uploaded_batch");
         }
         this.selectedClassFilter = "all";
 
@@ -665,31 +670,57 @@ class DashboardManager {
             b.corrected = b.papers.filter(p => this.isPaperCorrected(p)).length;
             b.uncorrected = b.total - b.corrected;
             b.firstPendingPaper = b.papers.find(p => !this.isPaperCorrected(p)) || null;
-            const isRecent = b.latestTimestamp > 0 && (now - b.latestTimestamp < 48 * 60 * 60 * 1000);
+            // 7-day recency window for newly uploaded batches
+            const isRecent = b.latestTimestamp > 0 && (now - b.latestTimestamp < 7 * 24 * 60 * 60 * 1000);
             const matchesNewTpl = catalogTpls.some(t => {
                 const name = (t.name || t.examName || '').toLowerCase().trim();
                 const bName = (b.templateName || b.examName || '').toLowerCase().trim();
                 return name && bName && (name === bName || bName.includes(name) || name.includes(bName));
             });
-            // Card stays NEW until at least one paper is corrected
-            b.isNew = (matchesNewTpl || isRecent) && b.corrected === 0;
+            // Card stays marked NEW while it has pending papers to correct
+            b.isNew = (matchesNewTpl || isRecent) && b.uncorrected > 0;
+            b.isCompletelyNew = b.isNew && b.corrected === 0;
             return b;
         });
+
         if (activePanelSubject) {
             this.batches = this.batches.filter(b => window.appStorage.isSubjectMatch(b.subject, b.templateName, activePanelSubject, b.templateName));
         }
-        if (this.highlightBatchKey) {
-            const hKey = this.highlightBatchKey.toLowerCase().trim();
-            this.batches.sort((a, b) => {
+
+        // Global sort: Newly uploaded templates/batches FIRST!
+        this.batches.sort((a, b) => {
+            if (this.highlightBatchKey) {
+                const hKey = this.highlightBatchKey.toLowerCase().trim();
                 const aMatch = a.key.toLowerCase().trim() === hKey || hKey.includes(a.key.toLowerCase().trim()) ||
                                (hKey.includes(a.className.toLowerCase()) && hKey.includes(a.templateName.toLowerCase()));
                 const bMatch = b.key.toLowerCase().trim() === hKey || hKey.includes(b.key.toLowerCase().trim()) ||
                                (hKey.includes(b.className.toLowerCase()) && hKey.includes(b.templateName.toLowerCase()));
                 if (aMatch && !bMatch) return -1;
                 if (!aMatch && bMatch) return 1;
-                return 0;
-            });
-        }
+            }
+
+            // 1. Completely untouched new templates first
+            const aCompNew = Boolean(a.isCompletelyNew);
+            const bCompNew = Boolean(b.isCompletelyNew);
+            if (aCompNew !== bCompNew) return aCompNew ? -1 : 1;
+
+            // 2. Any new template (in progress)
+            const aIsNew = Boolean(a.isNew);
+            const bIsNew = Boolean(b.isNew);
+            if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
+
+            // 3. Batches with pending papers before fully completed ones
+            const aPending = a.uncorrected > 0;
+            const bPending = b.uncorrected > 0;
+            if (aPending !== bPending) return aPending ? -1 : 1;
+
+            // 4. Latest upload timestamp first (LIFO)
+            const tsA = a.latestTimestamp || 0;
+            const tsB = b.latestTimestamp || 0;
+            if (tsA !== tsB) return tsB - tsA;
+
+            return (a.templateName || "").localeCompare(b.templateName || "");
+        });
 
         // Distinct classes for filter pills: Canonicalize, deduplicate and ensure count > 0
         const activeClassesList = (this.teacherClasses && this.teacherClasses.length > 0)
@@ -958,7 +989,30 @@ class DashboardManager {
                                     `;
                                 }
 
-                                // Group batches by Grade Level (10th top, then 12th below, then others)
+                                // 1. Identify Newly Uploaded Templates to feature right at the top
+                                const newBatches = displayBatches.filter(b => b.isNew || (b.latestTimestamp > 0 && (now - b.latestTimestamp < 7 * 24 * 60 * 60 * 1000) && b.uncorrected > 0));
+
+                                const newSectionHtml = (newBatches.length > 0 && this.selectedClassFilter === 'all') ? `
+                                    <div class="dash-new-templates-section" style="margin-bottom: 24px; padding: 18px 20px; background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(5, 150, 105, 0.03) 100%); border: 1.5px solid rgba(16, 185, 129, 0.35); border-radius: 16px; box-shadow: 0 4px 18px rgba(16, 185, 129, 0.08);">
+                                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px;">
+                                            <div style="display: flex; align-items: center; gap: 8px;">
+                                                <span style="font-size: 1.25rem;">✨</span>
+                                                <h4 style="font-size: 0.95rem; font-weight: 700; color: #065F46; margin: 0; display: flex; align-items: center; gap: 8px;">
+                                                    Newly Uploaded Templates & Exams
+                                                    <span style="background: #10B981; color: white; font-size: 0.68rem; font-weight: 700; padding: 2px 8px; border-radius: 999px; letter-spacing: 0.03em;">
+                                                        ${newBatches.length} NEW
+                                                    </span>
+                                                </h4>
+                                            </div>
+                                            <span style="font-size: 0.78rem; color: #047857; font-weight: 500;">Recently uploaded answer sheets ready for your evaluation</span>
+                                        </div>
+                                        <div class="teacher-batches-grid">
+                                            ${newBatches.map(b => this.renderBatchCardHtml(b)).join('')}
+                                        </div>
+                                    </div>
+                                ` : '';
+
+                                // Group batches by Grade Level
                                 const gradeGroupsMap = new Map();
                                 displayBatches.forEach(b => {
                                     const g = this.getGradeLevel(b.className);
@@ -966,34 +1020,48 @@ class DashboardManager {
                                     gradeGroupsMap.get(g).push(b);
                                 });
 
-                                // Sorted grades: 10th first, 12th second, 11th third, others
+                                // Sorted grades: grades with new templates first, then 10th, 12th, 11th, others
                                 const sortedGrades = Array.from(gradeGroupsMap.keys()).sort((a, b) => {
+                                    const aHasNew = (gradeGroupsMap.get(a) || []).some(item => item.isNew);
+                                    const bHasNew = (gradeGroupsMap.get(b) || []).some(item => item.isNew);
+                                    if (aHasNew !== bHasNew) return aHasNew ? -1 : 1;
+
                                     const order = { 10: 1, 12: 2, 11: 3, 99: 4 };
                                     const ordA = order[a] !== undefined ? order[a] : (a < 10 ? 0 : 5);
                                     const ordB = order[b] !== undefined ? order[b] : (b < 10 ? 0 : 5);
                                     return ordA - ordB;
                                 });
 
-                                return sortedGrades.map(gKey => {
+                                const gradeSectionsHtml = sortedGrades.map(gKey => {
                                     const gBatches = gradeGroupsMap.get(gKey) || [];
                                     if (gBatches.length === 0) return '';
 
                                     // Sort batches within grade:
-                                    // 1. Section A first, then Section B, then Section C
-                                    // 2. Newly added / latest timestamp first (LIFO)
-                                    // 3. Fallback alphabetical
+                                    // 1. Newly added / untouched templates first!
+                                    // 2. Latest uploaded timestamp (LIFO)
+                                    // 3. Batches with pending papers before completed
+                                    // 4. Section letters (A, B, C)
                                     gBatches.sort((a, b) => {
-                                        const secA = this.getSectionLetter(a.className);
-                                        const secB = this.getSectionLetter(b.className);
-                                        if (secA !== secB) return secA.localeCompare(secB);
-                                        // Priority 1: Newly added template first!
+                                        const aCompNew = Boolean(a.isCompletelyNew);
+                                        const bCompNew = Boolean(b.isCompletelyNew);
+                                        if (aCompNew !== bCompNew) return aCompNew ? -1 : 1;
+
                                         const aIsNew = Boolean(a.isNew);
                                         const bIsNew = Boolean(b.isNew);
                                         if (aIsNew !== bIsNew) return aIsNew ? -1 : 1;
-                                        // Priority 2: Latest timestamp first (LIFO)
+
                                         const tsA = a.latestTimestamp || 0;
                                         const tsB = b.latestTimestamp || 0;
                                         if (tsA !== tsB) return tsB - tsA;
+
+                                        const aPending = a.uncorrected > 0;
+                                        const bPending = b.uncorrected > 0;
+                                        if (aPending !== bPending) return aPending ? -1 : 1;
+
+                                        const secA = this.getSectionLetter(a.className);
+                                        const secB = this.getSectionLetter(b.className);
+                                        if (secA !== secB) return secA.localeCompare(secB);
+
                                         return (a.templateName || "").localeCompare(b.templateName || "");
                                     });
 
@@ -1042,6 +1110,8 @@ class DashboardManager {
                                         </div>
                                     `;
                                 }).join('');
+
+                                return newSectionHtml + gradeSectionsHtml;
                             })()}
                         </div>
                     </div>
