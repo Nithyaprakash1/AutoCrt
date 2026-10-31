@@ -3263,7 +3263,8 @@ class AppController {
             "settings": "settings-container-root",
             "user-management": "user-management-container-root",
             "admin-panel": "admin-panel-container-root",
-            "super-admin": "super-admin-container-root"
+            "super-admin": "super-admin-container-root",
+            "template-manager": "template-manager-container-root"
         };
         const rootId = rootIdMap[viewName];
         const root = rootId ? document.getElementById(rootId) : null;
@@ -3327,6 +3328,12 @@ class AppController {
                     onShowToast: (msg, type) => this.showToast(msg, type)
                 });
                 await Promise.all([this.correctionMarksPageManager.init(), minSkeletonDelay()]);
+            }
+        } else if (viewName === "template-manager") {
+            activateSection("view-template-manager");
+            if (root && window.TemplateManagerPage) {
+                this.templateManagerPage = new TemplateManagerPage(root);
+                await Promise.all([this.templateManagerPage.render(), minSkeletonDelay()]);
             }
         } else if (viewName === "settings") {
             activateSection("view-settings");
