@@ -373,41 +373,7 @@ class FirebaseManager {
             const rawFile = evaluation.rawFile || null;
             if (evalData.rawFile) delete evalData.rawFile;
 
-            // Upload PDF file to Firebase Storage
-            await this.ensureReady(3000);
-            if (this.storage) {
-                const storagePath = `evaluations_pdf/${evalData.id}.pdf`;
-                let newUploadUrl = null;
-
-                // 1. If rawFile is provided (new file upload or replacement), always upload it directly to Storage
-                if (rawFile instanceof File || rawFile instanceof Blob) {
-                    try {
-                        newUploadUrl = await this.uploadStorageBlob(storagePath, rawFile, { contentType: 'application/pdf' });
-                    } catch (fErr) {
-                        console.warn("Direct file upload to Storage failed:", fErr);
-                    }
-                }
-
-                // 2. If no rawFile, but pdfDataUrl is a Base64 data URL, upload it
-                if (!newUploadUrl && evalData.pdfDataUrl && evalData.pdfDataUrl.startsWith("data:")) {
-                    try {
-                        const blob = this.dataURLtoBlob(evalData.pdfDataUrl);
-                        if (blob) {
-                            newUploadUrl = await this.uploadStorageBlob(storagePath, blob, { contentType: 'application/pdf' });
-                        }
-                    } catch (pdfErr) {
-                        console.warn("Base64 PDF upload to Storage failed:", pdfErr);
-                    }
-                }
-
-                // Update evalData with newly uploaded Storage URL
-                if (newUploadUrl) {
-                    evalData.pdfStorageUrl = newUploadUrl;
-                    evaluation.pdfStorageUrl = newUploadUrl;
-                }
-            }
-
-            // 2. Firestore Document Size Optimization:
+            // 1. Firestore Document Size Optimization:
             // Cloud Firestore has a strict 1MB document size limit.
             // Save sanitized document: omit redundant base64 strings and duplicate page arrays
             const firestoreRecord = Object.assign({}, evalData);
@@ -419,9 +385,46 @@ class FirebaseManager {
             firestoreRecord.pageCount = evalData.pageCount || 1;
             firestoreRecord.updatedAt = new Date().toISOString();
 
+            // CRITICAL: Write marks, questions, status & annotations to Firestore IMMEDIATELY (sub-100ms)
+            // Never block on heavy background storage uploads so closing the laptop never loses the save!
+            await this.ensureReady(1500);
             if (this.firestore) {
                 await this.firestore.collection("evaluations").doc(String(evalData.id)).set(firestoreRecord, { merge: true });
-                console.log(`🔥 Successfully saved evaluation ${evalData.id} to Firestore! Single Storage PDF: ${evalData.pdfStorageUrl ? 'Uploaded' : 'Pending'}`);
+                console.log(`🔥 Successfully saved evaluation ${evalData.id} to Firestore! Marks: ${evalData.obtainedMarks || 0}`);
+            }
+
+            // 2. Background PDF Upload to Storage (ONLY if not already uploaded)
+            if (this.storage && !evalData.pdfStorageUrl) {
+                const storagePath = `evaluations_pdf/${evalData.id}.pdf`;
+                let newUploadUrl = null;
+
+                if (rawFile instanceof File || rawFile instanceof Blob) {
+                    try {
+                        newUploadUrl = await this.uploadStorageBlob(storagePath, rawFile, { contentType: 'application/pdf' });
+                    } catch (fErr) {
+                        console.warn("Direct file upload to Storage failed:", fErr);
+                    }
+                } else if (evalData.pdfDataUrl && evalData.pdfDataUrl.startsWith("data:")) {
+                    try {
+                        const blob = this.dataURLtoBlob(evalData.pdfDataUrl);
+                        if (blob) {
+                            newUploadUrl = await this.uploadStorageBlob(storagePath, blob, { contentType: 'application/pdf' });
+                        }
+                    } catch (pdfErr) {
+                        console.warn("Base64 PDF upload to Storage failed:", pdfErr);
+                    }
+                }
+
+                if (newUploadUrl) {
+                    evalData.pdfStorageUrl = newUploadUrl;
+                    evaluation.pdfStorageUrl = newUploadUrl;
+                    if (this.firestore) {
+                        this.firestore.collection("evaluations").doc(String(evalData.id)).set({
+                            pdfStorageUrl: newUploadUrl,
+                            hasPdfStorage: true
+                        }, { merge: true }).catch(() => {});
+                    }
+                }
             }
 
             return true;
@@ -523,7 +526,7 @@ class FirebaseManager {
 
         // 2. High-speed Direct REST Fallback (Direct GET to Firestore REST API, ultra-reliable across all machines/browsers)
         try {
-            const endpoint = `https://firestore.googleapis.com/v1/projects/${this.config.projectId}/databases/(default)/documents/evaluations?pageSize=100`;
+            const endpoint = `https://firestore.googleapis.com/v1/projects/${this.config.projectId}/databases/(default)/documents/evaluations?pageSize=300`;
             const resp = await fetch(endpoint);
             if (resp.ok) {
                 const json = await resp.json();

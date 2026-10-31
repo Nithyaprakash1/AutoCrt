@@ -545,20 +545,26 @@ class StorageService {
                 if (!ev || !ev.id) return ev;
                 const draft = this.getDraft(ev.id);
                 let merged = ev;
-                if (draft && (!ev.status || ev.status !== "Completed")) {
-                    const draftTime = draft.timestamp || draft.savedAt || 0;
-                    const evTime = ev.updatedAt ? new Date(ev.updatedAt).getTime() : 0;
-                    if (!evTime || draftTime >= evTime) {
-                        merged = Object.assign({}, ev, {
-                            obtainedMarks: draft.obtainedMarks !== undefined ? draft.obtainedMarks : ev.obtainedMarks,
-                            maxMarks: draft.maxMarks || ev.maxMarks,
-                            percentage: draft.percentage !== undefined ? draft.percentage : ev.percentage,
-                            grade: draft.grade || ev.grade,
-                            status: draft.status || ev.status,
-                            questions: (draft.questions && draft.questions.length > 0) ? draft.questions : ev.questions
-                        });
-                    } else {
+                if (draft) {
+                    const isCloudDone = ev.status === "Completed" || ev.status === "Corrected" || ev.status === "Graded" || Number(ev.obtainedMarks) > 0;
+                    if (isCloudDone) {
+                        // Cloud paper is already evaluated/marked! Clear any stale local pending draft from this device
                         this.clearDraft(ev.id);
+                    } else {
+                        const draftTime = draft.timestamp || draft.savedAt || 0;
+                        const evTime = ev.updatedAt ? new Date(ev.updatedAt).getTime() : 0;
+                        if (!evTime || draftTime >= evTime) {
+                            merged = Object.assign({}, ev, {
+                                obtainedMarks: draft.obtainedMarks !== undefined ? draft.obtainedMarks : ev.obtainedMarks,
+                                maxMarks: draft.maxMarks || ev.maxMarks,
+                                percentage: draft.percentage !== undefined ? draft.percentage : ev.percentage,
+                                grade: draft.grade || ev.grade,
+                                status: draft.status || ev.status,
+                                questions: (draft.questions && draft.questions.length > 0) ? draft.questions : ev.questions
+                            });
+                        } else {
+                            this.clearDraft(ev.id);
+                        }
                     }
                 }
 
@@ -799,7 +805,7 @@ class StorageService {
         if (s.includes('bio') || s.includes('botany') || s.includes('zoology') || s.includes('life sci') || s.includes('bio-')) return 'biology';
         if (s.includes('chem') || s.includes('che-')) return 'chemistry';
         if (s.includes('physic') || s === 'phy' || s.startsWith('phy ') || s.includes('phy-')) return 'physics';
-        if (s.includes('math') || s.includes('mat-x') || s.includes('mat-xii') || s.includes('mat x') || s.includes('mat xii') || s.includes('10th math') || s.includes('10 math') || s === '10th revision' || s === 'revision 2 - objective' || s === 'revision 2 objective') return 'mathematics';
+        if (s.includes('math') || s.includes('mat-x') || s.includes('mat-xii') || s.includes('mat x') || s.includes('mat xii') || s.includes('10th math') || s.includes('10 math') || s === '10th revision math' || s === 'revision 2 - math objective') return 'mathematics';
         if (s.includes('english') || s.includes('eng') || s.includes('eng-')) return 'english';
         if (s.includes('econom') || s.includes('ecom') || s === 'eco' || s.startsWith('eco ') || s.endsWith(' eco') || s.includes('eco-') || s.includes('eco_') || s === 'econ' || s === 'ec') return 'economics';
         if (s.includes('histor')) return 'history';
@@ -891,27 +897,54 @@ class StorageService {
         const cExam = this.canonicalizeSubject(pExam);
         const cTpl = this.canonicalizeSubject(pTpl);
 
-        // 1. Direct canonical match from paperSubject, examName, or templateName
-        if (cPaper === cTarget || cExam === cTarget || cTpl === cTarget) {
-            return true;
-        }
-
-        // 2. Strict conflict prevention: If paper has an explicitly identified DIFFERENT standard core subject,
-        // and neither the exam nor template points to the target subject, do NOT cross-leak
         const STANDARD_SUBJECTS = new Set([
             'entrepreneurship', 'business_studies', 'accountancy', 'social_science',
             'political_science', 'informatics_practices', 'computer_science', 'biology',
             'chemistry', 'physics', 'mathematics', 'english', 'economics', 'history',
             'geography', 'tamil', 'hindi', 'french', 'sanskrit', 'science'
         ]);
-        if (cPaper && STANDARD_SUBJECTS.has(cPaper) && cPaper !== cTarget) {
-            if (cExam !== cTarget && cTpl !== cTarget) {
-                return false;
+
+        // 1. STRICT CORE SUBJECT ISOLATION:
+        // If the paper's explicit subject is known, it is the absolute source of truth.
+        // An Economics paper CAN NEVER appear in Mathematics, Physics, English, etc.!
+        if (cPaper && STANDARD_SUBJECTS.has(cPaper)) {
+            if (cPaper === cTarget) {
+                return true;
             }
+            // Allow Science sub-branches (e.g. Class 10 Science branches)
+            const isScienceBranch = (cPaper === 'science' && (cTarget === 'physics' || cTarget === 'chemistry' || cTarget === 'biology')) ||
+                                    (cTarget === 'science' && (cPaper === 'physics' || cPaper === 'chemistry' || cPaper === 'biology'));
+            if (isScienceBranch) {
+                return true;
+            }
+            // Explicit core subject mismatch: STRICTLY REJECT! Never leak across core subjects!
+            return false;
         }
 
-        // 3. Combined text scan fallback
+        // 2. If paper subject is unknown/empty, check if examName or template explicitly belongs to a known subject
+        const detectedSub = (cExam && STANDARD_SUBJECTS.has(cExam)) ? cExam : ((cTpl && STANDARD_SUBJECTS.has(cTpl)) ? cTpl : null);
+        if (detectedSub) {
+            if (detectedSub === cTarget) return true;
+            const isScienceBranch = (detectedSub === 'science' && (cTarget === 'physics' || cTarget === 'chemistry' || cTarget === 'biology')) ||
+                                    (cTarget === 'science' && (detectedSub === 'physics' || detectedSub === 'chemistry' || detectedSub === 'biology'));
+            if (isScienceBranch) return true;
+            return false;
+        }
+
+        // 3. Fallback direct match
+        if (cPaper === cTarget || cExam === cTarget || cTpl === cTarget) {
+            return true;
+        }
+
+        // 4. Combined text scan fallback
         const combined = `${pSub} ${pExam} ${pTpl}`.toLowerCase();
+
+        // Economics exclusivity: If paper mentions economics, it can ONLY match economics!
+        const hasEco = combined.includes('econom') || combined.includes('ecom') || /\b(eco|econ)\b/.test(combined);
+        if (hasEco) {
+            return cTarget === 'economics';
+        }
+
         if (cTarget === 'political_science') {
             return combined.includes('politic') || combined.includes('pol science') || combined.includes('pol sci') || combined.includes('polity') || combined.includes('civic') || combined.includes('pol-');
         }
@@ -928,7 +961,10 @@ class StorageService {
             return combined.includes('physic') || combined.includes('phy-') || combined.startsWith('phy ') || combined.endsWith(' phy') || /\bphy\b/.test(combined);
         }
         if (cTarget === 'mathematics') {
-            return combined.includes('math') || combined.includes('mat-x') || combined.includes('mat-xii') || combined.includes('mat x') || combined.includes('mat xii') || combined.includes('10th math') || combined.includes('10 math') || combined.includes('10th revision') || (combined.includes('revision 2') && !combined.includes('eco') && !combined.includes('chem') && !combined.includes('phy') && !combined.includes('bio'));
+            if (combined.includes('eco') || combined.includes('econom') || combined.includes('ecom') || combined.includes('commerce') || combined.includes('account') || combined.includes('business')) {
+                return false;
+            }
+            return combined.includes('math') || combined.includes('mat-x') || combined.includes('mat-xii') || combined.includes('mat x') || combined.includes('mat xii') || combined.includes('10th math') || combined.includes('10 math') || (combined.includes('10th revision') && !combined.includes('soc')) || (combined.includes('revision 2') && !combined.includes('eco') && !combined.includes('chem') && !combined.includes('phy') && !combined.includes('bio'));
         }
         if (cTarget === 'tamil') {
             return combined.includes('tamil') || combined.includes('tam-') || combined.startsWith('tam ') || combined.endsWith(' tam') || /\btam\b/.test(combined);
@@ -937,7 +973,7 @@ class StorageService {
             return combined.includes('english') || combined.includes('eng') || combined.includes('eng-');
         }
         if (cTarget === 'economics') {
-            return combined.includes('econom') || combined.includes('ecom') || /\b(eco|econ)\b/.test(combined);
+            return hasEco;
         }
         if (cTarget === 'history') {
             return combined.includes('histor');
@@ -1130,14 +1166,20 @@ class StorageService {
         }
 
         if (evalObj) {
-            const draft = this.getDraft(id);
-            if (draft) {
-                if (draft.annotations && draft.annotations.length > 0) evalObj.annotations = draft.annotations;
-                if (draft.questions && draft.questions.length > 0) evalObj.questions = draft.questions;
-                if (draft.obtainedMarks !== undefined) evalObj.obtainedMarks = draft.obtainedMarks;
-                if (draft.percentage !== undefined) evalObj.percentage = draft.percentage;
-                if (draft.grade !== undefined) evalObj.grade = draft.grade;
-                if (draft.status !== undefined) evalObj.status = draft.status;
+            const isDone = evalObj.status === "Completed" || evalObj.status === "Corrected" || evalObj.status === "Graded" || Number(evalObj.obtainedMarks) > 0;
+            if (isDone) {
+                // Cloud paper is already marked or finished! Discard any stale local pending draft
+                this.clearDraft(id);
+            } else {
+                const draft = this.getDraft(id);
+                if (draft) {
+                    if (draft.annotations && draft.annotations.length > 0) evalObj.annotations = draft.annotations;
+                    if (draft.questions && draft.questions.length > 0) evalObj.questions = draft.questions;
+                    if (draft.obtainedMarks !== undefined) evalObj.obtainedMarks = draft.obtainedMarks;
+                    if (draft.percentage !== undefined) evalObj.percentage = draft.percentage;
+                    if (draft.grade !== undefined) evalObj.grade = draft.grade;
+                    if (draft.status !== undefined) evalObj.status = draft.status;
+                }
             }
 
             // 1. Recover pages and pdfDataUrl from CacheStorage / Memory Cache if missing

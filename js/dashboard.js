@@ -318,6 +318,9 @@ class DashboardManager {
         if (e.status === "Completed" || e.status === "Corrected" || e.status === "Graded" || e.status === "Evaluated") {
             return true;
         }
+        if (Number(e.obtainedMarks) > 0) {
+            return true;
+        }
         if (Array.isArray(e.questions) && e.questions.length > 0) {
             const hasUnmarked = e.questions.some(q => !q.status || q.status === "unmarked" || q.status === "pending");
             if (!hasUnmarked) return true;
