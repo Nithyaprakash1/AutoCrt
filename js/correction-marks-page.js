@@ -774,27 +774,16 @@ class CorrectionMarksPageManager {
                     }
                 });
 
-                const qSum = ev.questions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
-                if (qSum > currentObt) {
-                    ev.obtainedMarks = Math.round(qSum * 10) / 10;
+                const qSum = ev.questions.reduce((sum, q) => {
+                    if (q.status === "skipped" || q.status === "unmarked" || q.status === "pending") return sum;
+                    return sum + (Number(q.awardedMarks) || 0);
+                }, 0);
+                const roundedQSum = Math.round(qSum * 10) / 10;
+                if (ev.obtainedMarks !== roundedQSum) {
+                    ev.obtainedMarks = roundedQSum;
                     ev.percentage = maxM > 0 ? Math.round((ev.obtainedMarks / maxM) * 100) : 0;
                     ev.grade = ev.percentage >= 90 ? "A+" : ev.percentage >= 75 ? "A" : ev.percentage >= 60 ? "B" : ev.percentage >= 40 ? "C" : "F";
                     ev.status = ev.questions.every(q => q.status && q.status !== "unmarked" && q.status !== "pending") ? "Completed" : "In Progress";
-                    changed = true;
-                }
-            }
-
-            // Annotation recovery check
-            if (Array.isArray(ev.annotations) && ev.annotations.length > 0) {
-                let annMarkSum = 0;
-                ev.annotations.forEach(a => {
-                    if (a.marks !== undefined) annMarkSum += Number(a.marks);
-                    else if (a.type === "marks" || a.type === "margin_mark") annMarkSum += Number(a.points || a.text) || 0;
-                });
-                if (annMarkSum > Number(ev.obtainedMarks) && annMarkSum <= maxM) {
-                    ev.obtainedMarks = Math.round(annMarkSum * 10) / 10;
-                    ev.percentage = maxM > 0 ? Math.round((ev.obtainedMarks / maxM) * 100) : 0;
-                    ev.grade = ev.percentage >= 90 ? "A+" : ev.percentage >= 75 ? "A" : ev.percentage >= 60 ? "B" : ev.percentage >= 40 ? "C" : "F";
                     changed = true;
                 }
             }

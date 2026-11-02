@@ -500,13 +500,12 @@ class StorageService {
                             addedCount++;
                         } else {
                             const existing = listMap.get(sId);
-                            // Realtime cloud authority: if cloud paper is completed, has marks, or has newer/equal timestamp
-                            const cloudIsDone = fbItem.status === "Completed" || fbItem.status === "Corrected" || fbItem.status === "Graded";
-                            const cloudHasMarks = Number(fbItem.obtainedMarks) > 0;
-                            const cloudHasAnnotations = Array.isArray(fbItem.annotations) && fbItem.annotations.length > 0;
-                            const cloudIsNewer = fbItem.updatedAt && (!existing.updatedAt || fbItem.updatedAt >= existing.updatedAt);
+                            // Realtime cloud authority: only overwrite local if cloud is strictly newer
+                            const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
+                            const cloudTime = fbItem.updatedAt ? new Date(fbItem.updatedAt).getTime() : 0;
+                            const cloudIsNewer = cloudTime > existingTime;
 
-                            if (cloudIsDone || cloudHasMarks || cloudHasAnnotations || cloudIsNewer) {
+                            if (cloudIsNewer) {
                                 const merged = Object.assign({}, existing, fbItem, {
                                     obtainedMarks: (fbItem.obtainedMarks !== undefined && fbItem.obtainedMarks !== null) ? fbItem.obtainedMarks : existing.obtainedMarks,
                                     maxMarks: fbItem.maxMarks || existing.maxMarks,
@@ -523,7 +522,9 @@ class StorageService {
                                 const idx = list.findIndex(e => String(e.id) === sId);
                                 if (idx >= 0) list[idx] = merged;
                                 this._saveEvaluationToIndexedDB(merged);
-                                if (cloudIsDone || cloudHasMarks) {
+                                const draft = this.getDraft(sId);
+                                const draftTime = draft ? (draft.timestamp || draft.savedAt || 0) : 0;
+                                if (draft && cloudTime >= draftTime) {
                                     this.clearDraft(sId);
                                 }
                             }
@@ -546,39 +547,35 @@ class StorageService {
                 const draft = this.getDraft(ev.id);
                 let merged = ev;
                 if (draft) {
-                    const isCloudDone = ev.status === "Completed" || ev.status === "Corrected" || ev.status === "Graded" || Number(ev.obtainedMarks) > 0;
-                    if (isCloudDone) {
-                        // Cloud paper is already evaluated/marked! Clear any stale local pending draft from this device
+                    const draftTime = draft.timestamp || draft.savedAt || 0;
+                    const evTime = ev.updatedAt ? new Date(ev.updatedAt).getTime() : 0;
+                    if (!evTime || draftTime >= evTime) {
+                        merged = Object.assign({}, ev, {
+                            obtainedMarks: draft.obtainedMarks !== undefined ? draft.obtainedMarks : ev.obtainedMarks,
+                            maxMarks: draft.maxMarks || ev.maxMarks,
+                            percentage: draft.percentage !== undefined ? draft.percentage : ev.percentage,
+                            grade: draft.grade || ev.grade,
+                            status: draft.status || ev.status,
+                            questions: (draft.questions && draft.questions.length > 0) ? draft.questions : ev.questions,
+                            annotations: (draft.annotations && draft.annotations.length > 0) ? draft.annotations : (ev.annotations || [])
+                        });
+                    } else if (ev.status === "Completed" || ev.status === "Corrected") {
                         this.clearDraft(ev.id);
-                    } else {
-                        const draftTime = draft.timestamp || draft.savedAt || 0;
-                        const evTime = ev.updatedAt ? new Date(ev.updatedAt).getTime() : 0;
-                        if (!evTime || draftTime >= evTime) {
-                            merged = Object.assign({}, ev, {
-                                obtainedMarks: draft.obtainedMarks !== undefined ? draft.obtainedMarks : ev.obtainedMarks,
-                                maxMarks: draft.maxMarks || ev.maxMarks,
-                                percentage: draft.percentage !== undefined ? draft.percentage : ev.percentage,
-                                grade: draft.grade || ev.grade,
-                                status: draft.status || ev.status,
-                                questions: (draft.questions && draft.questions.length > 0) ? draft.questions : ev.questions
-                            });
-                        } else {
-                            this.clearDraft(ev.id);
-                        }
                     }
                 }
 
-                // If questions exist, calculate exact awarded sum to prevent stale or divergent totalMarks
+                // Question marks are the SINGLE SOURCE OF TRUTH for obtainedMarks & percentages
                 if (Array.isArray(merged.questions) && merged.questions.length > 0) {
-                    const qSum = merged.questions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
+                    const qSum = merged.questions.reduce((sum, q) => {
+                        if (q.status === "skipped" || q.status === "unmarked" || q.status === "pending") return sum;
+                        return sum + (Number(q.awardedMarks) || 0);
+                    }, 0);
                     const roundedQSum = Math.round(qSum * 10) / 10;
-                    if (roundedQSum > 0 || (merged.obtainedMarks === undefined || merged.obtainedMarks === null)) {
-                        merged.obtainedMarks = roundedQSum;
-                        if (merged.maxMarks && Number(merged.maxMarks) > 0) {
-                            merged.percentage = Math.round((roundedQSum / Number(merged.maxMarks)) * 100);
-                            if (window.calculateGradeScale) {
-                                merged.grade = window.calculateGradeScale(roundedQSum, merged.maxMarks).grade;
-                            }
+                    merged.obtainedMarks = roundedQSum;
+                    if (merged.maxMarks && Number(merged.maxMarks) > 0) {
+                        merged.percentage = Math.round((roundedQSum / Number(merged.maxMarks)) * 100);
+                        if (window.calculateGradeScale) {
+                            merged.grade = window.calculateGradeScale(roundedQSum, merged.maxMarks).grade;
                         }
                     }
                 }
@@ -599,33 +596,7 @@ class StorageService {
                     }
                 }
 
-                // Strip incorrect "Grade XII English" mistakenly forced on Class 10
-                const isGrade10 = String(merged.classLabel || merged.className || merged.class || '').includes('10');
-                if (isGrade10) {
-                    if (merged.examName && String(merged.examName).toLowerCase().includes('grade xii english')) {
-                        merged.examName = 'Grade 10 English Assessment 2026';
-                    }
-                    if (merged.templateName && String(merged.templateName).toLowerCase().includes('grade xii english')) {
-                        merged.templateName = 'Grade 10 English Assessment 2026';
-                    }
-                }
-
-                // Harmonize template and exam name if contradictory to the actual paper subject
-                if (merged.subject) {
-                    const originalTpl = merged.templateName;
-                    const originalExam = merged.examName;
-                    const originalTplId = merged.templateId;
-                    merged.templateName = this.harmonizeTemplateForSubject(merged.templateName, merged.subject);
-                    merged.examName = this.harmonizeTemplateForSubject(merged.examName, merged.subject);
-                    if (merged.templateId === "mat-x-10th-rev-40" || (merged.templateName === "10 MATHEMATICS - Revision 2 Objective" && !merged.templateId)) {
-                        merged.templateId = "mat-x-rev2-40";
-                    } else if (merged.templateName === "10 MATHEMATICS - Revision 1 Objective" && !merged.templateId) {
-                        merged.templateId = "mat-x-rev1-40";
-                    }
-                    if (merged.templateName !== originalTpl || merged.examName !== originalExam || merged.templateId !== originalTplId) {
-                        try { this._saveEvaluationToIndexedDB(merged); } catch (e) {}
-                    }
-                }
+                return merged;
 
                 return merged;
             });
@@ -1138,12 +1109,11 @@ class StorageService {
                         evalObj = cloudObj;
                         this._saveEvaluationToIndexedDB(evalObj);
                     } else {
-                        const cloudIsDone = cloudObj.status === "Completed" || cloudObj.status === "Corrected" || cloudObj.status === "Graded";
-                        const cloudHasMarks = Number(cloudObj.obtainedMarks) > 0;
-                        const cloudHasAnnotations = Array.isArray(cloudObj.annotations) && cloudObj.annotations.length > 0;
-                        const cloudIsNewer = cloudObj.updatedAt && (!evalObj.updatedAt || cloudObj.updatedAt >= evalObj.updatedAt);
+                        const cloudTime = cloudObj.updatedAt ? new Date(cloudObj.updatedAt).getTime() : 0;
+                        const evalTime = evalObj.updatedAt ? new Date(evalObj.updatedAt).getTime() : 0;
+                        const cloudIsNewer = cloudTime > evalTime;
 
-                        if (cloudIsDone || cloudHasMarks || cloudHasAnnotations || cloudIsNewer) {
+                        if (cloudIsNewer) {
                             evalObj = Object.assign({}, evalObj, cloudObj, {
                                 pages: (evalObj.pages && evalObj.pages.length > 0) ? evalObj.pages : (cloudObj.pages || []),
                                 pdfDataUrl: evalObj.pdfDataUrl || cloudObj.pdfDataUrl || null,
@@ -1151,7 +1121,11 @@ class StorageService {
                                 annotations: (Array.isArray(cloudObj.annotations) && cloudObj.annotations.length > 0) ? cloudObj.annotations : (evalObj.annotations || [])
                             });
                             this._saveEvaluationToIndexedDB(evalObj);
-                            this.clearDraft(targetId);
+                            const draft = this.getDraft(targetId);
+                            const draftTime = draft ? (draft.timestamp || draft.savedAt || 0) : 0;
+                            if (draft && cloudTime >= draftTime) {
+                                this.clearDraft(targetId);
+                            }
                         }
                     }
                 }
@@ -1161,19 +1135,34 @@ class StorageService {
         }
 
         if (evalObj) {
-            const isDone = evalObj.status === "Completed" || evalObj.status === "Corrected" || evalObj.status === "Graded" || Number(evalObj.obtainedMarks) > 0;
-            if (isDone) {
-                // Cloud paper is already marked or finished! Discard any stale local pending draft
-                this.clearDraft(id);
-            } else {
-                const draft = this.getDraft(id);
-                if (draft) {
+            const draft = this.getDraft(id);
+            if (draft) {
+                const draftTime = draft.timestamp || draft.savedAt || 0;
+                const evalTime = evalObj.updatedAt ? new Date(evalObj.updatedAt).getTime() : 0;
+                if (!evalTime || draftTime >= evalTime) {
                     if (draft.annotations && draft.annotations.length > 0) evalObj.annotations = draft.annotations;
                     if (draft.questions && draft.questions.length > 0) evalObj.questions = draft.questions;
                     if (draft.obtainedMarks !== undefined) evalObj.obtainedMarks = draft.obtainedMarks;
                     if (draft.percentage !== undefined) evalObj.percentage = draft.percentage;
                     if (draft.grade !== undefined) evalObj.grade = draft.grade;
                     if (draft.status !== undefined) evalObj.status = draft.status;
+                } else if (evalObj.status === "Completed" || evalObj.status === "Corrected") {
+                    this.clearDraft(id);
+                }
+            }
+
+            // Strict consistency: question sum is the single source of truth for scores
+            if (Array.isArray(evalObj.questions) && evalObj.questions.length > 0) {
+                const qSum = evalObj.questions.reduce((sum, q) => {
+                    if (q.status === "skipped" || q.status === "unmarked" || q.status === "pending") return sum;
+                    return sum + (Number(q.awardedMarks) || 0);
+                }, 0);
+                evalObj.obtainedMarks = Math.round(qSum * 10) / 10;
+                if (evalObj.maxMarks && Number(evalObj.maxMarks) > 0) {
+                    evalObj.percentage = Math.round((evalObj.obtainedMarks / Number(evalObj.maxMarks)) * 100);
+                    if (window.calculateGradeScale) {
+                        evalObj.grade = window.calculateGradeScale(evalObj.obtainedMarks, evalObj.maxMarks).grade;
+                    }
                 }
             }
 
@@ -1205,11 +1194,6 @@ class StorageService {
             if (!evalObj.pages) evalObj.pages = evalObj.pdfDataUrl ? [evalObj.pdfDataUrl] : [];
         } else {
             evalObj = this.getDraft(id);
-        }
-
-        if (evalObj && evalObj.subject) {
-            evalObj.templateName = this.harmonizeTemplateForSubject(evalObj.templateName, evalObj.subject);
-            evalObj.examName = this.harmonizeTemplateForSubject(evalObj.examName, evalObj.subject);
         }
 
         return evalObj ? JSON.parse(JSON.stringify(evalObj)) : null;
@@ -1292,6 +1276,21 @@ class StorageService {
 
         if (!evaluation.pdfDataUrl && evaluation.pages && evaluation.pages.length === 1 && typeof evaluation.pages[0] === 'string' && evaluation.pages[0].startsWith('data:application/pdf')) {
             evaluation.pdfDataUrl = evaluation.pages[0];
+        }
+
+        // Synchronize obtainedMarks, percentage, and grade from questions as single source of truth
+        if (Array.isArray(evaluation.questions) && evaluation.questions.length > 0) {
+            const qSum = evaluation.questions.reduce((sum, q) => {
+                if (q.status === "skipped" || q.status === "unmarked" || q.status === "pending") return sum;
+                return sum + (Number(q.awardedMarks) || 0);
+            }, 0);
+            evaluation.obtainedMarks = Math.round(qSum * 10) / 10;
+            if (evaluation.maxMarks && Number(evaluation.maxMarks) > 0) {
+                evaluation.percentage = Math.round((evaluation.obtainedMarks / Number(evaluation.maxMarks)) * 100);
+                if (window.calculateGradeScale) {
+                    evaluation.grade = window.calculateGradeScale(evaluation.obtainedMarks, evaluation.maxMarks).grade;
+                }
+            }
         }
 
         const cachePayload = {

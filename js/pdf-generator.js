@@ -369,9 +369,9 @@ class PDFGenerator {
         }
 
         const maxMarks = Number(evaluation.maxMarks) || calcMax || 70;
-        const obtainedMarks = (evaluation.obtainedMarks !== undefined && evaluation.obtainedMarks !== null)
-            ? Number(evaluation.obtainedMarks)
-            : calcObtained;
+        const obtainedMarks = questions.length > 0
+            ? calcObtained
+            : ((evaluation.obtainedMarks !== undefined && evaluation.obtainedMarks !== null) ? Number(evaluation.obtainedMarks) : 0);
         const pct = maxMarks > 0 ? Math.round((obtainedMarks / maxMarks) * 100) : 0;
 
         const gradeInfo = (window.calculateGradeScale 

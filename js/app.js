@@ -30,14 +30,23 @@ class AppController {
         // Ensure storage is initialized
         await window.appStorage.init();
 
-        // Auto-restore any evaluations corrupted by default maths template to their proper blueprints
-        await this.restoreMisplacedEvaluations();
-        // Auto-migrate any 10th Tamil Revision 1 evaluations to official 40 Qs / 40M (1 Section, 40 Qs x 1M) blueprint
-        await this.migrateTamilGrade10Evaluations();
-        // Auto-migrate any Biology Revision 1 evaluations to official 13 Qs Revision 1 Subjective blueprint
-        await this.migrateBiologyRevision1Evaluations();
-        // Auto-unify any Economics evaluations from hardcoded eco-xii-40 to genuine Economics Revision 2 blueprint
-        await this.migrateEconomicsDuplicateEvaluations();
+        // Run one-time legacy database migrations safely; NEVER on every page load
+        const MIGRATION_KEY = "niprak_auto_migrations_v4_completed";
+        if (!localStorage.getItem(MIGRATION_KEY)) {
+            try {
+                // Auto-restore any evaluations corrupted by default maths template to their proper blueprints
+                await this.restoreMisplacedEvaluations();
+                // Auto-migrate any 10th Tamil Revision 1 evaluations to official 40 Qs / 40M (1 Section, 40 Qs x 1M) blueprint
+                await this.migrateTamilGrade10Evaluations();
+                // Auto-migrate any Biology Revision 1 evaluations to official 13 Qs Revision 1 Subjective blueprint
+                await this.migrateBiologyRevision1Evaluations();
+                // Auto-unify any Economics evaluations from hardcoded eco-xii-40 to genuine Economics Revision 2 blueprint
+                await this.migrateEconomicsDuplicateEvaluations();
+            } catch (migErr) {
+                console.warn("One-time migrations warning:", migErr);
+            }
+            try { localStorage.setItem(MIGRATION_KEY, "true"); } catch (_) {}
+        }
 
         // Multi-Device Tab Foreground Sync (0-polling, triggers only on returning to active tab)
         document.addEventListener("visibilitychange", async () => {
@@ -361,7 +370,7 @@ class AppController {
             for (const ev of all) {
                 if (!ev) continue;
                 // Never mutate user-uploaded papers
-                if (ev.isUserUploaded) continue;
+                if (ev.isUserUploaded || ev.uploadedAt || ev.pdfStorageUrl) continue;
 
                 const subLower = (ev.subject || "").toLowerCase().trim();
                 const tplLower = (ev.templateName || "").toLowerCase().trim();
@@ -642,7 +651,7 @@ class AppController {
 
             let updatedCount = 0;
             for (const ev of all) {
-                if (!ev || ev.isUserUploaded) continue;
+                if (!ev || ev.isUserUploaded || ev.uploadedAt || ev.pdfStorageUrl) continue;
                 const subLower = (ev.subject || "").toLowerCase();
                 const tplLower = (ev.templateName || "").toLowerCase();
                 const examLower = (ev.examName || "").toLowerCase();
@@ -731,7 +740,7 @@ class AppController {
 
             let updatedCount = 0;
             for (const ev of allEvals) {
-                if (!ev || ev.isUserUploaded) continue;
+                if (!ev || ev.isUserUploaded || ev.uploadedAt || ev.pdfStorageUrl) continue;
                 const subLower = (ev.subject || "").toLowerCase();
                 const tplLower = (ev.templateName || "").toLowerCase();
                 const examLower = (ev.examName || "").toLowerCase();
@@ -828,7 +837,7 @@ class AppController {
 
             let updatedCount = 0;
             for (const ev of allEvals) {
-                if (!ev) continue;
+                if (!ev || ev.isUserUploaded || ev.uploadedAt || ev.pdfStorageUrl) continue;
                 const isLegacyEco40 = ev.templateId === "eco-xii-40" || (ev.templateName && ev.templateName.includes("Grade XII Economics - 40 Marks"));
                 if (isLegacyEco40) {
                     if (genuineTpl) {
@@ -4480,8 +4489,11 @@ class AppController {
         this.activeEvaluation.questions = newQuestions;
 
         // Recalculate obtained total & percentage
-        const totalObt = this.activeEvaluation.questions.reduce((sum, q) => sum + (Number(q.awardedMarks) || 0), 0);
-        this.activeEvaluation.obtainedMarks = Math.round(Math.max(totalObt, prevEvalObtained) * 10) / 10;
+        const totalObt = this.activeEvaluation.questions.reduce((sum, q) => {
+            if (q.status === "skipped" || q.status === "unmarked" || q.status === "pending") return sum;
+            return sum + (Number(q.awardedMarks) || 0);
+        }, 0);
+        this.activeEvaluation.obtainedMarks = Math.round(totalObt * 10) / 10;
         if (this.activeEvaluation.maxMarks > 0) {
             this.activeEvaluation.percentage = Math.round((this.activeEvaluation.obtainedMarks / this.activeEvaluation.maxMarks) * 100);
         }
