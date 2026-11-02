@@ -57,8 +57,14 @@ class UploadedPapersPageManager {
 
             if (isTeacher && assigned.length > 0) {
                 const filtered = window.appStorage.filterEvaluationsForUser(allPapers);
-                this.papers = (filtered && filtered.length > 0) ? filtered : allPapers;
+                // Ensure all user-uploaded answer scripts are always included
+                const userUploaded = allPapers.filter(p => p && (p.isUserUploaded || (!p.isMock && (p.uploadedAt || p.pdfDataUrl || p.pdfStorageUrl || (p.pages && p.pages.length > 0)))));
+                const combined = Array.from(new Set([...(filtered || []), ...userUploaded]));
+                this.papers = combined.length > 0 ? combined : allPapers;
                 const subjectSet = new Set(assigned);
+                this.papers.forEach(p => {
+                    if (p && p.subject) subjectSet.add(p.subject);
+                });
                 allPapers.forEach(p => {
                     if (p && p.subject) subjectSet.add(p.subject);
                 });
@@ -192,14 +198,16 @@ class UploadedPapersPageManager {
             : (currentUser && currentUser.class && currentUser.class.toLowerCase() !== 'all classes' && currentUser.class.toLowerCase() !== 'all' ? [currentUser.class] : []);
 
         return batches.filter(b => {
-            // Mandatory Teacher subject guard
-            if (isTeacher && this.subjects.length > 0) {
+            const hasUserUploaded = b.papers && b.papers.some(p => p.isUserUploaded || (!p.isMock && (p.uploadedAt || p.pdfDataUrl || p.pdfStorageUrl || (p.pages && p.pages.length > 0))));
+
+            // Mandatory Teacher subject guard (bypassed for user-uploaded papers or when 'all' is selected)
+            if (isTeacher && this.subjects.length > 0 && !hasUserUploaded) {
                 const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(b.subject, '', s, b.templateName));
                 if (!matchesAnyTeacherSub) return false;
             }
 
             // Mandatory Teacher class guard (if teacher is assigned specific classes)
-            if (isTeacher && teacherClasses.length > 0) {
+            if (isTeacher && teacherClasses.length > 0 && !hasUserUploaded) {
                 const bCls = (b.className || "").toLowerCase().replace(/[^a-z0-9]/g, '');
                 const matchesCls = teacherClasses.some(tc => {
                     const normTc = tc.toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -252,14 +260,16 @@ class UploadedPapersPageManager {
             const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
             const pKey = `${pCls}:::${examTitle}`;
 
-            // Mandatory Teacher subject guard
-            if (isTeacher && this.subjects.length > 0) {
+            const isUserUp = p.isUserUploaded || (!p.isMock && (p.uploadedAt || p.pdfDataUrl || p.pdfStorageUrl || (p.pages && p.pages.length > 0)));
+
+            // Mandatory Teacher subject guard (bypassed for user-uploaded papers)
+            if (isTeacher && this.subjects.length > 0 && !isUserUp) {
                 const matchesAnyTeacherSub = this.subjects.some(s => window.appStorage.isSubjectMatch(p.subject, p.examName, s, p.templateName));
                 if (!matchesAnyTeacherSub) return false;
             }
 
             // Mandatory Teacher class guard (if teacher is assigned specific classes)
-            if (isTeacher && teacherClasses.length > 0) {
+            if (isTeacher && teacherClasses.length > 0 && !isUserUp) {
                 const pClsNorm = (pCls || "").toLowerCase().replace(/[^a-z0-9]/g, '');
                 const matchesCls = teacherClasses.some(tc => {
                     const normTc = tc.toLowerCase().replace(/[^a-z0-9]/g, '');

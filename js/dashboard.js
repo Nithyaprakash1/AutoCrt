@@ -156,6 +156,8 @@ class DashboardManager {
         const lastBatch = sessionStorage.getItem("niprak_last_uploaded_batch");
         if (lastSub) {
             this.selectedSubjectFilter = lastSub;
+            this.teacherSubject = lastSub;
+            try { sessionStorage.setItem("niprak_active_subject", lastSub); } catch (e) {}
             sessionStorage.removeItem("niprak_last_uploaded_subject");
         }
         if (lastCls) {
@@ -180,6 +182,18 @@ class DashboardManager {
             let assignedCls = (user.assignedClasses && user.assignedClasses.length > 0)
                 ? [...user.assignedClasses]
                 : (user.class ? [user.class] : []);
+
+            // Also dynamically authorize any subject present in user-uploaded papers
+            if (Array.isArray(this.evaluations)) {
+                this.evaluations.forEach(e => {
+                    const eSub = (e.subject || "").trim();
+                    if (eSub && eSub !== "all" && eSub !== "All Subjects") {
+                        if (!assignedSubs.some(s => window.appStorage && window.appStorage.isSubjectMatch(s, "", eSub, ""))) {
+                            assignedSubs.push(eSub);
+                        }
+                    }
+                });
+            }
 
             this.teacherSubjects = assignedSubs;
             this.teacherSubject = assignedSubs[0] || user.subject || "";
@@ -220,21 +234,24 @@ class DashboardManager {
         // Evaluator / Teacher desk defaults to assigned subject panel
         const sessSub = sessionStorage.getItem("niprak_active_subject");
         if (isTeacher) {
-            const primarySub = (this.teacherSubject && this.teacherSubject !== "all" && this.teacherSubject !== "All Subjects")
-                ? this.teacherSubject
-                : (this.teacherSubjects && this.teacherSubjects.find(s => s && s !== "all" && s !== "All Subjects"));
+            // Only set default if not already explicitly selected by lastSub or sharedSub
+            if (!this.selectedSubjectFilter || this.selectedSubjectFilter === "all") {
+                const primarySub = (this.teacherSubject && this.teacherSubject !== "all" && this.teacherSubject !== "All Subjects")
+                    ? this.teacherSubject
+                    : (this.teacherSubjects && this.teacherSubjects.find(s => s && s !== "all" && s !== "All Subjects"));
 
-            // Check if sessSub is genuinely one of this teacher's assigned subjects
-            const isAssigned = sessSub && sessSub !== "all" && sessSub !== "All Subjects" &&
-                this.teacherSubjects && this.teacherSubjects.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", sessSub, "") : s.toLowerCase() === sessSub.toLowerCase());
+                // Check if sessSub is genuinely one of this teacher's assigned subjects
+                const isAssigned = sessSub && sessSub !== "all" && sessSub !== "All Subjects" &&
+                    this.teacherSubjects && this.teacherSubjects.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", sessSub, "") : s.toLowerCase() === sessSub.toLowerCase());
 
-            if (isAssigned) {
-                this.selectedSubjectFilter = sessSub;
-            } else if (primarySub && (!this.teacherSubjects || this.teacherSubjects.length <= 1)) {
-                this.selectedSubjectFilter = primarySub;
-                try { sessionStorage.setItem("niprak_active_subject", primarySub); } catch (e) {}
-            } else {
-                this.selectedSubjectFilter = "all";
+                if (isAssigned) {
+                    this.selectedSubjectFilter = sessSub;
+                } else if (primarySub && (!this.teacherSubjects || this.teacherSubjects.length <= 1)) {
+                    this.selectedSubjectFilter = primarySub;
+                    try { sessionStorage.setItem("niprak_active_subject", primarySub); } catch (e) {}
+                } else {
+                    this.selectedSubjectFilter = "all";
+                }
             }
         } else {
             // Admin or Uploader desk: can use sessSub if present, otherwise default to all
@@ -374,11 +391,17 @@ class DashboardManager {
         const user = window.appStorage ? window.appStorage.getCurrentUser() : null;
         const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
         if (isTeacher && Array.isArray(this.teacherSubjects) && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
-            return this.evaluations.filter(e => this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName)));
+            return this.evaluations.filter(e => {
+                const isUserUp = e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)));
+                return isUserUp || this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+            });
         }
 
         if (this.teacherSubject && this.teacherSubject !== 'all' && this.teacherSubject !== 'All Subjects') {
-            return this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName));
+            return this.evaluations.filter(e => {
+                const isUserUp = e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)));
+                return isUserUp || window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName);
+            });
         }
 
         return this.evaluations;
@@ -469,10 +492,12 @@ class DashboardManager {
                 const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, activeSub, e.templateName);
                 if (!subMatch) return false;
             } else if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
-                const matches = this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+                const isUserUp = e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)));
+                const matches = isUserUp || this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
                 if (!matches) return false;
             } else if (this.teacherSubject && this.teacherSubject !== 'all' && this.teacherSubject !== 'All Subjects') {
-                const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName);
+                const isUserUp = e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)));
+                const subMatch = isUserUp || window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName);
                 if (!subMatch) return false;
             }
 
@@ -580,11 +605,14 @@ class DashboardManager {
             : ((this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all' && this.selectedSubjectFilter !== 'All Subjects') ? this.selectedSubjectFilter : null);
 
         // Compute Class & Template Batches for Teacher Desk:
-        let evalsForBatches = subjectEvals;
-        if (activePanelSubject) {
-            evalsForBatches = this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, activePanelSubject, e.templateName));
-        } else if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
-            evalsForBatches = this.evaluations.filter(e => this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName)));
+        let evalsForBatches = this.evaluations;
+        if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
+            evalsForBatches = this.evaluations.filter(e => {
+                if (e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)))) {
+                    return true;
+                }
+                return this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+            });
         }
 
         if (isTeacher && this.teacherClasses && this.teacherClasses.length > 0 && !this.teacherClasses.includes("All Classes") && !this.teacherClasses.includes("all")) {
@@ -712,10 +740,6 @@ class DashboardManager {
             return b;
         });
 
-        if (activePanelSubject) {
-            this.batches = this.batches.filter(b => window.appStorage.isSubjectMatch(b.subject, b.templateName, activePanelSubject, b.templateName));
-        }
-
         // Global sort: Newly uploaded untouched templates/batches FIRST!
         this.batches.sort((a, b) => {
             if (this.highlightBatchKey) {
@@ -787,6 +811,13 @@ class DashboardManager {
         });
 
         const distinctBatchSubjects = Array.from(subjectBatchCountMap.keys()).sort();
+        // Also ensure all assigned or uploaded teacher subjects are present in distinctBatchSubjects
+        (this.teacherSubjects || []).forEach(ts => {
+            if (ts && ts !== "all" && ts !== "All Subjects" && !distinctBatchSubjects.some(s => window.appStorage && window.appStorage.isSubjectMatch(s, "", ts, ""))) {
+                distinctBatchSubjects.push(ts);
+                if (!subjectBatchCountMap.has(ts)) subjectBatchCountMap.set(ts, 0);
+            }
+        });
 
         // Safety reset filters if previously selected class or subject no longer exists in available batches
         if (this.selectedClassFilter && this.selectedClassFilter !== "all") {

@@ -1049,20 +1049,20 @@ class StorageService {
         const filtered = list.filter(e => {
             if (!e) return false;
 
-            // 1. SUBJECT MATCH: Always strictly enforce Authorized Subjects from User Management
-            if (!allowsAllSubjects) {
-                const subjectMatches = assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName, s, e.templateName));
-                if (!subjectMatches) return false;
-            }
-
             // Direct teacher assignment takes priority if specifically assigned to this teacher
             if (e.assignedTeacherId && teacherUid && String(e.assignedTeacherId) === String(teacherUid)) {
                 return true;
             }
 
-            // User-uploaded real answer scripts of authorized subjects are not blocked by class mismatch
+            // User-uploaded real answer scripts must NEVER be blocked from evaluation or viewing!
             if (e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)))) {
                 return true;
+            }
+
+            // 1. SUBJECT MATCH: Always strictly enforce Authorized Subjects from User Management
+            if (!allowsAllSubjects) {
+                const subjectMatches = assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+                if (!subjectMatches) return false;
             }
 
             // 2. CLASS MATCH (if teacher has specific class restrictions)

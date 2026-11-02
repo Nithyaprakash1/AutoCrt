@@ -4767,7 +4767,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 await new Promise(r => setTimeout(r, 20));
             }
 
-            if (duplicateCount > 0 && window.app && window.app.showToast) {
+            if (duplicateCount > 0 && stagedItems.length === 0) {
+                this.showDuplicateUploadNoticeModal(duplicateCount);
+            } else if (duplicateCount > 0 && window.app && window.app.showToast) {
                 window.app.showToast(`Ingestion complete: ${duplicateCount} duplicate paper(s) were safely ignored.`, "info");
             }
         } finally {
@@ -5151,6 +5153,86 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         alert(`Please browse or drop your actual ${subName} PDF answer sheet file to upload.`);
     }
 
+    // --- Duplicate Upload Notice & Instant Navigation Modal ---
+    showDuplicateUploadNoticeModal(duplicateCount) {
+        const modalId = "modal-duplicate-upload-notice";
+        const existing = document.getElementById(modalId);
+        if (existing) existing.remove();
+
+        const subName = this.selectedSubject?.name || "Economics";
+        const clsName = this.selectedClass?.label || this.selectedClass?.name || "Class 12-C";
+        const tplName = (this.selectedTemplate?.name || this.selectedTemplate?.examName || "Exam Blueprint").trim();
+        const batchKey = `${clsName}:::${tplName}`;
+        const existingCount = Array.isArray(this.existingPapers) && this.existingPapers.length > 0 ? this.existingPapers.length : duplicateCount;
+
+        const backdrop = document.createElement("div");
+        backdrop.id = modalId;
+        backdrop.className = "publish-loading-backdrop";
+        backdrop.innerHTML = `
+            <div class="publish-loading-card" style="max-width: 500px;">
+                <div class="publish-modal-icon-wrap" style="background: rgba(18, 185, 129, 0.12); border: 2px solid rgba(18, 185, 129, 0.3);">
+                    <svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="#10B981" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                </div>
+                <h3 class="publish-modal-title">Papers Already Uploaded & Saved!</h3>
+                <p class="publish-modal-subtitle">
+                    The answer sheets for <strong style="color: var(--text-main, #1E293B);">${clsName} – ${subName}</strong> are already present in storage (<strong>${existingCount} paper(s)</strong> under <em>${tplName}</em>).
+                </p>
+                <div class="publish-pills-row" style="margin-bottom: 16px;">
+                    <span class="publish-badge-pill pill-green">✓ Saved in Database</span>
+                    <span class="publish-badge-pill">${clsName}</span>
+                    <span class="publish-badge-pill">${subName}</span>
+                </div>
+                <p style="font-size: 0.85rem; color: var(--text-muted, #64748B); line-height: 1.5; margin-bottom: 22px;">
+                    Duplicate re-upload was safely prevented. You can navigate directly to the <strong>${subName} Teacher Desk</strong> to start marking or view these papers in <strong>Uploaded Papers</strong>.
+                </p>
+                <div class="publish-modal-actions" style="display: flex; flex-direction: column; gap: 8px;">
+                    <button type="button" class="publish-btn-primary" id="btn-dup-modal-goto-desk" style="background: #10B981; width: 100%; justify-content: center;">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                        <span>Open ${subName} Teacher Desk</span>
+                    </button>
+                    <div style="display: flex; gap: 8px; width: 100%;">
+                        <button type="button" class="publish-btn-primary" id="btn-dup-modal-goto-papers" style="background: #007AFF; flex: 1; justify-content: center;">
+                            <span>View Uploaded Papers</span>
+                        </button>
+                        <button type="button" class="publish-btn-secondary" id="btn-dup-modal-dismiss" style="flex: 1; justify-content: center;">
+                            <span>Stay in Upload Desk</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(backdrop);
+
+        backdrop.querySelector("#btn-dup-modal-goto-desk")?.addEventListener("click", async () => {
+            backdrop.remove();
+            sessionStorage.setItem("niprak_last_uploaded_subject", subName);
+            sessionStorage.setItem("niprak_active_subject", subName);
+            if (clsName) sessionStorage.setItem("niprak_last_uploaded_class", clsName);
+            if (batchKey) sessionStorage.setItem("niprak_last_uploaded_batch", batchKey);
+            if (window.app) {
+                await window.app.switchView("dashboard");
+            }
+        });
+
+        backdrop.querySelector("#btn-dup-modal-goto-papers")?.addEventListener("click", async () => {
+            backdrop.remove();
+            if (window.app) {
+                await window.app.switchView("uploaded-papers");
+                if (window.app.uploadedPapersPageManager) {
+                    window.app.uploadedPapersPageManager.selectedSubject = subName;
+                    if (batchKey) window.app.uploadedPapersPageManager.selectedBatchKey = batchKey;
+                    window.app.uploadedPapersPageManager.render();
+                }
+            }
+        });
+
+        backdrop.querySelector("#btn-dup-modal-dismiss")?.addEventListener("click", () => backdrop.remove());
+        backdrop.addEventListener("click", (e) => {
+            if (e.target === backdrop) backdrop.remove();
+        });
+    }
+
     // --- File Size Limit Modal ---
     showFileSizeLimitModal(fileName, sizeMb) {
         const modalId = "modal-file-size-error";
@@ -5414,8 +5496,13 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         if (actionsEl) {
             actionsEl.style.display = "flex";
             actionsEl.style.justifyContent = "center";
+            actionsEl.style.flexWrap = "wrap";
             actionsEl.style.gap = "10px";
             actionsEl.innerHTML = `
+                <button type="button" class="publish-btn-primary" id="btn-dialog-goto-desk" style="background: #10B981;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    <span>Open ${subName} Teacher Desk</span>
+                </button>
                 <button type="button" class="publish-btn-primary" id="btn-dialog-goto-papers" style="background: #007AFF;">
                     <span>View Uploaded Papers (${subName})</span>
                 </button>
@@ -5423,6 +5510,18 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     <span>Close</span>
                 </button>
             `;
+
+            actionsEl.querySelector("#btn-dialog-goto-desk")?.addEventListener("click", async () => {
+                const backdrop = document.getElementById("modal-publish-loading-dialog");
+                if (backdrop) backdrop.remove();
+                sessionStorage.setItem("niprak_last_uploaded_subject", subName);
+                sessionStorage.setItem("niprak_active_subject", subName);
+                if (clsName) sessionStorage.setItem("niprak_last_uploaded_class", clsName);
+                if (batchKey) sessionStorage.setItem("niprak_last_uploaded_batch", batchKey);
+                if (window.app) {
+                    await window.app.switchView("dashboard");
+                }
+            });
 
             actionsEl.querySelector("#btn-dialog-goto-papers")?.addEventListener("click", async () => {
                 const backdrop = document.getElementById("modal-publish-loading-dialog");
@@ -5709,12 +5808,26 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             if (cls && subject) {
                 sessionStorage.setItem("niprak_last_uploaded_class", cls.label || cls.name);
                 sessionStorage.setItem("niprak_last_uploaded_subject", subject.name);
+                sessionStorage.setItem("niprak_active_subject", subject.name);
                 if (this.selectedTemplate) {
                     const tplName = (this.selectedTemplate.name || this.selectedTemplate.examName || "").trim();
                     const bKey = `${cls.label || cls.name}:::${tplName}`;
                     sessionStorage.setItem("niprak_last_uploaded_template", tplName);
                     sessionStorage.setItem("niprak_last_uploaded_batch", bKey);
                 }
+
+                // Dynamically authorize this subject in user profile storage so the teacher desk displays it
+                try {
+                    const currentUser = window.appStorage ? window.appStorage.getCurrentUser() : null;
+                    if (currentUser && subject.name) {
+                        if (!Array.isArray(currentUser.assignedSubjects)) currentUser.assignedSubjects = [];
+                        if (!currentUser.assignedSubjects.some(s => window.appStorage && window.appStorage.isSubjectMatch(s, '', subject.name, ''))) {
+                            currentUser.assignedSubjects.push(subject.name);
+                            localStorage.setItem("niprak_active_user", JSON.stringify(currentUser));
+                            localStorage.setItem("onespace_active_user", JSON.stringify(currentUser));
+                        }
+                    }
+                } catch (userErr) {}
             }
 
             if (window.app && window.app.showToast) {

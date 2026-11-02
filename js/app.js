@@ -2690,6 +2690,15 @@ class AppController {
             return window.uploadPortal.selectedSubject.name;
         }
 
+        // Also incorporate dynamically authorized subjects from dashboard (e.g. newly uploaded papers)
+        if (this.dashboardManager && Array.isArray(this.dashboardManager.teacherSubjects) && this.dashboardManager.teacherSubjects.length > 0) {
+            this.dashboardManager.teacherSubjects.forEach(ts => {
+                if (ts && ts !== "all" && ts !== "All Subjects" && !assignedSubs.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", ts, "") : s.toLowerCase() === ts.toLowerCase())) {
+                    assignedSubs.push(ts);
+                }
+            });
+        }
+
         // 3. For Teachers: Strictly lock to their assigned subjects!
         if (isTeacher && assignedSubs.length > 0) {
             if (this.dashboardManager && typeof this.dashboardManager.getActiveSubject === "function") {
