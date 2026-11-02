@@ -643,19 +643,12 @@ class DashboardManager {
         let evalsForBatches = this.evaluations;
         if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
             evalsForBatches = this.evaluations.filter(e => {
-                if (e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)))) {
-                    return true;
-                }
                 return this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
             });
         }
 
         if (isTeacher && this.teacherClasses && this.teacherClasses.length > 0 && !this.teacherClasses.includes("All Classes") && !this.teacherClasses.includes("all")) {
             evalsForBatches = evalsForBatches.filter(e => {
-                // User-uploaded real answer scripts of authorized subjects are not blocked by class mismatch
-                if (e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)))) {
-                    return true;
-                }
                 const rawCls = (e.class || e.className || e.classLabel || "");
                 const eCls = rawCls.toLowerCase().replace(/[^a-z0-9]/g, '');
                 return this.teacherClasses.some(tc => {
@@ -845,14 +838,8 @@ class DashboardManager {
             subjectBatchCountMap.set(sub, (subjectBatchCountMap.get(sub) || 0) + 1);
         });
 
-        const distinctBatchSubjects = Array.from(subjectBatchCountMap.keys()).sort();
-        // Also ensure all assigned or uploaded teacher subjects are present in distinctBatchSubjects
-        (this.teacherSubjects || []).forEach(ts => {
-            if (ts && ts !== "all" && ts !== "All Subjects" && !distinctBatchSubjects.some(s => window.appStorage && window.appStorage.isSubjectMatch(s, "", ts, ""))) {
-                distinctBatchSubjects.push(ts);
-                if (!subjectBatchCountMap.has(ts)) subjectBatchCountMap.set(ts, 0);
-            }
-        });
+        // Only show subjects that have at least 1 batch — don't pad with 0-count assigned subjects
+        const distinctBatchSubjects = Array.from(subjectBatchCountMap.keys()).filter(s => (subjectBatchCountMap.get(s) || 0) > 0).sort();
 
         // Safety reset filters if previously selected class or subject no longer exists in available batches
         if (this.selectedClassFilter && this.selectedClassFilter !== "all") {
