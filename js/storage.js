@@ -2409,12 +2409,10 @@ class StorageService {
             const fileNorm = (paper.fileName || (paper.rawFile && paper.rawFile.name) || "").toLowerCase().trim().replace(/[^a-z0-9]/g, '');
 
             let studentKey = "";
-            if (rollNorm) {
-                studentKey = `roll:${rollNorm}`;
-            } else if (nameNorm && !nameNorm.includes("unnamed") && nameNorm !== "student") {
-                studentKey = `name:${nameNorm}`;
-            } else if (fileNorm) {
+            if (fileNorm) {
                 studentKey = `file:${fileNorm}`;
+            } else if (rollNorm && nameNorm && !nameNorm.includes("unnamed") && nameNorm !== "student") {
+                studentKey = `roll:${rollNorm}_name:${nameNorm}`;
             } else {
                 studentKey = `id:${paper.id}`;
             }

@@ -1257,9 +1257,11 @@ class UploadPortalManager {
                 });
             }
             const b = batchMap.get(bKey);
-            const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || (e.studentName ? String(e.studentName).trim().toLowerCase() : String(e.id));
-            if (!b.studentMap.has(sKey)) {
-                b.studentMap.set(sKey, e);
+            // Preserve all papers: even if Register No is same, display the paper!
+            const pId = String(e.id);
+            if (!b.seenIds) b.seenIds = new Set();
+            if (!b.seenIds.has(pId)) {
+                b.seenIds.add(pId);
                 b.paperCount++;
                 if (e.status === "Completed" || (Number(e.obtainedMarks) > 0)) b.completedCount++;
                 b.papers.push(e);
@@ -4713,25 +4715,20 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     possibleRoll = extracted.rollNo;
                 }
 
-                // --- DUPLICATE PREVENTION (Strictly scoped inside current template) ---
+                // --- DUPLICATE PREVENTION: Only prevent re-adding the EXACT SAME file ---
                 const isDuplicateInQueue = (this.fileQueue || []).some(item => {
-                    const rollMatch = possibleRoll && String(item.rollNo).trim() === possibleRoll;
-                    const nameMatch = possibleName && String(item.studentName).toLowerCase().trim() === possibleName.toLowerCase();
-                    const fileMatch = item.fileName && item.fileName.toLowerCase() === file.name.toLowerCase();
-                    return rollMatch || nameMatch || fileMatch;
+                    return item.fileName && item.fileName.toLowerCase() === file.name.toLowerCase();
                 }) || stagedItems.some(item => {
-                    const rollMatch = possibleRoll && String(item.rollNo).trim() === possibleRoll;
-                    const nameMatch = possibleName && String(item.studentName).toLowerCase().trim() === possibleName.toLowerCase();
-                    const fileMatch = item.fileName && item.fileName.toLowerCase() === file.name.toLowerCase();
-                    return rollMatch || nameMatch || fileMatch;
+                    return item.fileName && item.fileName.toLowerCase() === file.name.toLowerCase();
                 });
 
                 const isDuplicateInExisting = (this.existingPapers || []).some(paper => {
-                    const rollMatch = possibleRoll && String(paper.rollNo).trim() === possibleRoll;
-                    const nameMatch = possibleName && String(paper.studentName).toLowerCase().trim() === possibleName.toLowerCase();
-                    const fileMatch = file.name && ((paper.fileName && paper.fileName.toLowerCase() === file.name.toLowerCase()) ||
+                    const sameFile = file.name && ((paper.fileName && paper.fileName.toLowerCase() === file.name.toLowerCase()) ||
                                                    (paper.rawFile && paper.rawFile.name && paper.rawFile.name.toLowerCase() === file.name.toLowerCase()));
-                    return rollMatch || nameMatch || fileMatch;
+                    const sameStudent = possibleName && String(paper.studentName).toLowerCase().trim() === possibleName.toLowerCase();
+                    const sameRoll = possibleRoll && String(paper.rollNo).trim() === possibleRoll;
+                    // Only reject if it's the exact same file AND same student
+                    return sameFile && (sameStudent || sameRoll);
                 });
 
                 if (isDuplicateInQueue || isDuplicateInExisting) {
@@ -5693,21 +5690,16 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                     };
                 });
 
-                // Check if paper already exists for this student in this class & exam:
-                const rollKey = String(item.rollNo || "").trim().toLowerCase();
-                const nameKey = String(item.studentName || "").trim().toLowerCase();
+                // Check if exact same paper record already exists (preserve distinct papers even if Register No is identical!):
                 const itemFileName = String(item.fileName || (item.file && item.file.name) || "").trim().toLowerCase();
                 const existingMatch = (this.existingPapers || []).find(p => {
-                    const pRoll = String(p.rollNo || "").trim().toLowerCase();
-                    const pName = String(p.studentName || "").trim().toLowerCase();
+                    if (item.id && String(p.id) === String(item.id)) return true;
                     const pFile = String(p.fileName || (p.rawFile && p.rawFile.name) || "").trim().toLowerCase();
-                    if (rollKey && pRoll && rollKey === pRoll) return true;
-                    if (nameKey && pName && nameKey === pName) return true;
                     if (itemFileName && pFile && itemFileName === pFile) return true;
                     return false;
                 });
 
-                // Overwrite existing paper if found, rather than creating a duplicate!
+                // Reuse ID only if editing or re-uploading the exact same file; otherwise create separate paper
                 const evalId = item.id || (existingMatch ? existingMatch.id : `eval-${Date.now()}-${Math.floor(Math.random() * 100000)}`);
 
                 const newEvaluation = {

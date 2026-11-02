@@ -142,21 +142,22 @@ class UploadedPapersPageManager {
                 });
             }
             const b = batchMap.get(batchKey);
-            // Deduplicate exact duplicate uploads for the same student inside the batch, prioritizing graded copy
-            const sKey = (p.rollNo ? String(p.rollNo).trim().toLowerCase() : '') || (p.studentName ? String(p.studentName).trim().toLowerCase() : String(p.id));
-            if (b.studentMap.has(sKey)) {
-                const existing = b.studentMap.get(sKey);
+            // Preserve EVERY paper: even if Register No / rollNo is identical, display the paper!
+            const pId = String(p.id);
+            if (!b.paperMap) b.paperMap = new Map();
+            if (b.paperMap.has(pId)) {
+                const existing = b.paperMap.get(pId);
                 const existingScore = Number(existing.obtainedMarks) || 0;
                 const newScore = Number(p.obtainedMarks) || 0;
                 const existingIsDone = existing.status === 'Completed' || existingScore > 0;
                 const newIsDone = p.status === 'Completed' || newScore > 0;
                 if (!existingIsDone && newIsDone) {
-                    const idx = b.papers.findIndex(item => String(item.id) === String(existing.id));
+                    const idx = b.papers.findIndex(item => String(item.id) === pId);
                     if (idx >= 0) b.papers[idx] = p;
-                    b.studentMap.set(sKey, p);
+                    b.paperMap.set(pId, p);
                 }
             } else {
-                b.studentMap.set(sKey, p);
+                b.paperMap.set(pId, p);
                 b.papers.push(p);
             }
             if (!b.examDate && p.examDate) b.examDate = p.examDate;

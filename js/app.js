@@ -5497,18 +5497,16 @@ class AppController {
             return true;
         });
 
-        // Deduplicate multiple uploads for the exact same student inside this template
-        const studentMap = new Map();
+        // Preserve all papers: even if Register No is same, display and navigate every paper!
+        const seenIds = new Set();
+        const batchPapers = [];
         matching.forEach(e => {
-            const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || 
-                         (e.studentName ? String(e.studentName).trim().toLowerCase() : String(e.id));
-            if (!studentMap.has(sKey)) {
-                studentMap.set(sKey, e);
-            } else if (String(e.id) === curId) {
-                studentMap.set(sKey, e);
+            const id = String(e.id);
+            if (!seenIds.has(id)) {
+                seenIds.add(id);
+                batchPapers.push(e);
             }
         });
-        const batchPapers = Array.from(studentMap.values());
 
         // Sort roster: numeric roll number first, then alphabetical student name
         batchPapers.sort((a, b) => {
@@ -5556,18 +5554,17 @@ class AppController {
             sameTemplatePapers = this.getSameTemplatePapers(this.activeEvaluation, allEvaluations);
         }
 
-        // Deduplicate and sort
-        const studentMap = new Map();
+        // Preserve all papers: even if Register No is same, navigate through all papers
+        const seenIds = new Set();
+        const dedupedList = [];
         sameTemplatePapers.forEach(e => {
-            const sKey = (e.rollNo ? String(e.rollNo).trim().toLowerCase() : '') || 
-                         (e.studentName ? String(e.studentName).trim().toLowerCase() : String(e.id));
-            if (!studentMap.has(sKey)) {
-                studentMap.set(sKey, e);
-            } else if (String(e.id) === currentId) {
-                studentMap.set(sKey, e);
+            const id = String(e.id);
+            if (!seenIds.has(id)) {
+                seenIds.add(id);
+                dedupedList.push(e);
             }
         });
-        sameTemplatePapers = Array.from(studentMap.values()).sort((a, b) => {
+        sameTemplatePapers = dedupedList.sort((a, b) => {
             const rollA = parseInt((a.rollNo || "").replace(/\D/g, "")) || 0;
             const rollB = parseInt((b.rollNo || "").replace(/\D/g, "")) || 0;
             if (rollA !== rollB) return rollA - rollB;
