@@ -1733,17 +1733,21 @@ class DashboardManager {
 
                 if (batch) {
                     const targetPaper = batch.firstPendingPaper || (batch.papers && batch.papers[0]);
-                    if (window.app && typeof window.app.showLoadingBox === "function") {
-                        window.app.showLoadingBox("Opening Answer Script...", `Opening ${targetPaper?.studentName || 'Student'}'s paper in ${batch.className}...`);
-                    }
-                    if (targetPaper && this.options.onOpenEvaluation) {
-                        this.options.onOpenEvaluation(targetPaper, batch.papers);
-                    } else if (targetPaper && window.app) {
-                        window.app.openWorkspace(targetPaper, batch.papers);
+                    if (targetPaper) {
+                        if (window.app && typeof window.app.showLoadingBox === "function") {
+                            window.app.showLoadingBox("Opening Answer Script...", `Opening ${targetPaper.studentName || 'Student'}'s paper in ${batch.className}...`);
+                        }
+                        if (this.options.onOpenEvaluation) {
+                            this.options.onOpenEvaluation(targetPaper, batch.papers);
+                        } else if (window.app) {
+                            window.app.openWorkspace(targetPaper, batch.papers);
+                        }
                     } else if (window.app) {
+                        if (typeof window.app.hideLoadingBox === "function") window.app.hideLoadingBox();
                         window.app.showToast("No papers found in this batch.", "warning");
                     }
                 } else if (window.app) {
+                    if (typeof window.app.hideLoadingBox === "function") window.app.hideLoadingBox();
                     window.app.showToast("Opening evaluation workspace...", "info");
                 }
             });
@@ -1817,21 +1821,37 @@ class DashboardManager {
         // Start Correction Queue button (Banner)
         const startBtn = this.container.querySelector("#dash-btn-start-correction");
         if (startBtn) {
-            startBtn.addEventListener("click", () => {
-                if (window.app && typeof window.app.showLoadingBox === "function") {
-                    window.app.showLoadingBox("Opening Answer Script...", "Loading first pending student paper...");
-                }
+            startBtn.addEventListener("click", async () => {
                 // Find first uncorrected paper in active scope to open directly
                 const targetPool = (this.filteredEvaluations && this.filteredEvaluations.length > 0)
                     ? this.filteredEvaluations
                     : this.getSubjectEvals();
                 const uncorrected = targetPool.find(e => !this.isPaperCorrected(e)) || targetPool[0];
-                if (uncorrected && this.options.onOpenEvaluation) {
-                    this.options.onOpenEvaluation(uncorrected);
-                } else if (this.evaluations.length > 0 && this.options.onOpenEvaluation) {
-                    this.options.onOpenEvaluation(this.evaluations[0]);
+                const targetToOpen = uncorrected || (this.evaluations.length > 0 ? this.evaluations[0] : null);
+
+                if (targetToOpen) {
+                    if (window.app && typeof window.app.showLoadingBox === "function") {
+                        window.app.showLoadingBox("Opening Answer Script...", "Loading first pending student paper...");
+                    }
+                    try {
+                        if (this.options.onOpenEvaluation) {
+                            await this.options.onOpenEvaluation(targetToOpen);
+                        } else if (window.app) {
+                            await window.app.openWorkspace(targetToOpen);
+                        }
+                    } catch (openErr) {
+                        console.error("Error opening paper:", openErr);
+                        if (window.app && typeof window.app.hideLoadingBox === "function") {
+                            window.app.hideLoadingBox();
+                        }
+                    }
                 } else if (this.options.onStartNew) {
+                    if (window.app && typeof window.app.hideLoadingBox === "function") {
+                        window.app.hideLoadingBox();
+                    }
                     this.options.onStartNew();
+                } else if (window.app && typeof window.app.hideLoadingBox === "function") {
+                    window.app.hideLoadingBox();
                 }
             });
         }
@@ -2004,15 +2024,27 @@ class DashboardManager {
                     if (window.app && typeof window.app.showLoadingBox === "function") {
                         window.app.showLoadingBox("Opening Answer Script...", "Loading student paper & correction workspace...");
                     }
-                    const evaluation = await window.appStorage.getEvaluationById(id);
-                    if (evaluation) {
-                        if (this.options.onOpenEvaluation) {
-                            this.options.onOpenEvaluation(evaluation);
-                        } else if (window.app) {
-                            window.app.openWorkspace(evaluation);
+                    try {
+                        const evaluation = await window.appStorage.getEvaluationById(id);
+                        if (evaluation) {
+                            if (this.options.onOpenEvaluation) {
+                                await this.options.onOpenEvaluation(evaluation);
+                            } else if (window.app) {
+                                await window.app.openWorkspace(evaluation);
+                            }
+                        } else {
+                            if (window.app && typeof window.app.hideLoadingBox === "function") {
+                                window.app.hideLoadingBox();
+                            }
+                            if (window.app && typeof window.app.showToast === "function") {
+                                window.app.showToast("Paper record not found. Please refresh the page.", "error");
+                            }
                         }
-                    } else if (window.app && typeof window.app.hideLoadingBox === "function") {
-                        window.app.hideLoadingBox();
+                    } catch (openErr) {
+                        console.error("Error opening evaluation:", openErr);
+                        if (window.app && typeof window.app.hideLoadingBox === "function") {
+                            window.app.hideLoadingBox();
+                        }
                     }
                     return;
                 }

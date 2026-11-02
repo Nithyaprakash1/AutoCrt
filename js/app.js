@@ -3720,27 +3720,9 @@ class AppController {
             this.updateUserProfileDisplay(evaluation.subject, evaluation.className || evaluation.class);
         }
 
-        // Subject Authorization Check: Teachers may ONLY evaluate papers of their assigned subjects
-        const activeUser = window.appStorage.getCurrentUser();
-        if (activeUser && (activeUser.role === 'evaluator' || activeUser.role === 'teacher')) {
-            const assigned = (Array.isArray(activeUser.assignedSubjects) && activeUser.assignedSubjects.length > 0)
-                ? activeUser.assignedSubjects.filter(s => s && s !== 'all' && s !== 'All Subjects')
-                : (activeUser.subject ? [activeUser.subject] : []);
-
-            if (assigned.length > 0) {
-                const isMatch = assigned.some(s => window.appStorage.isSubjectMatch(evaluation.subject, evaluation.examName || evaluation.templateName, s, evaluation.templateName));
-                if (!isMatch) {
-                    const msg = `Access Restricted: This paper is for ${evaluation.subject || 'another subject'}. You are assigned to ${assigned.join(', ') || 'no subjects'}.`;
-                    if (this.showToast) this.showToast(msg, "error");
-                    else alert(msg);
-                    await this.switchView("dashboard");
-                    return;
-                }
-            }
-        }
-
         // If raw PDF scans are purged to preserve storage, open the Student Scorecard directly
         if (evaluation.rawScansPurged) {
+            this.hideLoadingBox();
             if (this.showToast) {
                 this.showToast(`Displaying score log for ${evaluation.studentName || 'Student'} (scans purged to save storage)`);
             }
@@ -3851,7 +3833,7 @@ class AppController {
         }
 
                 this.activeEvaluation = evaluation;
-        this.switchView("workspace");
+        await this.switchView("workspace");
 
         // Show workspace loading overlay
         const wsOverlay = document.getElementById("ws-loading-overlay");
@@ -4272,6 +4254,7 @@ class AppController {
             console.error("Error opening evaluation in workspace:", openErr);
             this.showToast("Note: Student paper could not be loaded from cloud. Displaying digital scorecard.", 4000);
         } finally {
+            this.hideLoadingBox();
             if (wsOverlay) {
                 wsOverlay.style.opacity = "0";
                 setTimeout(() => {
