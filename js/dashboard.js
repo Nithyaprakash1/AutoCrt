@@ -183,14 +183,24 @@ class DashboardManager {
                 ? [...user.assignedClasses]
                 : (user.class ? [user.class] : []);
 
-            // Also dynamically authorize any subject present in user-uploaded papers
-            if (Array.isArray(this.evaluations)) {
+            // Only expand to subjects found in papers that already match this teacher's assigned classes
+            // (Don't auto-add subjects from ALL papers globally — that gave every teacher access to everything!)
+            if (Array.isArray(this.evaluations) && assignedSubs.length > 0 && !assignedSubs.includes("All Subjects")) {
+                const assignedClsNorms = assignedCls
+                    .filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
+                    .map(c => c.toLowerCase().replace(/[^a-z0-9]/g, ''));
                 this.evaluations.forEach(e => {
                     const eSub = (e.subject || "").trim();
-                    if (eSub && eSub !== "all" && eSub !== "All Subjects") {
-                        if (!assignedSubs.some(s => window.appStorage && window.appStorage.isSubjectMatch(s, "", eSub, ""))) {
-                            assignedSubs.push(eSub);
-                        }
+                    if (!eSub || eSub === "all" || eSub === "All Subjects") return;
+                    // Already authorized
+                    if (assignedSubs.some(s => window.appStorage && window.appStorage.isSubjectMatch(s, "", eSub, ""))) return;
+                    // Only add if the paper's class matches an assigned class
+                    if (assignedClsNorms.length > 0) {
+                        const eCls = (e.class || e.className || e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+                        const classMatches = assignedClsNorms.some(norm =>
+                            eCls === norm || eCls.includes(norm) || norm.includes(eCls)
+                        );
+                        if (classMatches) assignedSubs.push(eSub);
                     }
                 });
             }

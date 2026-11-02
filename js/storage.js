@@ -1054,11 +1054,6 @@ class StorageService {
                 return true;
             }
 
-            // User-uploaded real answer scripts must NEVER be blocked from evaluation or viewing!
-            if (e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)))) {
-                return true;
-            }
-
             // 1. SUBJECT MATCH: Always strictly enforce Authorized Subjects from User Management
             if (!allowsAllSubjects) {
                 const subjectMatches = assignedSubjects.some(s => this.isSubjectMatch(e.subject, e.examName, s, e.templateName));
