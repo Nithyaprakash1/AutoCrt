@@ -678,6 +678,11 @@ class MarkingPanel {
                     if (curQ && curQ.status !== "unmarked" && Number(curQ.awardedMarks) === val) {
                         this.clearQuestionMark(this.activeQuestionIndex);
                     } else {
+                        // If 0 is pressed but the question already has partial step marks accumulated,
+                        // don't overwrite those marks — the ✗ Zero button handles intentional zeroing.
+                        if (val === 0 && curQ && Number(curQ.awardedMarks) > 0) {
+                            return;
+                        }
                         this.assignCurrentQuestionMark(val);
                         if (curQ && (val >= curQ.maxMarks || val === 0)) {
                             setTimeout(() => {
@@ -907,6 +912,11 @@ class MarkingPanel {
                 if (curQ && curQ.status !== "unmarked" && Number(curQ.awardedMarks) === val) {
                     this.clearQuestionMark(this.activeQuestionIndex);
                 } else {
+                    // If 0 is pressed but the question already has partial step marks accumulated,
+                    // don't overwrite those marks — the ✗ Zero button handles intentional zeroing.
+                    if (val === 0 && curQ && Number(curQ.awardedMarks) > 0) {
+                        return;
+                    }
                     this.assignCurrentQuestionMark(val);
                     if (curQ && (val >= curQ.maxMarks || val === 0)) {
                         setTimeout(() => {
