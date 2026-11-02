@@ -196,7 +196,17 @@ class DashboardManager {
             }
 
             this.teacherSubjects = assignedSubs;
-            this.teacherSubject = assignedSubs[0] || user.subject || "";
+            // Respect explicitly selected subject or last uploaded subject!
+            const sessSub = sessionStorage.getItem("niprak_active_subject");
+            if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all" && this.selectedSubjectFilter !== "All Subjects") {
+                this.teacherSubject = this.selectedSubjectFilter;
+            } else if (lastSub) {
+                this.teacherSubject = lastSub;
+            } else if (sessSub && sessSub !== "all" && sessSub !== "All Subjects" && assignedSubs.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", sessSub, "") : s.toLowerCase() === sessSub.toLowerCase())) {
+                this.teacherSubject = sessSub;
+            } else {
+                this.teacherSubject = assignedSubs[0] || user.subject || "";
+            }
             this.teacherClasses = assignedCls;
 
             this.teacherName = user.name || (isTeacher ? "Faculty Evaluator" : "User");
@@ -233,6 +243,23 @@ class DashboardManager {
 
         // Evaluator / Teacher desk defaults to assigned subject panel
         const sessSub = sessionStorage.getItem("niprak_active_subject");
+
+        // DEDUCE SUBJECT FROM HIGHLIGHT BATCH IF PRESENT
+        if (this.highlightBatchKey && Array.isArray(this.evaluations)) {
+            const hKey = this.highlightBatchKey.toLowerCase().trim();
+            const matchedEval = this.evaluations.find(e => {
+                const rawCls = (e.className || e.class || e.classLabel || "").toLowerCase();
+                const rawExam = (e.examName || e.templateName || "").toLowerCase();
+                return (rawCls && rawExam && hKey.includes(rawCls) && hKey.includes(rawExam)) ||
+                       hKey.includes((e.subject || "").toLowerCase());
+            });
+            if (matchedEval && matchedEval.subject) {
+                this.selectedSubjectFilter = matchedEval.subject;
+                this.teacherSubject = matchedEval.subject;
+                try { sessionStorage.setItem("niprak_active_subject", matchedEval.subject); } catch (e) {}
+            }
+        }
+
         if (isTeacher) {
             // Only set default if not already explicitly selected by lastSub or sharedSub
             if (!this.selectedSubjectFilter || this.selectedSubjectFilter === "all") {
@@ -383,6 +410,9 @@ class DashboardManager {
     }
 
     getSubjectEvals() {
+        if (this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all' && this.selectedSubjectFilter !== 'All Subjects') {
+            return this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, this.selectedSubjectFilter, e.templateName));
+        }
         const activeSub = this.getActiveSubject();
         if (activeSub && activeSub !== 'all' && activeSub !== 'All Subjects') {
             return this.evaluations.filter(e => window.appStorage.isSubjectMatch(e.subject, e.examName, activeSub, e.templateName));
@@ -594,15 +624,20 @@ class DashboardManager {
         const ic = window.Icons || {};
         const greetingStr = this.getGreeting();
         const activeSub = this.getActiveSubject();
-        const displaySubject = activeSub || (this.teacherSubject && this.teacherSubject !== 'all' && this.teacherSubject !== 'All Subjects'
-            ? this.teacherSubject 
-            : (teacherAssigned.length === 1 && teacherAssigned[0] !== 'All Subjects' ? teacherAssigned[0] : (teacherAssigned.length > 1 ? teacherAssigned.join(' & ') : (isAdmin ? 'All Subjects' : 'Evaluation'))));
+        const isAllSelected = !this.selectedSubjectFilter || this.selectedSubjectFilter === "all" || this.selectedSubjectFilter === "All Subjects";
+        const displaySubject = (!isAllSelected && activeSub) ? activeSub : (
+            isAllSelected && teacherAssigned.length > 1
+                ? "All Subjects"
+                : (activeSub || (this.teacherSubject && this.teacherSubject !== 'all' && this.teacherSubject !== 'All Subjects'
+                    ? this.teacherSubject 
+                    : (teacherAssigned.length === 1 && teacherAssigned[0] !== 'All Subjects' ? teacherAssigned[0] : (teacherAssigned.length > 1 ? teacherAssigned.join(' & ') : (isAdmin ? 'All Subjects' : 'Evaluation')))))
+        );
         let displayName = this.teacherName || (user?.name || "Teacher");
 
         // Active panel subject: isolate cards & papers to that specific subject desk if explicitly selected
-        const activePanelSubject = (activeSub && activeSub !== 'all' && activeSub !== 'All Subjects')
+        const activePanelSubject = (!isAllSelected && activeSub && activeSub !== 'all' && activeSub !== 'All Subjects')
             ? activeSub
-            : ((this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all' && this.selectedSubjectFilter !== 'All Subjects') ? this.selectedSubjectFilter : null);
+            : ((!isAllSelected && this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all' && this.selectedSubjectFilter !== 'All Subjects') ? this.selectedSubjectFilter : null);
 
         // Compute Class & Template Batches for Teacher Desk:
         let evalsForBatches = this.evaluations;
@@ -1528,6 +1563,7 @@ class DashboardManager {
                 const sub = btn.getAttribute("data-subject") || "all";
                 this.selectedSubjectFilter = sub;
                 if (sub !== "all") {
+                    this.teacherSubject = sub;
                     try { sessionStorage.setItem("niprak_active_subject", sub); } catch (e) {}
                 } else {
                     try { sessionStorage.removeItem("niprak_active_subject"); } catch (e) {}
@@ -2177,7 +2213,7 @@ class DashboardManager {
             const result = await window.appStorage.deduplicateEvaluations({ dryRun: false });
 
             // Reload evaluations from storage
-            this.evaluations = await window.appStorage.getAllEvaluations(false, false);
+            this.evaluations = await window.appStorage.getAllEvaluations(false, true);
             this.applyFilters();
             this.render();
             this.bindEvents();

@@ -2029,6 +2029,10 @@ class UploadPortalManager {
                             <span class="existing-badge" id="existing-count-badge">Loading papers...</span>
                         </div>
                         <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                            <button type="button" class="btn-primary" id="btn-portal-move-to-subject-desk" title="Move to ${this.selectedSubject.name} Panel in Teacher Desk" style="display: inline-flex; align-items: center; gap: 7px; background: #10B981; color: #FFFFFF; border: none; padding: 7px 18px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.35); transition: all 0.2s ease;">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                                <span>Move to ${this.selectedSubject.name} Panel</span>
+                            </button>
                             <button type="button" class="btn-existing-bulk-delete" id="btn-existing-bulk-delete" title="Bulk delete selected papers" style="display: inline-flex; align-items: center; gap: 6px; background: ${this.selectedExistingPaperIds.size > 0 ? '#DC2626' : '#FFFFFF'}; border: 1.5px solid #DC2626; color: ${this.selectedExistingPaperIds.size > 0 ? '#FFFFFF' : '#DC2626'}; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                                 <span>Bulk Delete Papers</span>
@@ -2190,9 +2194,21 @@ class UploadPortalManager {
         const gotoEvalBtn = this.container.querySelector("#btn-goto-evaluator");
         if (gotoEvalBtn) {
             gotoEvalBtn.addEventListener("click", () => {
+                if (this.selectedSubject && this.selectedSubject.name) {
+                    this.navigateToSubjectDesk(this.selectedSubject.name);
+                    return;
+                }
                 if (this.options.onSwitchToEvaluator) {
                     this.options.onSwitchToEvaluator();
                 }
+            });
+        }
+
+        // Direct "Move to Subject Panel" button in Existing Papers Header
+        const btnMoveToSub = this.container.querySelector("#btn-portal-move-to-subject-desk");
+        if (btnMoveToSub) {
+            btnMoveToSub.addEventListener("click", () => {
+                this.navigateToSubjectDesk();
             });
         }
 
@@ -5204,15 +5220,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
 
         document.body.appendChild(backdrop);
 
-        backdrop.querySelector("#btn-dup-modal-goto-desk")?.addEventListener("click", async () => {
+        backdrop.querySelector("#btn-dup-modal-goto-desk")?.addEventListener("click", () => {
             backdrop.remove();
-            sessionStorage.setItem("niprak_last_uploaded_subject", subName);
-            sessionStorage.setItem("niprak_active_subject", subName);
-            if (clsName) sessionStorage.setItem("niprak_last_uploaded_class", clsName);
-            if (batchKey) sessionStorage.setItem("niprak_last_uploaded_batch", batchKey);
-            if (window.app) {
-                await window.app.switchView("dashboard");
-            }
+            this.navigateToSubjectDesk(subName, clsName, tplName);
         });
 
         backdrop.querySelector("#btn-dup-modal-goto-papers")?.addEventListener("click", async () => {
@@ -5511,16 +5521,10 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 </button>
             `;
 
-            actionsEl.querySelector("#btn-dialog-goto-desk")?.addEventListener("click", async () => {
+            actionsEl.querySelector("#btn-dialog-goto-desk")?.addEventListener("click", () => {
                 const backdrop = document.getElementById("modal-publish-loading-dialog");
                 if (backdrop) backdrop.remove();
-                sessionStorage.setItem("niprak_last_uploaded_subject", subName);
-                sessionStorage.setItem("niprak_active_subject", subName);
-                if (clsName) sessionStorage.setItem("niprak_last_uploaded_class", clsName);
-                if (batchKey) sessionStorage.setItem("niprak_last_uploaded_batch", batchKey);
-                if (window.app) {
-                    await window.app.switchView("dashboard");
-                }
+                this.navigateToSubjectDesk(subName, clsName, tplName);
             });
 
             actionsEl.querySelector("#btn-dialog-goto-papers")?.addEventListener("click", async () => {
@@ -5902,6 +5906,19 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         }
 
         wrap.innerHTML = `
+            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; background: rgba(16, 185, 129, 0.08); border: 1.5px solid rgba(16, 185, 129, 0.3); border-radius: 10px; padding: 10px 16px; margin-bottom: 14px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                    <div style="width: 28px; height: 28px; border-radius: 6px; background: #10B981; color: white; display: flex; align-items: center; justify-content: center; font-size: 0.9rem;">✓</div>
+                    <div>
+                        <div style="font-size: 0.88rem; font-weight: 700; color: #065F46;">${matches.length} Paper(s) In Class — Ready for Teacher Evaluation Desk</div>
+                        <div style="font-size: 0.78rem; color: #047857;">Open the ${this.selectedSubject.name} Panel directly to evaluate and view all batches.</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-primary" id="btn-table-jump-to-desk" style="display: inline-flex; align-items: center; gap: 6px; background: #10B981; color: #FFFFFF; border: none; padding: 7px 18px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                    <span>Open in ${this.selectedSubject.name} Panel ›</span>
+                </button>
+            </div>
             <div class="table-wrapper">
                 <table class="papers-table">
                     <thead>
@@ -6009,6 +6026,16 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
             });
         });
 
+        const btnTableJumpToDesk = wrap.querySelector("#btn-table-jump-to-desk");
+        if (btnTableJumpToDesk) {
+            btnTableJumpToDesk.onclick = () => this.navigateToSubjectDesk();
+        }
+
+        const btnMoveToSubHeader = this.container.querySelector("#btn-portal-move-to-subject-desk");
+        if (btnMoveToSubHeader) {
+            btnMoveToSubHeader.onclick = () => this.navigateToSubjectDesk();
+        }
+
         const btnBulkDeleteExisting = this.container.querySelector("#btn-existing-bulk-delete");
         if (btnBulkDeleteExisting) {
             btnBulkDeleteExisting.onclick = async () => {
@@ -6109,6 +6136,54 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 );
             });
         });
+    }
+
+    navigateToSubjectDesk(targetSubject = null, targetClass = null, targetTemplate = null) {
+        const subName = targetSubject || this.selectedSubject?.name || "Economics";
+        const clsName = targetClass || this.selectedClass?.label || this.selectedClass?.name || "Class 12-C";
+        const tplName = targetTemplate || this.selectedTemplate?.name || this.selectedTemplate?.examName || "Economics Revision 2 Subjective 2026";
+        const batchKey = `${clsName}:::${tplName}`;
+
+        try {
+            sessionStorage.setItem("niprak_active_subject", subName);
+            sessionStorage.setItem("niprak_last_uploaded_subject", subName);
+            sessionStorage.setItem("niprak_last_uploaded_class", clsName);
+            sessionStorage.setItem("niprak_last_uploaded_batch", batchKey);
+            localStorage.setItem("niprak_active_portal", "evaluator");
+            localStorage.setItem("onespace_active_portal", "evaluator");
+
+            const u = window.appStorage.getCurrentUser();
+            if (u) {
+                if (!Array.isArray(u.assignedSubjects)) u.assignedSubjects = [];
+                if (!u.assignedSubjects.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", subName, "") : s.toLowerCase() === subName.toLowerCase())) {
+                    u.assignedSubjects.push(subName);
+                }
+                u.subject = subName;
+                localStorage.setItem("niprak_active_user", JSON.stringify(u));
+                localStorage.setItem("onespace_active_user", JSON.stringify(u));
+            }
+        } catch (e) {
+            console.warn("navigateToSubjectDesk storage error:", e);
+        }
+
+        if (window.app) {
+            window.app.setPortal("evaluator", false);
+            window.app.switchView("dashboard").then(() => {
+                if (window.app.dashboardManager) {
+                    window.app.dashboardManager.teacherSubject = subName;
+                    window.app.dashboardManager.selectedSubjectFilter = subName;
+                    window.app.dashboardManager.highlightBatchKey = batchKey;
+                    window.app.dashboardManager.activeBatchKey = null;
+                    window.app.dashboardManager.init().then(() => {
+                        window.app.dashboardManager.render();
+                        window.app.dashboardManager.bindEvents();
+                    });
+                }
+                if (window.app.showToast) {
+                    window.app.showToast(`Switched to ${subName} Evaluation Desk!`, "success");
+                }
+            });
+        }
     }
 }
 
