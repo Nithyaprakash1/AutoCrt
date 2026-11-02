@@ -652,13 +652,16 @@ class DashboardManager {
         // Compute Class & Template Batches for Teacher Desk:
         let evalsForBatches = this.evaluations;
         if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
-            evalsForBatches = this.evaluations.filter(e => {
+            const subMatches = this.evaluations.filter(e => {
                 return this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
             });
+            if (subMatches.length > 0) {
+                evalsForBatches = subMatches;
+            }
         }
 
         if (isTeacher && this.teacherClasses && this.teacherClasses.length > 0 && !this.teacherClasses.includes("All Classes") && !this.teacherClasses.includes("all")) {
-            evalsForBatches = evalsForBatches.filter(e => {
+            const classMatches = evalsForBatches.filter(e => {
                 const rawCls = (e.class || e.className || e.classLabel || "");
                 const eCls = rawCls.toLowerCase().replace(/[^a-z0-9]/g, '');
                 return this.teacherClasses.some(tc => {
@@ -675,6 +678,10 @@ class DashboardManager {
                     return false;
                 });
             });
+            // If class filtering found matches, apply it; if 0 matches, retain subject matches so batches are never lost
+            if (classMatches.length > 0) {
+                evalsForBatches = classMatches;
+            }
         }
 
         const batchMap = new Map();
@@ -898,6 +905,11 @@ class DashboardManager {
         }
         if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all" && this.selectedSubjectFilter !== "All Subjects") {
             displayBatches = displayBatches.filter(b => window.appStorage.isSubjectMatch(b.subject, b.templateName, this.selectedSubjectFilter, b.templateName));
+        }
+
+        // Safety fallback: if class or subject filter eliminated all batches, restore all available batches
+        if (displayBatches.length === 0 && this.batches && this.batches.length > 0) {
+            displayBatches = this.batches;
         }
 
         // Check if currently viewing Tamil desk

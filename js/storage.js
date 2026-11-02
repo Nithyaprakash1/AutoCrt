@@ -500,12 +500,21 @@ class StorageService {
                             addedCount++;
                         } else {
                             const existing = listMap.get(sId);
-                            // Realtime cloud authority: only overwrite local if cloud is strictly newer
                             const existingTime = existing.updatedAt ? new Date(existing.updatedAt).getTime() : 0;
                             const cloudTime = fbItem.updatedAt ? new Date(fbItem.updatedAt).getTime() : 0;
-                            const cloudIsNewer = cloudTime > existingTime;
+                            const cloudIsDone = fbItem.status === "Completed" || fbItem.status === "Corrected" || fbItem.status === "Graded";
+                            const localIsDone = existing.status === "Completed" || existing.status === "Corrected" || existing.status === "Graded";
+                            const cloudIsNewerOrEqual = cloudTime >= existingTime;
 
-                            if (cloudIsNewer) {
+                            // Always preserve / attach cloud media URLs and structure if missing locally
+                            if (!existing.pdfStorageUrl && fbItem.pdfStorageUrl) existing.pdfStorageUrl = fbItem.pdfStorageUrl;
+                            if ((!existing.pages || existing.pages.length === 0) && Array.isArray(fbItem.pages) && fbItem.pages.length > 0) existing.pages = fbItem.pages;
+                            if (!existing.pdfDataUrl && fbItem.pdfDataUrl) existing.pdfDataUrl = fbItem.pdfDataUrl;
+                            if ((!existing.questions || existing.questions.length === 0) && Array.isArray(fbItem.questions) && fbItem.questions.length > 0) existing.questions = fbItem.questions;
+                            if (!existing.templateId && fbItem.templateId) existing.templateId = fbItem.templateId;
+                            if (!existing.templateName && fbItem.templateName) existing.templateName = fbItem.templateName;
+
+                            if (cloudIsNewerOrEqual || (cloudIsDone && !localIsDone)) {
                                 const merged = Object.assign({}, existing, fbItem, {
                                     obtainedMarks: (fbItem.obtainedMarks !== undefined && fbItem.obtainedMarks !== null) ? fbItem.obtainedMarks : existing.obtainedMarks,
                                     maxMarks: fbItem.maxMarks || existing.maxMarks,
@@ -514,7 +523,6 @@ class StorageService {
                                     status: fbItem.status || existing.status,
                                     questions: (Array.isArray(fbItem.questions) && fbItem.questions.length > 0) ? fbItem.questions : existing.questions,
                                     annotations: (Array.isArray(fbItem.annotations) && fbItem.annotations.length > 0) ? fbItem.annotations : (existing.annotations || []),
-                                    // Strictly retain local scanned pages & pdf data url so cloud document size optimization never strips local paper scans
                                     pages: (existing.pages && existing.pages.length > 0) ? existing.pages : (fbItem.pages || []),
                                     pdfDataUrl: existing.pdfDataUrl || fbItem.pdfDataUrl || null,
                                     pdfStorageUrl: fbItem.pdfStorageUrl || existing.pdfStorageUrl || null
@@ -595,8 +603,6 @@ class StorageService {
                         merged.subject = 'English';
                     }
                 }
-
-                return merged;
 
                 return merged;
             });
@@ -1109,11 +1115,21 @@ class StorageService {
                         evalObj = cloudObj;
                         this._saveEvaluationToIndexedDB(evalObj);
                     } else {
+                        // Always attach essential cloud asset URLs and template metadata if missing locally
+                        if (!evalObj.pdfStorageUrl && cloudObj.pdfStorageUrl) evalObj.pdfStorageUrl = cloudObj.pdfStorageUrl;
+                        if ((!evalObj.pages || evalObj.pages.length === 0) && Array.isArray(cloudObj.pages) && cloudObj.pages.length > 0) evalObj.pages = cloudObj.pages;
+                        if (!evalObj.pdfDataUrl && cloudObj.pdfDataUrl) evalObj.pdfDataUrl = cloudObj.pdfDataUrl;
+                        if ((!evalObj.questions || evalObj.questions.length === 0) && Array.isArray(cloudObj.questions) && cloudObj.questions.length > 0) evalObj.questions = cloudObj.questions;
+                        if (!evalObj.templateId && cloudObj.templateId) evalObj.templateId = cloudObj.templateId;
+                        if (!evalObj.templateName && cloudObj.templateName) evalObj.templateName = cloudObj.templateName;
+
                         const cloudTime = cloudObj.updatedAt ? new Date(cloudObj.updatedAt).getTime() : 0;
                         const evalTime = evalObj.updatedAt ? new Date(evalObj.updatedAt).getTime() : 0;
-                        const cloudIsNewer = cloudTime > evalTime;
+                        const cloudIsDone = cloudObj.status === "Completed" || cloudObj.status === "Corrected" || cloudObj.status === "Graded";
+                        const localIsDone = evalObj.status === "Completed" || evalObj.status === "Corrected" || evalObj.status === "Graded";
+                        const cloudIsNewerOrEqual = cloudTime >= evalTime;
 
-                        if (cloudIsNewer) {
+                        if (cloudIsNewerOrEqual || (cloudIsDone && !localIsDone)) {
                             evalObj = Object.assign({}, evalObj, cloudObj, {
                                 pages: (evalObj.pages && evalObj.pages.length > 0) ? evalObj.pages : (cloudObj.pages || []),
                                 pdfDataUrl: evalObj.pdfDataUrl || cloudObj.pdfDataUrl || null,
