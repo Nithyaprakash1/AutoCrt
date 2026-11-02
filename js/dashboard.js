@@ -826,13 +826,30 @@ class DashboardManager {
             classBatchCountMap.set(canonCls, (classBatchCountMap.get(canonCls) || 0) + 1);
         });
 
-        const distinctBatchClasses = Array.from(classBatchCountMap.keys()).sort((a, b) => {
+        // Distinct classes for filter pills: only include teacher's assigned classes (if restricted)
+        const hasClassRestriction = activeClassesList.length > 0;
+        let distinctBatchClasses = Array.from(classBatchCountMap.keys()).filter(cls => {
+            if (!hasClassRestriction) return true; // admin / all-classes
+            return activeClassesList.some(ac => {
+                const acNorm = ac.toLowerCase().replace(/[^a-z0-9]/g, '');
+                const clsNorm = cls.toLowerCase().replace(/[^a-z0-9]/g, '');
+                if (acNorm === clsNorm || acNorm.includes(clsNorm) || clsNorm.includes(acNorm)) return true;
+                const acNum = acNorm.match(/\d+/)?.[0];
+                const clsNum = clsNorm.match(/\d+/)?.[0];
+                if (acNum && clsNum && acNum === clsNum) {
+                    const acSec = acNorm.replace(/\d+/g, '').replace('class','').replace('grade','');
+                    const clsSec = clsNorm.replace(/\d+/g, '').replace('class','').replace('grade','');
+                    if (!acSec || !clsSec || acSec === clsSec) return true;
+                }
+                return false;
+            });
+        }).sort((a, b) => {
             const na = this.getGradeLevel(a);
             const nb = this.getGradeLevel(b);
-            if (na !== nb) return na - nb; // 10th first, then 11th, then 12th
+            if (na !== nb) return na - nb;
             const secA = this.getSectionLetter(a);
             const secB = this.getSectionLetter(b);
-            if (secA !== secB) return secA.localeCompare(secB); // A, then B, then C
+            if (secA !== secB) return secA.localeCompare(secB);
             return a.localeCompare(b);
         });
 
@@ -848,8 +865,14 @@ class DashboardManager {
             subjectBatchCountMap.set(sub, (subjectBatchCountMap.get(sub) || 0) + 1);
         });
 
-        // Only show subjects that have at least 1 batch — don't pad with 0-count assigned subjects
-        const distinctBatchSubjects = Array.from(subjectBatchCountMap.keys()).filter(s => (subjectBatchCountMap.get(s) || 0) > 0).sort();
+        // Only show subjects that the teacher is assigned to AND that have actual batches
+        const hasSubjectRestriction = activeSubjectsList.length > 0 &&
+            !activeSubjectsList.some(s => s.toLowerCase() === 'all subjects' || s.toLowerCase() === 'all');
+        const distinctBatchSubjects = Array.from(subjectBatchCountMap.keys()).filter(s => {
+            if ((subjectBatchCountMap.get(s) || 0) === 0) return false; // no batches
+            if (!hasSubjectRestriction) return true; // admin / all-subjects
+            return activeSubjectsList.some(as => window.appStorage && window.appStorage.isSubjectMatch(s, "", as, ""));
+        }).sort();
 
         // Safety reset filters if previously selected class or subject no longer exists in available batches
         if (this.selectedClassFilter && this.selectedClassFilter !== "all") {
@@ -1024,7 +1047,7 @@ class DashboardManager {
                                     <div class="dash-class-pills-bar">
                                         <span class="filter-pills-label">Classes:</span>
                                         <button type="button" class="btn-dash-class-pill ${this.selectedClassFilter === 'all' ? 'active' : ''}" data-class="all">
-                                            All Classes (${this.batches.length})
+                                            All Classes (${distinctBatchClasses.reduce((sum, c) => sum + (classBatchCountMap.get(c) || 0), 0) || this.batches.length})
                                         </button>
                                         ${distinctBatchClasses.map(clsName => {
                                             const countForCls = classBatchCountMap.get(clsName) || 0;
@@ -1043,7 +1066,7 @@ class DashboardManager {
                                     <div class="dash-subject-pills-bar">
                                         <span class="filter-pills-label">Subjects:</span>
                                         <button type="button" class="btn-dash-subject-pill ${(!this.selectedSubjectFilter || this.selectedSubjectFilter === 'all') ? 'active' : ''}" data-subject="all">
-                                            All Subjects (${this.batches.length})
+                                            All Subjects (${distinctBatchSubjects.reduce((sum, s) => sum + (subjectBatchCountMap.get(s) || 0), 0) || this.batches.length})
                                         </button>
                                         ${distinctBatchSubjects.map(subName => {
                                             const countForSub = subjectBatchCountMap.get(subName) || 0;
