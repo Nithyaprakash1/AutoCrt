@@ -155,6 +155,7 @@ class AppController {
                     }
                 } else {
                     // Fall back to Teacher Desk dashboard
+                    this.hideLoadingBox();
                     this.switchPortal("evaluator", false);
                     await this.switchView("dashboard");
                     if (this.showToast) {
@@ -6978,7 +6979,11 @@ class AppController {
 
     async loadEvaluations() {
         if (this.currentView === "dashboard" && this.dashboardManager) {
-            this.dashboardManager.evaluations = await window.appStorage.getAllEvaluations(false, false);
+            if (typeof this.dashboardManager.fetchEvaluations === "function") {
+                this.dashboardManager.evaluations = await this.dashboardManager.fetchEvaluations(false);
+            } else {
+                this.dashboardManager.evaluations = await window.appStorage.getAllEvaluations(false, false);
+            }
             this.dashboardManager.applyFilters();
             this.dashboardManager.render();
             this.dashboardManager.bindEvents();

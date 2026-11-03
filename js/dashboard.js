@@ -146,9 +146,25 @@ class DashboardManager {
         `;
     }
 
+    async fetchEvaluations(forceRefresh = false) {
+        if (!window.appStorage) return [];
+        const allEvals = await window.appStorage.getAllEvaluations(forceRefresh, true);
+        const currentUser = window.appStorage.getCurrentUser();
+        const isTeacherUser = currentUser && (currentUser.role === 'evaluator' || currentUser.role === 'teacher');
+        let assigned = (currentUser && Array.isArray(currentUser.assignedSubjects) && currentUser.assignedSubjects.length > 0)
+            ? [...currentUser.assignedSubjects]
+            : (currentUser && currentUser.subject ? [currentUser.subject] : []);
+        assigned = assigned.filter(s => s && s !== 'all' && s !== 'All Subjects');
+
+        if (isTeacherUser && assigned.length > 0) {
+            return allEvals.filter(e => e && assigned.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName)));
+        }
+        return allEvals;
+    }
+
     async init() {
         if (!this.container) return;
-        this.evaluations = await window.appStorage.getAllEvaluations(false, false);
+        this.evaluations = await this.fetchEvaluations(false);
 
         // Check if uploader just published a new batch of papers
         const lastCls = sessionStorage.getItem("niprak_last_uploaded_class");
@@ -294,7 +310,7 @@ class DashboardManager {
                 const viewDash = document.getElementById("view-dashboard");
                 if (viewDash && !viewDash.classList.contains("active-view")) return;
 
-                this.evaluations = await window.appStorage.getAllEvaluations(false, false);
+                this.evaluations = await this.fetchEvaluations(false);
                 this.applyFilters();
                 if (!this.activeBatchKey) {
                     this.render();
@@ -307,7 +323,7 @@ class DashboardManager {
         }
 
         if (window.firebaseManager) {
-            window.appStorage.getAllEvaluations(true, false).then((freshList) => {
+            this.fetchEvaluations(true).then((freshList) => {
                 if (Array.isArray(freshList) && freshList.length > 0) {
                     this.evaluations = freshList;
                     this.applyFilters();
@@ -622,7 +638,6 @@ class DashboardManager {
             : ((!isAllSelected && this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all' && this.selectedSubjectFilter !== 'All Subjects') ? this.selectedSubjectFilter : null);
 
         // Compute Class & Template Batches for Teacher Desk:
-        // Compute Class & Template Batches for Teacher Desk:
         let evalsForBatches = this.evaluations;
         if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
             evalsForBatches = this.evaluations.filter(e => {
@@ -634,37 +649,22 @@ class DashboardManager {
             });
         }
 
-        if (isTeacher && this.teacherClasses && this.teacherClasses.length > 0 && !this.teacherClasses.includes("All Classes") && !this.teacherClasses.includes("all")) {
-            const classMatches = evalsForBatches.filter(e => {
-                const rawCls = (e.class || e.className || e.classLabel || "");
-                const eCls = rawCls.toLowerCase().replace(/[^a-z0-9]/g, '');
-                return this.teacherClasses.some(tc => {
-                    const normTc = tc.toLowerCase().replace(/[^a-z0-9]/g, '');
-                    if (!normTc || eCls === normTc || (normTc && eCls.includes(normTc)) || (eCls && normTc.includes(eCls))) return true;
-                    // Grade number matching: e.g. "10" matches "Class 10-A", "Class 10" matches "10-A"
-                    const numTc = normTc.match(/\d+/)?.[0];
-                    const numCls = eCls.match(/\d+/)?.[0];
-                    if (numTc && numCls && numTc === numCls) {
-                        const secTc = normTc.replace(/\d+/g, '').replace('class', '').replace('grade', '');
-                        const secCls = eCls.replace(/\d+/g, '').replace('class', '').replace('grade', '');
-                        if (!secTc || !secCls || secTc === secCls) return true;
-                    }
-                    return false;
-                });
-            });
-            // If class filtering found matches, apply it; if 0 matches, retain subject matches so batches are never lost
-            if (classMatches.length > 0) {
-                evalsForBatches = classMatches;
-            }
-        }
-
         const batchMap = new Map();
         evalsForBatches.forEach(e => {
+            if (!e) return;
             const rawCls = e.classLabel || e.className || e.class || "Class 12-A";
             const cls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
                 ? window.appStorage.canonicalizeClassName(rawCls)
                 : rawCls;
-            const sub = e.subject || activePanelSubject || displaySubject;
+
+            // Robust subject deduction for this paper
+            let sub = e.subject;
+            if (!sub || sub === "General" || sub === "All Subjects") {
+                const matchedAssigned = (this.teacherSubjects || []).find(ts => window.appStorage && window.appStorage.isSubjectMatch(e.subject, e.examName, ts, e.templateName));
+                sub = matchedAssigned || (activePanelSubject && activePanelSubject !== 'all' && activePanelSubject !== 'All Subjects' ? activePanelSubject : null) || displaySubject;
+            }
+            if (!sub) sub = "General";
+
             const rawExamTitle = (e.examName || e.templateName || "Assessment").trim();
             // Ignore minor date divergence in exam name so papers for the same exam never split into multiple cards
             const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
@@ -689,7 +689,10 @@ class DashboardManager {
             }
             const b = batchMap.get(batchKey);
             // Preserve EVERY paper: even if Register No / rollNo is same, display the paper!
-            // Only deduplicate if identical evaluation ID was already added.
+            // Ensure paper has a valid unique id so papers without explicit id are never collapsed
+            if (!e.id) {
+                e.id = e.evaluationId || e.paperId || e._id || (`p_${Date.now()}_${Math.floor(Math.random() * 100000)}`);
+            }
             const pId = String(e.id);
             if (!b.paperMap) b.paperMap = new Map();
             if (b.paperMap.has(pId)) {
@@ -809,24 +812,8 @@ class DashboardManager {
             classBatchCountMap.set(canonCls, (classBatchCountMap.get(canonCls) || 0) + 1);
         });
 
-        // Distinct classes for filter pills: only include teacher's assigned classes (if restricted)
-        const hasClassRestriction = activeClassesList.length > 0;
-        let distinctBatchClasses = Array.from(classBatchCountMap.keys()).filter(cls => {
-            if (!hasClassRestriction) return true; // admin / all-classes
-            return activeClassesList.some(ac => {
-                const acNorm = ac.toLowerCase().replace(/[^a-z0-9]/g, '');
-                const clsNorm = cls.toLowerCase().replace(/[^a-z0-9]/g, '');
-                if (acNorm === clsNorm || acNorm.includes(clsNorm) || clsNorm.includes(acNorm)) return true;
-                const acNum = acNorm.match(/\d+/)?.[0];
-                const clsNum = clsNorm.match(/\d+/)?.[0];
-                if (acNum && clsNum && acNum === clsNum) {
-                    const acSec = acNorm.replace(/\d+/g, '').replace('class','').replace('grade','');
-                    const clsSec = clsNorm.replace(/\d+/g, '').replace('class','').replace('grade','');
-                    if (!acSec || !clsSec || acSec === clsSec) return true;
-                }
-                return false;
-            });
-        }).sort((a, b) => {
+        // Distinct classes for filter pills from actual batches of the teacher's subject
+        const distinctBatchClasses = Array.from(classBatchCountMap.keys()).sort((a, b) => {
             const na = this.getGradeLevel(a);
             const nb = this.getGradeLevel(b);
             if (na !== nb) return na - nb;
@@ -1999,9 +1986,9 @@ class DashboardManager {
                         const evaluation = await window.appStorage.getEvaluationById(id);
                         if (evaluation) {
                             if (this.options.onOpenEvaluation) {
-                                await this.options.onOpenEvaluation(evaluation);
+                                await this.options.onOpenEvaluation(evaluation, this.filteredEvaluations);
                             } else if (window.app) {
-                                await window.app.openWorkspace(evaluation);
+                                await window.app.openWorkspace(evaluation, this.filteredEvaluations);
                             }
                         } else {
                             if (window.app && typeof window.app.hideLoadingBox === "function") {
@@ -2183,7 +2170,7 @@ class DashboardManager {
                 modal.remove();
 
                 // Refresh evaluations smoothly without jarring screen flicker
-                this.evaluations = await window.appStorage.getAllEvaluations(false, false);
+                this.evaluations = await this.fetchEvaluations(false);
                 this.applyFilters();
                 this.renderTableRows();
                 this.updateCountsInUI();
@@ -2248,7 +2235,7 @@ class DashboardManager {
             const result = await window.appStorage.deduplicateEvaluations({ dryRun: false });
 
             // Reload evaluations from storage
-            this.evaluations = await window.appStorage.getAllEvaluations(false, false);
+            this.evaluations = await this.fetchEvaluations(false);
             this.applyFilters();
             this.render();
             this.bindEvents();
@@ -2408,7 +2395,7 @@ class DashboardManager {
             modal.remove();
 
             // Refresh UI
-            this.evaluations = await window.appStorage.getAllEvaluations(false, false);
+            this.evaluations = await this.fetchEvaluations(false);
             this.applyFilters();
             this.render();
             this.bindEvents();

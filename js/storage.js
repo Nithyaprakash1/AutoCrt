@@ -1037,8 +1037,9 @@ class StorageService {
                 if (!subjectMatches) return false;
             }
 
-            // 2. CLASS MATCH (if teacher has specific class restrictions)
-            if (!allowsAllClasses) {
+            // 2. CLASS MATCH (if teacher has specific class restrictions and no subject restriction)
+            // If teacher has assigned subjects, preserve all papers of their authorized subject across all classes!
+            if (!allowsAllClasses && allowsAllSubjects) {
                 const eClass = (e.class || e.className || e.classLabel || "").toLowerCase().trim();
                 if (eClass) {
                     const classMatches = assignedClasses.some(c => {

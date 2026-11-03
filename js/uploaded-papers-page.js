@@ -1028,18 +1028,32 @@ class UploadedPapersPageManager {
                 if (window.app && typeof window.app.showLoadingBox === "function") {
                     window.app.showLoadingBox("Opening Answer Script...", "Loading student paper & correction workspace...");
                 }
-                const id = btn.getAttribute("data-paper-id");
-                let target = this.papers.find(p => p.id === id);
-                if (window.appStorage) {
-                    const fresh = await window.appStorage.getEvaluationById(id);
-                    if (fresh) target = fresh;
-                }
-                if (target && window.app) {
-                    const batches = this.computeBatches();
-                    const targetBatch = batches.find(b => b.papers.some(p => String(p.id) === String(id))) ||
-                                        (this.selectedBatchKey !== "all" ? batches.find(b => b.key === this.selectedBatchKey) : null);
-                    const queue = targetBatch ? targetBatch.papers : this.papers;
-                    window.app.openWorkspace(target, queue);
+                try {
+                    const id = btn.getAttribute("data-paper-id");
+                    let target = this.papers.find(p => String(p.id) === String(id));
+                    if (window.appStorage) {
+                        const fresh = await window.appStorage.getEvaluationById(id);
+                        if (fresh) target = fresh;
+                    }
+                    if (target && window.app) {
+                        const batches = this.computeBatches();
+                        const targetBatch = batches.find(b => b.papers.some(p => String(p.id) === String(id))) ||
+                                            (this.selectedBatchKey !== "all" ? batches.find(b => b.key === this.selectedBatchKey) : null);
+                        const queue = targetBatch ? targetBatch.papers : this.papers;
+                        await window.app.openWorkspace(target, queue);
+                    } else {
+                        if (window.app && typeof window.app.hideLoadingBox === "function") {
+                            window.app.hideLoadingBox();
+                        }
+                        if (window.app && typeof window.app.showToast === "function") {
+                            window.app.showToast("Paper record not found. Please refresh the page.", "error");
+                        }
+                    }
+                } catch (err) {
+                    console.error("Evaluate paper error:", err);
+                    if (window.app && typeof window.app.hideLoadingBox === "function") {
+                        window.app.hideLoadingBox();
+                    }
                 }
             });
         });
