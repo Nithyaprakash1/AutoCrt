@@ -596,11 +596,20 @@ class StorageService {
                     merged.class = canonCls;
                 }
 
-                // Canonicalize Subject Name: "10 English" -> "English"
+                // Auto-detect & heal subject if missing or "General" or "All Subjects"
+                if (!merged.subject || merged.subject === 'General' || merged.subject === 'All Subjects' || merged.subject === 'unknown') {
+                    const detected = this.detectSubjectFromText(`${merged.examName || ''} ${merged.templateName || ''}`);
+                    if (detected) {
+                        merged.subject = detected;
+                    }
+                }
+
+                // Canonicalize Subject Name to official standard name
                 if (merged.subject) {
-                    const sTrim = String(merged.subject).trim();
-                    if (sTrim.toLowerCase() === '10 english') {
-                        merged.subject = 'English';
+                    const canon = this.canonicalizeSubject(merged.subject);
+                    const stdName = this.getStandardSubjectName(canon);
+                    if (stdName) {
+                        merged.subject = stdName;
                     }
                 }
 
@@ -783,16 +792,53 @@ class StorageService {
         if (s.includes('chem') || s.includes('che-')) return 'chemistry';
         if (s.includes('physic') || s === 'phy' || s.startsWith('phy ') || s.includes('phy-')) return 'physics';
         if (s.includes('math') || s.includes('mat-x') || s.includes('mat-xii') || s.includes('mat x') || s.includes('mat xii') || s.includes('10th math') || s.includes('10 math') || s === '10th revision math' || s === 'revision 2 - math objective') return 'mathematics';
-        if (s.includes('english') || s.includes('eng') || s.includes('eng-')) return 'english';
+        if (s.includes('english') || s.includes('eng-') || s === 'eng' || s.startsWith('eng ') || s.endsWith(' eng')) return 'english';
         if (s.includes('econom') || s.includes('ecom') || s === 'eco' || s.startsWith('eco ') || s.endsWith(' eco') || s.includes('eco-') || s.includes('eco_') || s === 'econ' || s === 'ec') return 'economics';
         if (s.includes('histor')) return 'history';
         if (s.includes('geograph')) return 'geography';
         if (s.includes('tamil') || s === 'tam' || s.startsWith('tam ') || s.includes('tam-')) return 'tamil';
         if (s.includes('hindi') || s === 'hin' || s.startsWith('hin ') || s.includes('hin-')) return 'hindi';
-        if (s.includes('french')) return 'french';
+        if (s.includes('french') || s.includes('francais') || s === 'fre' || s.startsWith('fre ') || s.endsWith(' fre') || s.includes('fre-')) return 'french';
         if (s.includes('sanskrit')) return 'sanskrit';
         if (s === 'science' || s.startsWith('science ') || s.endsWith(' science') || s.includes('gen sci') || s.includes('general science') || s.includes('natural sci') || s.includes('sci-x') || s.includes('sci-')) return 'science';
         return s.replace(/\s+/g, '_');
+    }
+
+    getStandardSubjectName(canon) {
+        if (!canon) return null;
+        const MAP = {
+            'entrepreneurship': 'Entrepreneurship',
+            'business_studies': 'Business Studies',
+            'accountancy': 'Accountancy',
+            'social_science': 'Social Science',
+            'political_science': 'Political Science',
+            'informatics_practices': 'Informatics Practices',
+            'computer_science': 'Computer Science',
+            'biology': 'Biology',
+            'chemistry': 'Chemistry',
+            'physics': 'Physics',
+            'mathematics': 'Mathematics',
+            'english': 'English',
+            'economics': 'Economics',
+            'history': 'History',
+            'geography': 'Geography',
+            'tamil': 'Tamil',
+            'hindi': 'Hindi',
+            'french': 'French',
+            'sanskrit': 'Sanskrit',
+            'science': 'Science'
+        };
+        return MAP[canon] || null;
+    }
+
+    detectSubjectFromText(text) {
+        if (!text) return null;
+        const canon = this.canonicalizeSubject(text);
+        if (canon) {
+            const std = this.getStandardSubjectName(canon);
+            if (std) return std;
+        }
+        return null;
     }
 
     harmonizeTemplateForSubject(templateName, subject, className = '') {
@@ -938,16 +984,16 @@ class StorageService {
             return combined.includes('physic') || combined.includes('phy-') || combined.startsWith('phy ') || combined.endsWith(' phy') || /\bphy\b/.test(combined);
         }
         if (cTarget === 'mathematics') {
-            if (combined.includes('eco') || combined.includes('econom') || combined.includes('ecom') || combined.includes('commerce') || combined.includes('account') || combined.includes('business')) {
+            if (combined.includes('eco') || combined.includes('econom') || combined.includes('ecom') || combined.includes('commerce') || combined.includes('account') || combined.includes('business') || combined.includes('social') || combined.includes('politic') || combined.includes('history') || combined.includes('french') || combined.includes('tamil') || combined.includes('english')) {
                 return false;
             }
-            return combined.includes('math') || combined.includes('mat-x') || combined.includes('mat-xii') || combined.includes('mat x') || combined.includes('mat xii') || combined.includes('10th math') || combined.includes('10 math') || (combined.includes('10th revision') && !combined.includes('soc')) || (combined.includes('revision 2') && !combined.includes('eco') && !combined.includes('chem') && !combined.includes('phy') && !combined.includes('bio'));
+            return combined.includes('math') || combined.includes('mat-x') || combined.includes('mat-xii') || combined.includes('mat x') || combined.includes('mat xii') || combined.includes('10th math') || combined.includes('10 math') || /\bmath\b/.test(combined) || /\bmaths\b/.test(combined);
         }
         if (cTarget === 'tamil') {
             return combined.includes('tamil') || combined.includes('tam-') || combined.startsWith('tam ') || combined.endsWith(' tam') || /\btam\b/.test(combined);
         }
         if (cTarget === 'english') {
-            return combined.includes('english') || combined.includes('eng') || combined.includes('eng-');
+            return combined.includes('english') || combined.includes('eng-') || /\beng\b/.test(combined);
         }
         if (cTarget === 'economics') {
             return hasEco;
@@ -971,7 +1017,7 @@ class StorageService {
             return combined.includes('entrepreneur');
         }
         if (cTarget === 'french') {
-            return combined.includes('french') || combined.includes('fre-');
+            return combined.includes('french') || combined.includes('francais') || combined.includes('fre-') || /\bfre\b/.test(combined);
         }
         if (cTarget === 'informatics_practices') {
             return combined.includes('informatics') || combined.includes('info prac') || combined.includes('ip') || combined.includes('ip-');

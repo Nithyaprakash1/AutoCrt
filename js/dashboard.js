@@ -202,8 +202,10 @@ class DashboardManager {
             // Strict Subject Integrity: A teacher is ONLY assigned to what was explicitly allocated in User Management!
             // Never expand to other subjects found in the class papers!
             this.teacherSubjects = assignedSubs;
-            // Respect explicitly selected subject or last uploaded subject!
-            const sessSub = sessionStorage.getItem("niprak_active_subject");
+            // Respect explicitly selected subject or last uploaded subject, persisting across browser sessions!
+            const sessSub = sessionStorage.getItem("niprak_active_subject") || 
+                            localStorage.getItem("niprak_active_subject") || 
+                            localStorage.getItem("onespace_active_subject");
             if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all" && this.selectedSubjectFilter !== "All Subjects") {
                 this.teacherSubject = this.selectedSubjectFilter;
             } else if (lastSub) {
@@ -247,8 +249,10 @@ class DashboardManager {
             this.activeBatchKey = null;
         }
 
-        // Evaluator / Teacher desk defaults to assigned subject panel
-        const sessSub = sessionStorage.getItem("niprak_active_subject");
+        // Evaluator / Teacher desk defaults to assigned subject panel (persisting across days & reloads!)
+        const sessSub = sessionStorage.getItem("niprak_active_subject") || 
+                        localStorage.getItem("niprak_active_subject") || 
+                        localStorage.getItem("onespace_active_subject");
 
         // DEDUCE SUBJECT FROM HIGHLIGHT BATCH IF PRESENT
         if (this.highlightBatchKey && Array.isArray(this.evaluations)) {
@@ -262,7 +266,11 @@ class DashboardManager {
             if (matchedEval && matchedEval.subject) {
                 this.selectedSubjectFilter = matchedEval.subject;
                 this.teacherSubject = matchedEval.subject;
-                try { sessionStorage.setItem("niprak_active_subject", matchedEval.subject); } catch (e) {}
+                try {
+                    sessionStorage.setItem("niprak_active_subject", matchedEval.subject);
+                    localStorage.setItem("niprak_active_subject", matchedEval.subject);
+                    localStorage.setItem("onespace_active_subject", matchedEval.subject);
+                } catch (e) {}
             }
         }
 
@@ -276,7 +284,11 @@ class DashboardManager {
 
                 this.selectedSubjectFilter = isAssigned ? sessSub : primarySub;
                 this.teacherSubject = this.selectedSubjectFilter;
-                try { sessionStorage.setItem("niprak_active_subject", this.selectedSubjectFilter); } catch (e) {}
+                try {
+                    sessionStorage.setItem("niprak_active_subject", this.selectedSubjectFilter);
+                    localStorage.setItem("niprak_active_subject", this.selectedSubjectFilter);
+                    localStorage.setItem("onespace_active_subject", this.selectedSubjectFilter);
+                } catch (e) {}
             } else {
                 if (!this.selectedSubjectFilter) {
                     this.selectedSubjectFilter = "all";
@@ -296,7 +308,11 @@ class DashboardManager {
 
         const activeSubNow = this.getActiveSubject();
         if (activeSubNow && activeSubNow !== "all" && activeSubNow !== "All Subjects") {
-            sessionStorage.setItem("niprak_active_subject", activeSubNow);
+            try {
+                sessionStorage.setItem("niprak_active_subject", activeSubNow);
+                localStorage.setItem("niprak_active_subject", activeSubNow);
+                localStorage.setItem("onespace_active_subject", activeSubNow);
+            } catch (e) {}
         }
         if (window.app && typeof window.app.updateUserProfileDisplay === "function") {
             window.app.updateUserProfileDisplay(activeSubNow, this.selectedClassFilter !== "all" ? this.selectedClassFilter : null);
@@ -448,9 +464,12 @@ class DashboardManager {
             if (this.batches && this.batches.length > 0) {
                 const parts = this.activeBatchKey.split(":::");
                 const targetCls = (parts[0] || "").toLowerCase().trim();
-                const targetTpl = (parts.slice(1).join(":::") || "").toLowerCase().trim();
+                const targetTpl = (parts[1] || "").toLowerCase().trim();
+                const targetSub = (parts[2] || "").toLowerCase().trim();
                 matchedBatch = this.batches.find(b => b.key === this.activeBatchKey ||
-                    (b.className && b.className.toLowerCase().trim() === targetCls && b.templateName && b.templateName.toLowerCase().trim() === targetTpl));
+                    (b.className && b.className.toLowerCase().trim() === targetCls &&
+                     b.templateName && b.templateName.toLowerCase().trim() === targetTpl &&
+                     (!targetSub || (b.subject && (b.subject.toLowerCase().trim() === targetSub || (window.appStorage && window.appStorage.isSubjectMatch(b.subject, '', targetSub, '')))))));
             }
 
             let baseList = [];
@@ -461,15 +480,21 @@ class DashboardManager {
                 // Fallback when this.batches is not yet computed
                 const parts = this.activeBatchKey.split(":::");
                 const targetCls = (parts[0] || "").toLowerCase().trim();
-                const targetTpl = (parts.slice(1).join(":::") || "").toLowerCase().trim();
+                const targetTpl = (parts[1] || "").toLowerCase().trim();
+                const targetSub = (parts[2] || "").toLowerCase().trim();
                 baseList = this.evaluations.filter(e => {
                     const rawCls = (e.classLabel || e.className || e.class || "Class 12-A");
                     const eCls = (window.appStorage && typeof window.appStorage.canonicalizeClassName === "function")
                         ? window.appStorage.canonicalizeClassName(rawCls).toLowerCase().trim()
                         : rawCls.toLowerCase().trim();
                     const examTitle = (e.examName || e.templateName || "Assessment").toLowerCase().trim().replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '');
-                    const eBatchKey = `${eCls}:::${examTitle}`;
+                    const eSub = (e.subject || "").toLowerCase().trim();
 
+                    if (targetSub && window.appStorage && !window.appStorage.isSubjectMatch(e.subject, e.examName, targetSub, e.templateName)) {
+                        return false;
+                    }
+
+                    const eBatchKey = `${eCls}:::${examTitle}:::${eSub}`;
                     if (eBatchKey === this.activeBatchKey.toLowerCase().trim()) return true;
 
                     const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
@@ -668,7 +693,8 @@ class DashboardManager {
             const rawExamTitle = (e.examName || e.templateName || "Assessment").trim();
             // Ignore minor date divergence in exam name so papers for the same exam never split into multiple cards
             const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
-            const batchKey = `${cls}:::${examTitle}`;
+            // Crucial: ALWAYS include subject in batchKey so different subjects with same exam name NEVER collide into 1 batch!
+            const batchKey = `${cls}:::${examTitle}:::${sub}`;
             if (!batchMap.has(batchKey)) {
                 batchMap.set(batchKey, {
                     key: batchKey,
@@ -827,9 +853,10 @@ class DashboardManager {
         const subjectBatchCountMap = new Map();
         this.batches.forEach(b => {
             let sub = (b.subject || "General").trim();
-            if (window.appStorage && typeof window.appStorage.isSubjectMatch === "function") {
-                const matchedAssigned = (this.teacherSubjects || []).find(ts => window.appStorage.isSubjectMatch(sub, "", ts, ""));
-                if (matchedAssigned) sub = matchedAssigned;
+            if (window.appStorage && typeof window.appStorage.canonicalizeSubject === "function") {
+                const canon = window.appStorage.canonicalizeSubject(sub);
+                const std = (typeof window.appStorage.getStandardSubjectName === "function") ? window.appStorage.getStandardSubjectName(canon) : null;
+                if (std) sub = std;
             }
             b.subject = sub;
             subjectBatchCountMap.set(sub, (subjectBatchCountMap.get(sub) || 0) + 1);
@@ -1177,12 +1204,15 @@ class DashboardManager {
         // VIEW 2: Batch Drill-Down Mode (When teacher clicked a specific batch)
         // Shows Batch Header Banner with [Back to All Batches] + Analytics + That batch's papers
         // =========================================================================
-        const [targetClass, ...restTpl] = this.activeBatchKey.split(":::");
-        const targetTemplate = restTpl.join(":::");
-        const currentBatch = (this.batches || []).find(b => b.key === this.activeBatchKey || (b.className === targetClass && b.templateName === targetTemplate)) || {
+        const batchParts = this.activeBatchKey.split(":::");
+        const targetClass = batchParts[0] || "";
+        const targetTemplate = batchParts[1] || "";
+        const targetSubject = batchParts[2] || "";
+        const currentBatch = (this.batches || []).find(b => b.key === this.activeBatchKey ||
+            (b.className === targetClass && b.templateName === targetTemplate && (!targetSubject || b.subject === targetSubject))) || {
             className: targetClass,
             templateName: targetTemplate,
-            subject: displaySubject,
+            subject: targetSubject || displaySubject,
             papers: this.filteredEvaluations,
             total: this.filteredEvaluations.length,
             corrected: this.filteredEvaluations.filter(e => this.isPaperCorrected(e)).length,
@@ -1554,9 +1584,17 @@ class DashboardManager {
                 this.selectedSubjectFilter = sub;
                 if (sub !== "all") {
                     this.teacherSubject = sub;
-                    try { sessionStorage.setItem("niprak_active_subject", sub); } catch (e) {}
+                    try {
+                        sessionStorage.setItem("niprak_active_subject", sub);
+                        localStorage.setItem("niprak_active_subject", sub);
+                        localStorage.setItem("onespace_active_subject", sub);
+                    } catch (e) {}
                 } else {
-                    try { sessionStorage.removeItem("niprak_active_subject"); } catch (e) {}
+                    try {
+                        sessionStorage.removeItem("niprak_active_subject");
+                        localStorage.removeItem("niprak_active_subject");
+                        localStorage.removeItem("onespace_active_subject");
+                    } catch (e) {}
                 }
                 this.applyFilters();
                 this.render();
@@ -1911,7 +1949,11 @@ class DashboardManager {
             subjectSelect.addEventListener("change", (e) => {
                 this.selectedSubjectFilter = e.target.value;
                 if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all" && this.selectedSubjectFilter !== "All Subjects") {
-                    sessionStorage.setItem("niprak_active_subject", this.selectedSubjectFilter);
+                    try {
+                        sessionStorage.setItem("niprak_active_subject", this.selectedSubjectFilter);
+                        localStorage.setItem("niprak_active_subject", this.selectedSubjectFilter);
+                        localStorage.setItem("onespace_active_subject", this.selectedSubjectFilter);
+                    } catch (e) {}
                 }
                 this.applyFilters();
                 this.renderTableRows();
@@ -2487,7 +2529,8 @@ class DashboardManager {
         } else if (this.activeBatchKey) {
             const parts = this.activeBatchKey.split(":::");
             const targetCls = (parts[0] || "").toLowerCase().trim();
-            const targetTpl = (parts.slice(1).join(":::") || "").toLowerCase().trim();
+            const targetTpl = (parts[1] || "").toLowerCase().trim();
+            const targetSub = (parts[2] || "").toLowerCase().trim();
             const matchedBatch = (this.batches || []).find(b => b.key === this.activeBatchKey);
             if (matchedBatch && matchedBatch.papers && matchedBatch.papers.length > 0) {
                 targets = [...matchedBatch.papers];
@@ -2495,15 +2538,19 @@ class DashboardManager {
                 targets = this.evaluations.filter(e => {
                     const eCls = (e.classLabel || e.className || e.class || "Class 12-A").toLowerCase().trim();
                     const examTitle = (e.examName || e.templateName || "Assessment").toLowerCase().trim();
-                    const dateStr = e.examDate ? ` (${e.examDate})`.toLowerCase().trim() : '';
-                    const eBatchKey = `${eCls}:::${examTitle}${dateStr}`.trim();
+                    const eSub = (e.subject || "").toLowerCase().trim();
+
+                    if (targetSub && window.appStorage && !window.appStorage.isSubjectMatch(e.subject, e.examName, targetSub, e.templateName)) {
+                        return false;
+                    }
+
+                    const eBatchKey = `${eCls}:::${examTitle}:::${eSub}`.trim();
                     if (eBatchKey === this.activeBatchKey.toLowerCase().trim()) return true;
 
-                    // Strict Date Check: If active batch has a date, paper must have the exact same date!
+                    // Strict Date Check: If active batch has an explicit date in targetTpl, paper must have the exact same date!
                     const targetDateMatch = targetTpl.match(/\((\d{4}-\d{2}-\d{2})\)/);
                     const targetDate = targetDateMatch ? targetDateMatch[1] : null;
                     if (targetDate && (!e.examDate || e.examDate !== targetDate)) return false;
-                    if (!targetDate && e.examDate) return false;
 
                     const normTargetCls = targetCls.replace(/[^a-z0-9]/g, '');
                     const eClsNorm = eCls.replace(/[^a-z0-9]/g, '');

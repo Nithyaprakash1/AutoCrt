@@ -111,7 +111,7 @@ class UploadedPapersPageManager {
             const rawExamTitle = (p.examName || p.templateName || "Assessment").trim();
             // Ignore minor date divergence in exam name so papers stay together in 1 card
             const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
-            const batchKey = `${cls}:::${examTitle}`;
+            const batchKey = `${cls}:::${examTitle}:::${sub}`;
             if (!batchMap.has(batchKey)) {
                 batchMap.set(batchKey, {
                     key: batchKey,
@@ -248,7 +248,7 @@ class UploadedPapersPageManager {
                 : rawCls;
             const rawExamTitle = (p.examName || p.templateName || "Assessment").trim();
             const examTitle = rawExamTitle.replace(/\s*\(\d{4}-\d{2}-\d{2}\)\s*$/g, '').trim();
-            const pKey = `${pCls}:::${examTitle}`;
+            const pKey = `${pCls}:::${examTitle}:::${p.subject || "General"}`;
 
             const isUserUp = p.isUserUploaded || (!p.isMock && (p.uploadedAt || p.pdfDataUrl || p.pdfStorageUrl || (p.pages && p.pages.length > 0)));
 

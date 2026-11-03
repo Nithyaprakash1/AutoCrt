@@ -5799,7 +5799,7 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 subjectName: subject?.name || "English",
                 className: batchClass,
                 templateName: batchTemplateName,
-                batchKey: `${batchClass}:::${batchExamName}`,
+                batchKey: `${batchClass}:::${batchExamName}:::${subject.name}`,
                 singleItem: singleItemInfo
             });
 
@@ -5814,9 +5814,11 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 sessionStorage.setItem("niprak_last_uploaded_class", cls.label || cls.name);
                 sessionStorage.setItem("niprak_last_uploaded_subject", subject.name);
                 sessionStorage.setItem("niprak_active_subject", subject.name);
+                localStorage.setItem("niprak_active_subject", subject.name);
+                localStorage.setItem("onespace_active_subject", subject.name);
                 if (this.selectedTemplate) {
                     const tplName = (this.selectedTemplate.name || this.selectedTemplate.examName || "").trim();
-                    const bKey = `${cls.label || cls.name}:::${tplName}`;
+                    const bKey = `${cls.label || cls.name}:::${tplName}:::${subject.name}`;
                     sessionStorage.setItem("niprak_last_uploaded_template", tplName);
                     sessionStorage.setItem("niprak_last_uploaded_batch", bKey);
                 }
@@ -6250,10 +6252,12 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         const subName = targetSubject || this.selectedSubject?.name || "Economics";
         const clsName = targetClass || this.selectedClass?.label || this.selectedClass?.name || "Class 12-C";
         const tplName = targetTemplate || this.selectedTemplate?.name || this.selectedTemplate?.examName || "Economics Revision 2 Subjective 2026";
-        const batchKey = `${clsName}:::${tplName}`;
+        const batchKey = `${clsName}:::${tplName}:::${subName}`;
 
         try {
             sessionStorage.setItem("niprak_active_subject", subName);
+            localStorage.setItem("niprak_active_subject", subName);
+            localStorage.setItem("onespace_active_subject", subName);
             sessionStorage.setItem("niprak_last_uploaded_subject", subName);
             sessionStorage.setItem("niprak_last_uploaded_class", clsName);
             sessionStorage.setItem("niprak_last_uploaded_batch", batchKey);
