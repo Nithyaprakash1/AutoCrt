@@ -2040,6 +2040,15 @@ class UploadPortalManager {
                                 <span>Bulk Delete Papers</span>
                                 <span id="existing-bulk-count">(${this.selectedExistingPaperIds.size})</span>
                             </button>
+                            <button type="button" class="btn-secondary" id="btn-portal-bulk-pdf" title="Bulk download evaluated PDFs for selected or all papers" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border: 1.5px solid #007AFF; color: #007AFF; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                <span>Bulk Download PDFs</span>
+                                <span id="portal-bulk-pdf-badge" style="background: rgba(0, 122, 255, 0.12); padding: 2px 7px; border-radius: 999px; font-size: 0.74rem;">(${this.selectedExistingPaperIds.size > 0 ? this.selectedExistingPaperIds.size : 'All ' + (this.existingPapers ? this.existingPapers.length : 0)})</span>
+                            </button>
+                            <button type="button" class="btn-secondary" id="btn-portal-bulk-excel" title="Download Excel / CSV spreadsheet with student marks" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border: 1.5px solid #16A34A; color: #16A34A; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                                <span>Download as Excel</span>
+                            </button>
                             <button type="button" class="btn-clean-unwanted-data" id="btn-portal-clean-data" title="Clean up unwanted test/demo data and Dharnish records" style="display: inline-flex; align-items: center; gap: 6px; background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #DC2626; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 500; cursor: pointer;">
                                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
                                 Clean Up Unwanted Data
@@ -5906,10 +5915,21 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                         <div style="font-size: 0.78rem; color: #047857;">Open the ${this.selectedSubject.name} Panel directly to evaluate and view all batches.</div>
                     </div>
                 </div>
-                <button type="button" class="btn-primary" id="btn-table-jump-to-desk" style="display: inline-flex; align-items: center; gap: 6px; background: #10B981; color: #FFFFFF; border: none; padding: 7px 18px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-                    <span>Open in ${this.selectedSubject.name} Panel ›</span>
-                </button>
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                    <button type="button" class="btn-secondary" id="btn-table-bulk-pdf" title="Bulk download evaluated PDFs" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border: 1.5px solid #007AFF; color: #007AFF; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        <span>Bulk PDF</span>
+                        <span id="table-bulk-pdf-badge" style="background: rgba(0, 122, 255, 0.12); padding: 1px 6px; border-radius: 999px; font-size: 0.72rem;">(${this.selectedExistingPaperIds.size > 0 ? this.selectedExistingPaperIds.size : 'All ' + matches.length})</span>
+                    </button>
+                    <button type="button" class="btn-secondary" id="btn-table-bulk-excel" title="Download Excel spreadsheet" style="display: inline-flex; align-items: center; gap: 6px; background: #FFFFFF; border: 1.5px solid #16A34A; color: #16A34A; padding: 6px 14px; border-radius: 8px; font-size: 0.82rem; font-weight: 600; cursor: pointer; transition: all 0.15s ease;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="16" y2="17"/></svg>
+                        <span>Download Excel</span>
+                    </button>
+                    <button type="button" class="btn-primary" id="btn-table-jump-to-desk" style="display: inline-flex; align-items: center; gap: 6px; background: #10B981; color: #FFFFFF; border: none; padding: 7px 18px; border-radius: 8px; font-size: 0.84rem; font-weight: 700; cursor: pointer; box-shadow: 0 2px 6px rgba(16, 185, 129, 0.35);">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+                        <span>Open in ${this.selectedSubject.name} Panel ›</span>
+                    </button>
+                </div>
             </div>
             <div class="table-wrapper">
                 <table class="papers-table">
@@ -5957,6 +5977,9 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                                     <button type="button" class="btn-action-edit-marks btn-portal-quick-marks" data-id="${p.id}" title="Quick enter or edit marks" style="background: rgba(0, 122, 255, 0.1); border: 1px solid rgba(0, 122, 255, 0.3); color: #007AFF; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
                                         ✏️ Marks
                                     </button>
+                                    <button type="button" class="btn-paper-action btn-portal-row-pdf" data-id="${p.id}" title="Download student evaluated PDF" style="background: rgba(0, 122, 255, 0.08); border: 1px solid rgba(0, 122, 255, 0.25); color: #007AFF; padding: 5px 10px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 4px;">
+                                        📄 PDF
+                                    </button>
                                     <button type="button" class="btn-paper-action btn-action-share btn-portal-share-paper" data-id="${p.id}" data-name="${p.studentName || ''}" data-roll="${p.rollNo || ''}" data-subject="${p.subject || ''}" data-class="${p.className || p.class || ''}" title="Share direct link to this paper via WhatsApp">
                                         ${(window.Icons && window.Icons.whatsapp) || ''}
                                         Share
@@ -5977,6 +6000,16 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
         const updateExistingBadge = () => {
             const countEl = this.container.querySelector("#existing-bulk-count");
             if (countEl) countEl.textContent = `(${this.selectedExistingPaperIds.size})`;
+            const pdfBadge = this.container.querySelector("#portal-bulk-pdf-badge");
+            if (pdfBadge) {
+                const totalCount = matches.length;
+                pdfBadge.textContent = `(${this.selectedExistingPaperIds.size > 0 ? this.selectedExistingPaperIds.size : 'All ' + totalCount})`;
+            }
+            const tblPdfBadge = wrap.querySelector("#table-bulk-pdf-badge");
+            if (tblPdfBadge) {
+                const totalCount = matches.length;
+                tblPdfBadge.textContent = `(${this.selectedExistingPaperIds.size > 0 ? this.selectedExistingPaperIds.size : 'All ' + totalCount})`;
+            }
             const bulkBtn = this.container.querySelector("#btn-existing-bulk-delete");
             if (bulkBtn) {
                 if (this.selectedExistingPaperIds.size > 0) {
@@ -6062,6 +6095,89 @@ Exam Paper Structure / Questions Details: [Paste your paper details or question 
                 );
             };
         }
+
+        // Bulk Download Evaluated PDFs (Selected or All in this class)
+        const triggerBulkPdfDownload = async () => {
+            const targets = this.selectedExistingPaperIds.size > 0
+                ? matches.filter(p => this.selectedExistingPaperIds.has(String(p.id)))
+                : matches;
+            if (!targets || targets.length === 0) {
+                if (window.app && window.app.showToast) {
+                    window.app.showToast("No papers available in this class to download.", "warning");
+                } else alert("No papers available in this class to download.");
+                return;
+            }
+            if (window.app && typeof window.app.downloadBulkPDFs === "function") {
+                await window.app.downloadBulkPDFs(targets);
+            } else if (window.appInstance && typeof window.appInstance.downloadBulkPDFs === "function") {
+                await window.appInstance.downloadBulkPDFs(targets);
+            }
+        };
+        this.container.querySelectorAll("#btn-portal-bulk-pdf, #btn-table-bulk-pdf").forEach(btn => {
+            btn.onclick = () => triggerBulkPdfDownload();
+        });
+
+        // Bulk Export Marks to Excel / CSV (Selected or All in this class)
+        const triggerExcelExport = async () => {
+            const targets = this.selectedExistingPaperIds.size > 0
+                ? matches.filter(p => this.selectedExistingPaperIds.has(String(p.id)))
+                : matches;
+            if (!targets || targets.length === 0) {
+                if (window.app && window.app.showToast) {
+                    window.app.showToast("No papers available in this class to export.", "warning");
+                } else alert("No papers available in this class to export.");
+                return;
+            }
+            if (window.app && typeof window.app.exportEvaluationsAsExcel === "function") {
+                await window.app.exportEvaluationsAsExcel(targets);
+            } else if (window.appInstance && typeof window.appInstance.exportEvaluationsAsExcel === "function") {
+                await window.appInstance.exportEvaluationsAsExcel(targets);
+            }
+        };
+        this.container.querySelectorAll("#btn-portal-bulk-excel, #btn-table-bulk-excel").forEach(btn => {
+            btn.onclick = () => triggerExcelExport();
+        });
+
+        // Individual Student Paper PDF Download
+        wrap.querySelectorAll(".btn-portal-row-pdf").forEach(btn => {
+            btn.addEventListener("click", async () => {
+                const id = btn.getAttribute("data-id");
+                let ev = matches.find(p => String(p.id) === String(id));
+                if (window.appStorage) {
+                    const fresh = await window.appStorage.getEvaluationById(id);
+                    if (fresh) ev = fresh;
+                }
+                if (ev) {
+                    if (window.app && typeof window.app.downloadEvaluationPDF === "function") {
+                        await window.app.downloadEvaluationPDF(ev);
+                    } else if (window.appInstance && typeof window.appInstance.downloadEvaluationPDF === "function") {
+                        await window.appInstance.downloadEvaluationPDF(ev);
+                    } else if (window.PDFGenerator && typeof window.PDFGenerator.generateCorrectedPaperPDF === "function") {
+                        await window.PDFGenerator.generateCorrectedPaperPDF(ev);
+                    }
+                }
+            });
+        });
+
+        // WhatsApp Share
+        wrap.querySelectorAll(".btn-portal-share-paper").forEach(btn => {
+            btn.addEventListener("click", () => {
+                const paperId = btn.getAttribute("data-id");
+                const studentName = btn.getAttribute("data-name");
+                const rollNo = btn.getAttribute("data-roll");
+                const subject = btn.getAttribute("data-subject");
+                const className = btn.getAttribute("data-class");
+                if (window.ShareManager && typeof window.ShareManager.sharePaper === "function") {
+                    window.ShareManager.sharePaper({
+                        paperId,
+                        studentName,
+                        rollNo,
+                        subject,
+                        className
+                    });
+                }
+            });
+        });
 
         wrap.querySelectorAll(".btn-portal-open-ws").forEach(btn => {
             btn.addEventListener("click", async () => {
