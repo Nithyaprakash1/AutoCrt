@@ -34,7 +34,7 @@ class CorrectionMarksPageManager {
         this.isLoading = true;
         try {
             if (window.appStorage) {
-                const all = await window.appStorage.getAllEvaluations(false, true);
+                const all = await window.appStorage.getAllEvaluations(false, false);
                 this.evaluations = Array.isArray(all) ? all : [];
 
                 const clsList = await window.appStorage.getClassesList();

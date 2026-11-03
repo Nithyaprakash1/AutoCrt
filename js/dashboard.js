@@ -148,7 +148,7 @@ class DashboardManager {
 
     async init() {
         if (!this.container) return;
-        this.evaluations = await window.appStorage.getAllEvaluations(false, true);
+        this.evaluations = await window.appStorage.getAllEvaluations(false, false);
 
         // Check if uploader just published a new batch of papers
         const lastCls = sessionStorage.getItem("niprak_last_uploaded_class");
@@ -183,28 +183,8 @@ class DashboardManager {
                 ? [...user.assignedClasses]
                 : (user.class ? [user.class] : []);
 
-            // Only expand to subjects found in papers that already match this teacher's assigned classes
-            // (Don't auto-add subjects from ALL papers globally — that gave every teacher access to everything!)
-            if (Array.isArray(this.evaluations) && assignedSubs.length > 0 && !assignedSubs.includes("All Subjects")) {
-                const assignedClsNorms = assignedCls
-                    .filter(c => c && c.toLowerCase() !== 'all classes' && c.toLowerCase() !== 'all')
-                    .map(c => c.toLowerCase().replace(/[^a-z0-9]/g, ''));
-                this.evaluations.forEach(e => {
-                    const eSub = (e.subject || "").trim();
-                    if (!eSub || eSub === "all" || eSub === "All Subjects") return;
-                    // Already authorized
-                    if (assignedSubs.some(s => window.appStorage && window.appStorage.isSubjectMatch(s, "", eSub, ""))) return;
-                    // Only add if the paper's class matches an assigned class
-                    if (assignedClsNorms.length > 0) {
-                        const eCls = (e.class || e.className || e.classLabel || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-                        const classMatches = assignedClsNorms.some(norm =>
-                            eCls === norm || eCls.includes(norm) || norm.includes(eCls)
-                        );
-                        if (classMatches) assignedSubs.push(eSub);
-                    }
-                });
-            }
-
+            // Strict Subject Integrity: A teacher is ONLY assigned to what was explicitly allocated in User Management!
+            // Never expand to other subjects found in the class papers!
             this.teacherSubjects = assignedSubs;
             // Respect explicitly selected subject or last uploaded subject!
             const sessSub = sessionStorage.getItem("niprak_active_subject");
@@ -271,22 +251,18 @@ class DashboardManager {
         }
 
         if (isTeacher) {
-            // Only set default if not already explicitly selected by lastSub or sharedSub
-            if (!this.selectedSubjectFilter || this.selectedSubjectFilter === "all") {
-                const primarySub = (this.teacherSubject && this.teacherSubject !== "all" && this.teacherSubject !== "All Subjects")
-                    ? this.teacherSubject
-                    : (this.teacherSubjects && this.teacherSubjects.find(s => s && s !== "all" && s !== "All Subjects"));
-
-                // Check if sessSub is genuinely one of this teacher's assigned subjects
+            const hasRestrictedSubs = this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects");
+            // Teacher desk: strictly default to teacher's authorized subject panel!
+            if (hasRestrictedSubs) {
+                const primarySub = this.teacherSubjects[0];
                 const isAssigned = sessSub && sessSub !== "all" && sessSub !== "All Subjects" &&
-                    this.teacherSubjects && this.teacherSubjects.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", sessSub, "") : s.toLowerCase() === sessSub.toLowerCase());
+                    this.teacherSubjects.some(s => window.appStorage ? window.appStorage.isSubjectMatch(s, "", sessSub, "") : s.toLowerCase() === sessSub.toLowerCase());
 
-                if (isAssigned) {
-                    this.selectedSubjectFilter = sessSub;
-                } else if (primarySub && (!this.teacherSubjects || this.teacherSubjects.length <= 1)) {
-                    this.selectedSubjectFilter = primarySub;
-                    try { sessionStorage.setItem("niprak_active_subject", primarySub); } catch (e) {}
-                } else {
+                this.selectedSubjectFilter = isAssigned ? sessSub : primarySub;
+                this.teacherSubject = this.selectedSubjectFilter;
+                try { sessionStorage.setItem("niprak_active_subject", this.selectedSubjectFilter); } catch (e) {}
+            } else {
+                if (!this.selectedSubjectFilter) {
                     this.selectedSubjectFilter = "all";
                 }
             }
@@ -318,7 +294,7 @@ class DashboardManager {
                 const viewDash = document.getElementById("view-dashboard");
                 if (viewDash && !viewDash.classList.contains("active-view")) return;
 
-                this.evaluations = await window.appStorage.getAllEvaluations(false, true);
+                this.evaluations = await window.appStorage.getAllEvaluations(false, false);
                 this.applyFilters();
                 if (!this.activeBatchKey) {
                     this.render();
@@ -331,7 +307,7 @@ class DashboardManager {
         }
 
         if (window.firebaseManager) {
-            window.appStorage.getAllEvaluations(true, true).then((freshList) => {
+            window.appStorage.getAllEvaluations(true, false).then((freshList) => {
                 if (Array.isArray(freshList) && freshList.length > 0) {
                     this.evaluations = freshList;
                     this.applyFilters();
@@ -432,15 +408,13 @@ class DashboardManager {
         const isTeacher = user && (user.role === 'evaluator' || user.role === 'teacher');
         if (isTeacher && Array.isArray(this.teacherSubjects) && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
             return this.evaluations.filter(e => {
-                const isUserUp = e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)));
-                return isUserUp || this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+                return this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
             });
         }
 
         if (this.teacherSubject && this.teacherSubject !== 'all' && this.teacherSubject !== 'All Subjects') {
             return this.evaluations.filter(e => {
-                const isUserUp = e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)));
-                return isUserUp || window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName);
+                return window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName);
             });
         }
 
@@ -532,12 +506,10 @@ class DashboardManager {
                 const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, activeSub, e.templateName);
                 if (!subMatch) return false;
             } else if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
-                const isUserUp = e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)));
-                const matches = isUserUp || this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
+                const matches = this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
                 if (!matches) return false;
             } else if (this.teacherSubject && this.teacherSubject !== 'all' && this.teacherSubject !== 'All Subjects') {
-                const isUserUp = e.isUserUploaded || (!e.isMock && (e.uploadedAt || e.pdfDataUrl || e.pdfStorageUrl || (e.pages && e.pages.length > 0)));
-                const subMatch = isUserUp || window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName);
+                const subMatch = window.appStorage.isSubjectMatch(e.subject, e.examName, this.teacherSubject, e.templateName);
                 if (!subMatch) return false;
             }
 
@@ -650,14 +622,16 @@ class DashboardManager {
             : ((!isAllSelected && this.selectedSubjectFilter && this.selectedSubjectFilter !== 'all' && this.selectedSubjectFilter !== 'All Subjects') ? this.selectedSubjectFilter : null);
 
         // Compute Class & Template Batches for Teacher Desk:
+        // Compute Class & Template Batches for Teacher Desk:
         let evalsForBatches = this.evaluations;
         if (isTeacher && this.teacherSubjects && this.teacherSubjects.length > 0 && !this.teacherSubjects.includes("All Subjects")) {
-            const subMatches = this.evaluations.filter(e => {
+            evalsForBatches = this.evaluations.filter(e => {
                 return this.teacherSubjects.some(s => window.appStorage.isSubjectMatch(e.subject, e.examName, s, e.templateName));
             });
-            if (subMatches.length > 0) {
-                evalsForBatches = subMatches;
-            }
+        } else if (activePanelSubject && activePanelSubject !== 'all' && activePanelSubject !== 'All Subjects') {
+            evalsForBatches = this.evaluations.filter(e => {
+                return window.appStorage.isSubjectMatch(e.subject, e.examName, activePanelSubject, e.templateName);
+            });
         }
 
         if (isTeacher && this.teacherClasses && this.teacherClasses.length > 0 && !this.teacherClasses.includes("All Classes") && !this.teacherClasses.includes("all")) {
@@ -890,7 +864,7 @@ class DashboardManager {
         }
         if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all" && this.selectedSubjectFilter !== "All Subjects") {
             const hasMatch = distinctBatchSubjects.some(s => window.appStorage.isSubjectMatch(s, "", this.selectedSubjectFilter, ""));
-            if (!hasMatch) this.selectedSubjectFilter = "all";
+            if (!hasMatch && !hasSubjectRestriction) this.selectedSubjectFilter = "all";
         }
 
         // Filter batches by selected class & subject filter pills
@@ -907,11 +881,6 @@ class DashboardManager {
         }
         if (this.selectedSubjectFilter && this.selectedSubjectFilter !== "all" && this.selectedSubjectFilter !== "All Subjects") {
             displayBatches = displayBatches.filter(b => window.appStorage.isSubjectMatch(b.subject, b.templateName, this.selectedSubjectFilter, b.templateName));
-        }
-
-        // Safety fallback: if class or subject filter eliminated all batches, restore all available batches
-        if (displayBatches.length === 0 && this.batches && this.batches.length > 0) {
-            displayBatches = this.batches;
         }
 
         // Check if currently viewing Tamil desk
@@ -2214,7 +2183,7 @@ class DashboardManager {
                 modal.remove();
 
                 // Refresh evaluations smoothly without jarring screen flicker
-                this.evaluations = await window.appStorage.getAllEvaluations(false, true);
+                this.evaluations = await window.appStorage.getAllEvaluations(false, false);
                 this.applyFilters();
                 this.renderTableRows();
                 this.updateCountsInUI();
@@ -2279,7 +2248,7 @@ class DashboardManager {
             const result = await window.appStorage.deduplicateEvaluations({ dryRun: false });
 
             // Reload evaluations from storage
-            this.evaluations = await window.appStorage.getAllEvaluations(false, true);
+            this.evaluations = await window.appStorage.getAllEvaluations(false, false);
             this.applyFilters();
             this.render();
             this.bindEvents();
@@ -2439,7 +2408,7 @@ class DashboardManager {
             modal.remove();
 
             // Refresh UI
-            this.evaluations = await window.appStorage.getAllEvaluations(false, true);
+            this.evaluations = await window.appStorage.getAllEvaluations(false, false);
             this.applyFilters();
             this.render();
             this.bindEvents();

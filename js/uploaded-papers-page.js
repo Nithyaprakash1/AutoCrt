@@ -56,21 +56,10 @@ class UploadedPapersPageManager {
             assigned = assigned.filter(s => s && s !== 'all' && s !== 'All Subjects');
 
             if (isTeacher && assigned.length > 0) {
-                const filtered = window.appStorage.filterEvaluationsForUser(allPapers);
-                // Ensure all user-uploaded answer scripts are always included
-                const userUploaded = allPapers.filter(p => p && (p.isUserUploaded || (!p.isMock && (p.uploadedAt || p.pdfDataUrl || p.pdfStorageUrl || (p.pages && p.pages.length > 0)))));
-                const combined = Array.from(new Set([...(filtered || []), ...userUploaded]));
-                this.papers = combined.length > 0 ? combined : allPapers;
-                const subjectSet = new Set(assigned);
-                this.papers.forEach(p => {
-                    if (p && p.subject) subjectSet.add(p.subject);
-                });
-                allPapers.forEach(p => {
-                    if (p && p.subject) subjectSet.add(p.subject);
-                });
-                this.subjects = Array.from(subjectSet);
+                this.papers = allPapers.filter(p => p && assigned.some(s => window.appStorage.isSubjectMatch(p.subject, p.examName, s, p.templateName)));
+                this.subjects = [...assigned];
                 if (this.selectedSubject !== "all" && !this.subjects.some(s => window.appStorage.isSubjectMatch(this.selectedSubject, '', s))) {
-                    this.selectedSubject = "all";
+                    this.selectedSubject = this.subjects[0] || "all";
                 }
             } else {
                 this.papers = allPapers;

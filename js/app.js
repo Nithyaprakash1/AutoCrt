@@ -6978,12 +6978,12 @@ class AppController {
 
     async loadEvaluations() {
         if (this.currentView === "dashboard" && this.dashboardManager) {
-            this.dashboardManager.evaluations = await window.appStorage.getAllEvaluations(false, true);
+            this.dashboardManager.evaluations = await window.appStorage.getAllEvaluations(false, false);
             this.dashboardManager.applyFilters();
             this.dashboardManager.render();
             this.dashboardManager.bindEvents();
         } else if (this.currentView === "history" && this.historyManager) {
-            this.historyManager.evaluations = await window.appStorage.getAllEvaluations(false, true);
+            this.historyManager.evaluations = await window.appStorage.getAllEvaluations(false, false);
             this.historyManager.init();
         } else if (this.currentView === "admin-panel" && this.adminPanelManager) {
             this.adminPanelManager.init();
